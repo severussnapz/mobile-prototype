@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: centraluk.jfrog.io/glb-docker-vir/library/postgres:17.4-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: genesis_ai_requirements
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  flyway:
+    image: centraluk.jfrog.io/glb-docker-vir/flyway/flyway:12.1.0-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - FLYWAY_URL=jdbc:postgresql://postgres:5432/genesis_ai_requirements
+      - FLYWAY_USER=postgres
+      - FLYWAY_PASSWORD=postgres
+      - FLYWAY_LOCATIONS=filesystem:/flyway/sql
+      - FLYWAY_BASELINE_ON_MIGRATE=true
+      - FLYWAY_BASELINE_VERSION=0
+    command: migrate
+    volumes:
+      - ./db/migrations:/flyway/sql
+
+  seed:
+    image: centraluk.jfrog.io/glb-docker-vir/library/postgres:17.4-alpine
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+    volumes:
+      - ./db/seed-local.sql:/seed-local.sql:ro
+    entrypoint: ["sh", "-c", "if PGPASSWORD=postgres psql -h postgres -U postgres -d genesis_ai_requirements -tAc \"SELECT 1 FROM project WHERE code = 'QABOT-001'\" | grep -q 1; then echo 'Seed data already exists — skipping'; else PGPASSWORD=postgres psql -h postgres -U postgres -d genesis_ai_requirements -f /seed-local.sql; fi"]
+    networks:
+      default:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      secrets:
+        - JF_USER
+        - JF_TOKEN
+        - GIT_TOKEN
+    ports:
+      - "5000:8080"
+    env_file:
+      - .env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=genesis_ai_requirements;Username=postgres;Password=postgres
+      - Authentication__Authority=${IDENTITY_URL}/v2.0/
+      - Authentication__Audience=${AUDIENCE}
+      - Cors__AllowedOrigins__0=http://localhost:8080
+      - Cors__AllowedOrigins__1=http://localhost:5000
+      - Cors__AllowedOrigins__2=https://app.dev.emishealthsolutions.com
+      - Cors__AllowedOrigins__3=https://app.int.emishealthsolutions.com
+      - Cors__AllowedOrigins__4=https://app.stg.emis-x.uk
+      - Cors__AllowedOrigins__5=https://app.emis-x.uk
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+
+secrets:
+  JF_USER:
+    environment: JFROG_USER
+  JF_TOKEN:
+    environment: JFROG_TOKEN
+  GIT_TOKEN:
+    environment: GIT_TOKEN

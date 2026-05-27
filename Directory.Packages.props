@@ -1,0 +1,54 @@
+<Project>
+  <ItemGroup>
+    <!-- Core frameworks -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="9.0.1" />
+
+    <!-- CQRS & Validation -->
+    <PackageVersion Include="MediatR" Version="12.4.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+
+    <!-- Mapping -->
+    <PackageVersion Include="AutoMapper" Version="13.0.1" />
+
+    <!-- Data Access -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+    <PackageVersion Include="Npgsql" Version="9.0.3" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+
+    <!-- Observability -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+
+    <!-- Health Checks -->
+    <PackageVersion Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+
+    <!-- Authentication -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+
+    <!-- AWS Bedrock -->
+    <PackageVersion Include="AWSSDK.BedrockRuntime" Version="3.7.422.0" />
+
+    <!-- JSON:API -->
+    <PackageVersion Include="Emis.JsonApi" Version="3.0.0" />
+
+    <!-- Testing -->
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.3.0" />
+
+    <!-- API Automation Tests -->
+    <PackageVersion Include="EMIS.ApiAutomationCore" Version="6.3.26" />
+    <PackageVersion Include="Emis.X.Scopes" Version="2.6.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.8" />
+    <PackageVersion Include="Refit" Version="10.1.6" />
+    <PackageVersion Include="Refit.HttpClientFactory" Version="10.1.6" />
+  </ItemGroup>
+</Project>

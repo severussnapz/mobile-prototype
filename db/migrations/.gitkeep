@@ -1,0 +1,3 @@
+-- Flyway SQL migrations go here.
+-- Naming convention: V{version}__{description}.sql
+-- Example: V1_0__create_initial_schema.sql

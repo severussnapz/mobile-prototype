@@ -1,0 +1,188 @@
+using System.IO.Compression;
+using System.Text;
+using System.Text.RegularExpressions;
+using Genesis.AI.Domain.Interfaces;
+using Genesis.AI.Api.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Genesis.AI.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/projects/{projectId:guid}/export")]
+[Authorize(Policy = AuthorisationPolicies.ProjectRead)]
+[Produces("application/json")]
+[Consumes("application/json")]
+public class ProjectExportController : ControllerBase
+{
+    private readonly IProjectRepository _projectRepository;
+    private readonly IArtefactRepository _artefactRepository;
+    private readonly TimeProvider _timeProvider;
+
+    public ProjectExportController(
+        IProjectRepository projectRepository,
+        IArtefactRepository artefactRepository,
+        TimeProvider timeProvider)
+    {
+        _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
+        _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    }
+
+    /// <summary>
+    /// Exports all artefacts for a project as a zip file, organised by stage.
+    /// Includes a prototype prompt file for loading in VS Code.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportProject(
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var project = await _projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project is null)
+        {
+            return NotFound(new
+            {
+                errors = new[]
+                {
+                    new { status = "404", title = "Project not found", detail = $"No project found with ID '{projectId}'." }
+                }
+            });
+        }
+
+        using var memoryStream = new MemoryStream();
+        var now = _timeProvider.GetUtcNow();
+        using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            await WriteReadmeAsync(archive, project, now);
+            await WriteStageArtefactsAsync(archive, project, cancellationToken);
+            await WritePrototypePromptAsync(archive, project, cancellationToken);
+        }
+
+        memoryStream.Position = 0;
+        var fileName = $"{project.Code.ToLowerInvariant()}-export-{now:yyyyMMdd}.zip";
+
+        return File(memoryStream.ToArray(), "application/zip", fileName);
+    }
+
+    private static async Task WriteReadmeAsync(ZipArchive archive, Domain.AggregatesModel.ProjectAggregate.Project project, DateTimeOffset exportedAt)
+    {
+        var readme = archive.CreateEntry("README.md");
+        await using var writer = new StreamWriter(readme.Open(), Encoding.UTF8);
+
+        await writer.WriteLineAsync($"# {project.Name}");
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync($"**Code:** {project.Code}");
+        await writer.WriteLineAsync($"**Compliance Domain:** {project.ComplianceDomain}");
+        await writer.WriteLineAsync($"**Exported:** {exportedAt:yyyy-MM-dd HH:mm:ss} UTC");
+        await writer.WriteLineAsync();
+
+        if (!string.IsNullOrWhiteSpace(project.Description))
+        {
+            await writer.WriteLineAsync("## Description");
+            await writer.WriteLineAsync();
+            await writer.WriteLineAsync(project.Description);
+            await writer.WriteLineAsync();
+        }
+
+        await writer.WriteLineAsync("## Pipeline Stages");
+        await writer.WriteLineAsync();
+        foreach (var stage in project.PipelineStages.OrderBy(stage => stage.SortOrder))
+        {
+            var statusEmoji = stage.Status.ToString() switch
+            {
+                "Complete" => "✅",
+                "InProgress" => "🔄",
+                "Blocked" => "🚫",
+                _ => "⬜"
+            };
+            await writer.WriteLineAsync($"- {statusEmoji} {stage.StageType} ({stage.Status})");
+        }
+    }
+
+    private async Task WriteStageArtefactsAsync(ZipArchive archive, Domain.AggregatesModel.ProjectAggregate.Project project, CancellationToken cancellationToken)
+    {
+        var artefacts = await _artefactRepository.GetByProjectIdAsync(project.Id, cancellationToken);
+        if (artefacts.Count == 0)
+            return;
+
+        // Group by file path and take latest version only
+        var latestByFile = artefacts
+            .GroupBy(artefact => artefact.FilePath)
+            .Select(group => group.OrderByDescending(artefact => artefact.Version).First())
+            .OrderBy(artefact => artefact.FilePath);
+
+        foreach (var artefact in latestByFile)
+        {
+            var entryPath = "artefacts/" + artefact.FilePath.TrimStart('/');
+            var entry = archive.CreateEntry(entryPath);
+
+            if (!string.IsNullOrEmpty(artefact.Content))
+            {
+                await using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
+                await writer.WriteAsync(artefact.Content);
+            }
+        }
+    }
+
+    private async Task WritePrototypePromptAsync(ZipArchive archive, Domain.AggregatesModel.ProjectAggregate.Project project, CancellationToken cancellationToken)
+    {
+        var prototypePrompt = archive.CreateEntry(".vscode/prototype-prompt.md");
+        await using var writer = new StreamWriter(prototypePrompt.Open(), Encoding.UTF8);
+
+        var template = $"""
+            # Prototype Generation Prompt
+
+            Use this prompt with your AI coding assistant (e.g. GitHub Copilot) to generate a working prototype from the requirements in this export.
+
+            ## Instructions
+
+            1. Open this folder in VS Code
+            2. Load the requirements from the `01-requirements_discovery/` folder
+            3. Use the following prompt with your AI assistant:
+
+            ---
+
+            ```
+            You are building a clickable static prototype for "{project.Name}".
+
+            Read all the requirement files in the `01-requirements_discovery/` folder.
+            Build a single-page HTML/CSS/JS prototype (no build tools, no frameworks) that:
+            - Demonstrates the core user flows described in the requirements
+            - Uses realistic mock data
+            - Is navigable with clickable elements
+            - Follows NHS design patterns (NHS Blue #005EB8, 8px grid, accessible)
+            - Can be opened directly in a browser (file:// protocol)
+
+            Output the prototype as `prototype/index.html` with embedded CSS and JS.
+            ```
+
+            ---
+
+            ## What's included in this export
+
+            | Folder | Contents |
+            |--------|----------|
+            """;
+
+        await writer.WriteAsync(string.Join('\n', template.Split('\n').Select(line => line.TrimStart())));
+        await WriteExportTableRowsAsync(writer, project, cancellationToken);
+    }
+
+    private async Task WriteExportTableRowsAsync(StreamWriter writer, Domain.AggregatesModel.ProjectAggregate.Project project, CancellationToken cancellationToken)
+    {
+        var artefacts = await _artefactRepository.GetByProjectIdAsync(project.Id, cancellationToken);
+        if (artefacts.Count > 0)
+        {
+            var fileCount = artefacts.GroupBy(artefact => artefact.FilePath).Count();
+            await writer.WriteLineAsync($"| `artefacts/` | {fileCount} artefact(s) |");
+        }
+    }
+
+    private static string ToKebabCase(string value)
+    {
+        return Regex.Replace(value, "(?<!^)([A-Z])", "-$1").ToLowerInvariant();
+    }
+}

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Genesis.AI.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Moq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Genesis.AI.Api\Genesis.AI.Api.csproj" />
+    <ProjectReference Include="..\..\src\Genesis.AI.Domain\Genesis.AI.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Genesis.AI.Infrastructure\Genesis.AI.Infrastructure.csproj" />
+    <ProjectReference Include="..\Genesis.AI.TestFramework\Genesis.AI.TestFramework.csproj" />
+  </ItemGroup>
+
+</Project>

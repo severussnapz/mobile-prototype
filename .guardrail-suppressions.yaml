@@ -1,0 +1,97 @@
+suppressions:
+  # API-001: This project uses standard REST JSON, not JSON:API format.
+  # It does not use the Emis.JsonApi package for response serialisation.
+  - id: API-001
+    justification: "Project uses standard REST JSON — not JSON:API format"
+
+  # API-004: This project uses URL-based versioning (/api/v1/) which is
+  # appropriate for an internal platform API. Accept header versioning would
+  # add complexity without benefit for single-consumer tooling.
+  - id: API-004
+    justification: "Internal platform API — URL-based versioning is simpler for single-consumer tooling"
+
+  # API-006: EMIS-Request-Id middleware not needed — this is an internal
+  # platform tool, not a multi-service distributed system.
+  - id: API-006
+    justification: "Internal platform tool — no distributed tracing requirements"
+
+  # API-009: Resource models use plain DTOs — this project does not use the
+  # Emis.JsonApi package or Identifiable<TId>. Standard REST JSON responses.
+  - id: API-009
+    justification: "Project uses standard REST JSON (not Emis.JsonApi package) — no Identifiable<TId> needed"
+
+  # API-011: Artefact collection endpoints are unbounded but artefact counts
+  # are naturally limited per project. Pagination not needed at this scale.
+  - id: API-011
+    path: "src/Genesis.AI.Api/Controllers/ArtefactController.cs"
+    justification: "Artefact counts are naturally bounded per project — pagination unnecessary"
+
+  # ENG-009: Streaming controller complexity is inherent to SSE/tool-loop
+  # architecture. BedrockAiService method handles multi-turn tool calls via
+  # yield return (cannot decompose into sub-methods). ConversationStreamController
+  # orchestrates streaming + tool execution in a single while-loop — SSE event
+  # sending has been extracted but class exceeds 200 lines due to tool execution.
+  - id: ENG-009
+    path: "src/Genesis.AI.Api/Controllers/ConversationStreamController.cs"
+    justification: "SSE streaming orchestration — class exceeds 200 lines; tool events extracted but core loop is indivisible"
+  - id: ENG-009
+    path: "src/Genesis.AI.Infrastructure/Services/BedrockAiService.cs"
+    justification: "StreamWithToolsAsync uses yield return in event loop — cannot delegate to sub-methods that also yield"
+
+  # SEC-002: String concatenation in PipelineToolDefinitions is NOT SQL —
+  # it's multiline AI tool description strings. No database query involved.
+  - id: SEC-002
+    path: "src/Genesis.AI.Infrastructure/Services/PipelineToolDefinitions.cs"
+    justification: "String concatenation builds AI tool description text, not SQL queries"
+
+  # ENG-003: Message, ParkingLotItem, TokenUsageRecord, and PipelineStage are child entities
+  # within their aggregate roots (Conversation, Project). They deliberately
+  # do NOT implement IAggregateRoot — only the root does.
+  - id: ENG-003
+    path: "src/Genesis.AI.Domain/AggregatesModel/ConversationAggregate/Message.cs"
+    justification: "Child entity of Conversation aggregate — not an aggregate root"
+  - id: ENG-003
+    path: "src/Genesis.AI.Domain/AggregatesModel/ConversationAggregate/ParkingLotItem.cs"
+    justification: "Child entity of Conversation aggregate — not an aggregate root"
+  - id: ENG-003
+    path: "src/Genesis.AI.Domain/AggregatesModel/ConversationAggregate/TokenUsageRecord.cs"
+    justification: "Child entity of Conversation aggregate — not an aggregate root"
+  - id: ENG-003
+    path: "src/Genesis.AI.Domain/AggregatesModel/ProjectAggregate/PipelineStage.cs"
+    justification: "Child entity of Project aggregate — not an aggregate root"
+
+
+  # OBS-001: Dockerfile.dev is for local development only — Dynatrace
+  # OneAgent is not required in dev containers.
+  - id: OBS-001
+    path: "Dockerfile.dev"
+    justification: "Local development Dockerfile — Dynatrace not required"
+
+
+  # API-007: POST endpoints for stage transitions (complete/skip/advance-phase)
+  # return 200 OK intentionally — they are state-transition actions, not resource
+  # creation endpoints. Only AddParkingLotItem returns 201 Created.
+  - id: API-007
+    path: "src/Genesis.AI.Api/Controllers/PipelineStagesController.cs"
+    justification: "POST actions are state transitions (complete/skip) — return 200 OK, not 201 Created"
+  - id: API-007
+    path: "src/Genesis.AI.Api/Controllers/ConversationStateController.cs"
+    justification: "AdvancePhase is a state transition — returns 200 OK, not 201 Created"
+
+  # ENG-005: Analyser pattern-matches 'new ProjectContext(...)' as DbContext
+  # instantiation, but ProjectContext is a value object created in a LINQ projection.
+  - id: ENG-005
+    path: "src/Genesis.AI.Infrastructure/Repositories/ConversationRepository.cs"
+    justification: "False positive — 'new ProjectContext(...)' is a value object in a LINQ Select, not a DbContext instantiation"
+
+  # TEST-005: Genesis.AI.ApiTests is an E2E API automation project that tests
+  # against a deployed service via HTTP. It uses EMIS.ApiAutomationCore, not
+  # WebApplicationFactory — this is by design, not an omission.
+  - id: TEST-005
+    path: "tests/Genesis.AI.ApiTests/*"
+    justification: "E2E API automation project — tests deployed service via HTTP, not in-process via WebApplicationFactory"
+
+  # OBS-004: Readiness probe consumed by ECS/Kubernetes orchestration which
+  # does not carry JWTs. Auth enforced at network level (security groups/ingress).
+  - id: OBS-004
+    justification: "Platform API deployed behind API gateway — readiness probe consumed by container orchestration without JWTs. Auth enforced at network level."

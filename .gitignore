@@ -1,0 +1,69 @@
+
+
+# Build outputs
+bin/
+obj/
+publish/
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# User/IDE files
+*.user
+*.suo
+*.userprefs
+.vs/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment secrets
+.env
+
+.github/skills/ado-story-creator/
+.github/skills/conventional-commits/
+.github/skills/emis-x-api-auth/
+.github/skills/emis-x-api-clinical-safety/
+.github/skills/emis-x-api-csharp-standards/
+.github/skills/emis-x-api-data-access/
+.github/skills/emis-x-api-domain-driven-design/
+.github/skills/emis-x-api-dynamodb/
+.github/skills/emis-x-api-legacy-sqlserver/
+.github/skills/emis-x-api-microservice-design/
+.github/skills/emis-x-api-observability/
+.github/skills/emis-x-api-postgres/
+.github/skills/emis-x-api-resource-design/
+.github/skills/emis-x-api-s3/
+.github/skills/emis-x-api-security/
+.github/skills/emis-x-api-standards/
+.github/skills/emis-x-api-supply-chain/
+.github/skills/emis-x-api-testing/
+.github/agents/EMIS-X_API_ENGINEER.agent.md
+.github/agents/EMIS-X_API_REVIEWER.agent.md
+
+# Genesis AI — managed by `genesis ai setup`
+.genesis-ai.yaml
+.github/skills/ado-story-creator/
+.github/skills/conventional-commits/
+.github/skills/emis-x-api-auth/
+.github/skills/emis-x-api-clinical-safety/
+.github/skills/emis-x-api-csharp-standards/
+.github/skills/emis-x-api-data-access/
+.github/skills/emis-x-api-domain-driven-design/
+.github/skills/emis-x-api-dynamodb/
+.github/skills/emis-x-api-legacy-sqlserver/
+.github/skills/emis-x-api-microservice-design/
+.github/skills/emis-x-api-observability/
+.github/skills/emis-x-api-postgres/
+.github/skills/emis-x-api-resource-design/
+.github/skills/emis-x-api-s3/
+.github/skills/emis-x-api-security/
+.github/skills/emis-x-api-standards/
+.github/skills/emis-x-api-supply-chain/
+.github/skills/emis-x-api-testing/
+.github/agents/EMIS-X_API_ENGINEER.agent.md
+.github/agents/EMIS-X_API_REVIEWER.agent.md
