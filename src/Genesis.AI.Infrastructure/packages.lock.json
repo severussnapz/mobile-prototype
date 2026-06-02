@@ -11,6 +11,27 @@
           "AWSSDK.Core": "[3.7.402.82, 4.0.0)"
         }
       },
+      "AWSSDK.Extensions.NETCore.Setup": {
+        "type": "Direct",
+        "requested": "[3.7.301, )",
+        "resolved": "3.7.301",
+        "contentHash": "hXejqa+G72kVCSmpKlNVWDEqa8KVWOFL/asgoE2mairQOnmTCv6vMxaXjJ0nQaad5/21zTdKDIfDiki5YTne1Q==",
+        "dependencies": {
+          "AWSSDK.Core": "3.7.300",
+          "Microsoft.Extensions.Configuration.Abstractions": "2.0.0",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "2.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "2.0.0"
+        }
+      },
+      "AWSSDK.S3": {
+        "type": "Direct",
+        "requested": "[3.7.416.7, )",
+        "resolved": "3.7.416.7",
+        "contentHash": "W5qaXzHVVxdnYgCPhYGTWRJpPoOkB8wt2xiaQ+htbYAqlrlBbJtPgEbnL2iU7PtqxddKJs81fIIFIXfBwmuTFA==",
+        "dependencies": {
+          "AWSSDK.Core": "[3.7.402.37, 4.0.0)"
+        }
+      },
       "Microsoft.EntityFrameworkCore": {
         "type": "Direct",
         "requested": "[10.0.0, )",

@@ -2,8 +2,6 @@
 
 ## High Priority
 
-- [ ] **S3 for artefact storage** — Currently artefacts are stored as text in PostgreSQL (`content` column). Move to S3 for scalability (large prototypes, generated docs). Keep metadata in DB, content in S3. Needs: S3 bucket, IAM roles, `IArtefactStorageService` abstraction, migration to add `s3_key` column and drop `content`.
-
 - [ ] **Deploy to Genesis platform** — Push into the genesis platform infrastructure. Needs: Terraform/IaC, ECS task definition, RDS PostgreSQL, S3 bucket, secrets in Secrets Manager, ALB target group, DNS entry, CI/CD pipeline.
 
 - [ ] **CI/CD pipeline** — No GitHub Actions workflows yet. Need: build + test, guardrail analyser, Docker image publish to JFrog, deploy to dev/staging/prod.

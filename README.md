@@ -101,7 +101,7 @@ Stages can be revisited in any order. When a user returns to a stage after other
 
 | Tool | Purpose | Side Effect |
 |------|---------|-------------|
-| `save_artefact` | Save a file (manifest.md, REQ-*.md, etc.) | Creates/versions artefact in DB |
+| `save_artefact` | Save a file (manifest.md, REQ-*.md, etc.) | Uploads content to S3; stores metadata + key in DB |
 | `advance_phase` | Move to next interview phase | Updates conversation phase tracking |
 | `update_progress` | Report questions asked / estimated total | Updates conversation progress metrics |
 | `add_parking_lot_item` | Defer a topic for later | Creates parking lot item on conversation |
@@ -131,6 +131,30 @@ Artefacts belong to the **project**, not a specific conversation or stage. This 
 - `GET /api/v1/projects/{id}/export` downloads ALL artefacts as a ZIP
 - Versioning: saving the same `file_path` again creates a new version (latest wins)
 
+### Key Design: S3 Content Storage
+
+Artefact **content lives in S3** (LocalStack locally); the database stores only metadata.
+
+| Concern | Where stored |
+|---------|--------------|
+| `file_path`, `version`, `s3_key`, `content_type`, `size_bytes`, `created_by` | PostgreSQL `artefacts` table |
+| Actual file content (markdown, HTML, JSON, etc.) | S3 bucket `genesis-ai-artefacts` |
+
+**Storage key scheme:** `projects/{projectId}/artefacts/{filePath}/v{version}`
+- Leading slashes in `filePath` are stripped before building the key
+- Example: project `03735ad1…`, file `requirements/REQ-001.md`, version 2 → `projects/03735ad1…/artefacts/requirements/REQ-001.md/v2`
+
+**Interface:** `IArtefactStorageService` (in `Domain/Interfaces/`) with three methods:
+- `SaveContentAsync(projectId, filePath, version, content, contentType, ct)` → returns storage key
+- `GetContentAsync(storageKey, ct)` → returns content or `null` if not found
+- `DeleteContentAsync(storageKey, ct)`
+
+**Implementation:** `S3ArtefactStorageService` (in `Infrastructure/Services/`). Bucket name read from `S3:ArtefactBucketName` configuration — throws `InvalidOperationException` on startup if missing.
+
+**LocalStack:** A LocalStack container runs alongside the API in Docker Compose and pre-creates the `genesis-ai-artefacts` bucket via `localstack/init-s3.sh`. Seed data uploads artefact content objects to LocalStack so `GET /api/v1/projects/{id}/artefacts/{artefactId}` returns real content locally.
+
+**Integration tests:** `IArtefactStorageService` is replaced with an in-memory mock (backed by `ConcurrentDictionary`) in `TestWebApplicationFactory` so tests never hit real S3.
+
 ### Key Design: Parking Lot Is Project-Wide
 
 Parking lot items are **stored** on individual conversations (FK relationship) but **queried** at project level:
@@ -153,6 +177,7 @@ Parking lot items are **stored** on individual conversations (FK relationship) b
 | Mapping | AutoMapper |
 | Validation | FluentValidation |
 | AI | AWS Bedrock (Claude Sonnet 4.6) |
+| Object storage | AWS S3 (LocalStack locally) |
 | Auth | JWT Bearer (scope-based policies) |
 | Observability | Serilog, health checks, Dynatrace |
 | Containerisation | Docker (multi-stage builds) |
@@ -192,7 +217,8 @@ open http://localhost:5000/swagger
 |---------|-------|------|---------|
 | `postgres` | postgres:17.4-alpine | 5432 | Database |
 | `flyway` | flyway:12.1.0-alpine | — | Runs migrations |
-| `seed` | postgres:17.4-alpine | — | Inserts test data |
+| `localstack` | localstack/localstack | 4566 | S3 emulation; creates `genesis-ai-artefacts` bucket |
+| `seed` | postgres:17.4-alpine | — | Inserts DB test data + uploads artefact content to LocalStack |
 | `api` | Dockerfile.dev | 5000→8080 | API server |
 
 Services start in dependency order: postgres (healthy) → flyway → seed → api.
@@ -225,8 +251,10 @@ src/
 ├── Genesis.AI.Api/              # HTTP layer (controllers, auth, middleware, DTOs)
 ├── Genesis.AI.Core/             # Base types (Entity, IAggregateRoot, logging)
 ├── Genesis.AI.Domain/           # Business logic (aggregates, commands, queries, enums)
+│   └── Interfaces/              # IArtefactStorageService (+ other contracts)
 └── Genesis.AI.Infrastructure/   # Data access (EF Core, repositories, AI services)
     ├── Prompts/                 # Embedded system prompts per stage (.md)
+    ├── Services/                # S3ArtefactStorageService, BedrockAiService, etc.
     └── Skills/                  # Embedded skill/guardrail content (.md)
 tests/
 ├── Genesis.AI.Tests/            # Unit tests (xUnit v3 + Moq)
@@ -234,8 +262,10 @@ tests/
 ├── Genesis.AI.ApiTests/         # E2E tests (Refit, hits running API)
 └── Genesis.AI.TestFramework/    # Shared utilities (MockTokenGenerator)
 db/
-├── migrations/                  # Flyway SQL (V1)
-└── seed-local.sql               # Idempotent local test data
+├── migrations/                  # Flyway SQL (V1, V2)
+├── seed-local.sql               # Idempotent local test data (DB rows + S3 objects)
+localstack/
+└── init-s3.sh                   # Creates genesis-ai-artefacts bucket on LocalStack startup
 ```
 
 ---
@@ -315,8 +345,9 @@ JWT Bearer with scope-based policies. Every controller action requires `[Authori
 Flyway format: `V{version}__description.sql` in `db/migrations/`.
 
 - `V1__initial_schema.sql` — Initial schema (tables, enums, indexes)
+- `V2__artefact_content_to_s3.sql` — Drops `content` column from `artefacts` table; adds `s3_key`, `content_type`, `size_bytes`
 
-To add a new migration: create `db/migrations/V2__description.sql` and rebuild.
+To add a new migration: create the next versioned file (e.g. `V3__description.sql`) and rebuild.
 
 ### Enum Handling
 
@@ -343,7 +374,7 @@ Run without arguments to list available projects.
 ## Testing
 
 ```bash
-# Unit tests (167 tests)
+# Unit tests (193 tests)
 dotnet test tests/Genesis.AI.Tests/
 
 # Integration tests (WebApplicationFactory + InMemory database)
@@ -370,10 +401,11 @@ dotnet test tests/Genesis.AI.ApiTests/
 5. **Soft-delete** — Projects are never physically deleted
 6. **Stage reopening** — Completed stages can be re-entered (increments iteration)
 7. **Project-scoped artefacts** — Cross-stage visibility; later stages read earlier output
-8. **Project-aggregated parking lot** — Items raised anywhere, resolved anywhere
-9. **Up to 40 tool turns** — Generous limit for output-heavy phases (e.g., saving 15+ requirement files)
-10. **Prompt caching** — Cache checkpoint after system prompt; 90% cost reduction on repeated context in tool loops
-11. **Per-turn token tracking** — Every Bedrock response records input, output, cache read, and cache write tokens with cost estimation
+8. **S3 content storage** — Artefact content in S3 (LocalStack locally); DB holds metadata + S3 key only
+9. **Project-aggregated parking lot** — Items raised anywhere, resolved anywhere
+10. **Up to 40 tool turns** — Generous limit for output-heavy phases (e.g., saving 15+ requirement files)
+11. **Prompt caching** — Cache checkpoint after system prompt; 90% cost reduction on repeated context in tool loops
+12. **Per-turn token tracking** — Every Bedrock response records input, output, cache read, and cache write tokens with cost estimation
 
 ---
 

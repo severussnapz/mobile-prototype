@@ -268,6 +268,8 @@
         "type": "Project",
         "dependencies": {
           "AWSSDK.BedrockRuntime": "[3.7.422, )",
+          "AWSSDK.Extensions.NETCore.Setup": "[3.7.301, )",
+          "AWSSDK.S3": "[3.7.416.7, )",
           "Genesis.AI.Core": "[1.0.0, )",
           "Genesis.AI.Domain": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.0, )",
@@ -281,6 +283,24 @@
         "contentHash": "5AFdEl8W1wNEQf35HNJhL3qLnz9MeLcj96Cm9KdMLt1Mq8AUaeLE2uPq+veGe5a6qnAsW0zlxOO6e/QnWq17yQ==",
         "dependencies": {
           "AWSSDK.Core": "[3.7.402.82, 4.0.0)"
+        }
+      },
+      "AWSSDK.Extensions.NETCore.Setup": {
+        "type": "CentralTransitive",
+        "requested": "[3.7.301, )",
+        "resolved": "3.7.301",
+        "contentHash": "hXejqa+G72kVCSmpKlNVWDEqa8KVWOFL/asgoE2mairQOnmTCv6vMxaXjJ0nQaad5/21zTdKDIfDiki5YTne1Q==",
+        "dependencies": {
+          "AWSSDK.Core": "3.7.300"
+        }
+      },
+      "AWSSDK.S3": {
+        "type": "CentralTransitive",
+        "requested": "[3.7.416.7, )",
+        "resolved": "3.7.416.7",
+        "contentHash": "W5qaXzHVVxdnYgCPhYGTWRJpPoOkB8wt2xiaQ+htbYAqlrlBbJtPgEbnL2iU7PtqxddKJs81fIIFIXfBwmuTFA==",
+        "dependencies": {
+          "AWSSDK.Core": "[3.7.402.37, 4.0.0)"
         }
       },
       "FluentValidation.DependencyInjectionExtensions": {

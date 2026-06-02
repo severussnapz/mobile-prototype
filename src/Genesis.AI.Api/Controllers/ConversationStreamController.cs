@@ -22,6 +22,7 @@ public class ConversationStreamController : ControllerBase
 {
     private readonly IConversationRepository _conversationRepository;
     private readonly IArtefactRepository _artefactRepository;
+    private readonly IArtefactStorageService _artefactStorageService;
     private readonly IAiService _aiService;
     private readonly IPromptService _promptService;
     private readonly ISkillContentService _skillContentService;
@@ -31,6 +32,7 @@ public class ConversationStreamController : ControllerBase
     public ConversationStreamController(
         IConversationRepository conversationRepository,
         IArtefactRepository artefactRepository,
+        IArtefactStorageService artefactStorageService,
         IAiService aiService,
         IPromptService promptService,
         ISkillContentService skillContentService,
@@ -39,6 +41,7 @@ public class ConversationStreamController : ControllerBase
     {
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
+        _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
         _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _skillContentService = skillContentService ?? throw new ArgumentNullException(nameof(skillContentService));
@@ -442,12 +445,16 @@ public class ConversationStreamController : ControllerBase
                 var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
                     projectId, filePath, cancellationToken);
 
-                var artefact = Artefact.CreateTextArtefact(
+                var storageKey = await _artefactStorageService.SaveContentAsync(
+                    projectId, filePath, nextVersion, content, "text/markdown", cancellationToken);
+
+                var artefact = Artefact.CreateS3Artefact(
                     projectId,
                     nextVersion,
                     filePath,
+                    storageKey,
                     "text/markdown",
-                    content,
+                    System.Text.Encoding.UTF8.GetByteCount(content),
                     createdBy,
                     _timeProvider);
 
@@ -617,16 +624,17 @@ public class ConversationStreamController : ControllerBase
                     return $"Artefact '{filePath}' not found. Use list_artefacts to see available files.";
                 }
 
-                if (artefact.Content is null)
+                var artefactContent = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
+                if (artefactContent is null)
                 {
-                    _logger.LogInformation("Tool get_artefact: {FilePath} is S3-backed (no inline content)", filePath);
-                    return $"Artefact '{filePath}' is stored in S3 and cannot be read inline. S3 key: {artefact.S3Key}";
+                    _logger.LogWarning("Tool get_artefact: content unavailable for {FilePath}", filePath);
+                    return $"Artefact '{filePath}' content could not be retrieved.";
                 }
 
                 _logger.LogInformation(
                     "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars)",
-                    filePath, artefact.Version, artefact.Content.Length);
-                return $"## {filePath} (v{artefact.Version})\n\n{artefact.Content}";
+                    filePath, artefact.Version, artefactContent.Length);
+                return $"## {filePath} (v{artefact.Version})\n\n{artefactContent}";
             }
 
             default:

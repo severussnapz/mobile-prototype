@@ -7,13 +7,16 @@ namespace Genesis.AI.Domain.Commands.CreateArtefacts;
 public class CreateArtefactsCommandHandler : IRequestHandler<CreateArtefactsCommand, IReadOnlyList<Artefact>>
 {
     private readonly IArtefactRepository _artefactRepository;
+    private readonly IArtefactStorageService _artefactStorageService;
     private readonly TimeProvider _timeProvider;
 
     public CreateArtefactsCommandHandler(
         IArtefactRepository artefactRepository,
+        IArtefactStorageService artefactStorageService,
         TimeProvider timeProvider)
     {
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
+        _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
@@ -27,13 +30,24 @@ public class CreateArtefactsCommandHandler : IRequestHandler<CreateArtefactsComm
                 continue;
 
             var nextVersion = await _artefactRepository.GetNextVersionAsync(request.ProjectId, cancellationToken);
+            var contentType = item.ContentType ?? "text/markdown";
+            var filePath = item.FilePath.Trim();
 
-            var artefact = Artefact.CreateTextArtefact(
+            var storageKey = await _artefactStorageService.SaveContentAsync(
+                request.ProjectId,
+                filePath,
+                nextVersion,
+                item.Content,
+                contentType,
+                cancellationToken);
+
+            var artefact = Artefact.CreateS3Artefact(
                 request.ProjectId,
                 nextVersion,
-                item.FilePath.Trim(),
-                item.ContentType ?? "text/markdown",
-                item.Content,
+                filePath,
+                storageKey,
+                contentType,
+                System.Text.Encoding.UTF8.GetByteCount(item.Content),
                 request.UserId,
                 _timeProvider);
 

@@ -1,0 +1,169 @@
+# REQ-006: Bot Loading & Status States
+**Priority:** Must Have
+**Effort:** Low
+**Risk:** Low
+**Depends On:** REQ-001
+---
+## User Story
+As an external partner developer,
+I need to see what the bot is doing while it processes my question,
+So that I know the system is working and am not left staring at a blank screen for up to 10 seconds.
+**Acceptance Criteria:**
+- [ ] While the bot is processing a response, a loading spinner is displayed in the chat interface
+- [ ] When the bot is executing tool calls (e.g. searching documentation, retrieving examples), a contextual status message is shown to the user (e.g. "Searching documentation…", "Retrieving examples…")
+- [ ] Status messages update in real-time as the bot progresses through tool calls
+- [ ] Spinner and status messages disappear when the response is ready
+- [ ] If the bot times out (>10s), a polite error message is shown: "Sorry, that's taking longer than expected. Please try again or escalate to our team."
+---
+## Dimension 1: Clinical Safety
+### Applicable Guardrails
+- N/A — system is not safety-critical (confirmed Phase 2)
+### Hazards Addressed
+- None identified
+### Mitigations
+- None required
+---
+## Dimension 2: Information Governance
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — status messages must not expose internal system details
+### GDPR Articles
+- **Article 6 Lawful Basis:** N/A — no personal data captured in loading states
+- **Article 9 Special Category:** N/A
+### Data Handling Requirements
+- **Data Categories:** None
+- **Data Subjects:** None
+- **Retention Period:** N/A
+- **Data Minimisation:** Status messages must not expose internal tool call details, API endpoints, or system internals
+---
+## Dimension 3: Security
+### Applicable Guardrails
+- **SEC-001:** TLS 1.2+ for all HTTP communication
+- **WSEC-006a:** encodeURIComponent() for any user-supplied URL values
+### Security Requirements
+- **Authentication:** EMIS-X authentication required (inherited from REQ-001)
+- **Authorisation:** Authenticated EMIS-X users only
+- **Encryption in Transit:** TLS 1.2+
+- **Encryption at Rest:** N/A — no data persisted
+- **Information Leakage:** Status messages MUST NOT expose internal system details, tool names, API endpoints, or error stack traces
+---
+## Dimension 4: Observability & Performance
+### Product KPIs
+- **KPI 1:** Spinner appearance latency — Target: < 300ms after question submission
+- **KPI 2:** Timeout rate — Target: < 5% of requests
+- **KPI 3:** Tool call duration per type — Baseline: TBD, Target: < 8s per tool call
+### Observable Events (OTEL Instrumentation)
+- **Span 1:** `qabot.loading.spinner.start`
+  - **Attributes:** session_id, question_length, timestamp
+- **Span 2:** `qabot.loading.toolcall.start`
+  - **Attributes:** session_id, tool_name (sanitised), timestamp
+- **Span 3:** `qabot.loading.toolcall.complete`
+  - **Attributes:** session_id, tool_name (sanitised), duration_ms, status
+- **Span 4:** `qabot.loading.timeout`
+  - **Attributes:** session_id, elapsed_ms, timestamp
+### Performance SLOs
+- **Spinner appearance:** < 300ms after question submission
+- **Availability:** 99.9%
+- **Timeout rate:** < 5%
+### Alerting Conditions
+- **Critical:** Timeout rate > 10% over 5 minutes → Slack/Teams alert
+- **Warning:** p95 spinner appearance > 500ms → Warning alert
+---
+## ✨ Evaluation Function Specification
+**PURPOSE:** Define DETERMINISTIC pass/fail criteria for coding agents to verify implementation.
+---
+### CHECK 1: Spinner Appearance Timing
+**Trigger:** User submits a question to the bot
+**Test Scenario 1: Spinner appears promptly**
+- **Setup:** Authenticated EMIS-X user with open chat session
+- **Input:** User submits question "Which auth flow should I use for a backend API?"
+- **Expected:** Loading spinner visible within 300ms of submission
+- **Validation:** Measure time from submit event to spinner render — must be < 300ms
+**Test Scenario 2: Spinner disappears on response**
+- **Input:** Bot completes processing and returns response
+- **Expected:** Spinner removed from DOM, response text displayed
+- **Validation:** Spinner element not present after response renders
+**Guardrail:** WCS-007a (i18n for status text)
+**Pass Criteria:** Spinner appears < 300ms, disappears on response
+---
+### CHECK 2: Tool Call Status Messages
+**Trigger:** Bot executes a tool call during processing
+**Test Scenario 1: Status message shown during tool call**
+- **Setup:** Bot processing a question that requires a documentation search
+- **Expected:** Status message visible: "Searching documentation…"
+- **Validation:** Status message element present in DOM during tool call execution
+**Test Scenario 2: Status message updates across multiple tool calls**
+- **Setup:** Bot executes two tool calls sequentially
+- **Expected:** Status message updates to reflect each tool call in sequence
+- **Validation:** Message text changes between tool calls
+**Test Scenario 3: Status message does not expose internals**
+- **Expected:** Status message contains only user-friendly text — no API endpoint names, internal function names, or stack traces
+- **Validation:** Message text matches approved strings from translation.json only
+**Guardrail:** IG-001 (no internal detail leakage), WCS-007a (i18n)
+**Pass Criteria:** Status messages shown, updated, and contain only approved user-friendly text
+---
+### CHECK 3: Timeout Handling
+**Trigger:** Bot processing exceeds 10 seconds
+**Test Scenario 1: Timeout error message shown**
+- **Setup:** Mock bot response delayed > 10s
+- **Expected Response:** Polite error message displayed: "Sorry, that's taking longer than expected. Please try again or escalate to our team."
+- **Validation:** Error message visible, spinner removed, escalation prompt accessible
+**Test Scenario 2: Timeout does not crash session**
+- **Expected:** Conversation remains intact after timeout; user can submit another question
+- **Validation:** Chat input re-enabled after timeout message shown
+**Guardrail:** WCS-007a (i18n for error text)
+**Pass Criteria:** Timeout surfaces polite error, session remains usable
+---
+### CHECK 4: A11Y-007a — Live Region for Status Messages
+**Trigger:** Any loading or status state rendered
+**Test Scenario: Screen reader announcement**
+- **Validation 1:** Status message container has `aria-live="polite"` or `role="status"`
+- **Validation 2:** Spinner has accessible label (aria-label or aria-labelledby)
+- **Validation 3:** Timeout error has `role="alert"` for immediate announcement
+**Guardrail:** A11Y-007a
+**Pass Criteria:** All dynamic states announced to screen readers
+---
+### CHECK 5: A11Y-010 — jest-axe Accessibility
+**Trigger:** Component render in test suite
+**Test Scenario: No accessibility violations**
+- **Validation:** `jest-axe` `toHaveNoViolations()` passes for loading spinner component, status message component, and timeout error component
+**Guardrail:** A11Y-010
+**Pass Criteria:** Zero axe violations in all loading state components
+---
+### CHECK 6: DS-001 — @emisgroup/ui-* Components
+**Trigger:** Component implementation review
+**Validation:** No native HTML `<button>`, `<input>`, `<select>`, `<textarea>`, `<dialog>` used in loading state components — all interactive elements use `@emisgroup/ui-*`
+**Guardrail:** DS-001
+**Pass Criteria:** Only @emisgroup/ui-* components used
+---
+### CHECK 7: WCS-007a / WCS-007b — i18n and British English
+**Trigger:** Any user-facing string in loading state components
+**Validation 1:** All status messages use `t()` from react-i18next — no hardcoded strings in JSX
+**Validation 2:** Translation keys present in `src/locales/en-GB/translation.json`
+**Validation 3:** British English spellings used (e.g. "Searching" not misspelled; check for colour/centre/grey patterns where applicable)
+**Guardrail:** WCS-007a, WCS-007b
+**Pass Criteria:** All strings externalised to translation.json with British English spellings
+---
+## Traceability
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-006 | — | Spinner < 300ms | WCS-007a | CHECK 1 |
+| REQ-006 | — | Tool call status messages | IG-001 | CHECK 2 |
+| REQ-006 | — | Timeout error handling | WCS-007a | CHECK 3 |
+| REQ-006 | — | Live regions for a11y | A11Y-007a | CHECK 4 |
+| REQ-006 | — | jest-axe no violations | A11Y-010 | CHECK 5 |
+| REQ-006 | — | @emisgroup components | DS-001 | CHECK 6 |
+| REQ-006 | — | i18n + British English | WCS-007a, WCS-007b | CHECK 7 |
+---
+## Change Log
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-31 | Pipeline 01 Requirements | Initial creation |
+**Pipeline Status:**
+- ✅ Pipeline 01 Complete (Requirements with eval specs)
+- ⏳ Pipeline 03 Pending (Architecture)
+- ⏳ Pipeline 04 Pending (Design — API contracts, DB schemas)
+- ⏳ Pipeline 05 Pending (PxD — UI/UX specifications)
+- ⏳ Pipeline 06 Pending (Clinical Safety — Full hazard/mitigation mapping)
+- ⏳ Pipeline 07 Pending (Normalisation — Transform to JSON)
+- ⏳ Pipeline 08 Pending (Planning — Dependency-ordered task plan)
+

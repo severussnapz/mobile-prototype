@@ -1,0 +1,161 @@
+# REQ-003: Full-Page Chat Mode
+**Priority:** Must Have
+**Effort:** Low
+**Risk:** Low
+**Depends On:** REQ-001
+---
+## User Story
+As an authenticated EMIS-X partner developer,
+I need a full-page chat view for the Q&A bot,
+So that I have more screen real estate for complex conversations without leaving the portal.
+**Acceptance Criteria:**
+- [ ] A dedicated full-page chat view is available at a fixed portal route (e.g. `/chat`)
+- [ ] Full-page view provides the same Q&A functionality as the widget — same bot, same citations, same escalation flow
+- [ ] Conversation history is shared between widget and full-page view within the same browser session
+- [ ] Widget includes an "expand" button to open the full-page view
+- [ ] Full-page view includes a "back" / "minimise" control to return to the widget
+- [ ] Both widget and full-page view require EMIS-X authentication — unauthenticated users cannot access the bot
+---
+## Dimension 1: Clinical Safety
+### Applicable Guardrails
+- N/A — system is not safety-critical; no patient data involved
+### Hazards Addressed
+- None identified
+### Mitigations
+- None required
+---
+## Dimension 2: Information Governance
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — no additional data captured beyond REQ-001/REQ-002
+### GDPR Articles
+- **Article 6 Lawful Basis:** N/A — no additional personal data captured in this requirement
+- **Article 9 Special Category:** N/A
+### Data Handling Requirements
+- **Data Categories:** No new data categories introduced
+- **Data Subjects:** Authenticated EMIS-X partner developers
+- **Retention Period:** Session-scoped only; conversation cleared on browser close or explicit reset
+- **Data Minimisation:** No data collected beyond what is captured in REQ-001/REQ-002
+---
+## Dimension 3: Security
+### Applicable Guardrails
+- **AUTH-004:** Authorisation Required — EMIS-X authentication required for all access
+- **SEC-001:** TLS Encryption — HTTPS in transit
+### Security Requirements
+- **Authentication:** EMIS-X OAuth2 — unauthenticated users redirected to login
+- **Authorisation:** Authenticated EMIS-X users only
+- **Encryption in Transit:** TLS 1.2+ for all HTTP
+- **Encryption at Rest:** N/A — no persistent data stored for this requirement
+---
+## Dimension 4: Observability & Performance
+### Product KPIs
+- **KPI 1:** Full-page view usage rate vs widget usage rate
+- **KPI 2:** Session continuity success rate (conversation persists between views)
+- **KPI 3:** Auth failure rate on full-page route
+### Observable Events (OTEL Instrumentation)
+- **Span 1:** `qabot.fullpage.open.start`
+  - **Attributes:** user_id, source (widget_expand / direct_url), session_id
+- **Span 2:** `qabot.fullpage.open.complete`
+  - **Attributes:** user_id, session_id, duration_ms, status
+- **Span 3:** `qabot.fullpage.minimise`
+  - **Attributes:** user_id, session_id, duration_ms
+### Performance SLOs
+- **Latency p95:** < 300ms for widget ↔ full-page transition (no reload)
+- **Availability:** 99.9%
+- **Error Rate:** < 0.1%
+### Alerting Conditions
+- **Critical:** Full-page route returning 5xx errors → PagerDuty
+- **Warning:** Auth failure rate > 5% → Slack
+---
+## ✨ Evaluation Function Specification
+**PURPOSE:** Define DETERMINISTIC pass/fail criteria for coding agents to verify implementation.
+---
+### CHECK 1: AUTH-004 — Unauthenticated Access Blocked
+**Trigger:** Any request to the full-page chat route or widget without EMIS-X authentication
+**Test Scenario 1: Unauthenticated user blocked**
+- **Input:** GET `/chat` with no EMIS-X session token
+- **Expected Response:** HTTP 302 redirect to EMIS-X login page
+- **Validation:** User is not shown any chat UI
+**Test Scenario 2: Authenticated user permitted**
+- **Input:** GET `/chat` with valid EMIS-X session token
+- **Expected Response:** HTTP 200, full-page chat UI rendered
+- **Validation:** Chat interface visible and functional
+**Applicable Guardrail:** AUTH-004
+**Pass Criteria:** Unauthenticated requests REDIRECTED to login; authenticated requests PERMITTED
+---
+### CHECK 2: Session Continuity — Widget to Full-Page
+**Trigger:** User starts conversation in widget then expands to full-page view
+**Test Scenario 1: Conversation persists on expand**
+- **Setup:** Send 2 messages in widget; note message content
+- **Action:** Click "expand" button to open full-page view
+- **Expected:** Full-page view shows same 2 messages in correct order
+- **Validation:** No messages lost; order preserved
+**Test Scenario 2: Conversation persists on minimise**
+- **Setup:** Send 1 message in full-page view
+- **Action:** Click "back" / "minimise" to return to widget
+- **Expected:** Widget shows same message
+- **Validation:** No messages lost
+**Applicable Guardrail:** WCS-007a (session state consistency)
+**Pass Criteria:** Conversation history IDENTICAL in both views within same browser session
+---
+### CHECK 3: Transition Performance — < 300ms
+**Trigger:** User clicks expand or minimise control
+**Test Scenario: Transition speed**
+- **Action:** Click "expand" button
+- **Measurement:** Time from click to full-page UI fully rendered
+- **Expected:** < 300ms
+- **Validation:** No full page reload occurs (no network request to server for page HTML)
+**Pass Criteria:** Widget ↔ full-page transition completes in < 300ms WITHOUT page reload
+---
+### CHECK 4: DS-001 — @emisgroup/ui-* Components Only
+**Trigger:** Any rendered UI element in the full-page view
+**Test Scenario: No native interactive HTML elements**
+- **Validation 1:** No `<button>` elements in rendered output — use `@emisgroup/ui-Button`
+- **Validation 2:** No native `<input>` elements — use `@emisgroup/ui-Input`
+- **Validation 3:** No native `<form>` elements
+- **Anti-pattern:** `<button onClick={expand}>Expand</button>`
+- **Correct pattern:** `<Button onClick={expand}>Expand</Button>` from `@emisgroup/ui-*`
+**Applicable Guardrail:** DS-001
+**Pass Criteria:** Zero native interactive HTML elements; all from @emisgroup/ui-*
+---
+### CHECK 5: A11Y-010 — jest-axe Accessibility
+**Trigger:** Component test file for full-page chat view
+**Test Scenario: No accessibility violations**
+- **Validation 1:** Test file imports `jest-axe` and calls `toHaveNoViolations()`
+- **Validation 2:** Full-page component renders without axe violations
+- **Validation 3:** Expand/minimise controls have accessible labels
+**Applicable Guardrail:** A11Y-010
+**Pass Criteria:** `toHaveNoViolations()` passes; all interactive controls have accessible labels
+---
+### CHECK 6: WCS-007a — i18n for All UI Text
+**Trigger:** Any user-facing string in the full-page view component
+**Test Scenario: No hardcoded strings**
+- **Validation 1:** No hardcoded English strings in JSX (e.g. no `"Expand"`, `"Back"`, `"Minimise"`)
+- **Validation 2:** All strings use `t()` from react-i18next
+- **Validation 3:** Translation keys exist in `src/locales/en-GB/translation.json`
+- **Validation 4:** British English spellings used (e.g. "minimise" not "minimize")
+**Applicable Guardrail:** WCS-007a, WCS-007b
+**Pass Criteria:** Zero hardcoded UI strings; all text via t(); British English in translation JSON
+---
+## Traceability
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-003 | — | Unauthenticated access blocked | AUTH-004 | CHECK 1 |
+| REQ-003 | — | Session continuity | WCS-007a | CHECK 2 |
+| REQ-003 | — | Transition performance | — | CHECK 3 |
+| REQ-003 | — | EMIS-X components | DS-001 | CHECK 4 |
+| REQ-003 | — | Accessibility | A11Y-010 | CHECK 5 |
+| REQ-003 | — | i18n / British English | WCS-007a, WCS-007b | CHECK 6 |
+---
+## Change Log
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-31 | Pipeline 01 Requirements | Initial creation |
+**Pipeline Status:**
+- ✅ Pipeline 01 Complete (Requirements with eval specs)
+- ⏳ Pipeline 03 Pending (Architecture)
+- ⏳ Pipeline 04 Pending (Design — API contracts, DB schemas)
+- ⏳ Pipeline 05 Pending (PxD — UI/UX specifications)
+- ⏳ Pipeline 06 Pending (Clinical Safety — Full hazard/mitigation mapping)
+- ⏳ Pipeline 07 Pending (Normalisation — Transform to JSON)
+- ⏳ Pipeline 08 Pending (Planning — Dependency-ordered tasks)
+

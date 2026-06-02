@@ -7,6 +7,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.Extensions.NETCore.Setup;
 
 namespace Genesis.AI.Infrastructure;
 
@@ -52,6 +56,36 @@ public static class DependencyInjection
         services.AddSingleton<IPromptService, EmbeddedPromptService>();
         services.AddSingleton<ISkillContentService, SkillContentService>();
 
+        AddS3(services, configuration);
+
         return services;
+    }
+
+    private static void AddS3(IServiceCollection services, IConfiguration configuration)
+    {
+        // Local development points at LocalStack via S3:ServiceUrl. In deployed
+        // environments the key is absent and the default IAM credential chain is
+        // used with the configured region (S3-002).
+        var serviceUrl = configuration["S3:ServiceUrl"];
+        if (!string.IsNullOrWhiteSpace(serviceUrl))
+        {
+            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
+                new BasicAWSCredentials("test", "test"),
+                new AmazonS3Config
+                {
+                    ServiceURL = serviceUrl,
+                    ForcePathStyle = true,
+                    AuthenticationRegion = "eu-west-2"
+                }));
+        }
+        else
+        {
+            services.AddAWSService<IAmazonS3>(new AWSOptions
+            {
+                Region = RegionEndpoint.EUWest2
+            });
+        }
+
+        services.AddSingleton<IArtefactStorageService, S3ArtefactStorageService>();
     }
 }

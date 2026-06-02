@@ -1,10 +1,38 @@
+<!-- rtk-instructions v2 -->
+# RTK — Token-Optimized CLI
+
+**rtk** is a CLI proxy that filters and compresses command outputs, saving 60-90% tokens.
+
+## Rule
+
+Always prefix shell commands with `rtk`:
+
+```bash
+# Instead of:              Use:
+git status                 rtk git status
+git log -10                rtk git log -10
+cargo test                 rtk cargo test
+docker ps                  rtk docker ps
+kubectl get pods           rtk kubectl pods
+```
+
+## Meta commands (use directly)
+
+```bash
+rtk gain              # Token savings dashboard
+rtk gain --history    # Per-command savings history
+rtk discover          # Find missed rtk opportunities
+rtk proxy <cmd>       # Run raw (no filtering) but track usage
+```
+<!-- /rtk-instructions -->
+
 # Genesis AI Requirements API — Copilot Instructions
 
 ## Project Overview
 
 Backend REST API for the Genesis AI Requirements Platform. Orchestrates an 8-stage requirements pipeline through AI-driven conversations, artefact generation, and stage management.
 
-**Tech Stack:** .NET 10.0, ASP.NET Core, Entity Framework Core, PostgreSQL 17, MediatR (CQRS), AutoMapper, FluentValidation, AWS Bedrock (Claude Sonnet 4.6), Docker, Flyway migrations.
+**Tech Stack:** .NET 10.0, ASP.NET Core, Entity Framework Core, PostgreSQL 17, MediatR (CQRS), AutoMapper, FluentValidation, AWS Bedrock (Claude Sonnet 4.6), AWSSDK.S3 (LocalStack locally), Docker, Flyway migrations.
 
 ---
 
@@ -39,7 +67,7 @@ src/
 └── Genesis.AI.Infrastructure/   # Data access + external services
     ├── EntityConfigurations/    # EF Core fluent API config
     ├── Repositories/            # IProjectRepository, IConversationRepository, IArtefactRepository
-    ├── Services/                # BedrockAiService, EmbeddedPromptService, SkillContentService, PipelineToolDefinitions
+    ├── Services/                # BedrockAiService, EmbeddedPromptService, SkillContentService, PipelineToolDefinitions, S3ArtefactStorageService
     ├── Skills/                  # Embedded skill content (.md files) injected into AI context
     └── Prompts/                 # Stage-specific system prompts (embedded resources)
 ```
@@ -57,7 +85,7 @@ All business logic flows through MediatR handlers:
 **Aggregate Roots:**
 - `Project` — Contains `PipelineStage` collection. Auto-initialises 8 stages on creation. Supports soft-delete.
 - `Conversation` — Contains `Message` and `ParkingLotItem` collections. Tracks phase progress, questions asked, requirements captured.
-- `Artefact` — Generated content stored as text in DB. Versioned per file path per project.
+- `Artefact` — Metadata stored in DB; content stored in S3 (LocalStack locally). Properties: `S3Key`, `ContentType`, `SizeBytes`. Use `CreateS3Artefact` factory. Versioned per file path per project.
 
 **Child Entities (not aggregate roots):**
 - `PipelineStage` — Owned by Project. State machine: NotStarted → InProgress → Complete (or Blocked).
@@ -167,10 +195,11 @@ Location: `db/migrations/` (Flyway format: `V{version}__description.sql`)
 
 Current migrations:
 - `V1__initial_schema.sql` — Initial schema (tables, enums, indexes)
+- `V2__artefact_content_to_s3.sql` — Drops `content` column; adds `s3_key`, `content_type`, `size_bytes`
 
 ### Adding Migrations
 
-1. Create `db/migrations/V2__description.sql` (increment version number)
+1. Create the next versioned file, e.g. `db/migrations/V3__description.sql`
 2. Use native PostgreSQL enums (`CREATE TYPE ... AS ENUM`) for any new enum types
 3. Update EF Core entity configuration in `Infrastructure/EntityConfigurations/`
 4. Register new enums in `DependencyInjection.cs` at all three levels
@@ -187,11 +216,12 @@ Current migrations:
 ## Running Locally
 
 ```bash
-# Start everything (postgres → flyway → seed → api)
+# Start everything (postgres → flyway → localstack → seed → api)
 docker compose up -d --build
 
 # API available at http://localhost:5000
 # Database at localhost:5432 (postgres/postgres, db: genesis_ai_requirements)
+# LocalStack S3 at http://localhost:4566 (bucket: genesis-ai-artefacts)
 
 # Rebuild after code changes
 docker compose up -d --build api
@@ -208,7 +238,7 @@ docker compose exec postgres psql -U postgres -d genesis_ai_requirements
 
 ### Docker Compose Services
 
-`postgres:17.4-alpine` (5432) → `flyway:12.1.0-alpine` (migrations) → `seed` (test data) → `api` (5000→8080, `Dockerfile.dev`)
+`postgres:17.4-alpine` (5432) → `flyway:12.1.0-alpine` (migrations) → `localstack` (4566, S3 emulation) → `seed` (DB rows + S3 objects) → `api` (5000→8080, `Dockerfile.dev`)
 
 Requires `.env` file with `IDENTITY_URL`, `AUDIENCE`, and credentials (`JFROG_USER`, `JFROG_TOKEN`, `GIT_TOKEN`).
 
@@ -217,10 +247,10 @@ Requires `.env` file with `IDENTITY_URL`, `AUDIENCE`, and credentials (`JFROG_US
 ## Testing
 
 ```bash
-# Unit tests (167 tests)
+# Unit tests (193 tests)
 dotnet test tests/Genesis.AI.Tests/
 
-# Integration tests (WebApplicationFactory + InMemory database)
+# Integration tests (WebApplicationFactory + InMemory database + mock IArtefactStorageService)
 dotnet test tests/Genesis.AI.IntegrationTests/
 
 # E2E API tests (needs running API + identity service credentials in .env)
@@ -228,7 +258,7 @@ dotnet test tests/Genesis.AI.ApiTests/
 ```
 
 - **xUnit v3 + Moq** for unit tests
-- **WebApplicationFactory + EF Core InMemory** for integration tests
+- **WebApplicationFactory + EF Core InMemory** for integration tests; `IArtefactStorageService` replaced by an in-memory mock (`ConcurrentDictionary<string, string>`) registered in `TestWebApplicationFactory`
 - **Refit + ROPC token flow** for E2E API tests
 - **MockTokenGenerator** in `Genesis.AI.TestFramework` project
 - Test naming: `Method_Scenario_Expected` (three parts separated by underscores)
@@ -285,6 +315,22 @@ dotnet test tests/Genesis.AI.ApiTests/
 |--------|------|--------|---------|
 | POST | `/stages/{stageId}/complete` | ProjectWrite | Mark stage complete |
 | POST | `/stages/{stageId}/skip` | ProjectWrite | Skip a stage |
+
+---
+
+## S3 Artefact Storage
+
+Artefact content lives in S3; the `artefacts` table stores metadata and the S3 key only.
+
+- **Interface:** `IArtefactStorageService` (`Domain/Interfaces/`) — `SaveContentAsync`, `GetContentAsync`, `DeleteContentAsync`
+- **Implementation:** `S3ArtefactStorageService` (`Infrastructure/Services/`) — uses `IAmazonS3`; bucket name from `S3:ArtefactBucketName` config
+- **Storage key scheme:** `projects/{projectId}/artefacts/{filePath}/v{version}` (leading `/` stripped from `filePath`)
+- **Local development:** LocalStack container at `http://localhost:4566`; `localstack/init-s3.sh` creates the `genesis-ai-artefacts` bucket on startup; in-container URL is `http://localstack:4566`
+- **Seed data:** `db/seed-local.sql` + the seed service upload artefact content objects to LocalStack so the full read path works locally
+- **Config keys:**
+  - `S3:ArtefactBucketName` — bucket name (e.g. `genesis-ai-artefacts`)
+  - `S3:ServiceUrl` — override endpoint (set to LocalStack URL in non-production environments)
+- **Never** store artefact content in the database. The `content` column was removed in `V2__artefact_content_to_s3.sql`.
 
 ---
 
@@ -393,3 +439,5 @@ Suppressions are documented in `.guardrail-suppressions.yaml` with justification
 9. **Descriptive lambda parameters** — no single-letter params like `a`, `c`, `x` (ENG-011)
 10. **Three-part test names** — `Method_Scenario_Expected` (TEST-007)
 11. **British English** — behaviour, colour, organisation (ENG-001)
+12. **Artefact content belongs in S3** — never store content in the `artefacts` DB table; use `IArtefactStorageService` to read/write; `Artefact` entity holds `S3Key`, not content
+13. **`CreateS3Artefact` is the only factory** — the old `CreateTextArtefact` factory was removed; always use `Artefact.CreateS3Artefact(...)` when creating artefact entities

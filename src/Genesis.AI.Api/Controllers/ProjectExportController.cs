@@ -17,15 +17,18 @@ public class ProjectExportController : ControllerBase
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IArtefactRepository _artefactRepository;
+    private readonly IArtefactStorageService _artefactStorageService;
     private readonly TimeProvider _timeProvider;
 
     public ProjectExportController(
         IProjectRepository projectRepository,
         IArtefactRepository artefactRepository,
+        IArtefactStorageService artefactStorageService,
         TimeProvider timeProvider)
     {
         _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
+        _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
@@ -119,10 +122,12 @@ public class ProjectExportController : ControllerBase
             var entryPath = "artefacts/" + artefact.FilePath.TrimStart('/');
             var entry = archive.CreateEntry(entryPath);
 
-            if (!string.IsNullOrEmpty(artefact.Content))
+            var content = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
+
+            if (!string.IsNullOrEmpty(content))
             {
                 await using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
-                await writer.WriteAsync(artefact.Content);
+                await writer.WriteAsync(content);
             }
         }
     }

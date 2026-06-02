@@ -68,6 +68,26 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
             // Mock IAiService — integration tests don't call AWS Bedrock
             var mockAiService = new Mock<IAiService>();
             services.AddSingleton(mockAiService.Object);
+
+            // Fake IArtefactStorageService — integration tests don't call S3/LocalStack.
+            // Keeps content in memory so save/read round-trips work.
+            var storageMock = new Mock<IArtefactStorageService>();
+            var contentStore = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
+            storageMock
+                .Setup(storage => storage.SaveContentAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(),
+                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns((Guid projectId, string filePath, int version, string content, string _, CancellationToken _) =>
+                {
+                    var key = $"projects/{projectId}/artefacts/{filePath}/v{version}";
+                    contentStore[key] = content;
+                    return Task.FromResult(key);
+                });
+            storageMock
+                .Setup(storage => storage.GetContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns((string key, CancellationToken _) =>
+                    Task.FromResult(contentStore.TryGetValue(key, out var stored) ? stored : null));
+            services.AddSingleton(storageMock.Object);
         });
 
         builder.ConfigureTestServices(services =>
