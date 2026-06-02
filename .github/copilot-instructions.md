@@ -43,13 +43,23 @@ Backend REST API for the Genesis AI Requirements Platform. Orchestrates an 8-sta
 ```
 src/
 ├── Genesis.AI.Api/              # HTTP presentation layer
-│   ├── Authentication/          # Policies, scopes, claims extensions
-│   ├── Controllers/             # Thin controllers → MediatR
-│   ├── Dtos/                    # Response DTOs (artefacts, progress, parking lot)
-│   ├── Mapping/                 # AutoMapper profiles
+│   ├── Authentication/          # Policies, scopes, claims extensions (cross-cutting)
+│   ├── Http/                    # Shared HTTP envelopes: ApiResponse<T>, ApiErrorResponse, ApiError
 │   ├── Middleware/              # Response headers (SEC-005)
-│   ├── Requests/                # Inbound request models
-│   └── Resources/               # Resource models (project, conversation, stage)
+│   ├── Features/                # Vertical slices — one folder per domain feature
+│   │   ├── Projects/            # ProjectsController, ProjectResource, PipelineStageResource,
+│   │   │                        # CreateProjectRequest, ProjectMappingProfile,
+│   │   │                        # ProjectTokenUsageResponse, TokenUsageTotals
+│   │   ├── Conversations/       # ConversationsController, ConversationStreamController,
+│   │   │                        # ConversationStateController, ConversationResource,
+│   │   │                        # MessageResource, ConversationProgressResponse,
+│   │   │                        # ParkingLotItemResponse, PhaseResponse, MessageCreatedResponse,
+│   │   │                        # request models, attachment types, ConversationMappingProfile
+│   │   ├── Artefacts/           # ArtefactController, ArtefactSummaryResponse,
+│   │   │                        # ArtefactDetailResponse, CreateArtefactsRequest,
+│   │   │                        # CreateArtefactRequestItem
+│   │   ├── Stages/              # PipelineStagesController, StageStatusResponse, StageMessageResponse
+│   │   └── Export/              # ProjectExportController
 ├── Genesis.AI.Core/             # Shared base types
 │   ├── Data/                    # (reserved)
 │   ├── Domain/                  # Entity base class, IAggregateRoot
@@ -78,7 +88,15 @@ All business logic flows through MediatR handlers:
 
 - **Commands** (writes): `Domain/Commands/{Feature}/` — contains `Command.cs`, `CommandHandler.cs`, optionally `CommandValidator.cs`
 - **Queries** (reads): `Domain/Queries/{Feature}/` — contains `Query.cs`, `QueryHandler.cs`
-- Handlers return domain entities; controllers map to DTOs/Resources via AutoMapper
+- Handlers return domain entities; controllers map to response types via AutoMapper
+
+### Vertical Slice Organisation (ARCH-008)
+
+The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical role:
+- Each `Features/{Feature}/` folder contains its controller(s), request models, response models, resources, and AutoMapper profile
+- Shared HTTP infrastructure (response envelopes, error types) lives in `Http/` — not in any feature slice
+- Cross-cutting concerns (auth policies, middleware) remain at the `Api` root
+- **No** `Controllers/`, `Dtos/`, `Requests/`, `Resources/`, or `Mapping/` folders — these are replaced by feature slices
 
 ### Domain Model
 
@@ -179,9 +197,12 @@ Default values use `HasDefaultValueSql("'value'::enum_type")`, never `HasDefault
 
 ### Code Structure Rules
 
-- One class per file
-- Namespace matches folder path
+- One class per file (CS-001 guardrail)
+- Namespace matches folder path — e.g. `Genesis.AI.Api.Features.Projects`
 - Controllers are thin — delegate to MediatR immediately
+- All controller body return types must be concrete named types — no `new { ... }` anonymous objects (API-017 guardrail)
+- Request/response models live in the feature slice folder alongside their controller (ARCH-007 guardrail)
+- Shared HTTP envelopes (`ApiResponse<T>`, `ApiErrorResponse`) live in `Http/` — not in feature slices
 - No single-letter lambda parameters (ENG-011 guardrail)
 - Test names follow `Method_Scenario_Expected` three-part convention (TEST-007 guardrail)
 
@@ -441,3 +462,5 @@ Suppressions are documented in `.guardrail-suppressions.yaml` with justification
 11. **British English** — behaviour, colour, organisation (ENG-001)
 12. **Artefact content belongs in S3** — never store content in the `artefacts` DB table; use `IArtefactStorageService` to read/write; `Artefact` entity holds `S3Key`, not content
 13. **`CreateS3Artefact` is the only factory** — the old `CreateTextArtefact` factory was removed; always use `Artefact.CreateS3Artefact(...)` when creating artefact entities
+14. **Feature slices, not technical folders** — new controllers, request models, response models go in `Features/{FeatureName}/`; no `Controllers/`, `Dtos/`, `Requests/`, `Resources/`, or `Mapping/` folders (ARCH-008)
+15. **Response models need concrete types** — no `new { ... }` anonymous objects in controller body helpers (API-017); request/response models must live in a feature slice or `Http/` (ARCH-007)

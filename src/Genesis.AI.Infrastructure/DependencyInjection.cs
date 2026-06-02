@@ -20,34 +20,7 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-
-        // Build NpgsqlDataSource with native enum mappings
-        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-        dataSourceBuilder.EnableDynamicJson();
-        dataSourceBuilder.MapEnum<ComplianceDomain>("compliance_domain");
-        dataSourceBuilder.MapEnum<ProjectStatus>("project_status");
-        dataSourceBuilder.MapEnum<StageType>("stage_type");
-        dataSourceBuilder.MapEnum<PipelineStageStatus>("pipeline_stage_status");
-        dataSourceBuilder.MapEnum<ConversationStatus>("conversation_status");
-        dataSourceBuilder.MapEnum<ParkingLotPriority>("parking_lot_priority");
-        dataSourceBuilder.MapEnum<ParkingLotStatus>("parking_lot_status");
-        dataSourceBuilder.MapEnum<MessageRole>("message_role");
-        var dataSource = dataSourceBuilder.Build();
-
-        services.AddDbContext<GenesisAiDbContext>(options =>
-            options.UseNpgsql(dataSource, options =>
-            {
-                options.MapEnum<ComplianceDomain>("compliance_domain");
-                options.MapEnum<ProjectStatus>("project_status");
-                options.MapEnum<StageType>("stage_type");
-                options.MapEnum<PipelineStageStatus>("pipeline_stage_status");
-                options.MapEnum<ConversationStatus>("conversation_status");
-                options.MapEnum<ParkingLotPriority>("parking_lot_priority");
-                options.MapEnum<ParkingLotStatus>("parking_lot_status");
-                options.MapEnum<MessageRole>("message_role");
-            }));
+        AddPersistence(services, configuration);
 
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
@@ -59,6 +32,43 @@ public static class DependencyInjection
         AddS3(services, configuration);
 
         return services;
+    }
+
+    private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+        // Build NpgsqlDataSource with native enum mappings
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.EnableDynamicJson();
+        MapEnums(dataSourceBuilder);
+        var dataSource = dataSourceBuilder.Build();
+
+        services.AddDbContext<GenesisAiDbContext>(options =>
+            options.UseNpgsql(dataSource, npgsqlOptions =>
+            {
+                npgsqlOptions.MapEnum<ComplianceDomain>("compliance_domain");
+                npgsqlOptions.MapEnum<ProjectStatus>("project_status");
+                npgsqlOptions.MapEnum<StageType>("stage_type");
+                npgsqlOptions.MapEnum<PipelineStageStatus>("pipeline_stage_status");
+                npgsqlOptions.MapEnum<ConversationStatus>("conversation_status");
+                npgsqlOptions.MapEnum<ParkingLotPriority>("parking_lot_priority");
+                npgsqlOptions.MapEnum<ParkingLotStatus>("parking_lot_status");
+                npgsqlOptions.MapEnum<MessageRole>("message_role");
+            }));
+    }
+
+    private static void MapEnums(NpgsqlDataSourceBuilder dataSourceBuilder)
+    {
+        dataSourceBuilder.MapEnum<ComplianceDomain>("compliance_domain");
+        dataSourceBuilder.MapEnum<ProjectStatus>("project_status");
+        dataSourceBuilder.MapEnum<StageType>("stage_type");
+        dataSourceBuilder.MapEnum<PipelineStageStatus>("pipeline_stage_status");
+        dataSourceBuilder.MapEnum<ConversationStatus>("conversation_status");
+        dataSourceBuilder.MapEnum<ParkingLotPriority>("parking_lot_priority");
+        dataSourceBuilder.MapEnum<ParkingLotStatus>("parking_lot_status");
+        dataSourceBuilder.MapEnum<MessageRole>("message_role");
     }
 
     private static void AddS3(IServiceCollection services, IConfiguration configuration)
