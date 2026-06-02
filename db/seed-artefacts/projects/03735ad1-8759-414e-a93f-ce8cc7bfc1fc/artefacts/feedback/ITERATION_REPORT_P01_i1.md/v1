@@ -1,0 +1,77 @@
+# Iteration Report — Pipeline 01 — Iteration 1
+**Agent:** Pipeline 01 Requirements Agent
+**Prompt Version:** v7/PIPELINE_01_REQUIREMENTS_DISCOVERY
+**Iteration Number:** 1
+**Date:** 2026-05-31
+**Project:** QABOT-001 — Q & A Interop Bot
+---
+## Session Scores
+| Dimension | Score (1–5) | Notes |
+|-----------|-------------|-------|
+| Output quality overall | N/A | User skipped feedback |
+| Eval spec specificity (checks were concrete, not vague) | N/A | User skipped feedback |
+| Guardrail accuracy (right IDs, right checks) | N/A | User skipped feedback |
+| Coverage completeness (nothing important missed) | N/A | User skipped feedback |
+| EMIS-X platform mandate accuracy | N/A | User skipped feedback |
+| Regulatory citation quality (IDs/clauses, no bare assertions) | N/A | User skipped feedback |
+**North Star Score:** N/A (feedback skipped)
+---
+## Requirements Produced
+| REQ ID | Title | Checks Generated | Under-specified? |
+|--------|-------|-----------------|-----------------|
+| REQ-001 | Conversational Q&A Chat Widget | 8 | No |
+| REQ-002 | Escalation to Human Support | 7 | No |
+| REQ-003 | Full-Page Chat Mode | 5 | No |
+| REQ-004 | Documentation Indexing via CI | 5 | No |
+| REQ-005 | Conversation Management | 5 | No |
+| REQ-006 | Bot Loading & Status States | 5 | No |
+**Total requirements:** 6
+**Total checks:** ~35 across all requirements
+**Requirements with < 3 checks:** None
+**Requirements with no concrete input/output values:** None
+---
+## Gaps Identified
+1. **REQ-001 authentication gap:** The initial REQ-001 draft was saved without EMIS-X authentication requirement. This was only confirmed mid-session during REQ-003 discussion. Required a v2 save to correct. The prompt should probe for authentication requirements earlier — ideally during Phase 2 or at the start of Phase 5 before the first requirement is confirmed.
+2. **Rate limiting captured as NFR only:** Rate limiting (50 messages/session, 200/day) was captured as a non-functional requirement rather than as a standalone requirement with an eval spec. Downstream coding agents will have no deterministic checks for rate limiting enforcement. Consider whether this warrants a REQ-007.
+3. **Degraded mode (bot outage → escalation form) not captured as a requirement:** This behaviour was mentioned in Phase 6 NFRs but never formalised as a requirement with acceptance criteria and eval checks. It is a meaningful UX behaviour that Pipeline 05 will need to design.
+4. **AWS SES silent failure behaviour** captured in integration points but not as an acceptance criterion in REQ-002. A coding agent implementing REQ-002 might not know to handle SES failure silently.
+5. **Teams webhook retry policy** deferred to Pipeline 03 without a default assumption. If Pipeline 03 doesn't address it, the behaviour on transient webhook failure is undefined.
+---
+## Prompt Improvement Recommendations
+| # | Section | Current behaviour | Recommended change | Priority |
+|---|---------|-------------------|-------------------|----------|
+| 1 | Phase 5 — Dimension 3: Security | Authentication is probed per-requirement but not asked globally upfront | Add a global authentication question at the start of Phase 5: "Does this system require authentication to access any part of it? If yes, what mechanism?" — so auth is established as a baseline before individual requirements are confirmed | HIGH |
+| 2 | Phase 5 — Requirements Elicitation | Integration failure modes (SES silent fail, webhook user-visible fail) are captured in Phase 7 but not fed back into the relevant requirement's acceptance criteria | After Phase 7, add a sweep: "For each integration point with a defined failure mode, check whether that failure mode is captured as an acceptance criterion in the relevant REQ. If not, update the REQ." | HIGH |
+| 3 | Phase 6 — NFR sweep | Rate limiting captured as NFR without eval spec | If rate limiting is confirmed, prompt: "Should this be a standalone requirement with deterministic checks (e.g. HTTP 429 on limit exceeded), or remain as an NFR?" | MEDIUM |
+| 4 | Phase 10.5 — Cross-cutting gate | Degraded mode captured in NFRs but not as a requirement | Add "degraded mode / graceful degradation" as an explicit cross-cutting concern in the Phase 10.5 gate checklist | MEDIUM |
+| 5 | Phase 5 — per-requirement confirmation | Auth correction required a v2 save | Do not save a requirement until all four dimensions (including security/auth) are fully confirmed — save only on explicit user "yes" after full dimension review | LOW |
+---
+## Regulatory Citation Gaps
+- `manifest.md`, Constraints section: GDPR Article 6 lawful basis for escalation email processing correctly tagged as `[UNVERIFIED — IG-OWNER: TBD — RESOLUTION DATE: TBD — GO-LIVE BLOCKER]` ✅
+- `REQ-002.md`, Dimension 2: GDPR Article 6 lawful basis correctly flagged as unverified ✅
+- No bare regulatory assertions identified — all claims carry either a Guardrail ID or an UNVERIFIED tag ✅
+---
+## Expert Corrections
+```
+CORRECTION-1:
+  Location: REQ-001 — Dimension 3: Security
+  Agent produced: "No authentication required to use widget; HTTPS in transit"
+  Expert corrected to: "EMIS-X authentication required for all access to widget and full-page view; unauthenticated access blocked with redirect to EMIS-X login"
+  Reason: Authentication requirement was confirmed by the user during REQ-003 discussion and applied retroactively. The agent should have probed for authentication before confirming REQ-001.
+  Pattern: ACCEPTANCE_CRITERIA
+```
+---
+## Downstream Agent Impact
+1. **Pipeline 03 — AI implementation approach undefined:** This is the highest-risk blocker. Pipeline 03 cannot complete architecture without deciding LLM vs RAG vs embeddings. The 2-sprint timebox makes this urgent.
+2. **Pipeline 03 — Rate limiting enforcement point:** Client-side, API gateway, or bot service — undefined. Pipeline 03 must decide and add architecture-level checks.
+3. **Pipeline 04 — AWS SES failure handling:** The silent failure behaviour for SES is described in the integration points table but is not an acceptance criterion in REQ-002. Pipeline 04 should add this to the API contract for the escalation endpoint.
+4. **Pipeline 05 — Degraded mode UX:** Bot outage → escalation form is a meaningful UX state not captured as a requirement. Pipeline 05 PxD will need to design this state without a formal requirement to reference.
+5. **Pipeline 07 — GDPR lawful basis blocker:** REQ-002 carries an unverified IG-003 lawful basis. Pipeline 07 normalisation will flag this as a go-live blocker during JSON transformation.
+---
+## Human Review Checklist
+- [ ] Regulatory citations verified against source documents
+- [x] Expert corrections recorded above (1 correction — REQ-001 auth gap)
+- [ ] HIGH priority prompt recommendations reviewed and approved
+- [x] Iteration report saved via `save_artefact` with `feedback/` file path
+- [ ] Agent team notified of prompt changes required (2 HIGH priority items identified)
+

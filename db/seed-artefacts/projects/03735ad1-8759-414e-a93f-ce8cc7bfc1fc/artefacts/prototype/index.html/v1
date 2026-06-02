@@ -1,0 +1,2224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QABOT-001 — Q&A Interop Bot Prototype</title>
+<style>
+/* ============================================================
+   PROTOTYPE BANNER
+   ============================================================ */
+#proto-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: #fbbf24;
+  color: #1c1917;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.01em;
+}
+/* ============================================================
+   STARLIGHT THEME TOKENS
+   ============================================================ */
+:root {
+  --sl-sidebar-bg: #1e1e2e;
+  --sl-sidebar-text: #cdd6f4;
+  --sl-sidebar-muted: #6c7086;
+  --sl-sidebar-active: #cba6f7;
+  --sl-sidebar-active-bg: rgba(203,166,247,0.12);
+  --sl-sidebar-hover: rgba(203,166,247,0.07);
+  --sl-sidebar-border: rgba(255,255,255,0.06);
+  --sl-content-bg: #ffffff;
+  --sl-content-text: #1e1b2e;
+  --sl-content-muted: #6b7280;
+  --sl-content-border: #e5e7eb;
+  --sl-accent: #7c3aed;
+  --sl-accent-light: #a78bfa;
+  --sl-accent-bg: rgba(124,58,237,0.08);
+  --sl-accent-hover: #6d28d9;
+  --sl-header-bg: #1e1e2e;
+  --sl-header-text: #cdd6f4;
+  --sl-header-border: rgba(255,255,255,0.08);
+  --sl-code-bg: #1e1e2e;
+  --sl-code-text: #cdd6f4;
+  --sl-danger: #dc2626;
+  --sl-warning: #d97706;
+  --sl-success: #16a34a;
+  --sl-success-bg: #f0fdf4;
+  --sl-error-bg: #fef2f2;
+  --sl-warning-bg: #fffbeb;
+  --radius: 8px;
+  --radius-sm: 4px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.1);
+}
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #f1f5f9;
+  color: var(--sl-content-text);
+  line-height: 1.6;
+  padding-top: 30px; /* banner height */
+}
+/* ============================================================
+   LAYOUT: PORTAL SHELL
+   ============================================================ */
+.portal-shell {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  grid-template-columns: 260px 1fr;
+  height: calc(100vh - 30px);
+  overflow: hidden;
+}
+.portal-shell.fullpage-mode {
+  grid-template-columns: 1fr;
+}
+/* HEADER */
+.sl-header {
+  grid-column: 1 / -1;
+  background: var(--sl-header-bg);
+  border-bottom: 1px solid var(--sl-header-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  color: var(--sl-header-text);
+}
+.sl-header .logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #cdd6f4;
+  text-decoration: none;
+}
+.sl-header .logo-icon {
+  width: 24px; height: 24px;
+  background: var(--sl-accent);
+  border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  color: white;
+  font-weight: 800;
+}
+.sl-header .header-search {
+  flex: 1;
+  max-width: 320px;
+  margin-left: auto;
+}
+.sl-header .header-search input {
+  width: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  color: #cdd6f4;
+  font-size: 13px;
+  outline: none;
+}
+.sl-header .header-search input::placeholder { color: var(--sl-sidebar-muted); }
+.sl-header .header-auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #9ba3af;
+}
+.sl-header .auth-avatar {
+  width: 28px; height: 28px;
+  background: var(--sl-accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+/* SIDEBAR */
+.sl-sidebar {
+  background: var(--sl-sidebar-bg);
+  border-right: 1px solid var(--sl-sidebar-border);
+  overflow-y: auto;
+  padding: 16px 0;
+}
+.sl-sidebar::-webkit-scrollbar { width: 4px; }
+.sl-sidebar::-webkit-scrollbar-track { background: transparent; }
+.sl-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.sl-sidebar-section {
+  margin-bottom: 8px;
+}
+.sl-sidebar-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sl-sidebar-muted);
+  padding: 8px 16px 4px;
+}
+.sl-sidebar-item {
+  display: block;
+  padding: 6px 16px;
+  font-size: 13.5px;
+  color: var(--sl-sidebar-text);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background 0.1s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.sl-sidebar-item:hover { background: var(--sl-sidebar-hover); }
+.sl-sidebar-item.active {
+  color: var(--sl-sidebar-active);
+  background: var(--sl-sidebar-active-bg);
+  font-weight: 500;
+}
+.sl-sidebar-item.sub {
+  padding-left: 28px;
+  font-size: 13px;
+}
+/* MAIN CONTENT */
+.sl-content {
+  background: var(--sl-content-bg);
+  overflow-y: auto;
+  position: relative;
+}
+.sl-content::-webkit-scrollbar { width: 6px; }
+.sl-content::-webkit-scrollbar-track { background: transparent; }
+.sl-content::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+.content-inner {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 48px 80px;
+}
+.content-inner h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--sl-content-text);
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+.content-inner .page-description {
+  font-size: 16px;
+  color: var(--sl-content-muted);
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--sl-content-border);
+  padding-bottom: 24px;
+}
+.content-inner h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 32px 0 12px;
+  color: var(--sl-content-text);
+}
+.content-inner h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 24px 0 8px;
+  color: var(--sl-content-text);
+}
+.content-inner p {
+  margin-bottom: 16px;
+  color: #374151;
+  font-size: 15px;
+}
+.content-inner code {
+  background: var(--sl-code-bg);
+  color: var(--sl-accent-light);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+}
+.content-inner pre {
+  background: var(--sl-code-bg);
+  border-radius: var(--radius);
+  padding: 20px;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.content-inner pre code {
+  background: none;
+  color: #cdd6f4;
+  font-size: 13px;
+  padding: 0;
+}
+.content-inner .aside {
+  background: var(--sl-accent-bg);
+  border-left: 3px solid var(--sl-accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+  color: #4c1d95;
+}
+/* BREADCRUMB */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sl-content-muted);
+  margin-bottom: 20px;
+}
+.breadcrumb span { opacity: 0.5; }
+/* UNAUTHENTICATED VIEW */
+#view-unauth {
+  display: none;
+}
+.unauth-content {
+  max-width: 480px;
+  margin: 80px auto;
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.unauth-content .lock-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.unauth-content h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--sl-content-text);
+}
+.unauth-content p {
+  color: var(--sl-content-muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--sl-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-decoration: none;
+}
+.btn-primary:hover { background: var(--sl-accent-hover); }
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: var(--sl-content-text);
+  border: 1px solid var(--sl-content-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-secondary:hover { background: #f9fafb; }
+.btn-danger {
+  background: var(--sl-danger);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-danger:hover { background: #b91c1c; }
+/* ============================================================
+   DEMO TOOLBAR
+   ============================================================ */
+.demo-toolbar {
+  position: fixed;
+  bottom: 0; left: 0;
+  z-index: 8000;
+  background: #1e1e2e;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  border-right: 1px solid rgba(255,255,255,0.1);
+  border-radius: 0 8px 0 0;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 560px;
+}
+.demo-toolbar .toolbar-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6c7086;
+  margin-right: 4px;
+}
+.demo-btn {
+  background: rgba(255,255,255,0.07);
+  color: #cdd6f4;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+.demo-btn:hover { background: rgba(255,255,255,0.13); }
+.demo-btn.active { background: rgba(203,166,247,0.2); color: var(--sl-sidebar-active); border-color: rgba(203,166,247,0.3); }
+/* ============================================================
+   CHAT WIDGET
+   ============================================================ */
+#chat-widget {
+  position: fixed;
+  bottom: 48px; right: 24px;
+  z-index: 7000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+/* Widget FAB button */
+.widget-fab {
+  width: 52px; height: 52px;
+  background: var(--sl-accent);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.15s, background 0.15s;
+  position: relative;
+  color: white;
+  font-size: 22px;
+}
+.widget-fab:hover { transform: scale(1.06); background: var(--sl-accent-hover); }
+.widget-fab .unread-badge {
+  position: absolute;
+  top: -2px; right: -2px;
+  width: 18px; height: 18px;
+  background: #ef4444;
+  border-radius: 50%;
+  border: 2px solid white;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+}
+/* Widget panel */
+.widget-panel {
+  width: 380px;
+  height: 520px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--sl-content-border);
+  animation: widget-appear 0.2s ease-out;
+}
+@keyframes widget-appear {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Widget header */
+.widget-header {
+  background: var(--sl-accent);
+  color: white;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.widget-header .bot-avatar {
+  width: 32px; height: 32px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.widget-header .bot-info { flex: 1; }
+.widget-header .bot-name { font-size: 14px; font-weight: 700; }
+.widget-header .bot-status { font-size: 11px; opacity: 0.8; display: flex; align-items: center; gap: 4px; }
+.widget-header .status-dot {
+  width: 6px; height: 6px;
+  background: #4ade80;
+  border-radius: 50%;
+  display: inline-block;
+}
+.widget-header-actions {
+  display: flex; gap: 4px;
+}
+.widget-icon-btn {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 6px;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: white;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+.widget-icon-btn:hover { background: rgba(255,255,255,0.25); }
+.widget-icon-btn title { display: none; }
+/* Messages area */
+.widget-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+}
+.widget-messages::-webkit-scrollbar { width: 4px; }
+.widget-messages::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
+/* Message bubbles */
+.msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  max-width: 100%;
+}
+.msg.user { flex-direction: row-reverse; }
+.msg-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.msg.bot .msg-avatar { background: var(--sl-accent); color: white; }
+.msg.user .msg-avatar { background: #e0e7ff; color: var(--sl-accent); }
+.msg-bubble {
+  max-width: 84%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.msg.bot .msg-bubble {
+  background: white;
+  border: 1px solid var(--sl-content-border);
+  border-top-left-radius: 2px;
+  color: var(--sl-content-text);
+}
+.msg.user .msg-bubble {
+  background: var(--sl-accent);
+  color: white;
+  border-top-right-radius: 2px;
+}
+/* Citation card */
+.citation-card {
+  margin-top: 8px;
+  background: var(--sl-accent-bg);
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.citation-card .citation-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sl-accent);
+  margin-bottom: 4px;
+}
+.citation-card .citation-url {
+  color: var(--sl-accent);
+  font-family: monospace;
+  font-size: 11px;
+  word-break: break-all;
+  display: block;
+  margin-bottom: 4px;
+}
+.citation-card .citation-quote {
+  color: #4c1d95;
+  font-style: italic;
+  font-size: 12px;
+  border-left: 2px solid var(--sl-accent-light);
+  padding-left: 8px;
+}
+/* Loading / status */
+.loading-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.loading-bubble {
+  background: white;
+  border: 1px solid var(--sl-content-border);
+  border-radius: 12px;
+  border-top-left-radius: 2px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--sl-content-muted);
+  min-width: 160px;
+}
+.loading-dots {
+  display: flex; gap: 4px; align-items: center;
+}
+.loading-dot {
+  width: 7px; height: 7px;
+  background: var(--sl-accent-light);
+  border-radius: 50%;
+  animation: dot-pulse 1.2s infinite ease-in-out;
+}
+.loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.loading-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1); }
+}
+.status-text {
+  font-size: 12px;
+  color: var(--sl-content-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.status-spinner {
+  width: 12px; height: 12px;
+  border: 2px solid #e0e7ff;
+  border-top-color: var(--sl-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Welcome message */
+.welcome-msg {
+  text-align: center;
+  padding: 20px 16px;
+  color: var(--sl-content-muted);
+}
+.welcome-msg .welcome-icon { font-size: 32px; margin-bottom: 8px; }
+.welcome-msg h4 { font-size: 14px; font-weight: 700; color: var(--sl-content-text); margin-bottom: 4px; }
+.welcome-msg p { font-size: 12.5px; }
+.welcome-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.suggestion-chip {
+  background: white;
+  border: 1px solid rgba(124,58,237,0.25);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--sl-accent);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, border-color 0.1s;
+}
+.suggestion-chip:hover { background: var(--sl-accent-bg); border-color: var(--sl-accent); }
+/* Error / timeout */
+.error-bubble {
+  background: var(--sl-error-bg);
+  border: 1px solid #fca5a5;
+  border-radius: 12px;
+  border-top-left-radius: 2px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--sl-danger);
+}
+.error-bubble .error-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+.error-link {
+  font-size: 12px;
+  color: var(--sl-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+}
+/* Deflection bubble */
+.deflection-bubble {
+  background: var(--sl-warning-bg);
+  border: 1px solid #fcd34d;
+  border-radius: 12px;
+  border-top-left-radius: 2px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #92400e;
+}
+/* Escalation form */
+.escalation-form {
+  margin-top: 10px;
+  background: white;
+  border: 1px solid var(--sl-content-border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.escalation-form .esc-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sl-content-text);
+  margin-bottom: 8px;
+}
+.escalation-form .esc-desc {
+  font-size: 12px;
+  color: var(--sl-content-muted);
+  margin-bottom: 10px;
+}
+.form-field { margin-bottom: 8px; }
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sl-content-text);
+  margin-bottom: 4px;
+}
+.form-input {
+  width: 100%;
+  border: 1px solid var(--sl-content-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--sl-content-text);
+  outline: none;
+  transition: border-color 0.15s;
+  background: white;
+}
+.form-input:focus { border-color: var(--sl-accent); box-shadow: 0 0 0 2px rgba(124,58,237,0.12); }
+.form-input.error { border-color: var(--sl-danger); }
+.form-error {
+  font-size: 11px;
+  color: var(--sl-danger);
+  margin-top: 3px;
+  display: none;
+}
+.form-error.visible { display: block; }
+.esc-submit {
+  width: 100%;
+  background: var(--sl-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: 4px;
+}
+.esc-submit:hover { background: var(--sl-accent-hover); }
+.esc-submit:disabled { background: #a78bfa; cursor: not-allowed; }
+/* Escalation success */
+.escalation-success {
+  background: var(--sl-success-bg);
+  border: 1px solid #86efac;
+  border-radius: var(--radius);
+  padding: 12px;
+  font-size: 13px;
+  color: #14532d;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.escalation-success .success-icon { font-size: 16px; flex-shrink: 0; }
+/* Widget input area */
+.widget-input-area {
+  padding: 10px 12px;
+  border-top: 1px solid var(--sl-content-border);
+  background: white;
+  flex-shrink: 0;
+}
+.widget-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.widget-input {
+  flex: 1;
+  border: 1px solid var(--sl-content-border);
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  outline: none;
+  resize: none;
+  max-height: 80px;
+  min-height: 36px;
+  line-height: 1.4;
+  transition: border-color 0.15s;
+  background: #f8fafc;
+  color: var(--sl-content-text);
+  font-family: inherit;
+}
+.widget-input:focus { border-color: var(--sl-accent); background: white; }
+.widget-input::placeholder { color: #9ca3af; }
+.widget-send-btn {
+  width: 36px; height: 36px;
+  background: var(--sl-accent);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  font-size: 15px;
+  transition: background 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.widget-send-btn:hover { background: var(--sl-accent-hover); transform: scale(1.05); }
+.widget-send-btn:disabled { background: #c4b5fd; cursor: not-allowed; transform: none; }
+.widget-input-footer {
+  font-size: 10px;
+  color: #9ca3af;
+  text-align: center;
+  margin-top: 5px;
+}
+/* Rate limit notice */
+.rate-limit-notice {
+  font-size: 11px;
+  color: var(--sl-warning);
+  text-align: center;
+  padding: 4px;
+}
+/* ============================================================
+   FULL-PAGE CHAT VIEW
+   ============================================================ */
+#view-fullpage {
+  display: none;
+  height: calc(100vh - 30px);
+  flex-direction: column;
+  background: white;
+}
+#view-fullpage.active { display: flex; }
+.fullpage-header {
+  background: var(--sl-accent);
+  color: white;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.fullpage-back-btn {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  transition: background 0.1s;
+}
+.fullpage-back-btn:hover { background: rgba(255,255,255,0.25); }
+.fullpage-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+}
+.fullpage-subtitle {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.fullpage-clear-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.fullpage-clear-btn:hover { background: rgba(255,255,255,0.2); }
+.fullpage-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.fullpage-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #f8fafc;
+}
+.fullpage-messages::-webkit-scrollbar { width: 6px; }
+.fullpage-messages::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+.fullpage-msg {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+.fullpage-msg.user { flex-direction: row-reverse; }
+.fullpage-msg-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+.fullpage-msg.bot .fullpage-msg-avatar { background: var(--sl-accent); color: white; }
+.fullpage-msg.user .fullpage-msg-avatar { background: #e0e7ff; color: var(--sl-accent); }
+.fullpage-msg-content {
+  max-width: 80%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fullpage-msg-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sl-content-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.fullpage-msg.user .fullpage-msg-label { text-align: right; }
+.fullpage-bubble {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.fullpage-msg.bot .fullpage-bubble {
+  background: white;
+  border: 1px solid var(--sl-content-border);
+  border-top-left-radius: 2px;
+  color: var(--sl-content-text);
+}
+.fullpage-msg.user .fullpage-bubble {
+  background: var(--sl-accent);
+  color: white;
+  border-top-right-radius: 2px;
+}
+.fullpage-input-area {
+  background: white;
+  border-top: 1px solid var(--sl-content-border);
+  padding: 16px 24px;
+  flex-shrink: 0;
+}
+.fullpage-input-inner {
+  max-width: 760px;
+  margin: 0 auto;
+}
+.fullpage-input-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.fullpage-input {
+  flex: 1;
+  border: 1px solid var(--sl-content-border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  max-height: 120px;
+  min-height: 44px;
+  line-height: 1.5;
+  transition: border-color 0.15s;
+  background: #f8fafc;
+  color: var(--sl-content-text);
+  font-family: inherit;
+}
+.fullpage-input:focus { border-color: var(--sl-accent); background: white; }
+.fullpage-input::placeholder { color: #9ca3af; }
+.fullpage-send-btn {
+  background: var(--sl-accent);
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex; align-items: center; gap: 6px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.fullpage-send-btn:hover { background: var(--sl-accent-hover); }
+.fullpage-input-footer {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 8px;
+  text-align: center;
+}
+/* Fullpage sidebar (session info) */
+.fullpage-sidebar {
+  width: 240px;
+  border-left: 1px solid var(--sl-content-border);
+  background: white;
+  padding: 20px 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.fp-sidebar-section { margin-bottom: 20px; }
+.fp-sidebar-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--sl-content-muted);
+  margin-bottom: 8px;
+}
+.fp-sidebar-item {
+  font-size: 12.5px;
+  color: var(--sl-content-text);
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fp-sidebar-item .fp-val {
+  font-weight: 500;
+  color: var(--sl-accent);
+  font-size: 12px;
+}
+.session-badge {
+  display: inline-block;
+  background: var(--sl-accent-bg);
+  color: var(--sl-accent);
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+/* ============================================================
+   MODAL / DIALOG
+   ============================================================ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 8500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  animation: modal-appear 0.15s ease-out;
+}
+@keyframes modal-appear {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.modal p { font-size: 14px; color: var(--sl-content-muted); margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+.hidden { display: none !important; }
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+.tag {
+  display: inline-block;
+  background: var(--sl-accent-bg);
+  color: var(--sl-accent);
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .portal-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 48px 1fr;
+  }
+  .sl-sidebar { display: none; }
+  .widget-panel { width: calc(100vw - 32px); right: 16px; }
+  .fullpage-sidebar { display: none; }
+  .content-inner { padding: 24px 20px 80px; }
+}
+</style>
+</head>
+<body>
+<!-- ============================================================
+     PROTOTYPE BANNER
+     ============================================================ -->
+<div id="proto-banner">
+  ⚠️ PROTOTYPE ONLY — Requirements validation artefact (QABOT-001). Not for production use. All data is fictional.
+</div>
+<!-- ============================================================
+     FULL-PAGE CHAT VIEW (shown when expanded)
+     ============================================================ -->
+<div id="view-fullpage">
+  <div id="proto-banner-fp" style="background:#fbbf24;color:#1c1917;text-align:center;font-size:12px;font-weight:600;padding:5px 12px;font-family:system-ui;letter-spacing:0.01em;">
+    ⚠️ PROTOTYPE ONLY — Requirements validation artefact (QABOT-001). Not for production use.
+  </div>
+  <div class="fullpage-header">
+    <button class="fullpage-back-btn" onclick="minimiseToWidget()" aria-label="Return to widget">
+      ← Back to portal
+    </button>
+    <div>
+      <div class="fullpage-title">🤖 EMIS Interop Assistant</div>
+      <div class="fullpage-subtitle">Full-page chat mode — /chat</div>
+    </div>
+    <button class="fullpage-clear-btn" onclick="openClearDialog('fullpage')" aria-label="Clear conversation">
+      🗑 Clear conversation
+    </button>
+  </div>
+  <div class="fullpage-body">
+    <div class="fullpage-messages" id="fullpage-messages" role="log" aria-live="polite" aria-label="Conversation history">
+      <!-- Messages rendered by JS -->
+    </div>
+    <div class="fullpage-sidebar">
+      <div class="fp-sidebar-section">
+        <div class="fp-sidebar-title">Session</div>
+        <div class="fp-sidebar-item">Mode <span class="fp-val">Full-page</span></div>
+        <div class="fp-sidebar-item">Messages <span class="fp-val" id="fp-msg-count">0</span></div>
+        <div class="fp-sidebar-item">Rate limit <span class="fp-val" id="fp-rate-limit">50 remaining</span></div>
+      </div>
+      <div class="fp-sidebar-section">
+        <div class="fp-sidebar-title">Authenticated as</div>
+        <div class="fp-sidebar-item" style="flex-direction:column;align-items:flex-start;gap:2px;">
+          <span style="font-weight:600;font-size:13px;">Alex Pemberton</span>
+          <span style="font-size:11px;color:#6b7280;">alex.pemberton@partnerco.io</span>
+          <span class="session-badge" style="margin-top:4px;">EMIS-X Partner</span>
+        </div>
+      </div>
+      <div class="fp-sidebar-section">
+        <div class="fp-sidebar-title">Current page</div>
+        <div style="font-size:11px;color:var(--sl-content-muted);word-break:break-all;font-family:monospace;">
+          /docs/authentication/oauth2-flows
+        </div>
+      </div>
+      <div class="fp-sidebar-section">
+        <div class="fp-sidebar-title">Data notice</div>
+        <div style="font-size:11px;color:var(--sl-content-muted);line-height:1.5;">
+          Conversation is stored in session only. History is cleared when you close this browser tab.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="fullpage-input-area">
+    <div class="fullpage-input-inner">
+      <div class="fullpage-input-row">
+        <textarea
+          class="fullpage-input"
+          id="fullpage-input"
+          placeholder="Ask anything about EMIS interoperability…"
+          aria-label="Ask a question about EMIS interoperability"
+          rows="1"
+          onkeydown="handleFullpageKey(event)"
+        ></textarea>
+        <button class="fullpage-send-btn" onclick="sendFullpageMessage()" aria-label="Send message">
+          Send ↑
+        </button>
+      </div>
+      <div class="fullpage-input-footer">
+        Press Enter to send · Shift+Enter for new line · 50 messages per session
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ============================================================
+     PORTAL SHELL (normal docs view)
+     ============================================================ -->
+<div class="portal-shell" id="portal-shell">
+  <!-- HEADER -->
+  <header class="sl-header">
+    <a class="logo" href="#" onclick="navigateTo('home');return false;">
+      <div class="logo-icon">E</div>
+      EMIS Developer Portal
+    </a>
+    <div class="header-search">
+      <input type="text" placeholder="Search documentation…" aria-label="Search documentation">
+    </div>
+    <div class="header-auth" id="header-auth">
+      <div class="auth-avatar" id="auth-avatar">AP</div>
+      <span id="auth-name">Alex Pemberton</span>
+    </div>
+  </header>
+  <!-- SIDEBAR -->
+  <nav class="sl-sidebar" aria-label="Documentation navigation">
+    <div class="sl-sidebar-section">
+      <div class="sl-sidebar-section-title">Getting Started</div>
+      <button class="sl-sidebar-item active" onclick="navigateTo('home')">Overview</button>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('quickstart')">Quick Start</button>
+    </div>
+    <div class="sl-sidebar-section">
+      <div class="sl-sidebar-section-title">Authentication</div>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('auth-overview')">Overview</button>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('oauth2-flows')" id="nav-oauth2">OAuth2 Flows</button>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('smart-launch')">SMART App Launch</button>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('token-refresh')">Token Refresh</button>
+    </div>
+    <div class="sl-sidebar-section">
+      <div class="sl-sidebar-section-title">APIs</div>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('fhir-api')">FHIR R4 API</button>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('rest-api')">REST API Reference</button>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('webhooks')">Webhooks</button>
+    </div>
+    <div class="sl-sidebar-section">
+      <div class="sl-sidebar-section-title">Interoperability</div>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('hl7-messaging')">HL7 Messaging</button>
+      <button class="sl-sidebar-item sub" onclick="navigateTo('data-mapping')">Data Mapping</button>
+    </div>
+  </nav>
+  <!-- MAIN CONTENT AREA -->
+  <main class="sl-content" id="main-content">
+    <!-- ── PAGE: HOME ── -->
+    <div id="page-home" class="content-inner">
+      <div class="breadcrumb">
+        <span>Docs</span> / <span>Overview</span>
+      </div>
+      <h1>EMIS Developer Portal</h1>
+      <p class="page-description">
+        Everything you need to integrate with EMIS APIs, SMART-on-FHIR app launch, and interoperability standards.
+      </p>
+      <h2>Getting Started</h2>
+      <p>Welcome to the EMIS Developer Portal. This documentation covers authentication flows, FHIR R4 API integration, HL7 messaging, and SMART App Launch.</p>
+      <div class="aside">
+        💡 <strong>Tip:</strong> Use the <strong>Ask the Bot</strong> widget (bottom-right) to get instant answers to your integration questions.
+      </div>
+      <h2>Popular Topics</h2>
+      <p>Click any topic in the sidebar, or ask the bot directly. Common questions include OAuth2 flow selection, token refresh patterns, and FHIR resource mapping.</p>
+      <h3>Authentication</h3>
+      <p>EMIS APIs use OAuth2. For backend services, use the <code>client_credentials</code> flow. For user-facing apps, use the SMART App Launch protocol with <code>authorization_code</code> flow.</p>
+      <pre><code>// Backend API authentication
+POST /oauth2/token
+Content-Type: application/x-www-form-urlencoded
+grant_type=client_credentials
+&amp;client_id=your_client_id
+&amp;client_secret=your_client_secret
+&amp;scope=system/*.read</code></pre>
+    </div>
+    <!-- ── PAGE: QUICKSTART ── -->
+    <div id="page-quickstart" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>Getting Started</span> / <span>Quick Start</span></div>
+      <h1>Quick Start</h1>
+      <p class="page-description">Get up and running with EMIS APIs in under 10 minutes.</p>
+      <h2>Step 1: Register your application</h2>
+      <p>Register your application in the EMIS Developer Console to receive your <code>client_id</code> and <code>client_secret</code>.</p>
+      <h2>Step 2: Choose your auth flow</h2>
+      <p>Backend APIs → <code>client_credentials</code>. User-facing apps → SMART App Launch.</p>
+      <h2>Step 3: Make your first API call</h2>
+      <pre><code>GET /fhir/r4/Patient/example-id
+Authorization: Bearer {access_token}
+Accept: application/fhir+json</code></pre>
+    </div>
+    <!-- ── PAGE: AUTH OVERVIEW ── -->
+    <div id="page-auth-overview" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>Authentication</span> / <span>Overview</span></div>
+      <h1>Authentication Overview</h1>
+      <p class="page-description">EMIS APIs use OAuth2 and SMART-on-FHIR for secure access.</p>
+      <h2>Supported Flows</h2>
+      <p>EMIS supports three authentication flows depending on your use case:</p>
+      <h3>1. Client Credentials (Backend Services)</h3>
+      <p>Use this when your application runs server-side without a user context. Suitable for data pipelines, scheduled jobs, and backend integrations.</p>
+      <h3>2. Authorization Code (User-Facing Apps)</h3>
+      <p>Use this for applications where a user must authenticate. Combines with SMART App Launch for clinical context.</p>
+      <h3>3. SMART App Launch</h3>
+      <p>EMIS's implementation of the SMART-on-FHIR specification. Provides clinical context (patient, encounter) alongside the OAuth2 token.</p>
+    </div>
+    <!-- ── PAGE: OAUTH2 FLOWS ── -->
+    <div id="page-oauth2-flows" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>Authentication</span> / <span>OAuth2 Flows</span></div>
+      <h1>OAuth2 Flows</h1>
+      <p class="page-description">Detailed guide to EMIS OAuth2 implementation.</p>
+      <h2>Client Credentials Flow</h2>
+      <p>For backend services that do not act on behalf of a specific user.</p>
+      <pre><code>POST https://auth.emis.com/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+grant_type=client_credentials
+&amp;client_id=CLIENT_ID
+&amp;client_secret=CLIENT_SECRET
+&amp;scope=system/Patient.read system/Observation.read</code></pre>
+      <h2>Authorization Code Flow</h2>
+      <p>For user-facing applications. Redirect the user to the EMIS authorisation endpoint, then exchange the code for a token.</p>
+    </div>
+    <!-- ── PAGE: SMART LAUNCH ── -->
+    <div id="page-smart-launch" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>Authentication</span> / <span>SMART App Launch</span></div>
+      <h1>SMART App Launch</h1>
+      <p class="page-description">EMIS implementation of the SMART-on-FHIR App Launch Framework.</p>
+      <h2>Overview</h2>
+      <p>SMART App Launch allows your application to receive clinical context (patient ID, encounter ID) alongside the OAuth2 access token.</p>
+    </div>
+    <!-- ── PAGE: TOKEN REFRESH ── -->
+    <div id="page-token-refresh" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>Authentication</span> / <span>Token Refresh</span></div>
+      <h1>Token Refresh</h1>
+      <p class="page-description">How to refresh access tokens without re-authenticating the user.</p>
+      <h2>Refresh Token Flow</h2>
+      <p>Exchange a refresh token for a new access token using the <code>refresh_token</code> grant type.</p>
+      <pre><code>POST /oauth2/token
+grant_type=refresh_token
+&amp;refresh_token=REFRESH_TOKEN
+&amp;client_id=CLIENT_ID</code></pre>
+    </div>
+    <!-- ── PAGE: FHIR API ── -->
+    <div id="page-fhir-api" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>APIs</span> / <span>FHIR R4 API</span></div>
+      <h1>FHIR R4 API</h1>
+      <p class="page-description">EMIS FHIR R4 compliant API reference.</p>
+      <h2>Base URL</h2>
+      <pre><code>https://api.emis.com/fhir/r4</code></pre>
+      <h2>Supported Resources</h2>
+      <p>Patient, Observation, Condition, MedicationRequest, Appointment, and more.</p>
+    </div>
+    <!-- ── PAGE: REST API ── -->
+    <div id="page-rest-api" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>APIs</span> / <span>REST API Reference</span></div>
+      <h1>REST API Reference</h1>
+      <p class="page-description">Full REST API endpoint reference for EMIS integrations.</p>
+    </div>
+    <!-- ── PAGE: WEBHOOKS ── -->
+    <div id="page-webhooks" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>APIs</span> / <span>Webhooks</span></div>
+      <h1>Webhooks</h1>
+      <p class="page-description">Receive real-time notifications from EMIS systems.</p>
+    </div>
+    <!-- ── PAGE: HL7 ── -->
+    <div id="page-hl7-messaging" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>Interoperability</span> / <span>HL7 Messaging</span></div>
+      <h1>HL7 Messaging</h1>
+      <p class="page-description">EMIS HL7 v2 and FHIR messaging patterns.</p>
+    </div>
+    <!-- ── PAGE: DATA MAPPING ── -->
+    <div id="page-data-mapping" class="content-inner hidden">
+      <div class="breadcrumb"><span>Docs</span> / <span>Interoperability</span> / <span>Data Mapping</span></div>
+      <h1>Data Mapping</h1>
+      <p class="page-description">Map EMIS data models to standard interoperability formats.</p>
+    </div>
+    <!-- ── UNAUTHENTICATED VIEW ── -->
+    <div id="page-unauth" class="hidden">
+      <div class="unauth-content">
+        <div class="lock-icon">🔒</div>
+        <h2>Authentication required</h2>
+        <p>You must sign in with your EMIS-X credentials to access the EMIS Developer Portal and the Q&A assistant.</p>
+        <button class="btn-primary" onclick="simulateLogin()">Sign in with EMIS-X</button>
+      </div>
+    </div>
+  </main>
+</div>
+<!-- ============================================================
+     CHAT WIDGET
+     ============================================================ -->
+<div id="chat-widget">
+  <!-- FAB button -->
+  <button class="widget-fab" id="widget-fab" onclick="toggleWidget()" aria-label="Open EMIS Interop Assistant" aria-expanded="false">
+    💬
+    <span class="unread-badge hidden" id="unread-badge" aria-label="1 new message">1</span>
+  </button>
+  <!-- Widget panel -->
+  <div class="widget-panel hidden" id="widget-panel" role="dialog" aria-label="EMIS Interop Assistant" aria-modal="false">
+    <!-- Widget header -->
+    <div class="widget-header">
+      <div class="bot-avatar">🤖</div>
+      <div class="bot-info">
+        <div class="bot-name">EMIS Interop Assistant</div>
+        <div class="bot-status">
+          <span class="status-dot"></span>
+          Online · Docs indexed
+        </div>
+      </div>
+      <div class="widget-header-actions">
+        <button class="widget-icon-btn" onclick="expandToFullPage()" aria-label="Expand to full-page chat" title="Expand">⤢</button>
+        <button class="widget-icon-btn" onclick="openClearDialog('widget')" aria-label="Clear conversation" title="Clear conversation">🗑</button>
+        <button class="widget-icon-btn" onclick="toggleWidget()" aria-label="Close assistant" title="Close">✕</button>
+      </div>
+    </div>
+    <!-- Messages -->
+    <div class="widget-messages" id="widget-messages" role="log" aria-live="polite" aria-label="Conversation history">
+      <!-- Populated by JS -->
+    </div>
+    <!-- Input area -->
+    <div class="widget-input-area">
+      <div class="widget-input-row">
+        <textarea
+          class="widget-input"
+          id="widget-input"
+          placeholder="Ask about EMIS interoperability…"
+          aria-label="Ask a question about EMIS interoperability"
+          rows="1"
+          onkeydown="handleWidgetKey(event)"
+        ></textarea>
+        <button class="widget-send-btn" id="widget-send-btn" onclick="sendWidgetMessage()" aria-label="Send message">↑</button>
+      </div>
+      <div class="widget-input-footer" id="widget-footer-text">
+        50 messages remaining this session
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ============================================================
+     CLEAR CONVERSATION DIALOG
+     ============================================================ -->
+<div class="modal-backdrop" id="clear-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-dialog-title">
+  <div class="modal">
+    <h3 id="clear-dialog-title">Clear conversation?</h3>
+    <p>This will permanently delete your current conversation history. This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeClearDialog()">Cancel</button>
+      <button class="btn-danger" onclick="confirmClear()">Clear conversation</button>
+    </div>
+  </div>
+</div>
+<!-- ============================================================
+     DEMO TOOLBAR
+     ============================================================ -->
+<div class="demo-toolbar" role="complementary" aria-label="Prototype demo controls">
+  <span class="toolbar-label">Demo</span>
+  <button class="demo-btn active" id="btn-auth" onclick="setAuthState(true)">✓ Authenticated</button>
+  <button class="demo-btn" id="btn-unauth" onclick="setAuthState(false)">🔒 Unauthenticated</button>
+  <button class="demo-btn" onclick="loadScenario('in-scope')" title="Scenario A: in-scope question with citation">💬 In-scope answer</button>
+  <button class="demo-btn" onclick="loadScenario('deflection')" title="Scenario B: out-of-scope deflection">🚫 Deflection</button>
+  <button class="demo-btn" onclick="loadScenario('escalation')" title="Scenario C: escalation flow">📧 Escalation</button>
+  <button class="demo-btn" onclick="loadScenario('timeout')" title="Scenario D: timeout error">⏱ Timeout</button>
+  <button class="demo-btn" onclick="loadScenario('loading')" title="Show loading states">⏳ Loading states</button>
+  <button class="demo-btn" onclick="resetAll()">↺ Reset all</button>
+</div>
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+var state = {
+  isAuthenticated: true,
+  widgetOpen: false,
+  currentPage: 'home',
+  clearTarget: null,  // 'widget' or 'fullpage'
+  isFullPage: false,
+  messages: [],       // shared conversation array
+  messageCount: 0,
+  rateLimit: 50,
+  isLoading: false,
+  loadingStep: 0,
+  loadingTimer: null
+};
+/* ============================================================
+   FICTIONAL DATA
+   ============================================================ */
+var SCENARIOS = {
+  'in-scope': {
+    userMsg: 'Which auth flow should I use for a backend API that calls EMIS APIs without a user context?',
+    botResponse: {
+      type: 'answer',
+      text: 'For a backend API that calls EMIS APIs without a user context, you should use the <strong>Client Credentials</strong> OAuth2 flow. This flow is designed exactly for server-to-server communication where there is no end user involved.\n\nYou\'ll POST to the token endpoint with your <code>client_id</code>, <code>client_secret</code>, and the desired <code>scope</code> (e.g. <code>system/*.read</code>). The response gives you a bearer token valid for a configurable period — typically 1 hour.',
+      citation: {
+        url: 'https://developer.emis.com/docs/authentication/oauth2-flows',
+        quote: 'Use the client_credentials grant type for backend services that do not act on behalf of a specific user. This flow requires your client_id and client_secret and returns a system-scoped access token.'
+      }
+    }
+  },
+  'deflection': {
+    userMsg: "What's the weather like today?",
+    botResponse: {
+      type: 'deflection',
+      text: "I can only help with questions about EMIS interoperability — please try asking about our APIs or authentication flows. For example, you could ask about OAuth2 flows, SMART App Launch, FHIR R4 resources, or HL7 messaging."
+    }
+  },
+  'escalation': {
+    userMsg: 'How do I handle token refresh for SMART on FHIR when the user\'s session expires mid-consultation?',
+    botResponse: {
+      type: 'escalation',
+      text: "I wasn't able to find a definitive answer for this specific scenario in the indexed documentation. This may be a more advanced edge case not yet covered in our docs."
+    }
+  },
+  'timeout': {
+    userMsg: 'Can you explain the full EMIS data model for clinical observations?',
+    botResponse: {
+      type: 'timeout'
+    }
+  },
+  'loading': {
+    userMsg: 'What FHIR resources does EMIS support for patient demographics?',
+    botResponse: {
+      type: 'answer',
+      text: 'EMIS supports the following FHIR R4 resources for patient demographics: <strong>Patient</strong> (core demographics including name, DOB, address, identifiers), <strong>RelatedPerson</strong> (next of kin and carers), and <strong>Organization</strong> (GP practice and registered organisation).\n\nThe <code>Patient</code> resource is the primary resource and maps directly to the EMIS patient record.',
+      citation: {
+        url: 'https://developer.emis.com/docs/fhir/r4/patient-demographics',
+        quote: 'The EMIS FHIR R4 Patient resource conforms to the UK Core Patient profile and includes NHS Number as a primary identifier alongside local patient identifiers.'
+      }
+    }
+  }
+};
+var LOADING_STEPS = [
+  { icon: '🔍', text: 'Searching documentation…' },
+  { icon: '📄', text: 'Retrieving relevant sections…' },
+  { icon: '🔗', text: 'Checking citations…' },
+  { icon: '✍️', text: 'Composing answer…' }
+];
+/* ============================================================
+   INIT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', function() {
+  renderWidgetMessages();
+  showWelcomeMessage();
+  updateNavHighlight('home');
+});
+/* ============================================================
+   AUTH STATE
+   ============================================================ */
+function setAuthState(isAuth) {
+  state.isAuthenticated = isAuth;
+  var widget = document.getElementById('chat-widget');
+  var unauth = document.getElementById('page-unauth');
+  var mainContent = document.getElementById('main-content');
+  var authBtn = document.getElementById('btn-auth');
+  var unauthBtn = document.getElementById('btn-unauth');
+  if (isAuth) {
+    widget.style.display = 'flex';
+    unauth.classList.add('hidden');
+    showPage(state.currentPage);
+    authBtn.classList.add('active');
+    unauthBtn.classList.remove('active');
+    document.getElementById('header-auth').style.display = 'flex';
+  } else {
+    // Close widget first
+    if (state.widgetOpen) toggleWidget();
+    widget.style.display = 'none';
+    // Hide all pages
+    var pages = mainContent.querySelectorAll('.content-inner, #page-unauth');
+    pages.forEach(function(p) { p.classList.add('hidden'); });
+    unauth.classList.remove('hidden');
+    authBtn.classList.remove('active');
+    unauthBtn.classList.add('active');
+    document.getElementById('header-auth').style.display = 'none';
+  }
+}
+function simulateLogin() {
+  setAuthState(true);
+}
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function navigateTo(pageId) {
+  if (!state.isAuthenticated) return;
+  state.currentPage = pageId;
+  showPage(pageId);
+  updateNavHighlight(pageId);
+  // Simulate session persistence — messages survive navigation
+  // (they're already in state.messages, no action needed)
+}
+function showPage(pageId) {
+  var mainContent = document.getElementById('main-content');
+  var pages = mainContent.querySelectorAll('[id^="page-"]');
+  pages.forEach(function(p) { p.classList.add('hidden'); });
+  var target = document.getElementById('page-' + pageId);
+  if (target) target.classList.remove('hidden');
+}
+function updateNavHighlight(pageId) {
+  var items = document.querySelectorAll('.sl-sidebar-item');
+  items.forEach(function(item) { item.classList.remove('active'); });
+  // Map page IDs to nav button onclick values
+  var map = {
+    'home': 0, 'quickstart': 1, 'auth-overview': 2,
+    'oauth2-flows': 3, 'smart-launch': 4, 'token-refresh': 5,
+    'fhir-api': 6, 'rest-api': 7, 'webhooks': 8,
+    'hl7-messaging': 9, 'data-mapping': 10
+  };
+  if (map[pageId] !== undefined && items[map[pageId]]) {
+    items[map[pageId]].classList.add('active');
+  }
+}
+/* ============================================================
+   WIDGET TOGGLE
+   ============================================================ */
+function toggleWidget() {
+  if (!state.isAuthenticated) return;
+  state.widgetOpen = !state.widgetOpen;
+  var panel = document.getElementById('widget-panel');
+  var fab = document.getElementById('widget-fab');
+  var badge = document.getElementById('unread-badge');
+  if (state.widgetOpen) {
+    panel.classList.remove('hidden');
+    fab.setAttribute('aria-expanded', 'true');
+    fab.innerHTML = '✕';
+    badge.classList.add('hidden');
+    // Focus input
+    setTimeout(function() {
+      document.getElementById('widget-input').focus();
+    }, 100);
+    scrollWidgetToBottom();
+  } else {
+    panel.classList.add('hidden');
+    fab.setAttribute('aria-expanded', 'false');
+    fab.innerHTML = '💬';
+  }
+}
+/* ============================================================
+   EXPAND / MINIMISE
+   ============================================================ */
+function expandToFullPage() {
+  state.isFullPage = true;
+  // Hide portal shell
+  document.getElementById('portal-shell').style.display = 'none';
+  document.getElementById('chat-widget').style.display = 'none';
+  // Show fullpage
+  var fp = document.getElementById('view-fullpage');
+  fp.classList.add('active');
+  // Render messages in fullpage
+  renderFullpageMessages();
+  // Focus input
+  setTimeout(function() {
+    document.getElementById('fullpage-input').focus();
+  }, 100);
+}
+function minimiseToWidget() {
+  state.isFullPage = false;
+  // Hide fullpage
+  var fp = document.getElementById('view-fullpage');
+  fp.classList.remove('active');
+  // Show portal
+  document.getElementById('portal-shell').style.display = 'grid';
+  document.getElementById('chat-widget').style.display = 'flex';
+  // Ensure widget is open
+  if (!state.widgetOpen) {
+    state.widgetOpen = true;
+    document.getElementById('widget-panel').classList.remove('hidden');
+    document.getElementById('widget-fab').setAttribute('aria-expanded', 'true');
+    document.getElementById('widget-fab').innerHTML = '✕';
+  }
+  renderWidgetMessages();
+  scrollWidgetToBottom();
+}
+/* ============================================================
+   MESSAGE RENDERING
+   ============================================================ */
+function renderWidgetMessages() {
+  var container = document.getElementById('widget-messages');
+  if (!container) return;
+  container.innerHTML = '';
+  if (state.messages.length === 0) {
+    container.appendChild(createWelcomeEl());
+    return;
+  }
+  state.messages.forEach(function(msg) {
+    container.appendChild(createWidgetMsgEl(msg));
+  });
+}
+function renderFullpageMessages() {
+  var container = document.getElementById('fullpage-messages');
+  if (!container) return;
+  container.innerHTML = '';
+  if (state.messages.length === 0) {
+    var welcome = document.createElement('div');
+    welcome.style.cssText = 'text-align:center;padding:40px 20px;color:#6b7280;';
+    welcome.innerHTML = '<div style="font-size:40px;margin-bottom:12px;">🤖</div><h3 style="font-size:18px;font-weight:700;color:#1e1b2e;margin-bottom:8px;">EMIS Interop Assistant</h3><p style="font-size:14px;">Ask me anything about EMIS APIs, authentication flows, FHIR resources, or HL7 messaging.</p>';
+    container.appendChild(welcome);
+    return;
+  }
+  state.messages.forEach(function(msg) {
+    container.appendChild(createFullpageMsgEl(msg));
+  });
+  // Update sidebar counts
+  document.getElementById('fp-msg-count').textContent = state.messages.length;
+  document.getElementById('fp-rate-limit').textContent = state.rateLimit + ' remaining';
+}
+function createWelcomeEl() {
+  var el = document.createElement('div');
+  el.className = 'welcome-msg';
+  el.innerHTML = '<div class="welcome-icon">🤖</div>' +
+    '<h4>EMIS Interop Assistant</h4>' +
+    '<p>Ask me anything about EMIS APIs, authentication, FHIR, or HL7.</p>' +
+    '<div class="welcome-suggestions">' +
+    '<button class="suggestion-chip" onclick="fillAndSend(\'Which auth flow should I use for a backend API?\')">Which auth flow for a backend API?</button>' +
+    '<button class="suggestion-chip" onclick="fillAndSend(\'How do I handle token refresh for SMART on FHIR?\')">How do I handle SMART token refresh?</button>' +
+    '<button class="suggestion-chip" onclick="fillAndSend(\'What FHIR resources does EMIS support?\')">What FHIR resources are supported?</button>' +
+    '</div>';
+  return el;
+}
+function fillAndSend(text) {
+  document.getElementById('widget-input').value = text;
+  sendWidgetMessage();
+}
+function createWidgetMsgEl(msg) {
+  var outer = document.createElement('div');
+  if (msg.type === 'user') {
+    outer.className = 'msg user';
+    outer.innerHTML =
+      '<div class="msg-avatar">AP</div>' +
+      '<div class="msg-bubble">' + escHtml(msg.text) + '</div>';
+    return outer;
+  }
+  if (msg.type === 'answer') {
+    outer.className = 'msg bot';
+    var bubbleHtml = '<div class="msg-bubble">' + msg.text;
+    if (msg.citation) {
+      bubbleHtml += '<div class="citation-card">' +
+        '<div class="citation-label">📎 Source</div>' +
+        '<a class="citation-url" href="#" onclick="return false;">' + escHtml(msg.citation.url) + '</a>' +
+        '<div class="citation-quote">"' + escHtml(msg.citation.quote) + '"</div>' +
+        '</div>';
+    }
+    bubbleHtml += '</div>';
+    outer.innerHTML = '<div class="msg-avatar">🤖</div>' + bubbleHtml;
+    return outer;
+  }
+  if (msg.type === 'deflection') {
+    outer.className = 'msg bot';
+    outer.innerHTML = '<div class="msg-avatar">🤖</div>' +
+      '<div class="deflection-bubble">⚠️ ' + escHtml(msg.text) + '</div>';
+    return outer;
+  }
+  if (msg.type === 'escalation-prompt') {
+    outer.className = 'msg bot';
+    outer.innerHTML = '<div class="msg-avatar">🤖</div>' +
+      '<div class="msg-bubble">' + escHtml(msg.text) +
+      '<div class="escalation-form" id="escalation-form-widget">' +
+        '<div class="esc-title">📧 Escalate to our team</div>' +
+        '<div class="esc-desc">Provide your email address and we\'ll get back to you. We\'ll also send the Teams team a notification with your question.</div>' +
+        '<div class="form-field">' +
+          '<label class="form-label" for="esc-email-widget">Email address</label>' +
+          '<input type="email" class="form-input" id="esc-email-widget" placeholder="you@partnerco.io" aria-label="Your email address" aria-describedby="esc-email-error-widget">' +
+          '<div class="form-error" id="esc-email-error-widget" role="alert">Please enter a valid email address</div>' +
+        '</div>' +
+        '<button class="esc-submit" id="esc-submit-widget" onclick="submitEscalation(\'widget\')">Send escalation</button>' +
+      '</div>' +
+      '</div>';
+    return outer;
+  }
+  if (msg.type === 'escalation-success') {
+    outer.className = 'msg bot';
+    outer.innerHTML = '<div class="msg-avatar">🤖</div>' +
+      '<div class="escalation-success">' +
+        '<span class="success-icon">✅</span>' +
+        '<span>Thanks for reaching out — we\'ve received your question and will be in touch soon. A confirmation email has been sent to <strong>' + escHtml(msg.email || 'your address') + '</strong>.</span>' +
+      '</div>';
+    return outer;
+  }
+  if (msg.type === 'error') {
+    outer.className = 'msg bot';
+    outer.innerHTML = '<div class="msg-avatar">🤖</div>' +
+      '<div class="error-bubble" role="alert">' +
+        '⏱ Sorry, that\'s taking longer than expected. Please try again or escalate to our team.' +
+        '<div class="error-actions">' +
+          '<button class="error-link" onclick="loadScenario(\'escalation\')">Escalate to our team</button>' +
+          '<span style="color:#d1d5db;font-size:12px;">·</span>' +
+          '<button class="error-link" onclick="retryLastMessage()">Try again</button>' +
+        '</div>' +
+      '</div>';
+    return outer;
+  }
+  return outer;
+}
+function createFullpageMsgEl(msg) {
+  var outer = document.createElement('div');
+  if (msg.type === 'user') {
+    outer.className = 'fullpage-msg user';
+    outer.innerHTML =
+      '<div class="fullpage-msg-avatar">AP</div>' +
+      '<div class="fullpage-msg-content">' +
+        '<div class="fullpage-msg-label">You</div>' +
+        '<div class="fullpage-bubble">' + escHtml(msg.text) + '</div>' +
+      '</div>';
+    return outer;
+  }
+  if (msg.type === 'answer') {
+    outer.className = 'fullpage-msg bot';
+    var inner = '<div class="fullpage-msg-avatar">🤖</div><div class="fullpage-msg-content"><div class="fullpage-msg-label">EMIS Interop Assistant</div><div class="fullpage-bubble">' + msg.text;
+    if (msg.citation) {
+      inner += '<div class="citation-card" style="margin-top:10px;">' +
+        '<div class="citation-label">📎 Source</div>' +
+        '<a class="citation-url" href="#" onclick="return false;">' + escHtml(msg.citation.url) + '</a>' +
+        '<div class="citation-quote">"' + escHtml(msg.citation.quote) + '"</div>' +
+        '</div>';
+    }
+    inner += '</div></div>';
+    outer.innerHTML = inner;
+    return outer;
+  }
+  if (msg.type === 'deflection') {
+    outer.className = 'fullpage-msg bot';
+    outer.innerHTML = '<div class="fullpage-msg-avatar">🤖</div>' +
+      '<div class="fullpage-msg-content">' +
+        '<div class="fullpage-msg-label">EMIS Interop Assistant</div>' +
+        '<div class="deflection-bubble" style="border-radius:12px;border-top-left-radius:2px;">⚠️ ' + escHtml(msg.text) + '</div>' +
+      '</div>';
+    return outer;
+  }
+  if (msg.type === 'escalation-prompt') {
+    outer.className = 'fullpage-msg bot';
+    outer.innerHTML = '<div class="fullpage-msg-avatar">🤖</div>' +
+      '<div class="fullpage-msg-content" style="max-width:520px;">' +
+        '<div class="fullpage-msg-label">EMIS Interop Assistant</div>' +
+        '<div class="fullpage-bubble">' + escHtml(msg.text) +
+          '<div class="escalation-form" id="escalation-form-fullpage" style="margin-top:12px;">' +
+            '<div class="esc-title">📧 Escalate to our team</div>' +
+            '<div class="esc-desc">Provide your email address and we\'ll get back to you.</div>' +
+            '<div class="form-field">' +
+              '<label class="form-label" for="esc-email-fullpage">Email address</label>' +
+              '<input type="email" class="form-input" id="esc-email-fullpage" placeholder="you@partnerco.io" aria-label="Your email address" aria-describedby="esc-email-error-fullpage">' +
+              '<div class="form-error" id="esc-email-error-fullpage" role="alert">Please enter a valid email address</div>' +
+            '</div>' +
+            '<button class="esc-submit" id="esc-submit-fullpage" onclick="submitEscalation(\'fullpage\')">Send escalation</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    return outer;
+  }
+  if (msg.type === 'escalation-success') {
+    outer.className = 'fullpage-msg bot';
+    outer.innerHTML = '<div class="fullpage-msg-avatar">🤖</div>' +
+      '<div class="fullpage-msg-content">' +
+        '<div class="fullpage-msg-label">EMIS Interop Assistant</div>' +
+        '<div class="escalation-success" style="border-radius:12px;">' +
+          '<span class="success-icon">✅</span>' +
+          '<span>Thanks for reaching out — we\'ve received your question and will be in touch soon. A confirmation email has been sent to <strong>' + escHtml(msg.email || 'your address') + '</strong>.</span>' +
+        '</div>' +
+      '</div>';
+    return outer;
+  }
+  if (msg.type === 'error') {
+    outer.className = 'fullpage-msg bot';
+    outer.innerHTML = '<div class="fullpage-msg-avatar">🤖</div>' +
+      '<div class="fullpage-msg-content">' +
+        '<div class="fullpage-msg-label">EMIS Interop Assistant</div>' +
+        '<div class="error-bubble" role="alert" style="border-radius:12px;border-top-left-radius:2px;">' +
+          '⏱ Sorry, that\'s taking longer than expected. Please try again or escalate to our team.' +
+          '<div class="error-actions">' +
+            '<button class="error-link" onclick="loadScenario(\'escalation\')">Escalate to our team</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    return outer;
+  }
+  return outer;
+}
+/* ============================================================
+   SEND MESSAGE
+   ============================================================ */
+function sendWidgetMessage() {
+  var input = document.getElementById('widget-input');
+  var text = input.value.trim();
+  if (!text || state.isLoading) return;
+  if (state.rateLimit <= 0) {
+    showRateLimitWarning();
+    return;
+  }
+  input.value = '';
+  state.rateLimit--;
+  state.messageCount++;
+  // Add user message
+  state.messages.push({ type: 'user', text: text });
+  renderWidgetMessages();
+  scrollWidgetToBottom();
+  // Show loading
+  showWidgetLoading();
+  // Determine response (simple keyword matching for demo)
+  var scenario = detectScenario(text);
+  var delay = scenario === 'timeout' ? 1500 : 2000;
+  setTimeout(function() {
+    hideWidgetLoading();
+    var response = SCENARIOS[scenario] ? SCENARIOS[scenario].botResponse : SCENARIOS['in-scope'].botResponse;
+    state.messages.push(response);
+    renderWidgetMessages();
+    scrollWidgetToBottom();
+    updateRateLimitDisplay();
+  }, delay);
+}
+function sendFullpageMessage() {
+  var input = document.getElementById('fullpage-input');
+  var text = input.value.trim();
+  if (!text || state.isLoading) return;
+  if (state.rateLimit <= 0) return;
+  input.value = '';
+  state.rateLimit--;
+  state.messageCount++;
+  state.messages.push({ type: 'user', text: text });
+  renderFullpageMessages();
+  scrollFullpageToBottom();
+  // Show loading in fullpage
+  showFullpageLoading();
+  var scenario = detectScenario(text);
+  var delay = scenario === 'timeout' ? 1500 : 2000;
+  setTimeout(function() {
+    hideFullpageLoading();
+    var response = SCENARIOS[scenario] ? SCENARIOS[scenario].botResponse : SCENARIOS['in-scope'].botResponse;
+    state.messages.push(response);
+    renderFullpageMessages();
+    scrollFullpageToBottom();
+  }, delay);
+}
+function detectScenario(text) {
+  var lower = text.toLowerCase();
+  if (lower.includes('weather') || lower.includes('stock') || lower.includes('recipe') || lower.includes('sport')) return 'deflection';
+  if (lower.includes('escalat') || lower.includes('token refresh') || lower.includes('smart on fhir') || lower.includes('mid-consult')) return 'escalation';
+  if (lower.includes('data model') || lower.includes('full') && lower.includes('clinical')) return 'timeout';
+  return 'in-scope';
+}
+function handleWidgetKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendWidgetMessage();
+  }
+}
+function handleFullpageKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendFullpageMessage();
+  }
+}
+/* ============================================================
+   LOADING STATES
+   ============================================================ */
+var widgetLoadingEl = null;
+var fullpageLoadingEl = null;
+var loadingStepInterval = null;
+function showWidgetLoading() {
+  state.isLoading = true;
+  document.getElementById('widget-send-btn').disabled = true;
+  var container = document.getElementById('widget-messages');
+  widgetLoadingEl = document.createElement('div');
+  widgetLoadingEl.className = 'loading-state';
+  widgetLoadingEl.id = 'widget-loading-el';
+  widgetLoadingEl.setAttribute('role', 'status');
+  widgetLoadingEl.setAttribute('aria-live', 'polite');
+  widgetLoadingEl.innerHTML =
+    '<div class="msg-avatar" style="background:var(--sl-accent);color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">🤖</div>' +
+    '<div class="loading-bubble">' +
+      '<div class="loading-dots"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>' +
+      '<div class="status-text" id="widget-status-text"><span class="status-spinner"></span> <span id="widget-status-label">Searching documentation…</span></div>' +
+    '</div>';
+  container.appendChild(widgetLoadingEl);
+  scrollWidgetToBottom();
+  // Cycle through loading steps
+  var step = 0;
+  loadingStepInterval = setInterval(function() {
+    step = (step + 1) % LOADING_STEPS.length;
+    var label = document.getElementById('widget-status-label');
+    if (label) label.textContent = LOADING_STEPS[step].text;
+  }, 600);
+}
+function hideWidgetLoading() {
+  state.isLoading = false;
+  document.getElementById('widget-send-btn').disabled = false;
+  if (loadingStepInterval) { clearInterval(loadingStepInterval); loadingStepInterval = null; }
+  var el = document.getElementById('widget-loading-el');
+  if (el) el.remove();
+}
+function showFullpageLoading() {
+  state.isLoading = true;
+  var container = document.getElementById('fullpage-messages');
+  fullpageLoadingEl = document.createElement('div');
+  fullpageLoadingEl.className = 'fullpage-msg bot';
+  fullpageLoadingEl.id = 'fullpage-loading-el';
+  fullpageLoadingEl.setAttribute('role', 'status');
+  fullpageLoadingEl.setAttribute('aria-live', 'polite');
+  fullpageLoadingEl.innerHTML =
+    '<div class="fullpage-msg-avatar">🤖</div>' +
+    '<div class="fullpage-msg-content">' +
+      '<div class="fullpage-msg-label">EMIS Interop Assistant</div>' +
+      '<div class="loading-bubble" style="border-radius:12px;border-top-left-radius:2px;">' +
+        '<div class="loading-dots"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>' +
+        '<div class="status-text"><span class="status-spinner"></span> <span id="fp-status-label">Searching documentation…</span></div>' +
+      '</div>' +
+    '</div>';
+  container.appendChild(fullpageLoadingEl);
+  scrollFullpageToBottom();
+  var step = 0;
+  loadingStepInterval = setInterval(function() {
+    step = (step + 1) % LOADING_STEPS.length;
+    var label = document.getElementById('fp-status-label');
+    if (label) label.textContent = LOADING_STEPS[step].text;
+  }, 600);
+}
+function hideFullpageLoading() {
+  state.isLoading = false;
+  if (loadingStepInterval) { clearInterval(loadingStepInterval); loadingStepInterval = null; }
+  var el = document.getElementById('fullpage-loading-el');
+  if (el) el.remove();
+}
+/* ============================================================
+   SCENARIO LOADER (demo toolbar)
+   ============================================================ */
+function loadScenario(scenarioKey) {
+  if (!state.isAuthenticated) {
+    alert('Switch to Authenticated mode first.');
+    return;
+  }
+  // Open widget if not open
+  if (!state.widgetOpen && !state.isFullPage) {
+    state.widgetOpen = true;
+    var panel = document.getElementById('widget-panel');
+    panel.classList.remove('hidden');
+    document.getElementById('widget-fab').setAttribute('aria-expanded', 'true');
+    document.getElementById('widget-fab').innerHTML = '✕';
+  }
+  var scenario = SCENARIOS[scenarioKey];
+  if (!scenario) return;
+  // Add user message
+  state.messages.push({ type: 'user', text: scenario.userMsg });
+  if (scenarioKey === 'loading') {
+    // Show loading states for 3 seconds then show answer
+    if (state.isFullPage) {
+      renderFullpageMessages();
+      scrollFullpageToBottom();
+      showFullpageLoading();
+      setTimeout(function() {
+        hideFullpageLoading();
+        state.messages.push(scenario.botResponse);
+        renderFullpageMessages();
+        scrollFullpageToBottom();
+      }, 3000);
+    } else {
+      renderWidgetMessages();
+      scrollWidgetToBottom();
+      showWidgetLoading();
+      setTimeout(function() {
+        hideWidgetLoading();
+        state.messages.push(scenario.botResponse);
+        renderWidgetMessages();
+        scrollWidgetToBottom();
+      }, 3000);
+    }
+    return;
+  }
+  // Add bot response immediately for other scenarios
+  state.messages.push(scenario.botResponse);
+  if (state.isFullPage) {
+    renderFullpageMessages();
+    scrollFullpageToBottom();
+  } else {
+    renderWidgetMessages();
+    scrollWidgetToBottom();
+  }
+}
+/* ============================================================
+   ESCALATION
+   ============================================================ */
+function submitEscalation(context) {
+  var emailInput = document.getElementById('esc-email-' + context);
+  var errorEl = document.getElementById('esc-email-error-' + context);
+  var submitBtn = document.getElementById('esc-submit-' + context);
+  var email = emailInput ? emailInput.value.trim() : '';
+  // Validate email (RFC 5322 simplified)
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    emailInput.classList.add('error');
+    errorEl.classList.add('visible');
+    emailInput.focus();
+    return;
+  }
+  // Clear error
+  emailInput.classList.remove('error');
+  errorEl.classList.remove('visible');
+  // Disable submit (idempotency)
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Sending…';
+  // Simulate dispatch
+  setTimeout(function() {
+    // Remove the escalation-prompt message and replace with success
+    var idx = state.messages.findLastIndex(function(m) { return m.type === 'escalation-prompt'; });
+    if (idx === -1) {
+      // Fallback: find last index manually
+      for (var i = state.messages.length - 1; i >= 0; i--) {
+        if (state.messages[i].type === 'escalation-prompt') { idx = i; break; }
+      }
+    }
+    if (idx !== -1) {
+      state.messages[idx] = { type: 'escalation-success', email: email };
+    } else {
+      state.messages.push({ type: 'escalation-success', email: email });
+    }
+    if (context === 'fullpage') {
+      renderFullpageMessages();
+      scrollFullpageToBottom();
+    } else {
+      renderWidgetMessages();
+      scrollWidgetToBottom();
+    }
+  }, 800);
+}
+/* ============================================================
+   CLEAR CONVERSATION
+   ============================================================ */
+function openClearDialog(target) {
+  state.clearTarget = target;
+  document.getElementById('clear-dialog').classList.add('open');
+}
+function closeClearDialog() {
+  document.getElementById('clear-dialog').classList.remove('open');
+  state.clearTarget = null;
+}
+function confirmClear() {
+  state.messages = [];
+  state.messageCount = 0;
+  closeClearDialog();
+  if (state.isFullPage) {
+    renderFullpageMessages();
+  } else {
+    renderWidgetMessages();
+  }
+}
+/* ============================================================
+   RATE LIMIT
+   ============================================================ */
+function showRateLimitWarning() {
+  var footer = document.getElementById('widget-footer-text');
+  if (footer) {
+    footer.innerHTML = '<span style="color:var(--sl-warning);">⚠️ You\'ve reached the 50 message limit for this session. Please clear your conversation or return tomorrow.</span>';
+  }
+}
+function updateRateLimitDisplay() {
+  var footer = document.getElementById('widget-footer-text');
+  if (footer) {
+    footer.textContent = state.rateLimit + ' messages remaining this session';
+    if (state.rateLimit <= 10) {
+      footer.style.color = 'var(--sl-warning)';
+    }
+  }
+}
+/* ============================================================
+   RETRY
+   ============================================================ */
+function retryLastMessage() {
+  // Remove error message and last user message, re-send
+  if (state.messages.length >= 2) {
+    var last = state.messages[state.messages.length - 1];
+    if (last.type === 'error') {
+      state.messages.pop(); // remove error
+      var userMsg = state.messages[state.messages.length - 1];
+      if (userMsg && userMsg.type === 'user') {
+        state.messages.pop(); // remove user msg
+        var text = userMsg.text;
+        // Re-inject
+        state.messages.push({ type: 'user', text: text });
+        renderWidgetMessages();
+        showWidgetLoading();
+        setTimeout(function() {
+          hideWidgetLoading();
+          state.messages.push(SCENARIOS['in-scope'].botResponse);
+          renderWidgetMessages();
+          scrollWidgetToBottom();
+        }, 2000);
+      }
+    }
+  }
+}
+/* ============================================================
+   RESET
+   ============================================================ */
+function resetAll() {
+  state.messages = [];
+  state.messageCount = 0;
+  state.rateLimit = 50;
+  state.isLoading = false;
+  if (loadingStepInterval) { clearInterval(loadingStepInterval); loadingStepInterval = null; }
+  closeClearDialog();
+  if (state.isFullPage) {
+    minimiseToWidget();
+  }
+  if (state.widgetOpen) {
+    toggleWidget();
+  }
+  setAuthState(true);
+  navigateTo('home');
+  renderWidgetMessages();
+  updateRateLimitDisplay();
+}
+/* ============================================================
+   SCROLL HELPERS
+   ============================================================ */
+function scrollWidgetToBottom() {
+  setTimeout(function() {
+    var el = document.getElementById('widget-messages');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 50);
+}
+function scrollFullpageToBottom() {
+  setTimeout(function() {
+    var el = document.getElementById('fullpage-messages');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 50);
+}
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+// Polyfill for findLastIndex (not in all browsers)
+if (!Array.prototype.findLastIndex) {
+  Array.prototype.findLastIndex = function(fn) {
+    for (var i = this.length - 1; i >= 0; i--) {
+      if (fn(this[i], i, this)) return i;
+    }
+    return -1;
+  };
+}
+// Close modal on backdrop click
+document.getElementById('clear-dialog').addEventListener('click', function(e) {
+  if (e.target === this) closeClearDialog();
+});
+// Keyboard: Escape closes modal
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeClearDialog();
+    if (state.widgetOpen) toggleWidget();
+  }
+});
+// Show welcome message on init
+function showWelcomeMessage() {
+  renderWidgetMessages();
+}
+</script>
+</body>
+</html>
+

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Genesis.AI.Api.Dtos;
 using Genesis.AI.Domain.Commands.CreateArtefacts;
+using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.Queries.GetArtefactById;
 using Genesis.AI.Domain.Queries.GetArtefactsByStage;
 using MediatR;
@@ -17,10 +18,12 @@ namespace Genesis.AI.Api.Controllers;
 public class ArtefactController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IArtefactStorageService _artefactStorageService;
 
-    public ArtefactController(IMediator mediator)
+    public ArtefactController(IMediator mediator, IArtefactStorageService artefactStorageService)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
     }
 
     /// <summary>
@@ -63,6 +66,8 @@ public class ArtefactController : ControllerBase
         if (artefact is null || artefact.ProjectId != projectId)
             return NotFound();
 
+        var content = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
+
         return Ok(new ArtefactDetailDto
         {
             Id = artefact.Id,
@@ -70,7 +75,7 @@ public class ArtefactController : ControllerBase
             Version = artefact.Version,
             FilePath = artefact.FilePath,
             ContentType = artefact.ContentType,
-            Content = artefact.Content,
+            Content = content,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
             CreatedAt = artefact.CreatedAt

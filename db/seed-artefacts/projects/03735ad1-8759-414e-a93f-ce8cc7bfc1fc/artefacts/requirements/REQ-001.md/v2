@@ -1,0 +1,253 @@
+# REQ-001: Conversational Q&A Chat Widget
+**Priority:** Must Have
+**Effort:** High
+**Risk:** High
+**Depends On:** None
+---
+## User Story
+As an authenticated EMIS-X partner developer,
+I need a conversational chat bot embedded in the partner portal,
+So that I can get clear, example-driven answers to my interoperability questions without waiting for the internal team.
+**Acceptance Criteria:**
+- [ ] Widget is visible in the bottom-right corner on every portal page
+- [ ] Both the widget and full-page view require EMIS-X authentication — unauthenticated users are redirected to login
+- [ ] Bot reformulates documentation content in clearer language with examples rather than quoting verbatim
+- [ ] Every answer includes a citation: the source page URL and the relevant quoted lines from that page
+- [ ] Out-of-scope questions (e.g. "What's the weather like today?") receive a polite deflection: "I can only help with questions about EMIS interoperability — please try asking about our APIs or authentication flows."
+- [ ] Conversation history persists across page navigation until the browser is closed or the user explicitly presses "Clear conversation"
+---
+## Dimension 1: Clinical Safety
+### Applicable Guardrails
+- Not applicable — this system is classified as not safety-critical and does not process patient data.
+### Hazards Addressed
+- None identified — no patient safety implications.
+### Mitigations
+- None required.
+---
+## Dimension 2: Information Governance
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — only the user's question text and session conversation history are processed; no unnecessary personal data collected.
+- **IG-003:** Lawful Basis Declaration — lawful basis for processing conversation data must be confirmed before go-live.
+### GDPR Articles
+- **Article 6 Lawful Basis:** `[UNVERIFIED — IG-OWNER: TBD — RESOLUTION DATE: TBD — GO-LIVE BLOCKER]`
+  - Likely basis: Legitimate interests (Article 6(1)(f)) — processing partner developer queries to provide technical support. Requires confirmation.
+- **Article 9 Special Category:** Not applicable — no health or special category data processed.
+### Data Handling Requirements
+- **Data Categories:** Conversation text (questions and answers), session state
+- **Data Subjects:** External partner developers
+- **Retention Period:** Session-scoped only — conversation history cleared on browser close or explicit reset. No server-side retention of conversation content unless escalation is triggered.
+- **Data Minimisation:** Only collect question text; do not collect user identity, IP address, or device fingerprint unless required for escalation.
+---
+## Dimension 3: Security
+### Applicable Guardrails
+- **AUTH-004:** Authorisation Required — EMIS-X authentication required for all access to the chat widget and full-page view.
+- **SEC-001:** TLS Encryption in Transit — all communication between the widget and backend must use TLS 1.2+.
+- **WSEC-006a:** URL Encoding — any user-supplied query text embedded in API requests must use `encodeURIComponent()`.
+- **WSEC-013:** Security Headers — `@emisgroup/acp-security-headers` must be present in package dependencies.
+### Security Requirements
+- **Authentication:** EMIS-X OAuth2 — unauthenticated users redirected to EMIS-X login before chat is accessible.
+- **Authorisation:** Authenticated EMIS-X users only.
+- **Encryption in Transit:** TLS 1.2+ for all HTTP communication between widget and backend AI service.
+- **Encryption at Rest:** Not applicable — no server-side conversation storage for standard interactions.
+---
+## Dimension 4: Observability & Performance
+### Product KPIs
+- **KPI 1:** Bot answer rate (questions answered vs. deflected/escalated) — Baseline: 0%, Target: >80% answered without escalation
+- **KPI 2:** Sprint time spent answering interop questions — Baseline: ~20%, Target: <5%
+- **KPI 3:** p95 response latency — Baseline: N/A, Target: <10,000ms
+### Observable Events (OTEL Instrumentation)
+- **Span 1:** `qabot.chat.query.start`
+  - Attributes: session_id, question_length_chars, page_url
+- **Span 2:** `qabot.chat.query.complete`
+  - Attributes: session_id, duration_ms, status (answered/deflected/error), citation_count
+- **Span 3:** `qabot.chat.session.reset`
+  - Attributes: session_id, reset_trigger (browser_close/explicit_button)
+### Performance SLOs
+- **Latency p95:** < 10,000ms
+- **Availability:** 99.9%
+- **Error Rate:** < 1%
+### Alerting Conditions
+- **Critical:** p95 latency exceeds 15,000ms for 5 consecutive minutes → Teams/PagerDuty
+- **Warning:** Error rate exceeds 1% over 10-minute window → Teams notification
+---
+## Dimension 5: Frontend & Accessibility
+### EMIS-X Platform Mandates (Non-Negotiable)
+- **WA-005:** pnpm only — `pnpm-lock.yaml` must exist; `package-lock.json` / `yarn.lock` forbidden
+- **DS-001:** `@emisgroup/ui-*` components only — no native `<button>`, `<input>`, `<textarea>`, `<dialog>`
+- **DS-002:** Design tokens only — no hardcoded hex/rgb/hsl in CSS/SCSS; use `var(--token-*)`
+- **DS-004:** Iconify `~icons/ic/outline-*` — no lucide-react, react-icons, heroicons
+- **WSEC-013:** `@emisgroup/acp-security-headers` in package.json dependencies
+- **HTTP-002a:** `axios.create({ timeout: 30_000 })` — no raw `fetch()` or bare `axios.get()`
+- **HTTP-003a:** No `httpAgent` / `httpsAgent` / `keepAlive` — browser SPA must not configure Node.js agents
+- **WCS-007a:** All UI text via `t()` from react-i18next; keys in `src/locales/en-GB/translation.json`
+- **WCS-007b:** British English spellings — colour, centre, grey, behaviour, licence
+- **A11Y-010:** `jest-axe` + `toHaveNoViolations()` in every component test file
+### Accessibility Requirements
+- Chat input field must have `aria-label` or `aria-labelledby` (A11Y-004a)
+- Loading/thinking state must use `aria-live="polite"` or `role="status"` (A11Y-007a)
+- Error states must use `role="alert"` (A11Y-007a)
+- Widget open/close toggle must be keyboard accessible
+---
+## ✨ Evaluation Function Specification
+**PURPOSE:** Define DETERMINISTIC pass/fail criteria for coding agents to verify implementation.
+---
+### CHECK 1: AUTH-004 — EMIS-X Authentication Required
+**Trigger:** Any request to access the chat widget (widget render or full-page route) without an EMIS-X session.
+**Test Scenario 1: Unauthenticated user blocked**
+- **Input:** Page load with no EMIS-X session token
+- **Expected Behaviour:** Chat widget NOT rendered; user redirected to EMIS-X login
+- **Validation:** Widget DOM element absent for unauthenticated users
+**Test Scenario 2: Authenticated user permitted**
+- **Input:** Page load with valid EMIS-X session token
+- **Expected Behaviour:** Chat widget rendered and interactive
+- **Validation:** Widget DOM element present; chat input enabled
+**Applicable Guardrail:** AUTH-004
+**Pass Criteria:** Unauthenticated users BLOCKED and REDIRECTED; authenticated users PERMITTED
+---
+### CHECK 2: WSEC-006a — User Query URL Encoding
+**Trigger:** Any API call from the widget that embeds user-supplied question text in a URL or query string.
+**Test Scenario 1: Special characters in query are encoded**
+- **Input:** Question text containing `&`, `=`, `+`, `?`, spaces — e.g. `"What's the auth flow for /token endpoint?"`
+- **Expected Behaviour:** The outgoing HTTP request URL contains `encodeURIComponent()` encoded values — e.g. `%2F`, `%3F`, `%27`
+- **Anti-pattern:** Raw template literal interpolation — e.g. `` `/api/query?q=${userInput}` ``
+**Test Scenario 2: Clean query passes through correctly**
+- **Input:** `"Which authentication flow should I use?"`
+- **Expected Behaviour:** Request URL formed correctly with encoded query parameter; response received
+**Applicable Guardrail:** WSEC-006a
+**Pass Criteria:** All user-supplied values URL-encoded before insertion into request URLs
+---
+### CHECK 3: OUT-OF-SCOPE — Deflection Response
+**Trigger:** User submits a question with no relevance to EMIS interoperability documentation.
+**Test Scenario 1: Unrelated question deflected**
+- **Input:** `"What's the weather like today?"`
+- **Expected Response:** Bot reply containing polite deflection message
+- **Expected Body:** Text includes "I can only help with questions about EMIS interoperability" (or equivalent polite phrasing from translation.json)
+- **Validation:** Response does NOT include a citation URL or quoted doc lines
+- **Validation:** Response does NOT fabricate an answer
+**Test Scenario 2: In-scope question answered**
+- **Input:** `"I've got a backend API that I want to make calls from to EMIS APIs, which authentication flow should I be using?"`
+- **Expected Response:** Answer text + at least one citation URL + at least one quoted line from source doc
+- **Validation:** Response does NOT deflect
+**Applicable Guardrail:** IG-001 (Data Minimisation — do not hallucinate beyond indexed docs)
+**Pass Criteria:** Out-of-scope questions DEFLECTED; in-scope questions ANSWERED with citation
+---
+### CHECK 4: CITATION — Every Answer Includes Source Reference
+**Trigger:** Any successful (non-deflected) bot response.
+**Test Scenario 1: Citation fields present**
+- **Input:** Any valid in-scope question
+- **Expected Response:** Response object contains:
+  - `answer` (string — reformulated explanation)
+  - `citations` (array, length ≥ 1)
+  - Each citation contains: `page_url` (valid URL string) + `quoted_lines` (non-empty string)
+- **Validation:** `citations` array is NOT empty
+- **Validation:** `page_url` is a valid absolute URL (starts with `https://`)
+- **Validation:** `quoted_lines` is non-empty string
+**Test Scenario 2: No citation fabrication**
+- **Validation:** `page_url` values must resolve to actual pages within the partner portal documentation domain — not external or invented URLs
+**Applicable Guardrail:** IG-001 (factual accuracy / data minimisation — no hallucinated content)
+**Pass Criteria:** Every non-deflected response contains ≥ 1 citation with URL and quoted lines
+---
+### CHECK 5: PERFORMANCE — p95 Response Latency < 10,000ms
+**Trigger:** Any chat query submission.
+**Test Scenario 1: Response within SLO**
+- **Setup:** Submit 20 representative in-scope questions
+- **Measurement:** Record response time for each (from submission to first complete response received)
+- **Expected Result:** 95th percentile of response times < 10,000ms
+- **Validation:** No individual response exceeds 30,000ms (hard timeout)
+**Test Scenario 2: Timeout handled gracefully**
+- **Setup:** Simulate backend response time > 30,000ms
+- **Expected UI Behaviour:** Widget displays error message — "Sorry, it's taking longer than expected. Please try again." — with `role="alert"`
+- **Validation:** Widget does not hang indefinitely
+**Applicable Guardrail:** HTTP-002a (axios timeout: 30,000ms)
+**Pass Criteria:** p95 < 10,000ms; timeouts surface user-friendly error with role="alert"
+---
+### CHECK 6: SESSION PERSISTENCE — Conversation Survives Page Navigation
+**Trigger:** User navigates to a different page mid-conversation.
+**Test Scenario 1: History retained after navigation**
+- **Setup:** User sends 2 messages; receives 2 responses
+- **Action:** User navigates to a different portal page
+- **Expected Behaviour:** Widget reopens showing full prior conversation history
+- **Validation:** Message count in widget = 4 (2 questions + 2 answers)
+**Test Scenario 2: Session cleared on explicit reset**
+- **Setup:** User sends messages; conversation history present
+- **Action:** User clicks "Clear conversation" button
+- **Expected Behaviour:** Widget conversation area is empty; session state reset
+- **Validation:** Message count = 0 after reset
+**Test Scenario 3: Session cleared on browser close**
+- **Setup:** Conversation history present in sessionStorage
+- **Action:** Browser session ends (tab/window close)
+- **Expected Behaviour:** On next visit, widget opens with empty conversation
+- **Validation:** sessionStorage key for conversation history does not persist to new session
+**Applicable Guardrail:** IG-001 (Data Minimisation — no persistent storage of conversation beyond session)
+**Pass Criteria:** History persists across navigation; cleared on browser close and explicit reset
+---
+### CHECK A: DS-001 — No Native HTML Interactive Elements
+**Trigger:** Widget component render.
+- Mount the chat widget React component
+- Assert `document.querySelector('button, input, select, textarea, dialog')` returns `null`
+- All interaction uses `@emisgroup/ui-*` equivalents
+**Pass Criteria:** Zero native HTML interactive elements in rendered output.
+---
+### CHECK B: DS-002 — No Hardcoded Colour Values
+**Trigger:** Any SCSS/CSS file in the widget component directory.
+- Read all `.scss` / `.css` files
+- Assert no match for `/#[0-9a-fA-F]{3,8}|rgb\(|rgba\(|hsl\(|hsla\(/`
+- All colours use `var(--token-*)` design tokens
+**Pass Criteria:** Zero hardcoded colour literals in style files.
+---
+### CHECK C: A11Y-004a — Chat Input Has Accessible Label
+**Trigger:** Chat input field render.
+- Render widget and run `await axe(container)`
+- Assert zero violations with id `label` or `label-content-name-mismatch`
+- Chat input field has `aria-label="Ask a question about EMIS interoperability"` or equivalent `aria-labelledby`
+**Pass Criteria:** jest-axe `toHaveNoViolations()` passes; chat input labelled correctly.
+---
+### CHECK D: WCS-007a/b — All UI Text Uses i18n with British English
+**Trigger:** Any user-visible text in the widget.
+- Static analysis of widget `.tsx` files
+- Assert zero multi-word text between `>` and `<` not wrapped in `{t(`
+- Verify `src/locales/en-GB/translation.json` contains British English spellings: "colour", "centre", "grey" where applicable
+- Deflection message key present in translation file
+**Pass Criteria:** Zero hardcoded English strings in JSX; British English in translation JSON.
+---
+### CHECK E: A11Y-010 — jest-axe in Widget Component Test
+**Trigger:** Widget component test file.
+- Assert test file imports `axe` from `jest-axe`
+- Assert test file contains `toHaveNoViolations()`
+- Assert loading state uses `aria-live="polite"` or `role="status"`
+- Assert error state uses `role="alert"`
+**Pass Criteria:** jest-axe assertion present; live regions correctly assigned.
+---
+## Traceability
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|-----------------|
+| REQ-001 | Unauthenticated access | EMIS-X auth enforcement | AUTH-004 | CHECK 1 |
+| REQ-001 | URL injection via unencoded query | encodeURIComponent() | WSEC-006a | CHECK 2 |
+| REQ-001 | Hallucinated/out-of-scope responses | Deflection logic | IG-001 | CHECK 3 |
+| REQ-001 | Missing citations / factual drift | Citation enforcement | IG-001 | CHECK 4 |
+| REQ-001 | Poor UX due to slow responses | p95 SLO + timeout | HTTP-002a | CHECK 5 |
+| REQ-001 | Session data leakage across visits | sessionStorage + reset | IG-001 | CHECK 6 |
+| REQ-001 | — | @emisgroup components | DS-001 | CHECK A |
+| REQ-001 | — | Design tokens | DS-002 | CHECK B |
+| REQ-001 | — | Accessible input label | A11Y-004a | CHECK C |
+| REQ-001 | — | i18n + British English | WCS-007a/b | CHECK D |
+| REQ-001 | — | jest-axe coverage | A11Y-010 | CHECK E |
+---
+## Change Log
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-31 | Pipeline 01 Requirements | Initial creation |
+| 1.1 | 2026-05-31 | Pipeline 01 Requirements | Phase 11 correction: EMIS-X authentication added to widget (confirmed applies to both widget and full-page); AUTH-004 CHECK 1 added |
+**Next Update:** Pipeline 03 Architecture will:
+- Add Architecture section (platform boundaries, ADRs, tech stack)
+- Update Evaluation Function Specification with architecture-level checks
+- Add integration patterns and failure modes
+**Pipeline Status:**
+- ✅ Pipeline 01 Complete (Requirements with eval specs)
+- ⏳ Pipeline 03 Pending (Architecture)
+- ⏳ Pipeline 04 Pending (Design — API contracts, DB schemas)
+- ⏳ Pipeline 05 Pending (PxD — UI/UX specifications)
+- ⏳ Pipeline 06 Pending (Clinical Safety — N/A for this system)
+- ⏳ Pipeline 07 Pending (Normalisation — Transform to JSON)
+- ⏳ Pipeline 08 Pending (Planning — Dependency-ordered task plan)
+

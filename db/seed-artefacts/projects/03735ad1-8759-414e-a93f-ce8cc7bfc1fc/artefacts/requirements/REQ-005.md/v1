@@ -1,0 +1,164 @@
+# REQ-005: Conversation Management
+**Priority:** Must Have
+**Effort:** Low
+**Risk:** Low
+**Depends On:** REQ-001, REQ-003
+---
+## User Story
+As an external partner developer,
+I need my conversation history to persist across pages and views within my session, and to be clearable on demand or on browser close,
+So that I can continue a conversation naturally without losing context, and start fresh when I choose.
+**Acceptance Criteria:**
+- [ ] Conversation history persists across page navigation within the same browser session
+- [ ] Conversation history persists between widget and full-page views within the same session
+- [ ] An explicit "Clear conversation" button is available in both the widget and full-page view
+- [ ] Clicking "Clear conversation" immediately resets the conversation to a clean state (confirmation prompt shown before clearing)
+- [ ] Closing the browser clears the conversation — no history persists on next visit
+---
+## Dimension 1: Clinical Safety
+### Applicable Guardrails
+- N/A — system is not safety-critical
+### Hazards Addressed
+- None identified
+### Mitigations
+- None required
+---
+## Dimension 2: Information Governance
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — conversation data held in sessionStorage only, not persisted server-side
+### GDPR Articles
+- **Article 6 Lawful Basis:** N/A — no server-side personal data storage for conversation content
+- **Article 9 Special Category:** N/A
+### Data Handling Requirements
+- **Data Categories:** Conversation messages (non-personal in most cases)
+- **Data Subjects:** External partner developers
+- **Retention Period:** Session only — cleared on browser close
+- **Data Minimisation:** No conversation data written to server; sessionStorage scoped to tab/window
+---
+## Dimension 3: Security
+### Applicable Guardrails
+- **SEC-001:** TLS encryption in transit for all HTTP
+- **WSEC-006a:** encodeURIComponent() for any user-supplied URL values
+### Security Requirements
+- **Authentication:** EMIS-X authentication required (inherited from REQ-001, REQ-003)
+- **Authorisation:** Authenticated EMIS-X users only
+- **Encryption in Transit:** TLS 1.2+ for all HTTP
+- **Encryption at Rest:** N/A — conversation data not persisted server-side; sessionStorage used client-side only
+- **Storage:** sessionStorage (not localStorage) — scoped to tab/window, cleared on browser close
+---
+## Dimension 4: Observability & Performance
+### Product KPIs
+- **KPI 1:** Clear conversation event rate — baseline: unknown, target: measurable within sprint 1
+- **KPI 2:** Average session duration — baseline: unknown, target: measurable within sprint 1
+- **KPI 3:** Average conversation length (message count) — baseline: unknown, target: measurable within sprint 1
+### Observable Events (OTEL Instrumentation)
+- **Span 1:** `qabot.conversation.clear.start`
+  - **Attributes:** session_id, message_count_before_clear, trigger (button/browser_close)
+- **Span 2:** `qabot.conversation.clear.complete`
+  - **Attributes:** session_id, duration_ms, status
+### Performance SLOs
+- **Latency p95:** < 300ms for clear action
+- **Availability:** 99.9%
+- **Error Rate:** < 0.1%
+### Alerting Conditions
+- **Warning:** Clear action fails to reset state → Slack/Teams notification
+---
+## ✨ Evaluation Function Specification
+**PURPOSE:** Define DETERMINISTIC pass/fail criteria for coding agents to verify implementation.
+---
+### CHECK 1: Session Persistence Across Navigation
+**Trigger:** User navigates between pages within the same browser session
+**Test Scenario 1: Conversation persists across page navigation**
+- **Setup:** Authenticated EMIS-X user sends 3 messages in the widget on page A
+- **Action:** User navigates to page B
+- **Expected:** Widget shows same 3 messages
+- **Validation:** Message count and content identical before and after navigation
+**Test Scenario 2: Conversation persists between widget and full-page view**
+- **Setup:** Authenticated EMIS-X user sends 2 messages in widget
+- **Action:** User expands to full-page view
+- **Expected:** Full-page view shows same 2 messages
+- **Pass Criteria:** Conversation state shared across views within session
+**Applicable Guardrail:** IG-001 (Data Minimisation — sessionStorage only)
+**Pass Criteria:** Conversation history intact across navigation and view transitions
+---
+### CHECK 2: Clear Conversation Button
+**Trigger:** User clicks "Clear conversation" button
+**Test Scenario 1: Confirmation prompt shown before clearing**
+- **Input:** User clicks "Clear conversation"
+- **Expected:** Confirmation prompt appears before any data is cleared
+- **Validation:** Conversation history still visible at prompt stage
+**Test Scenario 2: Conversation cleared on confirmation**
+- **Input:** User confirms clear action
+- **Expected Response:** Conversation resets to empty state
+- **Validation:** Message count = 0, sessionStorage key cleared
+- **Timing:** Clear action completes < 300ms
+**Test Scenario 3: Cancel does not clear**
+- **Input:** User clicks "Clear conversation" then cancels
+- **Expected:** Conversation history unchanged
+- **Pass Criteria:** Cancel preserves all messages
+**Applicable Guardrail:** DS-001 (@emisgroup/ui-* components for button and confirmation dialog)
+**Pass Criteria:** Clear requires confirmation, executes within 300ms, cancellable
+---
+### CHECK 3: Browser Close Clears Conversation
+**Trigger:** User closes browser tab/window
+**Test Scenario 1: No persistence after browser close**
+- **Setup:** User has active conversation with 5 messages
+- **Action:** Close browser, reopen portal, navigate to same page
+- **Expected:** Widget shows empty conversation (no previous messages)
+- **Validation:** sessionStorage key does not exist on new session
+- **Anti-pattern:** localStorage used instead of sessionStorage (localStorage persists across browser close)
+**Applicable Guardrail:** IG-001 (Data Minimisation)
+**Pass Criteria:** sessionStorage used (not localStorage); conversation cleared on browser close
+---
+### CHECK 4: DS-001 — @emisgroup Components Only
+**Trigger:** Any rendered UI element for clear button or confirmation dialog
+**Test Scenario:** No native HTML interactive elements
+- **Validation 1:** No `<button>` elements — use `@emisgroup/ui-Button`
+- **Validation 2:** No `<dialog>` elements — use `@emisgroup/ui-Dialog` or equivalent
+- **Anti-pattern:** `<button onClick={clearConversation}>Clear</button>`
+**Applicable Guardrail:** DS-001
+**Pass Criteria:** All interactive elements use @emisgroup/ui-* components
+---
+### CHECK 5: WCS-007a — i18n for All UI Text
+**Trigger:** Any user-facing string in conversation management UI
+**Test Scenario:** All strings use t() from react-i18next
+- **Validation 1:** "Clear conversation" button label uses `t('conversation.clear.button')`
+- **Validation 2:** Confirmation prompt text uses `t('conversation.clear.confirm')`
+- **Validation 3:** Translation keys exist in `src/locales/en-GB/translation.json`
+- **Validation 4:** British English spellings used in translation JSON
+**Applicable Guardrail:** WCS-007a, WCS-007b
+**Pass Criteria:** No hardcoded English strings in JSX; all keys in en-GB translation file
+---
+### CHECK 6: A11Y-010 — jest-axe Accessibility
+**Trigger:** Component test file for conversation management UI
+**Test Scenario:** jest-axe passes with no violations
+- **Validation 1:** `import { axe, toHaveNoViolations } from 'jest-axe'` present in test file
+- **Validation 2:** `expect(results).toHaveNoViolations()` called in at least one test
+- **Validation 3:** Clear button has accessible label (`aria-label` or `htmlFor`)
+- **Validation 4:** Confirmation dialog has accessible role (`role="dialog"`, `aria-labelledby`)
+**Applicable Guardrail:** A11Y-010, A11Y-004a
+**Pass Criteria:** jest-axe passes with zero violations; all interactive elements accessible
+---
+## Traceability
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-005 | — | sessionStorage only | IG-001 | CHECK 3 |
+| REQ-005 | — | Confirmation before clear | DS-001 | CHECK 2 |
+| REQ-005 | — | Session persistence | IG-001 | CHECK 1 |
+| REQ-005 | — | @emisgroup components | DS-001 | CHECK 4 |
+| REQ-005 | — | i18n / British English | WCS-007a, WCS-007b | CHECK 5 |
+| REQ-005 | — | Accessibility | A11Y-010 | CHECK 6 |
+---
+## Change Log
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-31 | Pipeline 01 Requirements | Initial creation |
+**Pipeline Status:**
+- ✅ Pipeline 01 Complete (Requirements with eval specs)
+- ⏳ Pipeline 03 Pending (Architecture)
+- ⏳ Pipeline 04 Pending (Design — API contracts, DB schemas)
+- ⏳ Pipeline 05 Pending (PxD — UI/UX specifications)
+- ⏳ Pipeline 06 Pending (Clinical Safety — N/A for this system)
+- ⏳ Pipeline 07 Pending (Normalisation — Transform to JSON)
+- ⏳ Pipeline 08 Pending (Planning — Dependency-ordered tasks)
+

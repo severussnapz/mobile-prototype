@@ -31,15 +31,13 @@ public class ArtefactEntityTypeConfiguration : IEntityTypeConfiguration<Artefact
 
         builder.Property(artefact => artefact.S3Key)
             .HasColumnName("s3_key")
-            .HasMaxLength(1000);
+            .HasMaxLength(1000)
+            .IsRequired();
 
         builder.Property(artefact => artefact.ContentType)
             .HasColumnName("content_type")
             .HasMaxLength(100)
             .IsRequired();
-
-        builder.Property(artefact => artefact.Content)
-            .HasColumnName("content");
 
         builder.Property(artefact => artefact.SizeBytes)
             .HasColumnName("size_bytes");

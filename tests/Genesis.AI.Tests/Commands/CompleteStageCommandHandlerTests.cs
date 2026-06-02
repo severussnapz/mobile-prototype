@@ -174,6 +174,6 @@ public class CompleteStageCommandHandlerTests
 
     private static Artefact CreateArtefact(Guid projectId)
     {
-        return Artefact.CreateTextArtefact(projectId, 1, "requirements.md", "text/markdown", "# Content", "user-1", TimeProvider.System);
+        return Artefact.CreateS3Artefact(projectId, 1, "requirements.md", "projects/key/artefacts/requirements.md/v1", "text/markdown", 9, "user-1", TimeProvider.System);
     }
 }

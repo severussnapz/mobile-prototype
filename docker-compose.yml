@@ -42,6 +42,22 @@ services:
     networks:
       default:
 
+  localstack:
+    image: centraluk.jfrog.io/glb-docker-vir/localstack/localstack@sha256:897716c497b45eaa1c86c65fe4bd21806b07c2d230655f34ccfda7f6767d6383
+    environment:
+      - SERVICES=s3
+      - DEBUG=0
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
+      - ./db/seed-artefacts:/etc/localstack/seed-artefacts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal s3 ls s3://genesis-ai-artefacts/projects/ --recursive | grep -q manifest.md"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -60,6 +76,8 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=genesis_ai_requirements;Username=postgres;Password=postgres
       - Authentication__Authority=${IDENTITY_URL}/v2.0/
       - Authentication__Audience=${AUDIENCE}
+      - S3__ArtefactBucketName=genesis-ai-artefacts
+      - S3__ServiceUrl=http://localstack:4566
       - Cors__AllowedOrigins__0=http://localhost:8080
       - Cors__AllowedOrigins__1=http://localhost:5000
       - Cors__AllowedOrigins__2=https://app.dev.emishealthsolutions.com
@@ -69,6 +87,8 @@ services:
     depends_on:
       seed:
         condition: service_completed_successfully
+      localstack:
+        condition: service_healthy
 
 volumes:
   postgres_data:

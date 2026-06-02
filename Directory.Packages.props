@@ -30,6 +30,10 @@
     <!-- AWS Bedrock -->
     <PackageVersion Include="AWSSDK.BedrockRuntime" Version="3.7.422.0" />
 
+    <!-- AWS S3 -->
+    <PackageVersion Include="AWSSDK.S3" Version="3.7.416.7" />
+    <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.301" />
+
     <!-- JSON:API -->
     <PackageVersion Include="Emis.JsonApi" Version="3.0.0" />
 
