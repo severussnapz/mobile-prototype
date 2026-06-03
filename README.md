@@ -248,7 +248,14 @@ docker compose down -v
 
 ```
 src/
-├── Genesis.AI.Api/              # HTTP layer (controllers, auth, middleware, DTOs)
+├── Genesis.AI.Api/              # HTTP layer (feature slices, auth, middleware, shared Http envelopes)
+│   ├── Features/                # Vertical slices — one folder per feature (controller + models + profile)
+│   │   ├── Projects/
+│   │   ├── Conversations/
+│   │   ├── Artefacts/
+│   │   ├── Stages/
+│   │   └── Export/
+│   └── Http/                    # Shared envelopes: ApiResponse<T>, ApiErrorResponse, ApiError
 ├── Genesis.AI.Core/             # Base types (Entity, IAggregateRoot, logging)
 ├── Genesis.AI.Domain/           # Business logic (aggregates, commands, queries, enums)
 │   └── Interfaces/              # IArtefactStorageService (+ other contracts)

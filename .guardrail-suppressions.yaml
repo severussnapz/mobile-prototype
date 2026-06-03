@@ -1,4 +1,15 @@
 suppressions:
+  # ARCH-007: ApiResponse and ApiErrorResponse are cross-cutting, shared HTTP
+  # envelopes used by every feature slice — they are not feature-specific
+  # response models, so they live in the cross-cutting Http/ folder rather than
+  # in a feature slice or a Responses/ folder.
+  - id: ARCH-007
+    path: "src/Genesis.AI.Api/Http/ApiResponse.cs"
+    justification: "Cross-cutting shared HTTP envelope — not a feature-specific response model"
+  - id: ARCH-007
+    path: "src/Genesis.AI.Api/Http/ApiErrorResponse.cs"
+    justification: "Cross-cutting shared HTTP error envelope — not a feature-specific response model"
+
   # API-001: This project uses standard REST JSON, not JSON:API format.
   # It does not use the Emis.JsonApi package for response serialisation.
   - id: API-001
@@ -23,7 +34,7 @@ suppressions:
   # API-011: Artefact collection endpoints are unbounded but artefact counts
   # are naturally limited per project. Pagination not needed at this scale.
   - id: API-011
-    path: "src/Genesis.AI.Api/Controllers/ArtefactController.cs"
+    path: "src/Genesis.AI.Api/Features/Artefacts/ArtefactController.cs"
     justification: "Artefact counts are naturally bounded per project — pagination unnecessary"
 
   # ENG-009: Streaming controller complexity is inherent to SSE/tool-loop
@@ -32,7 +43,7 @@ suppressions:
   # orchestrates streaming + tool execution in a single while-loop — SSE event
   # sending has been extracted but class exceeds 200 lines due to tool execution.
   - id: ENG-009
-    path: "src/Genesis.AI.Api/Controllers/ConversationStreamController.cs"
+    path: "src/Genesis.AI.Api/Features/Conversations/ConversationStreamController.cs"
     justification: "SSE streaming orchestration — class exceeds 200 lines; tool events extracted but core loop is indivisible"
   - id: ENG-009
     path: "src/Genesis.AI.Infrastructure/Services/BedrockAiService.cs"
@@ -72,10 +83,10 @@ suppressions:
   # return 200 OK intentionally — they are state-transition actions, not resource
   # creation endpoints. Only AddParkingLotItem returns 201 Created.
   - id: API-007
-    path: "src/Genesis.AI.Api/Controllers/PipelineStagesController.cs"
+    path: "src/Genesis.AI.Api/Features/Stages/PipelineStagesController.cs"
     justification: "POST actions are state transitions (complete/skip) — return 200 OK, not 201 Created"
   - id: API-007
-    path: "src/Genesis.AI.Api/Controllers/ConversationStateController.cs"
+    path: "src/Genesis.AI.Api/Features/Conversations/ConversationStateController.cs"
     justification: "AdvancePhase is a state transition — returns 200 OK, not 201 Created"
 
   # ENG-005: Analyser pattern-matches 'new ProjectContext(...)' as DbContext
