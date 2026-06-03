@@ -107,7 +107,7 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 
 **Child Entities (not aggregate roots):**
 - `PipelineStage` — Owned by Project. State machine: NotStarted → InProgress → Complete (or Blocked).
-- `Message` — Owned by Conversation. Stores role, content, token count, optional image/document attachments (JSONB).
+- `Message` — Owned by Conversation. Stores role, content, token count, user identity (`UserErn`, `GivenName`, `FamilyName`), optional image/document attachments (JSONB).
 - `ParkingLotItem` — Owned by Conversation. Stores content, priority, status, source phase.
 - `TokenUsageRecord` — Owned by Conversation. Stores input, output, cache read, and cache write token counts per AI turn.
 
@@ -122,6 +122,7 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 - `Project.RecalculateStatus()` calls `UnblockAvailableStages()` which checks prerequisites and transitions Blocked → NotStarted when dependencies are satisfied
 - `PipelineStage.Start()` / `.Complete()` / `.Skip()` / `.Block()` / `.Reopen()` — state transitions with iteration tracking
 - `Conversation.AddMessage()` / `.AdvancePhase()` / `.SetPhase()` / `.UpdateProgress()` / `.Complete()` / `.Pause()` / `.Resume()`
+- `ParkingLotItem.Resolve()` / `.Defer()` / `.UpdatePriority()` / `.UpdateContent()`
 - Stage reopening increments `Iteration` and resets status to InProgress
 
 ---
@@ -187,11 +188,11 @@ Default values use `HasDefaultValueSql("'value'::enum_type")`, never `HasDefault
 | C# Type | PostgreSQL Type | Values |
 |---------|----------------|--------|
 | `ComplianceDomain` | `compliance_domain` | clinical_uk, generic, finance |
-| `ProjectStatus` | `project_status` | discovery, in_progress, complete |
+| `ProjectStatus` | `project_status` | discovery, in_progress, complete, archived |
 | `StageType` | `stage_type` | requirements_discovery, prototype, architecture, design, pxd, clinical_safety, normalisation, planning |
 | `PipelineStageStatus` | `pipeline_stage_status` | not_started, in_progress, complete, blocked |
 | `ConversationStatus` | `conversation_status` | active, completed, paused |
-| `ParkingLotPriority` | `parking_lot_priority` | critical, high, medium, low |
+| `ParkingLotPriority` | `parking_lot_priority` | critical, high, medium |
 | `ParkingLotStatus` | `parking_lot_status` | open, resolved, deferred |
 | `MessageRole` | `message_role` | user, assistant, system |
 
@@ -432,6 +433,7 @@ The `/api/v1/conversations/{id}/stream` endpoint sends real-time events:
 | `event: parking_lot_item` | `add_parking_lot_item` tool | `{id, content, priority, status, sourcePhase}` |
 | `event: parking_lot_resolved` | `resolve_parking_lot_item` tool | `{id, status}` |
 | `event: usage` | End of each AI turn | `{inputTokens, outputTokens, totalTokens, cacheReadInputTokens, cacheWriteInputTokens, cumulativeInputTokens, cumulativeOutputTokens}` |
+| `event: error` | AI stream error | `{error, reason}` — AI generation failure |
 | `data: [DONE]` | Stream complete | End-of-stream marker |
 
 All tool-triggered events are sent **immediately** when the tool completes (not batched at end of stream).
@@ -441,7 +443,7 @@ All tool-triggered events are sent **immediately** when the tool completes (not 
 
 ## Guardrail Compliance
 
-Platform: `emis-x-api` (defined in `.genesis-ai.yaml`, ref v2.0.0). Run the guardrail analyser before raising a PR.
+Platform: `emis-x-api` (defined in `.genesis-ai.yaml`, ref v2.0.1). Run the guardrail analyser before raising a PR.
 
 Suppressions are documented in `.guardrail-suppressions.yaml` with justifications for each.
 

@@ -84,6 +84,7 @@ services:
       - Cors__AllowedOrigins__3=https://app.int.emishealthsolutions.com
       - Cors__AllowedOrigins__4=https://app.stg.emis-x.uk
       - Cors__AllowedOrigins__5=https://app.emis-x.uk
+      - Cors__AllowedOrigins__6=https://host.sbx.emishealthsolutions.com
     depends_on:
       seed:
         condition: service_completed_successfully
