@@ -19,6 +19,12 @@ public class CreateProjectCommandHandler : IRequestHandler<CreateProjectCommand,
 
     public async Task<Guid> Handle(CreateProjectCommand request, CancellationToken cancellationToken)
     {
+        if (await _projectRepository.ExistsByCodeAsync(request.Code, cancellationToken))
+        {
+            throw new InvalidOperationException(
+                $"A project with code '{request.Code}' already exists.");
+        }
+
         var project = new Project(
             request.Code,
             request.Name,

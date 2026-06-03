@@ -39,6 +39,7 @@ public class ProjectsController : ControllerBase
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
     [ProducesResponseType(typeof(ProjectResource), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateProject(
         [FromBody] CreateProjectRequest request,
         CancellationToken cancellationToken)
@@ -64,7 +65,18 @@ public class ProjectsController : ControllerBase
             complianceDomain,
             userId);
 
-        var projectId = await _mediator.Send(command, cancellationToken);
+        Guid projectId;
+        try
+        {
+            projectId = await _mediator.Send(command, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ApiErrorResponse.Create(
+                "409",
+                "Duplicate project code",
+                ex.Message));
+        }
 
         var project = await _mediator.Send(
             new GetProjectByIdQuery(projectId), cancellationToken);
