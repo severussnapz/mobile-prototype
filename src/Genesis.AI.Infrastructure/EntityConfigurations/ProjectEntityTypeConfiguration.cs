@@ -55,7 +55,8 @@ public class ProjectEntityTypeConfiguration : IEntityTypeConfiguration<Project>
             .IsRequired();
 
         builder.HasIndex(project => project.Code)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("is_deleted = false");
 
         builder.HasMany(project => project.PipelineStages)
             .WithOne()
