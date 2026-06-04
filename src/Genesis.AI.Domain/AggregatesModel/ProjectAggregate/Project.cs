@@ -11,6 +11,7 @@ public class Project : Entity, IAggregateRoot
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public string? Description { get; private set; }
+    public string TimeSheetCode { get; private set; } = null!;
     public ComplianceDomain ComplianceDomain { get; private set; }
     public ProjectStatus Status { get; private set; }
     public string CreatedBy { get; private set; } = null!;
@@ -27,18 +28,21 @@ public class Project : Entity, IAggregateRoot
         string code,
         string name,
         string? description,
+        string timeSheetCode,
         ComplianceDomain complianceDomain,
         string createdBy,
         TimeProvider timeProvider)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(timeSheetCode);
         ArgumentException.ThrowIfNullOrWhiteSpace(createdBy);
 
         Id = Guid.NewGuid();
         Code = code.ToUpperInvariant();
         Name = name;
         Description = description;
+        TimeSheetCode = timeSheetCode;
         ComplianceDomain = complianceDomain;
         Status = ProjectStatus.Discovery;
         CreatedBy = createdBy;

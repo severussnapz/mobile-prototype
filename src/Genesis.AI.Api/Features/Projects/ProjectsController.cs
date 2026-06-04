@@ -62,6 +62,7 @@ public class ProjectsController : ControllerBase
             request.Code,
             request.Name,
             request.Description,
+            request.TimeSheetCode,
             complianceDomain,
             userId);
 

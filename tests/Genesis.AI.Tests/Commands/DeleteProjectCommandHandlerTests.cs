@@ -36,7 +36,7 @@ public class DeleteProjectCommandHandlerTests
     [Fact]
     public async Task Handle_ExistingProject_SoftDeletesProject()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
         _projectRepositoryMock
             .Setup(r => r.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(project);
@@ -51,7 +51,7 @@ public class DeleteProjectCommandHandlerTests
     [Fact]
     public async Task Handle_ExistingProject_SavesChanges()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
         _projectRepositoryMock
             .Setup(r => r.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(project);

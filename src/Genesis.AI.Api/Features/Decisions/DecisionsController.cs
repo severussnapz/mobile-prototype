@@ -81,7 +81,7 @@ public class DecisionsController : ControllerBase
     /// <summary>
     /// Updates an existing decision.
     /// </summary>
-    [HttpPut("{decisionId:guid}")]
+    [HttpPatch("{decisionId:guid}")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
     [ProducesResponseType(typeof(ApiResponse<DecisionResource>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

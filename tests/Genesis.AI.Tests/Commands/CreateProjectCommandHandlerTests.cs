@@ -36,7 +36,7 @@ public class CreateProjectCommandHandlerTests
     [Fact]
     public async Task Handle_ValidCommand_ReturnsNewProjectId()
     {
-        var command = new CreateProjectCommand("DOC", "Documents Management", "Description", ComplianceDomain.ClinicalUk, "user-1");
+        var command = new CreateProjectCommand("DOC", "Documents Management", "Description", "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1");
 
         var result = await _handler.Handle(command, CancellationToken.None);
 
@@ -52,7 +52,7 @@ public class CreateProjectCommandHandlerTests
             .Callback<Project, CancellationToken>((project, _) => capturedProject = project)
             .Returns(Task.CompletedTask);
 
-        var command = new CreateProjectCommand("DOC", "Documents Management", null, ComplianceDomain.Generic, "user-1");
+        var command = new CreateProjectCommand("DOC", "Documents Management", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1");
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -67,7 +67,7 @@ public class CreateProjectCommandHandlerTests
     [Fact]
     public async Task Handle_ValidCommand_SavesChanges()
     {
-        var command = new CreateProjectCommand("DOC", "Documents Management", null, ComplianceDomain.Generic, "user-1");
+        var command = new CreateProjectCommand("DOC", "Documents Management", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1");
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -83,7 +83,7 @@ public class CreateProjectCommandHandlerTests
             .Callback<Project, CancellationToken>((p, _) => capturedProject = p)
             .Returns(Task.CompletedTask);
 
-        var command = new CreateProjectCommand("TEST", "Test Project", "A description", ComplianceDomain.ClinicalUk, "admin");
+        var command = new CreateProjectCommand("TEST", "Test Project", "A description", "PORTASK0001045", ComplianceDomain.ClinicalUk, "admin");
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -91,6 +91,7 @@ public class CreateProjectCommandHandlerTests
         Assert.Equal("TEST", capturedProject.Code);
         Assert.Equal("Test Project", capturedProject.Name);
         Assert.Equal("A description", capturedProject.Description);
+        Assert.Equal("PORTASK0001045", capturedProject.TimeSheetCode);
         Assert.Equal(ComplianceDomain.ClinicalUk, capturedProject.ComplianceDomain);
         Assert.Equal("admin", capturedProject.CreatedBy);
         Assert.Equal(ProjectStatus.Discovery, capturedProject.Status);
@@ -106,7 +107,7 @@ public class CreateProjectCommandHandlerTests
             .Callback<Project, CancellationToken>((p, _) => capturedProject = p)
             .Returns(Task.CompletedTask);
 
-        var command = new CreateProjectCommand("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1");
+        var command = new CreateProjectCommand("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1");
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -123,7 +124,7 @@ public class CreateProjectCommandHandlerTests
             .Callback<Project, CancellationToken>((p, _) => capturedProject = p)
             .Returns(Task.CompletedTask);
 
-        var command = new CreateProjectCommand("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1");
+        var command = new CreateProjectCommand("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1");
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -145,7 +146,7 @@ public class CreateProjectCommandHandlerTests
             .Callback<Project, CancellationToken>((p, _) => capturedProject = p)
             .Returns(Task.CompletedTask);
 
-        var command = new CreateProjectCommand("DOC", "Documents", null, ComplianceDomain.Generic, "user-1");
+        var command = new CreateProjectCommand("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1");
 
         await _handler.Handle(command, CancellationToken.None);
 

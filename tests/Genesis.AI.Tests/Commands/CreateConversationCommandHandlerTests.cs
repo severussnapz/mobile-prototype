@@ -56,7 +56,7 @@ public class CreateConversationCommandHandlerTests
 
     private Project CreateProjectWithStages(ComplianceDomain domain = ComplianceDomain.ClinicalUk)
     {
-        return new Project("DOC", "Documents", null, domain, "user-1", _timeProvider);
+        return new Project("DOC", "Documents", null, "PORTASK0001045", domain, "user-1", _timeProvider);
     }
 
     [Fact]

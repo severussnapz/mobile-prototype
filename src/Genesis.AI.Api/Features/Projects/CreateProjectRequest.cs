@@ -13,6 +13,9 @@ public sealed class CreateProjectRequest
     [JsonPropertyName("description")]
     public string? Description { get; init; }
 
+    [JsonPropertyName("timeSheetCode")]
+    public string TimeSheetCode { get; init; } = null!;
+
     [JsonPropertyName("complianceDomain")]
     public string ComplianceDomain { get; init; } = null!;
 }

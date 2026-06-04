@@ -7,5 +7,6 @@ public record CreateProjectCommand(
     string Code,
     string Name,
     string? Description,
+    string TimeSheetCode,
     ComplianceDomain ComplianceDomain,
     string CreatedBy) : IRequest<Guid>;

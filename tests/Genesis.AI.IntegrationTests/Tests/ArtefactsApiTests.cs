@@ -21,7 +21,7 @@ public class ArtefactsApiTests : IDisposable
     private static async Task<string> CreateProjectAsync(HttpClient client)
     {
         var content = new StringContent(
-            """{"code":"ART","name":"Artefact Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"ART","name":"Artefact Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
         var response = await client.PostAsync("/api/v1/projects", content);

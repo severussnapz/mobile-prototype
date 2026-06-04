@@ -19,6 +19,10 @@ public class CreateProjectCommandValidator : AbstractValidator<CreateProjectComm
         RuleFor(command => command.Description)
             .MaximumLength(2000).WithMessage("Description must not exceed 2000 characters.");
 
+        RuleFor(command => command.TimeSheetCode)
+            .NotEmpty().WithMessage("Time sheet code is required.")
+            .MaximumLength(50).WithMessage("Time sheet code must not exceed 50 characters.");
+
         RuleFor(command => command.ComplianceDomain)
             .IsInEnum().WithMessage("Compliance domain must be a valid value.");
 

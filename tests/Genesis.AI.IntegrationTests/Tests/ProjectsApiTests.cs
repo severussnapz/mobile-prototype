@@ -37,7 +37,7 @@ public class ProjectsApiTests : IDisposable
     {
         var client = _factory.CreateAdminClient();
         var content = new StringContent(
-            """{"code":"INTTEST","name":"Integration Test Project","description":"Created by integration test","complianceDomain":"Generic"}""",
+            """{"code":"INTTEST","name":"Integration Test Project","description":"Created by integration test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
 
@@ -57,7 +57,7 @@ public class ProjectsApiTests : IDisposable
     {
         var client = _factory.CreateAdminClient();
         var content = new StringContent(
-            """{"code":"CLIN","name":"Clinical Project","description":"Test","complianceDomain":"ClinicalUk"}""",
+            """{"code":"CLIN","name":"Clinical Project","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"ClinicalUk"}""",
             System.Text.Encoding.UTF8,
             "application/json");
 
@@ -87,7 +87,7 @@ public class ProjectsApiTests : IDisposable
     {
         var client = _factory.CreateAdminClient();
         var content = new StringContent(
-            """{"code":"GEN","name":"Generic Project","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"GEN","name":"Generic Project","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
 
@@ -117,7 +117,7 @@ public class ProjectsApiTests : IDisposable
     {
         var client = _factory.CreateAdminClient();
         var content = new StringContent(
-            """{"code":"BAD","name":"Bad Domain","description":"Test","complianceDomain":"InvalidDomain"}""",
+            """{"code":"BAD","name":"Bad Domain","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"InvalidDomain"}""",
             System.Text.Encoding.UTF8,
             "application/json");
 
@@ -133,7 +133,7 @@ public class ProjectsApiTests : IDisposable
 
         // Create a project first
         var createContent = new StringContent(
-            """{"code":"GET1","name":"Get Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"GET1","name":"Get Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
         var createResponse = await client.PostAsync("/api/v1/projects", createContent);
@@ -169,7 +169,7 @@ public class ProjectsApiTests : IDisposable
 
         // Create then delete
         var createContent = new StringContent(
-            """{"code":"DEL1","name":"Delete Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"DEL1","name":"Delete Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
         var createResponse = await client.PostAsync("/api/v1/projects", createContent);
@@ -189,7 +189,7 @@ public class ProjectsApiTests : IDisposable
 
         // Create
         var createContent = new StringContent(
-            """{"code":"SOFT","name":"Soft Delete","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"SOFT","name":"Soft Delete","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
         var createResponse = await client.PostAsync("/api/v1/projects", createContent);
