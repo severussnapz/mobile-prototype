@@ -2,6 +2,8 @@ using Genesis.AI.Core.Data;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectAggregate;
+using Genesis.AI.Domain.AggregatesModel.ProjectDecisionAggregate;
+using Genesis.AI.Domain.AggregatesModel.ProjectNoteAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Infrastructure.EntityConfigurations;
 using MediatR;
@@ -20,6 +22,8 @@ public sealed class GenesisAiDbContext(
     public DbSet<ParkingLotItem> ParkingLotItems { get; set; }
     public DbSet<TokenUsageRecord> TokenUsageRecords { get; set; }
     public DbSet<Artefact> Artefacts { get; set; }
+    public DbSet<ProjectNote> ProjectNotes { get; set; }
+    public DbSet<ProjectDecision> ProjectDecisions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +47,8 @@ public sealed class GenesisAiDbContext(
         modelBuilder.ApplyConfiguration(new ParkingLotItemEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new TokenUsageRecordEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ArtefactEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectNoteEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectDecisionEntityTypeConfiguration());
         base.OnModelCreating(modelBuilder);
     }
 }
