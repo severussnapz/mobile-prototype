@@ -25,6 +25,8 @@ public static class DependencyInjection
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IArtefactRepository, ArtefactRepository>();
+        services.AddScoped<IProjectNoteRepository, ProjectNoteRepository>();
+        services.AddScoped<IProjectDecisionRepository, ProjectDecisionRepository>();
         services.AddSingleton<IAiService, BedrockAiService>();
         services.AddSingleton<IPromptService, EmbeddedPromptService>();
         services.AddSingleton<ISkillContentService, SkillContentService>();

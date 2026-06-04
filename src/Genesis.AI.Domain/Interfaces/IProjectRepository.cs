@@ -12,6 +12,7 @@ public interface IProjectRepository
     Task<IReadOnlyList<Project>> GetAllAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<Project>> GetByStatusAsync(string status, CancellationToken cancellationToken);
     Task<bool> ExistsByCodeAsync(string code, CancellationToken cancellationToken);
+    Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets the project that owns the given pipeline stage, including all stages.

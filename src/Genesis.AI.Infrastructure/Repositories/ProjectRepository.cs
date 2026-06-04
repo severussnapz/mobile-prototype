@@ -59,6 +59,12 @@ public class ProjectRepository : IProjectRepository
             .AnyAsync(project => project.Code == code, cancellationToken);
     }
 
+    public async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await _context.Projects
+            .AnyAsync(project => project.Id == id && !project.IsDeleted, cancellationToken);
+    }
+
     public async Task<Project?> GetByStageIdAsync(Guid stageId, CancellationToken cancellationToken)
     {
         return await _context.Projects
