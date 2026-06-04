@@ -49,7 +49,7 @@ public class SkipStageCommandHandlerTests
     [Fact]
     public async Task Handle_CompletedStage_ReturnsValidationError()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         var stage = project.PipelineStages.First(s => s.StageType == StageType.Prototype);
         stage.Start(_timeProvider);
         stage.Complete("user-1", _timeProvider);
@@ -70,7 +70,7 @@ public class SkipStageCommandHandlerTests
     [Fact]
     public async Task Handle_NotStartedStage_SkipsSuccessfully()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         var stage = project.PipelineStages.First(s => s.StageType == StageType.Prototype);
 
         _projectRepositoryMock
@@ -90,7 +90,7 @@ public class SkipStageCommandHandlerTests
     [Fact]
     public async Task Handle_SkipsStage_SavesChanges()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         var stage = project.PipelineStages.First(s => s.StageType == StageType.Prototype);
 
         _projectRepositoryMock

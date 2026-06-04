@@ -21,7 +21,7 @@ public class PipelineStagesApiTests : IDisposable
     private static async Task<string> GetFirstStageIdAsync(HttpClient client)
     {
         var content = new StringContent(
-            """{"code":"STG","name":"Stage Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"STG","name":"Stage Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
         var response = await client.PostAsync("/api/v1/projects", content);
@@ -39,7 +39,7 @@ public class PipelineStagesApiTests : IDisposable
     {
         // Create project
         var content = new StringContent(
-            """{"code":"STG2","name":"Stage Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"STG2","name":"Stage Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
         var response = await client.PostAsync("/api/v1/projects", content);

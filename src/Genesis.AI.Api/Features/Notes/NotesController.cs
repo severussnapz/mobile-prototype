@@ -78,7 +78,7 @@ public class NotesController : ControllerBase
     /// <summary>
     /// Updates the content of an existing note.
     /// </summary>
-    [HttpPut("{noteId:guid}")]
+    [HttpPatch("{noteId:guid}")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
     [ProducesResponseType(typeof(ApiResponse<NoteResource>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

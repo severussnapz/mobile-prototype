@@ -11,7 +11,7 @@ public class PipelineStageTests
         StageType stageType = StageType.RequirementsDiscovery,
         PipelineStageStatus status = PipelineStageStatus.NotStarted)
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         return project.PipelineStages.First(s => s.StageType == stageType);
     }
 

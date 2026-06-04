@@ -21,7 +21,7 @@ public class ConversationsApiTests : IDisposable
     private static async Task<(string ProjectId, string StageId)> CreateProjectAndGetFirstStageAsync(HttpClient client)
     {
         var content = new StringContent(
-            """{"code":"CONV","name":"Conv Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"CONV","name":"Conv Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
         var response = await client.PostAsync("/api/v1/projects", content);

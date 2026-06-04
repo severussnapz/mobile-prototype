@@ -39,7 +39,7 @@ public class CompleteStageCommandHandlerTests
 
     private Project CreateProjectWithInProgressStage(StageType stageType = StageType.RequirementsDiscovery)
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         var stage = project.PipelineStages.First(s => s.StageType == stageType);
         stage.Start(_timeProvider);
         return project;
@@ -82,7 +82,7 @@ public class CompleteStageCommandHandlerTests
     [Fact]
     public async Task Handle_StageNotInProgress_ReturnsValidationError()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         var stage = project.PipelineStages.First(s => s.StageType == StageType.RequirementsDiscovery);
         // Stage is NotStarted — should not be completable
 

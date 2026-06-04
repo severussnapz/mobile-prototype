@@ -32,7 +32,7 @@ public class AuthenticationTests : IDisposable
     {
         var client = _factory.CreateClient();
         var content = new StringContent(
-            """{"code":"AUTH","name":"Auth Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"AUTH","name":"Auth Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
 
@@ -57,7 +57,7 @@ public class AuthenticationTests : IDisposable
     {
         var client = _factory.CreateReadOnlyClient();
         var content = new StringContent(
-            """{"code":"READONLY","name":"Read Only Test","description":"Test","complianceDomain":"Generic"}""",
+            """{"code":"READONLY","name":"Read Only Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
             System.Text.Encoding.UTF8,
             "application/json");
 

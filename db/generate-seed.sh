@@ -109,9 +109,10 @@ SELECT '-- PROJECT: ' || name FROM project WHERE project_id = '${PROJECT_ID}';
 SELECT '-- ============================================================';
 SELECT '';
 SELECT format(
-  'INSERT INTO project (project_id, code, name, description, compliance_domain, status, created_by, created_at, updated_at, is_deleted) VALUES (%L, %L, %L, %L, %L, %L, %L, %L, %L, false);',
+  'INSERT INTO project (project_id, code, name, description, time_sheet_code, compliance_domain, status, created_by, created_at, updated_at, is_deleted) VALUES (%L, %L, %L, %L, %L, %L, %L, %L, %L, %L, false);',
   project_id, code, name,
   COALESCE(${DESC_OVERRIDE_SQL}, description),
+  time_sheet_code,
   compliance_domain::text, status::text, created_by, created_at, updated_at
 ) FROM project WHERE project_id = '${PROJECT_ID}';
 SELECT '';

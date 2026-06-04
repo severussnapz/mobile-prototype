@@ -10,7 +10,7 @@ public class ProjectTests
     [Fact]
     public void Constructor_ValidInputs_CreatesProjectWithCorrectProperties()
     {
-        var project = new Project("DOC", "Documents Management", "A description", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents Management", "A description", "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
 
         Assert.NotEqual(Guid.Empty, project.Id);
         Assert.Equal("DOC", project.Code);
@@ -25,7 +25,7 @@ public class ProjectTests
     [Fact]
     public void Constructor_WhenLowercaseCode_ConvertsToUppercase()
     {
-        var project = new Project("doc", "Name", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("doc", "Name", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
 
         Assert.Equal("DOC", project.Code);
     }
@@ -33,7 +33,7 @@ public class ProjectTests
     [Fact]
     public void Constructor_WhenCreated_InitialisesEightStages()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
 
         Assert.Equal(8, project.PipelineStages.Count);
     }
@@ -41,7 +41,7 @@ public class ProjectTests
     [Fact]
     public void Constructor_ClinicalUkDomain_OnlyRequirementsDiscoveryNotStarted()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
 
         var requirementsStage = project.PipelineStages.First(stage => stage.StageType == StageType.RequirementsDiscovery);
         Assert.Equal(PipelineStageStatus.NotStarted, requirementsStage.Status);
@@ -54,7 +54,7 @@ public class ProjectTests
     [Fact]
     public void Constructor_GenericDomain_OnlyRequirementsDiscoveryNotStarted()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
 
         var requirementsStage = project.PipelineStages.First(stage => stage.StageType == StageType.RequirementsDiscovery);
         Assert.Equal(PipelineStageStatus.NotStarted, requirementsStage.Status);
@@ -67,7 +67,7 @@ public class ProjectTests
     [Fact]
     public void Constructor_FinanceDomain_OnlyRequirementsDiscoveryNotStarted()
     {
-        var project = new Project("FIN", "Finance", null, ComplianceDomain.Finance, "user-1", _timeProvider);
+        var project = new Project("FIN", "Finance", null, "PORTASK0001045", ComplianceDomain.Finance, "user-1", _timeProvider);
 
         var requirementsStage = project.PipelineStages.First(stage => stage.StageType == StageType.RequirementsDiscovery);
         Assert.Equal(PipelineStageStatus.NotStarted, requirementsStage.Status);
@@ -80,7 +80,7 @@ public class ProjectTests
     [Fact]
     public void Constructor_WhenCreated_StagesHaveCorrectSortOrder()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
 
         var stages = project.PipelineStages.OrderBy(s => s.SortOrder).ToList();
         Assert.Equal(StageType.RequirementsDiscovery, stages[0].StageType);
@@ -91,7 +91,7 @@ public class ProjectTests
     [Fact]
     public void SoftDelete_WhenActive_SetsIsDeletedTrue()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
 
         project.SoftDelete(_timeProvider);
 
@@ -101,7 +101,7 @@ public class ProjectTests
     [Fact]
     public void SoftDelete_WhenActive_UpdatesTimestamp()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
         var originalUpdatedAt = project.UpdatedAt;
 
         project.SoftDelete(_timeProvider);
@@ -117,7 +117,7 @@ public class ProjectTests
     {
         // Act & Assert
         Assert.ThrowsAny<ArgumentException>(
-            () => new Project(code!, "Name", null, ComplianceDomain.Generic, "user-1", _timeProvider));
+            () => new Project(code!, "Name", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider));
     }
 
     [Theory]
@@ -128,7 +128,7 @@ public class ProjectTests
     {
         // Act & Assert
         Assert.ThrowsAny<ArgumentException>(
-            () => new Project("DOC", name!, null, ComplianceDomain.Generic, "user-1", _timeProvider));
+            () => new Project("DOC", name!, null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider));
     }
 
     [Theory]
@@ -139,13 +139,24 @@ public class ProjectTests
     {
         // Act & Assert
         Assert.ThrowsAny<ArgumentException>(
-            () => new Project("DOC", "Name", null, ComplianceDomain.Generic, createdBy!, _timeProvider));
+            () => new Project("DOC", "Name", null, "PORTASK0001045", ComplianceDomain.Generic, createdBy!, _timeProvider));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Constructor_NullOrEmptyTimeSheetCode_ThrowsArgumentException(string? timeSheetCode)
+    {
+        // Act & Assert
+        Assert.ThrowsAny<ArgumentException>(
+            () => new Project("DOC", "Name", null, timeSheetCode!, ComplianceDomain.Generic, "user-1", _timeProvider));
     }
 
     [Fact]
     public void RecalculateStatus_RequirementsDiscoveryComplete_UnblocksPrototype()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         var reqStage = project.PipelineStages.First(stage => stage.StageType == StageType.RequirementsDiscovery);
 
         reqStage.Start(_timeProvider);
@@ -159,7 +170,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_PrototypeComplete_UnblocksArchDesignPxd()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
 
@@ -173,7 +184,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_PrototypeComplete_ClinicalSafetyStillBlocked()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
 
@@ -185,7 +196,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_ArchDesignPxdComplete_UnblocksClinicalSafety()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
         CompleteStage(project, StageType.Architecture);
@@ -200,7 +211,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_NonClinicalDomain_ClinicalSafetyNeverUnblocks()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
         CompleteStage(project, StageType.Architecture);
@@ -215,7 +226,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_NonClinicalDomain_NormalisationUnblocksWhenClinicalSafetyBlocked()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
         CompleteStage(project, StageType.Architecture);
@@ -231,7 +242,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_ClinicalSafetyComplete_UnblocksNormalisation()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
         CompleteStage(project, StageType.Architecture);
@@ -247,7 +258,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_NormalisationComplete_UnblocksPlanning()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
         CompleteStage(project, StageType.Architecture);
@@ -264,7 +275,7 @@ public class ProjectTests
     [Fact]
     public void RecalculateStatus_AllStagesComplete_ProjectStatusComplete()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
         CompleteStage(project, StageType.RequirementsDiscovery);
         CompleteStage(project, StageType.Prototype);
         CompleteStage(project, StageType.Architecture);

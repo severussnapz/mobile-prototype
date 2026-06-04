@@ -27,8 +27,8 @@ public class ProjectQueryHandlerTests
     {
         var projects = new List<Project>
         {
-            new("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider),
-            new("AUTH", "Auth Service", null, ComplianceDomain.ClinicalUk, "user-2", _timeProvider),
+            new("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider),
+            new("AUTH", "Auth Service", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-2", _timeProvider),
         };
 
         _projectRepositoryMock
@@ -48,7 +48,7 @@ public class ProjectQueryHandlerTests
     {
         var projects = new List<Project>
         {
-            new("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider),
+            new("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider),
         };
 
         _projectRepositoryMock
@@ -69,7 +69,7 @@ public class ProjectQueryHandlerTests
     {
         var projects = new List<Project>
         {
-            new("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider),
+            new("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider),
         };
 
         _projectRepositoryMock
@@ -91,7 +91,7 @@ public class ProjectQueryHandlerTests
     [Fact]
     public async Task GetProjectById_Exists_ReturnsProject()
     {
-        var project = new Project("DOC", "Documents", null, ComplianceDomain.Generic, "user-1", _timeProvider);
+        var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.Generic, "user-1", _timeProvider);
         _projectRepositoryMock
             .Setup(r => r.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(project);

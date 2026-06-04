@@ -30,6 +30,11 @@ public class ProjectEntityTypeConfiguration : IEntityTypeConfiguration<Project>
             .HasColumnName("description")
             .HasMaxLength(2000);
 
+        builder.Property(project => project.TimeSheetCode)
+            .HasColumnName("time_sheet_code")
+            .HasMaxLength(50)
+            .IsRequired();
+
         builder.Property(project => project.ComplianceDomain)
             .HasColumnName("compliance_domain")
             .IsRequired();

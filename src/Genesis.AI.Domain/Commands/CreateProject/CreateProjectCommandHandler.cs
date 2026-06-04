@@ -29,6 +29,7 @@ public class CreateProjectCommandHandler : IRequestHandler<CreateProjectCommand,
             request.Code,
             request.Name,
             request.Description,
+            request.TimeSheetCode,
             request.ComplianceDomain,
             request.CreatedBy,
             _timeProvider);
