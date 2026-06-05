@@ -1,0 +1,794 @@
+﻿# REQ-011: Patient Matching
+
+**Priority:** Must Have
+**Effort:** High
+**Risk:** Critical (wrong patient match is a patient safety risk)
+**Depends On:** REQ-001 (Unified Inbound Document Inbox), REQ-002 (Electronic Inbound Ingestion), REQ-009 (Audit Trail)
+
+---
+
+## User Story
+
+As a practice administrator,
+I need inbound documents to be automatically matched to the correct patient,
+So that documents are filed against the right patient record without requiring manual lookup for every document.
+
+**Acceptance Criteria:**
+- [ ] The system automatically attempts to match every inbound document to a patient in the EMIS Web patient register. *(Must Have)*
+- [ ] NHSmail attachments are ingested as document source records and enter the Document Manager matching flow. The NHSmail service does not provide an authoritative patient match for Document Manager. *(Must Have)*
+- [ ] The primary matching signal is the NHS Number extracted from the document. Where the NHS Number passes Modulus 11 validation and uniquely matches a patient in the EMIS Web register, the match is confirmed automatically — no user confirmation step is required. The matched document is routed to the Filing Queue (if filing metadata requires completion) or directly to the Tasking Queue (if metadata is fully embedded and routing rules apply). *(Must Have)*
+- [ ] Where the matching confidence is insufficient for automatic confirmation (no valid NHS Number extractable, the NHS Number does not match a unique patient, or multiple candidate patients are found), the document is routed to the Unmatched tab for manual review. The user selects the correct patient from EMIS Web search results; the selected record’s EMIS Web patient identifier is used to confirm the match. *(Must Have)*
+- [ ] The user can manually search for a different patient and override the auto-suggested match at any point before the document is routed. *(Must Have)*
+- [ ] Where no match can be determined, the document is placed in an unmatched queue for manual review — it is never silently discarded or auto-filed without a match. *(Must Have)*
+- [ ] All auto-matches, manual match resolutions, and overrides are audited. *(Must Have)*
+- [ ] A user can re-open the patient matching workflow from the Filing, Coding, or Task Queue at any point to undo, modify, or replace a previously confirmed patient match. This action is audited. *(Must Have)*
+- [ ] When a patient match is changed after a document has been filed, the system warns the user that the change will update the document’s attribution in the patient record and requires explicit confirmation before proceeding. *(Must Have — CLIN-007)*
+
+---
+
+## Parking Lot
+
+- � **Patient match confidence threshold — defined (2026-05-26)**
+
+  High-confidence path: NHS Number (Modulus 11 validated) + unique patient register match → auto-match, no user confirmation required. All other cases → Unmatched tab for manual review. V1e clinical safety review to confirm thresholds are clinically appropriate.
+
+- 🔴 **Provisional clinician visibility on auto-match — blocked pending CSO sign-off**
+
+  Proposal to allow provisional document visibility before match confirmation — on the basis that speed of clinician access is a priority. Blocked pending formal clinical safety analysis and explicit Clinical Safety Officer sign-off. **Do not implement without CSO sign-off.** (HAZ-DOC-035 — Critical risk: wrong-patient document exposure.)
+
+- ⚪ **Fuzzy / partial patient matching with confidence-based recommendations (future phase)**
+
+  The current binary model (NHS Number match → Matched; otherwise → Unmatched queue) is the V1 baseline. A future phase should explore automated partial matching using demographic signals — for example, name and address similarity — to surface a ranked list of candidate patient records with a confidence recommendation, rather than routing straight to the unmatched queue.
+
+  **What this would look like:**
+  - Where no NHS Number is present or valid, the matching engine runs a partial match against name, date of birth, and/or address fields extracted from the document
+  - One or more candidate patients are surfaced to the user with a confidence recommendation (e.g. "Strong match", "Possible match", "Weak match")
+  - The user selects from the candidates or discards them and searches manually
+  - Explicit user confirmation is still required before any match is committed
+
+  **Why parked:**
+  - The matching algorithm, confidence signal definitions, and threshold values are not yet specified
+  - Partial matching on demographic data introduces additional patient safety risk (HAZ-DOC-032) that requires formal clinical safety analysis before implementation
+  - The UX for candidate presentation requires usability research
+
+  **When to revisit:** Once the binary matching model is validated in production, gather data on the volume and resolution rate of unmatched documents to size the value of partial matching. Algorithm specification, confidence threshold definition, and clinical safety analysis (V1e) must precede any implementation decision.
+
+---
+
+## Patient Match — Two-Path Model (Auto-match / Manual Review)
+
+> Patient matching uses a two-path model:
+>
+> **High-confidence path (auto-match):** Where the NHS Number passes Modulus 11 validation and uniquely matches a patient in the EMIS Web register, the match is confirmed automatically without requiring user action. Auto-matched documents are routed to the Filing Queue (if filing metadata requires completion) or directly to the Tasking Queue (if metadata is fully embedded and routing rules apply). Auto-matches are audited with `match_source: auto_nhsnumber`.
+>
+> **Manual review path (Unmatched tab):** Where no valid NHS Number can be extracted, the extracted NHS Number does not match any patient, or multiple candidate patients are found, the document is routed to the Unmatched tab. The user must manually search for and select the correct patient before the document proceeds. Manual matches are audited with `match_source: manual`.
+>
+> In all cases, a confirmed patient match can be undone or changed from any queue tab (Filing, Coding, Tasks) subject to explicit re-confirmation and audit.
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-001:** NHS Number Validation — NHS Number used for matching must pass Modulus 11 validation before being used as a matching signal
+- **CLIN-002:** Patient Data Audit Trail — all match suggestions, acceptances, and overrides audited
+- **CLIN-006:** Patient Identifier Validation — patient identifiers used in matching are GUIDs/ERNs; database PKs never exposed
+- **CLIN-007:** Hazard Mitigation Evidence — matched patient name displayed visibly in queue list row; user confirmation required before filing
+- **CLIN-010:** Error Handling Patient Safety — matching failures (no match found, multiple candidates) must never result in silent auto-filing; always route to manual review
+
+### Hazards Addressed
+
+- **HAZ-DOC-032:** Document filed against wrong patient — clinical decisions made using another patient's document; potential for serious harm
+  - **Severity:** Critical
+  - **Likelihood:** Low–Medium
+  - **Risk Level:** Critical
+
+- **HAZ-DOC-033:** Unmatched document silently lost — no patient match found and document discarded without user awareness
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-034:** Invalid NHS Number used as matching signal — malformed number matches incorrectly or bypasses validation
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-035:** Provisional visibility exposes document to wrong clinician before match is confirmed
+  - **Severity:** Critical
+  - **Likelihood:** Medium (if provisional visibility implemented without safeguards)
+  - **Risk Level:** Critical — **implementation blocked pending CSO sign-off**
+
+### Mitigations
+
+- **MIT-DOC-031:** User confirmation required before any document is filed against a patient match; auto-filing without confirmation not permitted
+  - **Type:** Business Logic + UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-032:** Unmatched documents routed to dedicated unmatched queue; never silently discarded
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-033:** NHS Number validated via Modulus 11 before use as matching signal; invalid numbers not used for matching
+  - **Type:** Validation
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-034:** Matched patient name displayed in the queue document list row and at the match confirmation step; unmatched documents visually distinguished from matched documents
+  - **Type:** UI Control
+  - **Effectiveness:** Partial (user must still review and confirm)
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **CLIN-001:** NHS Number Validation — Modulus 11 required (also an IG requirement; NHS Number is a personal identifier)
+- **IG-001:** Data Minimisation — matching process uses minimum required patient identifiers; full patient record not loaded until match confirmed
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(e) public task + Article 9(2)(h) health data
+- **IG-004:** Special Category Data Protection — patient matching data encrypted at rest and in transit
+- **IG-009:** Data Breach Notification — wrong patient match constitutes a potential data breach; must be detectable via audit trail
+
+### Data Handling
+- NHS Number used for matching is validated before use; stored as part of document metadata post-match
+- Patient identity data used in matching (NHS Number, name, DOB) not logged in plain text in audit entries — use patient ERN
+- Unmatched document queue access restricted to authorised users; unmatched documents are still patient-linked documents pending confirmation
+
+### GDPR Articles
+- **Article 5(1)(f):** Integrity and confidentiality — matching process protected
+- **Article 9(2)(h):** Special category health data — medical purposes
+- **Article 5(1)(d):** Accuracy — correct patient match is required to maintain accuracy of patient records
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — patient matching endpoints require valid JWT; match override requires appropriate role scope
+- **SEC-001:** TLS Encryption — all matching requests and responses over TLS 1.2+
+
+### Security Requirements
+- Patient search used during manual override is scoped to the authenticated user's practice; cross-practice patient lookup not permitted
+- Match suggestion results contain patient ERN only at API level; display name resolved server-side, not client-side
+- NHS Number extracted from documents handled as sensitive PII; not logged in plain text
+
+---
+
+## Dimension 4: Observability & Performance
+
+### Product KPIs
+- Auto-match success rate (documents successfully auto-matched vs. total inbound)
+- Match acceptance rate (user accepts suggested match vs. overrides)
+- Override rate (proxy for match quality; high override rate indicates matching needs improvement)
+- Unmatched queue size / clearance rate
+- Match processing latency (document received → match suggestion available)
+
+### Observable Events (OTEL Instrumentation)
+- `documents.matching.initiated` — auto-match process started for document
+- `documents.matching.matched` — match suggestion produced
+- `documents.matching.unmatched` — no match found; document routed to unmatched queue
+- `documents.matching.accepted` — user accepts suggested match
+- `documents.matching.overridden` — user overrides suggested match; new patient ERN recorded
+- `documents.matching.filed` — document successfully filed against confirmed patient
+
+### Performance SLOs
+- Match suggestion latency: p95 < 5 seconds from document ingestion to match suggestion available
+- Auto-match success rate: target ≥ 85% of inbound documents auto-matched (baseline TBC from pilot data)
+
+### Alerting Conditions
+
+| Condition | Threshold | Severity | Channel |
+|---|---|---|---|
+| Match suggestion latency breach | p95 > 5 seconds sustained for 5 min | HIGH | Ops alert |
+| Auto-match success rate drop | < 85% over rolling 1-hour window | HIGH | Ops alert |
+| Unmatched queue depth spike | > 2× baseline unmatched queue depth | MEDIUM | Ops alert |
+| NHS Number validation failure spike | > 5% of documents with extracted NHS Numbers failing Modulus 11 | MEDIUM | Ops alert |
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Primary resources:**
+- `document-matches`
+- `match-candidates`
+
+**Core endpoints:**
+- `POST /documents/{documentGuid}/matching/evaluate`
+- `POST /documents/{documentGuid}/matching/resolve-manual`
+- `POST /documents/{documentGuid}/matching/unmatch`
+- `GET /documents/{documentGuid}/matching`
+
+**Matching rules:**
+- High-confidence auto-match: valid NHS number (Modulus 11) + unique patient register hit.
+- Otherwise route as `Unmatched` for manual resolution.
+- Matching outcomes are persisted in canonical match state used by Filing/Coding/Task queues.
+
+### Database Schema
+
+**Table:** `document_matches`
+
+```sql
+CREATE TABLE document_matches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_guid UUID NOT NULL UNIQUE,
+    organisation_id UUID NOT NULL,
+    match_state VARCHAR(32) NOT NULL DEFAULT 'unmatched',
+    patient_ern VARCHAR(64),
+    nhs_number VARCHAR(10),
+    confidence_score NUMERIC(5,4),
+    resolution_method VARCHAR(32),
+    resolved_by UUID,
+    resolved_at TIMESTAMPTZ,
+    evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT match_state_values CHECK (match_state IN ('unmatched', 'auto_matched', 'manual_matched', 'filed')),
+    CONSTRAINT resolution_method_values CHECK (resolution_method IN ('auto', 'manual', 'override') OR resolution_method IS NULL),
+    CONSTRAINT nhs_number_format CHECK (nhs_number ~ '^[0-9]{10}$' OR nhs_number IS NULL)
+);
+
+-- Indexes
+CREATE UNIQUE INDEX idx_document_matches_document ON document_matches (document_guid);
+CREATE INDEX idx_document_matches_org_state ON document_matches (organisation_id, match_state);
+CREATE INDEX idx_document_matches_patient ON document_matches (patient_ern) WHERE patient_ern IS NOT NULL;
+```
+
+### Component Interfaces
+
+```csharp
+public interface IPatientMatchingService
+{
+  Task<Result<MatchEvaluationResource>> EvaluateAsync(EvaluateMatchCommand command, CancellationToken cancellationToken = default);
+  Task<Result<MatchResolutionResource>> ResolveManualAsync(ResolveManualMatchCommand command, CancellationToken cancellationToken = default);
+  Task<Result<MatchResolutionResource>> UnmatchAsync(UnmatchDocumentCommand command, CancellationToken cancellationToken = default);
+  Task<Result<MatchStateResource>> GetMatchStateAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+}
+```
+
+### NHSmail Matching Boundary
+
+- NHSmail service is an upstream ingestion producer only for Document Manager.
+- Any NHSmail-side manual association is non-authoritative for Document Manager queues.
+- Document Manager matching service evaluates NHSmail attachments using the same match policy as other sources.
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-001 — NHS Number Validated Before Use as Matching Signal
+- **Trigger:** NHS Number extracted from inbound document and used for patient matching
+- **Test Scenario:** Invalid NHS Number
+  - Input: Document containing NHS Number "485 777 3457" (invalid check digit)
+  - Validation 1: NHS Number fails Modulus 11 validation
+  - Validation 2: Invalid NHS Number not used as a matching signal
+  - Validation 3: Document routed to unmatched queue
+- **Test Scenario:** Valid NHS Number
+  - Input: Document containing NHS Number "485 777 3456" (valid check digit)
+  - Validation: NHS Number accepted and used as primary matching signal
+- **Guardrail:** CLIN-001
+- **Hazard:** HAZ-DOC-034
+- **Pass Criteria:** Invalid NHS Numbers never used as matching signals; Modulus 11 enforced
+
+### CHECK 2: CLIN-007 — User Confirmation Required Before Filing
+- **Trigger:** Auto-match suggestion produced
+- **Test Scenario:** Auto-filing bypass attempt
+  - Validation 1: No API path or UI interaction allows a document to be filed against a patient without explicit user confirmation of the match
+  - Validation 2: Match suggestion is presented to the user before any filing action is taken
+  - Validation 3: User must perform an explicit confirm action (not auto-confirmed after timeout)
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-032
+- **Pass Criteria:** Confirmation mandatory; no auto-filing without user action
+
+### CHECK 3: CLIN-010 — Unmatched Documents Routed to Queue, Not Discarded
+- **Trigger:** Auto-match finds no suitable patient
+- **Test Scenario:** No-match handling
+  - Validation 1: Document appears in unmatched queue
+  - Validation 2: Document is NOT discarded or silently dropped
+  - Validation 3: Unmatched queue is accessible to authorised users
+  - Validation 4: Unmatched document count visible to inbox users (not hidden)
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-033
+- **Pass Criteria:** All unmatched documents routed to queue; none silently lost
+
+### CHECK 4: CLIN-002 — Match Events Audited
+- **Trigger:** Any match event (suggestion, acceptance, override, filing)
+- **Test Scenario:** Audit completeness
+  - Validation 1: Audit entry for match suggestion: `action` ("MatchSuggested"), `document_ern`, `suggested_patient_ern`, `timestamp`
+  - Validation 2: Audit entry for acceptance: `action` ("MatchAccepted"), `user_ern`, `document_ern`, `patient_ern`, `timestamp`
+  - Validation 3: Audit entry for override: `action` ("MatchOverridden"), `user_ern`, `document_ern`, `original_patient_ern`, `new_patient_ern`, `timestamp`
+  - Validation 4: No plain NHS Numbers in any audit entry
+- **Guardrail:** CLIN-002
+- **Hazard:** HAZ-DOC-032
+- **Pass Criteria:** All match lifecycle events audited; before/after patient ERNs captured on override; no NHS Numbers in logs
+
+### CHECK 5: AUTH-004 — Patient Lookup Scoped to Practice
+- **Trigger:** Manual override — user searches for a different patient
+- **Test Scenario:** Cross-practice patient lookup
+  - Action: User searches for patient from a different practice during manual override
+  - Validation 1: Search results contain only patients registered at the authenticated user's practice
+  - Validation 2: Cross-practice patient records not returned
+- **Guardrail:** AUTH-004
+- **Hazard:** HAZ-DOC-032
+- **Pass Criteria:** Patient lookup strictly scoped to authenticated practice
+
+### CHECK 6: CLIN-007 — Matched Patient Displayed in Queue Document List Row
+- **Trigger:** A document in any queue has an auto-match result (matched or unmatched)
+- **Test Scenario A:** Matched document
+  - Validation 1: Document row in queue list displays matched patient name
+  - Validation 2: Patient name resolved server-side; patient ERN not exposed in the list UI
+- **Test Scenario B:** Unmatched document
+  - Validation 1: Document row displays "Unmatched" indicator in the patient column position
+  - Validation 2: No patient name displayed
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-032
+- **Pass Criteria:** All matched queue document rows display patient name; unmatched documents clearly indicated; patient ERN not exposed in the list view
+
+---
+
+
+### CHECK 17: PXD-001 — Auto-Match Candidate Presentation
+
+**Trigger:** Admin opens a document with an auto-matched patient
+
+**Test Scenario:**
+- Validation 1: Extraction `Banner variant="info"` present with NHS Number shown
+- Validation 2: Single matched candidate shown with `Badge variant="primary"` "Matched"
+- Validation 3: No second candidate shown in auto-match panel; any ambiguity routes to Unmatched tab
+- Validation 4: Confirm button enabled on load (candidate pre-selected); admin must click Confirm — no auto-advance
+- Validation 5: `axe(container)` 0 violations on match step
+
+**Pass Criteria:** Admin must take explicit confirm action; no auto-advance; clinical risk control satisfied — HAZ-DOC-032
+
+---
+
+### CHECK 18: PXD-002 — Manual Register Search Accessibility
+
+**Trigger:** Admin opens an Unmatched document
+
+**Test Scenario:**
+- Validation 1: `Banner variant="warning"` "No NHS Number found" shown
+- Validation 2: Search input has accessible label; results announced via `aria-live="polite"`
+- Validation 3: Results show patient name, DOB, sex, NHS Number (no other data)
+- Validation 4: Confirm disabled until candidate explicitly selected from results
+- Validation 5: Keyboard: Tab into search; type; Tab to results; Space selects; Tab to Confirm
+
+**Pass Criteria:** Manual search accessible; correct data fields shown; explicit confirmation required — HAZ-DOC-032 / HAZ-DOC-034 satisfied
+
+---
+
+### CHECK 19: PXD-003 — Patient Banner Persistence
+
+**Trigger:** Admin advances past Step 1
+
+**Test Scenario:**
+- Validation 1: Patient banner shows name, DOB, NHS Number, registration status on Steps 2, 3, 4
+- Validation 2: `aria-live="polite"` on banner announces matched patient when Step 1 confirmed
+- Validation 3: Banner cannot be dismissed or hidden on Steps 2–4
+
+**Pass Criteria:** Matched patient persistently visible across all workflow steps — CLIN-007 satisfied
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Full PxD.** UI surfaces: Patient Match step (Step 1 in StepIndicator), auto-match acceptance panel, manual EMIS Web register search, match candidates list (binary: Matched / Unmatched), Unmatched queue tab list, patient banner on subsequent steps. Prototype: Screens 2 (auto-match) and Unmatched queue (live register search).
+
+---
+
+### User Flow
+
+**Primary Flow — Auto-match accepted (most common):**
+1. Admin opens a document from the Filing queue; StepIndicator shows Step 1 "Patient Match"
+2. Protocol Panel shows: extraction notice (`Banner variant="info"` — NHS Number extracted from document), single match candidate with Matched status badge and patient demographics
+3. Admin clicks "Confirm match →" — match confirmed; Patient Banner updates with matched patient; Step 2 (File) unlocks
+4. Patient banner persists across Steps 2–4
+
+**Alternative Flow — Manual EMIS Web register search (Unmatched queue):**
+1. Admin opens a document from the Unmatched queue
+2. Protocol Panel shows: `Banner variant="warning"` — no NHS Number found; EMIS Web register search below
+3. Admin enters name or date of birth in search field; results load from EMIS Web register (live)
+4. Admin selects correct patient from results — match confirmation step shown
+5. Admin confirms — match saved; document moves to Filing queue for Steps 2–4
+
+**Routing — Any ambiguity goes to Unmatched tab (binary model):**
+- If no NHS Number extractable, NHS Number does not validate (Modulus 11), or NHS Number does not uniquely match a patient → document routed to Unmatched tab
+- The auto-match panel only ever shows a single confirmed candidate (the unique NHS Number match)
+- There is no multi-candidate panel in the Filing flow — partial/ambiguous matching is a future-phase capability (Parking Lot)
+
+**Exit Types:**
+- Confirm match: Step 1 complete; StepIndicator advances
+- Back to queue: document returns to queue; no match saved
+- Cannot be completed without match: "Confirm match" disabled if no candidate selected
+
+---
+
+### Wireframes
+
+**Step 1 — Auto-match panel (Protocol Panel):**
+
+```
+┌──────────────────────────────────────────────┐
+│ PROTOCOL PANEL — Step 1: Patient Match        │
+│ [1. Match ←] [2. File] [3. Code] [4. Task]   │
+│ ─────────────────────────────────────────── │
+│ ℹ️ NHS Number 485 777 3456 extracted from     │
+│    document. One match found in the EMIS Web  │
+│    register.                                  │
+│ ─────────────────────────────────────────── │
+│ ● Smith, John Edward                [Matched] │
+│   DOB: 01/01/1975 · Male · Registered         │
+│   NHS: 485 777 3456                           │
+│   The Birches Surgery · Active                │
+│ ─────────────────────────────────────────── │
+│  Auto-matched via NHS Number (Modulus 11).    │
+│  Confirm to proceed.                          │
+│ ─────────────────────────────────────────── │
+│ [← Back to queue]       [Confirm match →]    │
+└──────────────────────────────────────────────┘
+```
+
+**Step 1 — Manual EMIS Web register search (Unmatched tab):**
+
+```
+┌──────────────────────────────────────────────┐
+│ PROTOCOL PANEL — Step 1: Patient Match        │
+│ [1. Match ←] [2. File] [3. Code] [4. Task]   │
+│ ─────────────────────────────────────────── │
+│ ⚠️ No NHS Number found in document.           │
+│    Search the EMIS Web patient register       │
+│    manually to identify the correct patient.  │
+│ ─────────────────────────────────────────── │
+│ 🏥 Search EMIS Web register                  │
+│ [Enter name or date of birth…  ] [Search]     │
+│                                               │
+│ Results from EMIS Web register (3 found):     │
+│ ○ Cooper, Jane                      [Select] │
+│   DOB: 12/04/1968 · Female · Active           │
+│   NHS: 9990012345                             │
+│ ○ Cooper, Janet                     [Select] │
+│   DOB: 02/09/1970 · Female · Active           │
+│   NHS: 9990019876                             │
+│ ─────────────────────────────────────────── │
+│ [← Back to queue]       [Confirm match →]    │
+└──────────────────────────────────────────────┘
+```
+
+*(EMIS Web register search is live; results stream as admin types (debounced 300ms). "Select" = selects as radio option.)*
+
+---
+
+### Component Specifications
+
+> 🚫 All interactive elements use `@emisgroup/ui-*` exclusively.
+
+**Match Extraction Notice:**
+- Auto-match present: `Banner variant="info"` — `{t('matching.extracted', { nhsNumber })}`
+- No NHS Number: `Banner variant="warning"` — `{t('matching.noNhsNumber')}`
+- Both are non-dismissable during Step 1
+
+**Match Candidate Row:**
+- Container: `<label>` wrapping `RadioButton` + patient demographics block
+- `RadioButton aria-label={t('matching.selectCandidate', { name, nhsNumber })}`
+- Patient name: `<strong>` 14px
+- Demographics: DOB, sex, registration status, practice name — `var(--text-dim)` 12px
+- NHS Number: `var(--text-dim)` 12px bold
+- Status badge: `Badge variant="primary"` "Matched" — only shown on the single auto-matched candidate; no confidence score, no "Low match" label
+- Manual search results: no badge — admin selects the correct patient from a plain list; no system-assigned label
+- Selected state: `border: 2px solid var(--primary)`; `background: color-mix(in srgb, var(--primary) 5%, transparent)`
+
+**EMIS Web Register Search:**
+- Section heading: `~icons/ic/outline-local-hospital` 20px + `{t('matching.registerSearch.heading')}`
+- Search input: `Input clearable aria-label={t('matching.registerSearch.label')} placeholder={t('matching.registerSearch.placeholder')}`
+- Search results: `<ul role="listbox" aria-label={t('matching.results.label')}>` of candidate rows (same component as auto-match candidate row)
+- Loading state: `<div role="status" aria-live="polite">` wrapper + `Skeleton.Area` rows (3 placeholder rows)
+- Empty state: `{t('matching.noResults')}` + suggestion to refine search
+
+**Patient Banner (Steps 2–4):**
+- Cross-step shared component (from REQ-001 — reference only): `<div role="region" aria-live="polite">` with matched patient name, DOB, NHS Number, registration status
+- Updates immediately on match confirmation
+
+**Step Footer (Step 1):**
+- `Button variant="mono"` ← Back to queue
+- `Button variant="filled" disabled={!selectedCandidate}` Confirm match → (disabled until candidate selected)
+
+---
+
+### Interaction Patterns
+
+**Auto-match single candidate:**
+- Pre-selected on load; `Button variant="filled"` Confirm enabled immediately
+- Single candidate only — binary model; no alternative candidates shown in auto-match panel
+
+**EMIS Web register search:**
+- Input debounced 300ms; minimum 2 characters before search fires
+- Results replace previous results; loading skeleton shown during fetch
+- "No results" state after search with no matches
+- Selecting a result auto-scrolls to footer; Confirm button enables
+
+**Confirm match:**
+- On confirm: `Notification variant="success"` `{t('matching.confirmed', { name })}`
+- StepIndicator Step 1 icon changes to ✓; Step 2 tab unlocks
+- Patient Banner populates with matched patient details across all subsequent steps
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AAA — clinical data entry)
+
+> AAA required: incorrect patient match is a Critical clinical risk (HAZ-DOC-032).
+
+- [x] Perceivable: "Matched" badge uses `Badge` with text label (not colour alone); manual search results have no badge — selection indicated by border/background, not colour alone
+- [x] Operable: all candidates selectable by keyboard (Tab → RadioButton → Space); Confirm disabled until selection made
+- [x] Understandable: extraction notice explains why a candidate is pre-selected; admin must take explicit action to confirm (no auto-advance on selection)
+- [x] Robust: `jest-axe ^9.0.0`; all interactive elements are `@emisgroup/ui-*`; `aria-live` on EMIS Web search results
+
+**Rule A — all inputs labelled:**
+```tsx
+<Input aria-label={t('matching.registerSearch.label')} clearable ... />
+<RadioButton aria-label={t('matching.selectCandidate', { name, nhsNumber })} ... />
+```
+
+**Rule B — live regions:**
+```tsx
+<div role="status" aria-live="polite">{isSearching && t('matching.searching')}</div>
+<ul role="listbox" aria-live="polite" aria-label={t('matching.results.label')}>
+```
+
+---
+
+### Visual Design
+
+**Tokens:**
+- Selected candidate border: `var(--primary)` 2px solid
+- Selected candidate background: `color-mix(in srgb, var(--primary) 5%, transparent)`
+- Matched badge: `Badge variant="primary"` (NHS Blue) — auto-match panel only
+- Manual search results: no badge; selected state shown by `border: 2px solid var(--primary)`
+- Extract notice: `Banner variant="info"` (`var(--primary)` tint)
+- No NHS Number: `Banner variant="warning"` (`var(--cautionary)` tint)
+
+**i18n keys (British English, selection):**
+```json
+{
+  "matching.extracted": "NHS Number {{nhsNumber}} extracted from document. One match found in the EMIS Web register.",
+  "matching.noNhsNumber": "No NHS Number found in document. Search the EMIS Web patient register manually to identify the correct patient.",
+  "matching.registerSearch.label": "Search EMIS Web patient register",
+  "matching.registerSearch.placeholder": "Enter name or date of birth\u2026",
+  "matching.confirmed": "Patient matched: {{name}}.",
+  "matching.selectCandidate": "Select {{name}}, NHS {{nhsNumber}}"
+}
+```
+
+---
+
+### Error States
+
+**Register search fails (API error):** `Notification variant="error"` `{t('matching.registerSearch.error')}`; search field remains active
+
+**Match confirm fails (API error):** `Notification variant="error"` `{t('matching.confirm.error')}`; step stays on Step 1; admin can retry
+
+---
+
+### Empty States
+
+**No auto-match candidates found (NHS Number extracted but no register match):** `Banner variant="warning"` + register search panel shown automatically
+
+**Register search: no results:** `{t('matching.noResults')}` = "No patients found. Try a different name, date of birth, or NHS number."
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-011 | HAZ-DOC-034 | Modulus 11 NHS Number validation | CLIN-001 | CHECK 1 |
+| REQ-011 | HAZ-DOC-032 | User confirmation before filing | CLIN-007 | CHECK 2 |
+| REQ-011 | HAZ-DOC-033 | Unmatched queue; no silent discard | CLIN-010 | CHECK 3 |
+| REQ-011 | HAZ-DOC-032 | Match events audited | CLIN-002 | CHECK 4 |
+| REQ-011 | HAZ-DOC-032 | Patient lookup scoped to practice | AUTH-004 | CHECK 5 |
+| REQ-011 | HAZ-DOC-035 | Provisional visibility blocked pending CSO | — | Parked |
+| REQ-011 | HAZ-DOC-032 | Matched patient name shown in queue list rows | CLIN-007 | CHECK 6 |
+| REQ-011 | HAZ-DOC-032 | Explicit confirm; no auto-advance | CLIN-007 | CHECK 17 |
+| REQ-011 | HAZ-DOC-032 | Manual search accessible; correct fields | A11Y-001 | CHECK 18 |
+| REQ-011 | CLIN-007 | Patient banner persistent Steps 2–4 | CLIN-007 | CHECK 19 |
+| REQ-011 | HAZ-DOC-032 | Explicit user confirmation; no auto-advance to filing without confirmation | CLIN-009 | CHECK 20 |
+| REQ-011 | HAZ-DOC-032/034 | NHS Number Modulus 11 and identity validation at matching service boundary | CLIN-001 | CHECK 21 |
+| REQ-011 | HAZ-DOC-033 | Unmatched queue routing; explicit unresolved state; no silent discard | CLIN-004/CLIN-009 | CHECK 22 |
+| REQ-011 | HAZ-DOC-034 | All invalid NHS Number forms rejected at matching boundary | CLIN-001 | CHECK 23 |
+| REQ-011 | HAZ-DOC-035 | ALL BLOCKED — PL-10: CSO sign-off required before implementation | TBD | TBD (BLOCKED) |
+| REQ-011 | — | Patient banner state readiness and context presence gate | WCLIN-001/002 | CHECK 24 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — NHS Number extraction pipeline, matching algorithm, unmatched queue design, integration with EMIS Web patient register
+- V1c will ADD: Design section — matching API contract, unmatched queue API, patient search (override) API
+- V1d will ADD: UI/UX section — match suggestion presentation, accept/override interaction, unmatched queue view
+- V1e will ADD: Clinical Safety section — DCB0129 entries for HAZ-DOC-032/033/034/035; provisional visibility analysis; CSO sign-off required before provisional visibility is implemented
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|----------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation |
+| 1.1 | 2026-05-21 | V1a Requirements (amendment) | Added AC: matched patient name and match confidence rating (High / Low / Unmatched) displayed in queue document list rows. Updated confidence level AC to reference list display and confirmation step. Updated MIT-DOC-034. Added CHECK 6 (queue list display). Added traceability row. |
+| 1.2 | 2026-05-22 | V1a Requirements (amendment) | Removed match confidence scoring. Patient matching is now binary: Matched or Unmatched. Removed confidence level AC, replaced confidence threshold section with binary model description, updated MIT-DOC-034, CHECK 6, OTEL span, SLO, audit spec, and V1b–V1e notes. |
+| 1.3 | 2026-05-22 | V1a Requirements (amendment) | Added Parking Lot item: fuzzy/partial patient matching with confidence-based candidate recommendations, deferred to a future phase pending algorithm specification and clinical safety analysis. |
+| 1.4 | 2026-05-22 | V1a Requirements (amendment) | Added AC: Unmatched Queue list columns (Urgency, Document Title, Document Date, Source, Match action). Urgency is a dedicated colour-coded badge column. |
+| 1.5 | 2026-05-22 | V1a Requirements (amendment) | Consolidated Parking Lot. Moved Provisional Clinician Visibility into Parking Lot (🔴 blocked, CSO sign-off required). Added Patient Match Confidence Threshold parking lot item (🟡 deferred to V1e). |
+| 1.6 | 2026-05-27 | V1c Design | Aligned NHSmail integration boundary with REQ-002: NHSmail is an upstream ingestion source and PatientMatchingService owns canonical match state for Document Manager workflow decisions. |
+| 1.7 | 2026-05-28 | V1d PxD | Added PxD section (auto-match panel, manual EMIS Web register search, match candidate rows, patient banner, Step 1 wireframes). Added CHECK 17–19. Updated Traceability. |
+| 1.8 | 2026-05-29 | V1e Clinical Safety | Added Clinical Safety section (IF678 hazard cards for HAZ-DOC-032/033/034/035; HIT Design controls with CLIN-001/004/007/009 and WCLIN-001/002; CHECK 20-24 added). HAZ-DOC-035 ALL CAUSES BLOCKED per D-027 (CSO sign-off required). Severity/likelihood deferred to CSO manual entry (D-008). CSO sign-off deferred (D-031). Traceability updated. |
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+**Business:** Safe deterministic patient matching using NHS number and demographic data, with unmatched queue fallback (TaskTypeId 803) and manual resolution by clinicians. Auto-match promotes a task from unmatched to matched queue; un-match reverts it. A document cannot be filed until a patient is matched. NHSmail is an upstream ingestion source only: attachments arrive as documents and matching is performed by PatientMatchingService.
+
+**Data:** Phase 1 reads/writes to existing EMIS Web MS SQL per patching domain.
+
+- **Patient match (write):** `InboundDocuments.MatchDocumentIfNotAlreadyFiled` SP — params: `@DocumentGuid uniqueidentifier`, `@TaskId bigint`, `@PatientId int`, returns `@Result bit`. Logic: if `CareRecord.Document` row already exists for this GUID → result=1 (already filed, match rejected); else updates `InboundDocuments.WorkflowTask.PatientId` where TaskId matches and PatientId IS NULL → result=0 (success). Prevents double-matching a filed document.
+- **Patient unmatch (write):** `InboundDocuments.UnmatchPatient` SP — reverses the PatientId assignment on WorkflowTask.
+- **Auto-match data source:** `InboundDocuments.TasksWithMatchingPatient` view — exposes `TaskGuid`, `TaskId`, `TaskTypeId`, `Priority`, `DocumentGuid`, `MatchStatus`, `PatientMatchingStatus` ('Auto-matched' | 'Unmatched' | 'Manually matched' | 'Unknown'), `FilingStatus`, `OverAllStatus`, `NHS` (PatientIdentifier type 1), `PatientId`, `DisplayName`, `DateOfBirth`, `Sex`.
+- **PatientMatchingStatus enum (canonical values):** `Auto-matched` — NHS spine lookup matched; `Manually matched` — clinician confirmed; `Unmatched` — no match found; `Unknown` — matching not yet attempted. These must be preserved verbatim in the new data model as an enum.
+- **Phase 2 mapping (Aurora PostgreSQL 17):** `document_patient_matches(id uuid PK, document_guid uuid FK, patient_id uuid FK, match_status match_status_enum NOT NULL DEFAULT 'unknown', matched_by_user_role_id uuid nullable, matched_at timestamptz, unmatched_at timestamptz nullable, idempotency_key uuid UNIQUE NOT NULL)` with composite index on `(organisation_id, document_guid)` and partial index on `match_status = 'unmatched'` for unmatched queue performance.
+
+**Application:** PatientMatchingService (new) exposes match/unmatch/confirm endpoints. Phase 1 delegates to `MatchDocumentIfNotAlreadyFiled` and `UnmatchPatient` SPs. Phase 2 native implementation with MediatR command handlers: `MatchDocumentToPatientCommand`, `UnmatchDocumentCommand`. Filing gate enforced: `FilingStatus` check before any file command proceeds.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+**Technology:** React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions. Phase 1: per-domain MS SQL connection via Service Registry.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: PatientMatchingService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | PatientMatchingService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /documents/matching/evaluate (POST), /documents/matching/resolve-manual (POST) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+**Phase 1 — EMIS Web MS SQL (per-domain):**
+
+| Legacy SP / View | Purpose | Key Inputs | Key Outputs |
+|---|---|---|---|
+| `InboundDocuments.MatchDocumentIfNotAlreadyFiled` | Assign patient to unmatched task (idempotent) | `@DocumentGuid`, `@TaskId`, `@PatientId` | `@Result bit` — 0=matched, 1=already filed (rejected) |
+| `InboundDocuments.UnmatchPatient` | Revert patient assignment from task | `@TaskId`, `@UserInRoleId` | Side-effect: clears `WorkflowTask.PatientId`, re-queues as unmatched |
+| `InboundDocuments.TasksWithMatchingPatient` | Read task with patient + match status | `OrganisationId` filter | `PatientMatchingStatus`, `FilingStatus`, `OverAllStatus`, NHS number, demographics |
+| `InboundDocuments.DocumentTaskStatusDetail` | Per-document aggregate status | `OrganisationId`, `DocumentGuid` | `PatientMatchingStatus`, `FilingStatus`, `IsUnrecognisedSender`, `HasStructuredBodyAttachment` |
+| `CareRecord.Document` | Filing gate check (doc already filed?) | `DocumentGUID` | Existence = filed, reject re-match |
+
+**PatientMatchingStatus value set (must be preserved exactly in new system):**
+- `Auto-matched` — automatic match via NHS number/demographics
+- `Manually matched` — clinician confirmed manual match
+- `Unmatched` — no match resolved, task in TaskTypeId 803 queue
+- `Unknown` — matching not yet attempted
+
+**EMIS Web patient register:** Patient lookup by NHS number resolved via `PatientIdentifier` table (type 1 = NHS number). Demographics from `Patient` table (DisplayName, DateOfBirth, Sex).
+
+**Filing gate:** Document cannot be filed (`FilingStatus = 'Filed'`) unless `PatientMatchingStatus` is 'Auto-matched' or 'Manually matched'. Enforced at SP level by `MatchDocumentIfNotAlreadyFiled` return code check.
+
+**NHSmail handoff (EMIS-X existing service):**
+- Current NHSmail service behavior: reads mailbox, downloads attachments, creates tasks in its own PostgreSQL database, and supports manual patient association in its own UI.
+- Document Manager integration behavior: NHSmail attachments are published into the Documents ingestion pipeline as source `nhsmail` and then processed by PatientMatchingService for auto-match/manual-match decisions.
+- Authority boundary: any NHSmail-side association is not treated as authoritative for Document Manager filing and routing. Document Manager stores and governs the canonical match state used by Filing, Coding, and Task queues.
+- Target state: NHSmail-source documents follow the same match policy as all other sources (NHS number auto-match where valid and unique; otherwise Unmatched queue).
+
+**Phase 2 (post-cutover):** Native Aurora PostgreSQL — `document_patient_matches` table owned by PatientMatchingService. Match state replicated to inbox read model via domain event.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+---
+
+## Clinical Safety (Added by V1e)
+
+> Full IF678 hazard cards: `requirements/HAZARD-REGISTRY.md`
+
+**Hazard IDs:** HAZ-DOC-032, HAZ-DOC-033, HAZ-DOC-034, HAZ-DOC-035
+**CLIN Guardrails:** CLIN-001 (Patient Identifier Validation), CLIN-004 (Fail-Safe Error Handling), CLIN-007 (Hazard Log Traceability), CLIN-009 (Safe Defaults)
+**HIT Design Controls:**
+- HAZ-DOC-032: see HAZARD-REGISTRY.md (CHECK 20, CHECK 21)
+- HAZ-DOC-033: see HAZARD-REGISTRY.md (CHECK 22)
+- HAZ-DOC-034: see HAZARD-REGISTRY.md (CHECK 23)
+- HAZ-DOC-035: see HAZARD-REGISTRY.md (see HAZARD-REGISTRY.md)
+**Residual Risk Level:** [TBD — ALARP pending CSO Phase 6 assessment], CSO: Dan Watts
+
+---
+
+### DCB0129/0160 Compliance
+
+- Clinical Risk Management Plan: ✅ In place
+- Hazard Log (IF678): ✅ Documented in `requirements/HAZARD-REGISTRY.md`
+- Risk Assessment: ⏳ Pending — severity/likelihood to be entered by CSO (D-008)
+- Mitigations: ✅ Defined and CLIN-referenced
+- Residual Risk: ⏳ Pending — ALARP assessment deferred pending risk scores (Phase 6)

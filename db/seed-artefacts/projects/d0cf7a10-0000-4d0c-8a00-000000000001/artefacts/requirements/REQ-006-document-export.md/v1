@@ -1,0 +1,487 @@
+﻿# REQ-006: Document Export (Print, PDF Export, Original Format Download)
+
+**Priority:** Must Have
+**Effort:** Low (print + PDF export — pre-built); Medium (original format download — net-new)
+**Risk:** Low
+**Depends On:** REQ-004 (Document Viewer & Navigation), REQ-005 (File Format Support & Conversion)
+
+> ⚠️ **Implementation note:**
+> - **Print** and **Export to PDF** are already implemented as reusable EMIS-X components. **Do not re-implement.** Integrate the existing components.
+> - **Download in original file format** is a **net-new capability** and must be implemented. This is the only deliverable in this requirement requiring new engineering work. Original files are preserved at ingestion per REQ-005.
+
+---
+
+## User Story
+
+As a practice administrator or clinician,
+I need to export documents in multiple formats — print, PDF, and original file type — 
+So that I can share, archive, or escalate documents through appropriate channels.
+
+**Acceptance Criteria:**
+- [ ] Users can print a document directly from the viewer. *(Pre-built — integrate only)*
+- [ ] Users can export/download a document as a PDF. *(Pre-built — integrate only)*
+- [ ] Users can download a document in its original source file format (e.g. Word, RTF, TIFF, CDA XML). *(Net-new — must implement)*
+- [ ] The original format download is available for all documents where an original file was preserved at ingestion (per REQ-005).
+- [ ] Where no original file is available (e.g. document was ingested directly as PDF), the original format download option is absent or clearly disabled — not silently broken.
+- [ ] All three export actions are accessible from within the document viewer without navigating away.
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-009:** Clinical Safety Logging — all export and download actions logged with user ERN, document ERN, export type, and timestamp
+- **CLIN-007:** Hazard Mitigation Evidence — export of original file must not bypass the access controls applied to the PDF rendition
+
+### Hazards Addressed
+
+- **HAZ-DOC-017:** Uncontrolled export of patient documents — sensitive clinical documents printed or downloaded without audit trail
+  - **Severity:** High
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+
+- **HAZ-DOC-018:** User downloads original file believing it is the authoritative version, but it differs from the PDF rendition (e.g. RTF source vs converted PDF)
+  - **Severity:** Medium
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+### Mitigations
+
+- **MIT-DOC-016:** All export actions (print, PDF export, original download) logged with structured audit entry
+  - **Type:** Observability
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-017:** Original format download labelled clearly as "original file" to distinguish from the PDF rendition; no implication that one is more authoritative than the other
+  - **Type:** UI Control
+  - **Effectiveness:** Partial
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — export actions are user-initiated and explicit; no bulk export without deliberate action
+- **IG-003:** Lawful Basis Declaration — export for direct care purposes; Article 6(1)(e) + Article 9(2)(h)
+- **IG-009:** Data Breach Notification — bulk or anomalous export activity must be detectable via audit log analysis
+
+### Data Handling
+- Original file download serves the preserved source file from encrypted storage (per REQ-005)
+- Downloaded files are served to the authenticated user's browser — no server-side copy created or cached
+- Export actions do not modify the document or its status in the inbox workflow
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — original file download endpoint requires valid JWT with correct scope; same access controls as PDF rendition
+- **SEC-001:** TLS Encryption — file download served over TLS 1.2+
+
+### Security Requirements
+- Original file download served via authenticated, time-limited download URL — not a persistent public URL
+- Content-Disposition header set to `attachment` to force download rather than inline browser rendering of potentially unsafe file types (e.g. RTF, XML)
+- Downloaded filename must not expose internal storage paths or system identifiers
+
+---
+
+## Dimension 4: Observability & Performance
+
+### KPIs
+- Original format download success rate
+- Export action usage split (print vs PDF export vs original download)
+- Download latency (request → file served)
+
+### OTEL Spans
+- `documents.export.print_initiated` — user triggers print action
+- `documents.export.pdf_initiated` — user triggers PDF export
+- `documents.export.original_initiated` — user triggers original format download
+- `documents.export.original_completed` — original file served successfully
+- `documents.export.original_failed` — original file unavailable or download failed
+
+### SLOs
+- Original format download: p95 < 5 seconds for files up to 50MB
+- Download success rate: ≥ 99% for documents where an original file is present
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Implementation rule:** Print and PDF export remain integrated from existing components; original-format download is net-new.
+
+**Core endpoints:**
+- `GET /documents/{documentGuid}/export/pdf`
+- `GET /documents/{documentGuid}/export/original`
+
+**Response and security rules:**
+- Original export uses `Content-Disposition: attachment`.
+- Original export requires scoped authorization and pre-download audit logging.
+- If original file is unavailable, endpoint returns explicit not-available state and UI disables original export action.
+
+### Component Interfaces
+
+```csharp
+public interface IDocumentExportService
+{
+  Task<Result<ExportResource>> ExportPdfAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+  Task<Result<ExportResource>> ExportOriginalAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+> **Note:** Print and PDF export evaluation checks are owned by the existing reusable components. Only the original format download requires new evaluation checks.
+
+### CHECK 1: AUTH-004 — Original File Download Requires Authorisation
+- **Trigger:** Original file download endpoint
+- **Test Scenario:** Unauthorised download attempt
+  - Request without authorisation header → access denied (401)
+  - Request with valid JWT + correct scope → file served
+  - Attempt to use a download URL from a different authenticated user session → access denied (403)
+- **Guardrail:** AUTH-004
+- **Hazard:** HAZ-DOC-017
+- **Pass Criteria:** Original file not accessible without valid, correctly scoped authorisation
+
+### CHECK 2: CLIN-009 — All Export Actions Audited
+- **Trigger:** Any export action (print, PDF export, original download)
+- **Test Scenario:** Audit log on original download
+  - Action: Authenticated user downloads original file
+  - Validation 1: Audit log entry created containing: `action` ("OriginalDownload"), `user_ern`, `document_ern`, `export_format`, `timestamp` (ISO 8601)
+  - Validation 2: Audit log entry created BEFORE file is served
+  - Validation 3: Audit log does NOT contain the file content or patient NHS number
+- **Guardrail:** CLIN-009
+- **Hazard:** HAZ-DOC-017
+- **Pass Criteria:** Audit entry present for every download; created before file served; no sensitive content in log
+
+### CHECK 3: Original Unavailable — Graceful Disabled State
+- **Trigger:** User views a document where no original file was preserved (e.g. ingested directly as PDF)
+- **Test Scenario:** Missing original file handling
+  - Validation 1: Original format download option is absent or visibly disabled in the UI
+  - Validation 2: No download attempt is made to a non-existent file
+  - Validation 3: Disabled state is visually distinct and does not appear broken or errored
+- **Hazard:** HAZ-DOC-018
+- **Pass Criteria:** Download option cleanly absent/disabled when no original exists; no silent failure
+
+### CHECK 4: SEC — Content-Disposition Forces Download
+- **Trigger:** Original file download response
+- **Test Scenario:** Response headers
+  - Validation 1: Response includes `Content-Disposition: attachment; filename="..."` header
+  - Validation 2: Filename in Content-Disposition does not expose internal storage paths or system identifiers
+  - Validation 3: Content-Type matches the actual file format being served
+- **Guardrail:** SEC-001
+- **Hazard:** HAZ-DOC-017 (prevents browser inline rendering of potentially unsafe file types)
+- **Pass Criteria:** All original file downloads served as attachments; filename safe
+
+---
+
+
+### CHECK 17: PXD-001 — Original Download Button States
+
+**Trigger:** Admin views document in gallery viewer
+
+**Test Scenario A — Original available:**
+- Validation 1: `⬇ Original` button enabled; click triggers `GET /documents/{guid}/export/original`
+- Validation 2: Loading state renders during request; button disabled with spinner
+- Validation 3: Browser download triggers on success; `Notification variant="success"` shown
+- Validation 4: On failure: `Notification variant="error"` persistent; button returns to enabled
+
+**Test Scenario B — No original available:**
+- Validation 1: `⬇ Original` button renders `disabled` with `aria-disabled="true"`
+- Validation 2: Tooltip `{t('export.original.unavailableTooltip')}` visible on hover and focus
+- Validation 3: No network request made on click
+- Validation 4: `axe(container)` returns 0 violations on toolbar containing disabled button
+
+**Pass Criteria:** Correct button state for each scenario; WCAG 2.1 AA passes; no silent failures
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Partial PxD.**
+> - **Pre-built (integrate only):** Print (`🖶️ Print` button) and Export to PDF (`⬇ PDF` button) — existing EMIS-X viewer toolbar components. No layout or interaction spec required.
+> - **Net-new (Document Manager owned):** Original file download button (`⬇ Original`) including loading state, disabled state when no original available, and error state.
+
+---
+
+### User Flow
+
+**Primary Flow — Download original file:**
+1. Admin has a document open in the gallery viewer
+2. Viewer toolbar shows three export controls after separator: `🖶️ Print` | `⬇ PDF` | `⬇ Original`
+3. Admin clicks `⬇ Original`
+4. Button enters loading state (spinner, disabled, `{t('export.original.downloading')}`)
+5. Audit log entry created server-side before file is served
+6. Browser download triggers (`Content-Disposition: attachment`); button returns to default state
+7. `Notification variant="success"` shown: `{t('export.original.success')}`
+
+**Alternative Flow — No original file available:**
+1. Admin views a document where no original was preserved (e.g. ingested directly as PDF)
+2. `⬇ Original` button renders as `disabled`; tooltip: `{t('export.original.unavailableTooltip')}`
+3. Admin cannot trigger a download; no silent failure
+
+**Error Flow — Download fails:**
+1. API returns error (5xx, file not found, timeout)
+2. `Notification variant="error"` persistent: `{t('export.original.error')}`
+3. Button returns to enabled default state; admin may retry
+
+**Exit Types:** No screen navigation — all export actions are in-place within the gallery view.
+
+---
+
+### Wireframes
+
+**Viewer toolbar — export controls placement (from prototype v8):**
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ [←] [Page 1/3] [→] [Zoom+] [Zoom−] [Fit] [↻ Rotate] | [🖶️ Print] [⬇ PDF] [⬇ Original] │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+*(Separator `|` visually divides navigation controls from export controls. All three export buttons are icon + label. Toolbar is part of the pre-built viewer component except for `⬇ Original` which Document Manager injects.)*
+
+**`⬇ Original` button states:**
+
+| State | Visual | Behaviour |
+|---|---|---|
+| Default (original available) | `Button variant="mono"` enabled, icon `~icons/ic/outline-file-download` | Click triggers download |
+| Loading | Button disabled, spinner replaces icon, label `{t('export.original.downloading')}` | No-op on click |
+| Disabled (no original) | `Button variant="mono" disabled`, `var(--text-dim)`, tooltip on hover/focus | No-op on click |
+| Error | Button returns to default; `Notification variant="error"` persistent | Retry available |
+
+---
+
+### Component Specifications
+
+> 🚫 All components use `@emisgroup/ui-*` exclusively.
+
+**Original Download Button (net-new):**
+- Component: `Button variant="mono" size="small"` — matches Print and PDF sibling buttons
+- Default: `ariaLabel={t('export.original.ariaLabel')}` with icon `~icons/ic/outline-file-download` 20px + label `{t('export.original.label')}`
+- Loading: `disabled` + spinner icon `~icons/ic/outline-refresh` (animated) + label `{t('export.original.downloading')}`
+- Disabled (no original): `disabled aria-disabled="true" title={t('export.original.unavailableTooltip')}` + icon `var(--text-dim)` opacity 0.5
+- Tooltip on disabled: `Popover` or native `title` attribute — `{t('export.original.unavailableTooltip')}` = "Original file not available for this document"
+
+**Placement in toolbar:**
+- Document Manager injects `⬇ Original` button into the viewer toolbar slot provided by the pre-built viewer component API
+- Positioned after `⬇ PDF` button; no additional separator needed
+
+---
+
+### Interaction Patterns
+
+**Click `⬇ Original` (available):**
+1. Button enters loading state immediately (optimistic UI)
+2. `GET /documents/{documentGuid}/export/original` — timeout 30s
+3. On success: browser download triggers from `Content-Disposition: attachment` response; button returns to default
+4. On error/timeout: button returns to default; persistent error `Notification`
+
+**Hover/focus `⬇ Original` (disabled):**
+- Tooltip appears after 500ms delay: `{t('export.original.unavailableTooltip')}`
+- Keyboard: tooltip visible when button has focus (`role="tooltip"` associated via `aria-describedby`)
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AA)
+
+- [x] Perceivable: button label + icon (not icon-only); disabled state has tooltip with explanatory text
+- [x] Operable: Tab to button; Enter/Space triggers download (when enabled); disabled state communicates via `aria-disabled="true"` + tooltip
+- [x] Understandable: loading state announced via `aria-live` on button label; error announced via `Notification role="alert"`
+- [x] Robust: `jest-axe ^9.0.0`; `Button` is `@emisgroup/ui-button`
+
+**Rule B — loading state announced:**
+```tsx
+<Button
+  variant="mono"
+  size="small"
+  disabled={isDownloading || !hasOriginal}
+  aria-disabled={isDownloading || !hasOriginal}
+  aria-describedby={!hasOriginal ? 'originalUnavailableTooltip' : undefined}
+  ariaLabel={isDownloading ? t('export.original.downloading') : t('export.original.ariaLabel')}
+>
+  {/* icon + label */}
+</Button>
+<span id="originalUnavailableTooltip" role="tooltip">{t('export.original.unavailableTooltip')}</span>
+```
+
+---
+
+### Visual Design
+
+**Tokens:**
+- Button default: `var(--text)` (inherits from `Button variant="mono"`)
+- Button disabled icon/label: `var(--text-dim)`
+- Loading spinner: `var(--primary)` (animated `~icons/ic/outline-refresh`)
+- Success notification: `var(--positive)` (via `Notification variant="success"`)
+- Error notification: `var(--negative)` (via `Notification variant="error"`)
+
+**i18n keys (British English):**
+```json
+{
+  "export.original.label": "Original",
+  "export.original.ariaLabel": "Download original file",
+  "export.original.downloading": "Downloading…",
+  "export.original.unavailableTooltip": "Original file not available for this document",
+  "export.original.success": "Original file downloaded successfully.",
+  "export.original.error": "Download failed. Please try again."
+}
+```
+
+---
+
+### Error States
+
+**Download failure (5xx / timeout):** `Notification variant="error"` persistent (no auto-dismiss). `{t('export.original.error')}`. Button returns to enabled default.
+
+**No original available:** Button rendered `disabled`; tooltip explains. No error notification — this is an expected state (not an error).
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-006 | HAZ-DOC-017 | Auth on original download | AUTH-004 | CHECK 1 |
+| REQ-006 | HAZ-DOC-017 | All export actions audited | CLIN-009 | CHECK 2 |
+| REQ-006 | HAZ-DOC-018 | Graceful disabled state when no original | — | CHECK 3 |
+| REQ-006 | HAZ-DOC-017 | Content-Disposition forces download | SEC-001 | CHECK 4 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — original file retrieval from encrypted storage, time-limited download URL generation, integration with existing print/PDF export components
+- V1c will ADD: Design section — original file download API contract, Content-Disposition header spec, download URL token schema
+- V1d will ADD: UI/UX section — export action placement in viewer, disabled state design for missing originals, labelling of "original file" vs "PDF" download options
+- V1e will ADD: Clinical Safety section — DCB0129 entries for HAZ-DOC-017/018
+- **Print and PDF export:** Reference existing EMIS-X component interfaces; no new implementation required
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation |
+| 1.1 | 2026-05-21 | V1b Architecture | Added Architecture section |
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Support print, PDF, and original format export with net-new original file download endpoint.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsExportService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsExportService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /persons/{personGUID}/documents/{documentGUID}/original-file (GET) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+Existing print and PDF components plus document binary storage and auth scopes.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+

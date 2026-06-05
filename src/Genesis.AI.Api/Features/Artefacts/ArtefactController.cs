@@ -82,6 +82,34 @@ public class ArtefactController : ControllerBase
     }
 
     /// <summary>
+    /// Downloads a specific artefact's raw bytes as a file attachment.
+    /// Used for binary artefacts (spreadsheets, PDFs, images) that cannot be
+    /// rendered as text in the browser.
+    /// </summary>
+    [HttpGet("{artefactId:guid}/download")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
+    [Produces("application/octet-stream")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Download(
+        Guid projectId,
+        Guid artefactId,
+        CancellationToken cancellationToken)
+    {
+        var artefact = await _mediator.Send(new GetArtefactByIdQuery(artefactId), cancellationToken);
+        if (artefact is null || artefact.ProjectId != projectId)
+            return NotFound();
+
+        var content = await _artefactStorageService.GetBinaryContentAsync(artefact.S3Key, cancellationToken);
+        if (content is null || content.Length == 0)
+            return NotFound();
+
+        var fileName = artefact.FilePath.TrimStart('/').Split('/').Last();
+
+        return File(content, artefact.ContentType, fileName);
+    }
+
+    /// <summary>
     /// Saves one or more text artefacts for a project.
     /// Called by the frontend when the user confirms artefact output.
     /// </summary>

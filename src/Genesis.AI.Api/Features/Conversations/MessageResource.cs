@@ -25,6 +25,14 @@ public sealed class MessageResource
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? FamilyName { get; init; }
 
+    [JsonPropertyName("images")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<MessageImageResource>? Images { get; init; }
+
+    [JsonPropertyName("documents")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<MessageDocumentResource>? Documents { get; init; }
+
     [JsonPropertyName("createdAt")]
     public DateTimeOffset CreatedAt { get; init; }
 }

@@ -1,0 +1,1226 @@
+﻿# REQ-001: Unified Inbound Document Inbox
+
+**Priority:** Must Have
+**Effort:** High
+**Risk:** High
+**Depends On:** None
+**Increment:** 1 — Inbox & Triage
+**Outcome:** I can receive, view, and organize documents in one place
+
+> **Increment 1 scope boundary:** This file covers the unified inbox with two tabs (Unmatched Documents and Patient Matched Documents), triage, manual patient matching, document viewing, and queue navigation. Won't be filed, Reject, the Filing Queue workflow, coding, and task creation are in later increments and are captured in the dedicated deferred sections below.
+
+---
+
+## User Story
+
+As a practice administrator,
+I need to manage all inbound documents from a single, unified starting point,
+So that I can quickly triage and begin processing documents safely and efficiently without context-switching.
+
+---
+
+## ✅ Flow Variant Decision — **Confirmed: Approach B Adopted** (2026-05-26)
+
+**Decision:** Approach B is the confirmed entry-point design. Approach A is rejected. All acceptance criteria, PxD, and evaluation checks apply Approach B only.
+
+### ~~Approach A — Separate Inbound Inbox~~ *(Rejected)*
+
+~~All inbound documents land in a dedicated **Inbox** view. Users triage from the Inbox, then explicitly progress each document to the Filing Queue as a separate step.~~
+
+- ~~**Entry point:** Inbox~~
+- ~~**Workflow:** Inbox → Filing Queue → Coding Queue → Tasking → Complete~~
+- **Rejection reason:** requires an explicit move step from Inbox to Filing Queue — unnecessary friction at high volume; Filing Queue itself serves as triage view.
+- **Prototype (reference only):** `ui-samples/approach-a-inbox-then-filing.html`
+
+### Approach B — Unified Inbox with 2 Tabs *(Adopted — Increment 1)*
+
+The Documents Manager inbox presents **two tabs** in Increment 1: **Unmatched Documents** (default, leftmost) and **Patient Matched Documents**. All inbound documents land in one of these two tabs based on automatic patient matching status. Users resolve unmatched documents via manual patient search, after which the document moves to the Patient Matched Documents tab. Filing, coding, tasking, and rejection actions are deferred to later increments.
+
+- **Entry point:** Unmatched Documents tab (default active)
+- **Workflow (Increment 1):** Unmatched Documents → manual patient match → Patient Matched Documents
+- **Unmatched Documents tab:** Default landing tab; user resolves patient match before the document moves to the matched queue
+- **Patient Matched Documents tab:** Shows all documents with a confirmed patient match, awaiting filing (Increment 2)
+- **Prototype:** `ui-samples/REQ-001-prototype.html` (v3)
+
+---
+
+**Acceptance Criteria — Both Approaches:**
+- [ ] Each document row displays all minimum triage metadata fields in the following column order: Urgency indicator, Document Title, Date Received, Matched Patient (patient name; shown when a patient match exists; blank when unmatched), Document Type, Source, and Department.
+- [ ] Urgent documents are indicated by a red arrow displayed to the left of the document row. Non-urgent documents display no arrow. This is a binary indicator only — urgency categorisation (Urgent / Routine / Administrative) is a concept belonging to the Task Queue, not the document inbox. *(Must Have)*
+- [ ] Moving the mouse over a document row highlights that row visually to indicate hover state. *(Must Have)*
+- [ ] Users can triage by urgency and metadata without opening the document.
+- [ ] The document list remains usable at high volumes and during backlogs.
+- [ ] System autosaves state so users can resume work after interruptions without data loss.
+- [ ] After patient match is confirmed on a document, the system automatically advances to the next document in the queue without returning to the queue list, preserving the current sort and filter order. *(Must Have — Increment 1: required step is patient match confirmation only)*
+- [ ] The user can return to the queue document list at any point during processing using a "Back to queue" action; the current document's in-progress state is autosaved and the document is visibly marked as in-progress in the queue list.
+- [ ] When the queue is exhausted after completing a document, the system returns the user to the queue list with an appropriate empty-state message.
+- [ ] When navigating to the next document, the previous document's patient context is fully cleared before the new document's patient data is presented.
+- [ ] The actions menu trigger (⋮) is visually hidden at rest and becomes visible when the row is hovered or receives keyboard focus. *(V1d — interaction)*
+- [ ] Queue tabs use manual keyboard activation — arrow keys move focus between tabs; Enter or Space activates the focused tab and triggers a data fetch. *(V1d — accessibility)*
+- [ ] On viewports narrower than 768px, the queue document list renders as a card-per-document list; the urgency indicator, document title, date received, and matched patient name are visible on each card. *(V1d — responsive)*
+
+**Acceptance Criteria — Unmatched Tab (Approach B):**
+- [ ] A dedicated **Unmatched** tab is present within the Filing Queue view, showing all documents where no patient match could be automatically determined. *(Must Have)*
+- [ ] A document appears in the Unmatched tab when: (a) no valid NHS Number could be extracted, (b) the extracted NHS Number does not match any patient in the EMIS Web register, or (c) multiple candidate patients were found. *(Must Have)*
+- [ ] From the Unmatched tab, the user can open a document and perform a manual patient search. The patient search queries the **EMIS Web patient register** as the authoritative data source; results are drawn live from EMIS Web and not from a local cache or separate index. *(Must Have)*
+- [ ] The manual patient search UI presents results returned from EMIS Web, allowing the user to select the correct patient record. The selected record's EMIS Web patient identifier is used to confirm the match. *(Must Have)*
+- [ ] Once a match is confirmed in the Unmatched tab, the document moves to the **Patient Matched Documents** tab. *(Must Have)*
+- [ ] Unmatched documents are not moved to the Patient Matched Documents tab until a patient match has been confirmed. *(Must Have — clinical safety)*
+- [ ] The Unmatched tab displays a count badge showing the current number of unmatched documents. *(Must Have)*
+- [ ] All manual match resolutions from the Unmatched tab are audited, recording: `user_ern`, `document_ern`, `matched_patient_ern`, `match_source: manual`, `timestamp`. *(Must Have)*
+
+**Acceptance Criteria — Inbox Tab Structure (Increment 1):**
+- [ ] The inbox has **two tabs: Unmatched Documents** (default, leftmost) and **Patient Matched Documents**. No other tabs are present in Increment 1. *(Must Have)*
+- [ ] All inbound documents land directly in the Documents Manager inbox; there is no preceding Inbox step. *(Must Have)*
+- [ ] **The toolbar (search field, filter, sort, and upload controls) is positioned above the tab strip** and remains visible and functional regardless of which tab is active. The toolbar applies its search and filter context to the currently active tab's document list. *(Must Have)*
+- [ ] When the user clicks a document in the queue-peek sidebar while in gallery view, the current document's in-progress workflow state is autosaved before the selected document loads; the previously active document retains a visible in-progress badge in the peek list. *(V1d — queue-peek navigation)*
+- [ ] Once a patient match is confirmed in the workflow panel, the matched patient's name, date of birth, and NHS number are displayed in a persistent patient banner above the step indicator and remain visible for that document. *(V1d — patient banner; Increment 1: displayed after Match step only)*
+- [ ] Completed workflow steps in the step indicator are clickable; clicking a completed step navigates the user back to that step's content without losing data entered in later steps. *(V1d — StepIndicator navigation)*
+
+---
+
+### Acceptance Criteria — Deferred to Increment 2 (Safe Filing)
+
+*(Active when REQ-012, REQ-014, and REQ-010 are delivered. Do not implement in Increment 1.)*
+
+- [ ] *(REQ-010/REQ-012)* A user can **Reject** any document in the inbox. Reject is a **soft delete**: the document moves to a Rejected view and is **retrievable by an admin user within 30 days** of rejection.
+- [ ] *(REQ-010/REQ-012)* Rejecting a document requires the user to select a reason from a fixed list (e.g. Sent to wrong practice, Unreadable / corrupt file, Duplicate of existing record, Spam / unsolicited, Other). The Reject confirm button remains disabled until a reason is selected.
+- [ ] *(REQ-009)* A rejected document is audited: the reason, acting user ERN, document ERN, and timestamp are stored in the immutable audit trail.
+- [ ] *(REQ-010/REQ-012)* An admin user can retrieve a document from the Rejected view within the 30-day window. Retrieval restores the document to the inbox with the original triage metadata intact.
+- [ ] *(REQ-010/REQ-012)* The confirm action in the Reject dialogue is disabled until the user has selected a reason; the select field is marked invalid if the user attempts to confirm without a selection.
+- [ ] *(REQ-014)* The filing metadata panel includes **Confidentiality** and **Patient Online Visibility** controls inline, accessible during the standard filing workflow. Users do not navigate to a separate settings screen to set these values at time of filing.
+- [ ] *(REQ-014 + CLIN-010)* Confidentiality defaults to **Standard access** and Patient Online Visibility defaults to **Not visible to patient** (fail-closed defaults). A visible warning is displayed when either default is changed.
+- [ ] *(REQ-010)* The workflow panel includes a Task creation step (④ Task) after the coding step. Task creation is required before a document can reach Complete status where tasks are applicable.
+- [ ] *(REQ-012)* The workflow panel includes a File step (② File) allowing the user to assign filing metadata and commit the document to the patient record.
+
+---
+
+### Acceptance Criteria — Deferred to Increment 3 (Clinical & Operational Actions)
+
+*(Active when REQ-013 is delivered. Do not implement in Increment 1.)*
+
+- [ ] *(REQ-013)* A secondary coding panel is available from within the Filing Queue, allowing the user to assign SNOMED codes while filing. Completing coding from the Filing Queue causes the document to skip the Coding Queue downstream.
+- [ ] *(REQ-013)* The workflow panel includes a Code step (③ Code) as part of the standard filing workflow.
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-002:** Patient Data Audit Trail — immutable audit log created before returning patient data
+- **CLIN-007:** Hazard Mitigation Evidence — UI controls must implement HAZ-ID mitigations visibly
+- **CLIN-009:** Clinical Safety Logging — log safety-critical events using ERN (not NHS number)
+- **CLIN-010:** Error Handling Patient Safety — fail closed; never expose null or ambiguous states
+
+### Hazards Addressed
+
+- **HAZ-DOC-001:** Documents visible to users before appropriate clinical review
+  - **Severity:** High
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+  - **Source:** Known cross-cutting issue (stated by user)
+
+- **HAZ-DOC-002:** Urgent documents not surfaced or deprioritised in high-volume inbox
+  - **Severity:** High
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+
+- **HAZ-DOC-003:** Document accessed by wrong user / without appropriate role
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+- **HAZ-DOC-004:** Inbox state lost on interruption, leading to document processed twice or missed
+  - **Severity:** Medium
+  - **Likelihood:** Medium
+  - **Risk Level:** Medium
+
+- **HAZ-DOC-027:** *(Deferred — Increment 2, tied to Reject feature)* Document incorrectly rejected — a clinically significant letter is never filed to the patient record; the treating clinician is unaware of its existence
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+  - **Status:** ⏳ Deferred — active when Reject feature is implemented in Increment 2
+
+- **HAZ-DOC-028:** User navigates to the next document in the queue before completing all required processing steps on the current document — the partially processed document remains unactioned and is not visible as incomplete to the clinical team
+  - **Severity:** High
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+
+- **HAZ-DOC-029:** Action completion state is ambiguous across queue contexts — a user believes filing, coding, or task creation was completed as a secondary action in an earlier queue but it was not, and the document advances to Complete with missing clinical information
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+### Mitigations
+
+- **MIT-DOC-001:** Binary urgency indicator (red arrow) surfaced to the left of each document row at triage level; queue supports sorting/filtering by urgent status
+  - **Type:** UI Control
+  - **Effectiveness:** Partial (accuracy of source urgency flag determines completeness)
+
+- **MIT-DOC-002:** Role-based access control enforced at inbox level; documents only visible to authorised users
+  - **Type:** Business Logic + Auth
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-003:** Autosave on all in-progress work; resume state preserved on interruption
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-027:** *(Deferred — Increment 2)* Reject action requires mandatory reason selection; confirmation step before status applied; action is reversible by admin within 30 days; full audit trail records reason, user ERN, document ERN, and timestamp
+  - **Type:** UI Control + Business Logic
+  - **Effectiveness:** Partial
+  - **Status:** ⏳ Deferred — active when Reject feature is implemented in Increment 2
+
+- **MIT-DOC-028:** "Next document" action is only available after all required workflow steps for the current document are confirmed complete; documents with incomplete required steps remain in-queue and retain a visible in-progress indicator in the queue list
+  - **Type:** Business Logic + UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-029:** The completion state of each action (filed / coded / tasks complete) is displayed prominently and persistently on the document view in all queue contexts; individual action panels are clearly labelled as complete or incomplete; a document cannot reach Complete status if any required action is unconfirmed
+  - **Type:** UI Control + Business Logic
+  - **Effectiveness:** Complete
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — inbox metadata view returns only fields required for triage
+- **IG-002:** Privacy by Design and Default — minimum data surfaced at inbox level; full document requires explicit open action
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(e) (public task) + Article 9(2)(h) (health data, medical purposes)
+- **IG-004:** Special Category Data Protection — patient health documents are special category data; AES-256-GCM encryption at rest required
+- **IG-010:** Retention Policy Enforcement — documents subject to NHS records retention schedules (IF3005)
+
+### Data Handling
+- Triage metadata fields (Urgency, Title, Type, Date, Source, Department) are surfaced at inbox list level
+- Full document content requires deliberate open action (not surfaced passively in list view)
+- Patient identity not exposed at inbox list level beyond what is operationally necessary for triage
+- All document access logged (see CLIN-002)
+
+### GDPR Articles
+- **Article 6(1)(e):** Lawful basis — public task (NHS direct care)
+- **Article 9(2)(h):** Special category health data — medical diagnosis/treatment purposes
+- **Article 5(1)(c):** Data minimisation — inbox list view limited to minimum triage fields
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — all inbox endpoints require valid JWT with correct scope
+- **SEC-001:** TLS Encryption — all traffic over TLS 1.2+
+- **SEC-002:** No Secrets in Code — all credentials/keys in Azure Key Vault
+
+### Security Requirements
+- Role-based access: admin and clinician roles may have differentiated inbox views/capabilities
+- Session continuity: autosave state must not persist sensitive document content in insecure client storage (e.g. unencrypted localStorage/sessionStorage)
+- No patient document content exposed in URL parameters or browser history
+
+---
+
+## Dimension 4: Observability & Performance
+
+### Product KPIs
+- Inbox load time (time to render populated inbox view)
+- Document triage throughput (documents actioned per user per hour)
+- Autosave success rate
+- Inbox error rate (failed document loads, missing metadata)
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Approach:** Hybrid queue contract.
+
+**Versioning:** Header-based versioning only. The API path does not include a version segment.
+
+**JSON:API media type:** Requests and responses use `application/vnd.api+json`.
+
+**Resource type:** `documents` for list and detail resources.
+
+**Primary collection endpoint:** `GET /documents`
+
+**Queue selection:** The active tab is selected with `filter[queue]`.
+- `filter[queue]=unmatched` — Unmatched Documents tab (Increment 1)
+- `filter[queue]=matched` — Patient Matched Documents tab (Increment 1)
+
+> **Deferred to later increments:** `filter[queue]=filing` (REQ-012), `filter[queue]=coding` (REQ-013), `filter[queue]=tasks` (REQ-010), `filter[queue]=completed` (REQ-010), `filter[queue]=rejected` (REQ-010) — active when their respective requirements are delivered.
+
+**Common query parameters:**
+- `filter[search]` for free-text triage search scoped to the active queue
+- `filter[urgent]` for urgent-only list filtering
+- `sort` for sort order within the active queue
+- `page[number]` and `page[size]` for Json:API pagination
+
+**Response shape:**
+- `data` contains the current page of queue items for the selected tab
+- `included` contains only directly related resources needed for the list row and active side-panel context
+- `meta.queueCounts` returns counts for all queue tabs so the tab strip can render badges without a second round trip
+- `links.self`, `links.next`, and `links.prev` follow Json:API pagination rules
+- each item in `data` uses JSON:API `id`, `type`, `attributes`, and `relationships` members
+- errors are returned using JSON:API `errors[]`
+
+**Detail endpoints:**
+- `GET /documents/{documentId}` for the selected document's detail view
+- `GET /documents/{documentId}/match` for match context when needed
+- `GET /documents/{documentId}/tasks` for linked task visibility
+
+**Design note:** This is hybrid rather than fully split by tab. One collection endpoint serves all queue tabs through `filter[queue]`, while heavier document-specific surfaces remain on dedicated detail endpoints.
+
+---
+
+### Database Schema
+
+**No dedicated database table.** REQ-001 reads from the `documents` table managed by the ingestion pipeline (REQ-002) and the `document_work_in_progress` autosave table managed by the filing service (REQ-012). No schema is owned by this requirement.
+
+---
+
+### Observable Events (OTEL Instrumentation)
+- `documents.inbox.load` — inbox view requested → rendered
+- `documents.inbox.triage` — document row interacted with for triage
+- `documents.inbox.progress` — document moved to next workflow stage
+- `documents.inbox.autosave` — autosave event triggered and completed
+- `documents.queue.next_document` — user advances directly to the next document in queue from a completed document state; `previous_document_ern` and `next_document_ern` recorded as span attributes
+- `documents.action.secondary_complete` — user completes a secondary action from a non-native queue context; `action_type` (file | code | task) and `queue_context` (filing | coding | task) recorded as span attributes
+
+### Performance SLOs
+- Inbox render: p95 < 2 seconds at expected practice volume
+- Autosave: p99 success rate ≥ 99.9%
+- Metadata completeness: ≥ 99% of documents display all 6 triage metadata fields
+- Next document advance: p95 < 2 seconds from "Next document" action to next document viewer load
+
+### Alerting Conditions
+
+| Condition | Threshold | Severity | Channel |
+|---|---|---|---|
+| Inbox render p95 latency breach | > 2 seconds sustained for 5 min | HIGH | Ops alert |
+| Autosave success rate drop | < 99.9% over 5-minute window | CRITICAL | On-call page |
+| Inbox API error rate spike | > 1% of requests returning 5xx | HIGH | Ops alert |
+| Queue depth stall | Inbox queue depth unchanged for > 30 min during working hours | MEDIUM | Ops alert |
+
+---
+
+## ✨ Evaluation Function Specification
+
+> **Note:** HTTP status codes and low-level API mechanics have been explicitly deferred to V1c Design phase. Checks below specify *what* must be validated; specific endpoint paths and response schemas will be finalised in V1c and used to make these checks fully executable.
+
+### CHECK 1: CLIN-002 — Audit Log Created on Document Access
+- **Trigger:** User opens or views a document from the inbox
+- **Test Scenario:** Document access audit verification
+  - Action: User opens a document from the inbox
+  - Validation 1: Audit log entry created for the access event
+  - Validation 2: Audit log timestamp precedes response data return
+  - Validation 3: Audit log contains: `action`, `user_ern`, `document_ern`, `accessed_at` (ISO 8601), `ip_address`
+  - Validation 4: Audit log does NOT contain raw NHS number (use `patient_ern` instead)
+  - Validation 5: Audit log does NOT contain internal database integer primary keys
+- **Guardrail:** CLIN-002
+- **Hazard:** HAZ-DOC-003 (undetected unauthorised or incorrect access)
+- **Pass Criteria:** Audit log created before document content returned; contains all required fields; forbidden fields absent
+
+### CHECK 2: CLIN-007 — Urgency Indicator Surfaced Visibly in Inbox UI
+- **Trigger:** Inbox view rendered with documents present
+- **Test Scenario:** Urgency indicator presence and prominence
+  - Validation 1: Each urgent document row renders a red arrow indicator to the left of the row
+  - Validation 2: Non-urgent document rows render no arrow; absence is intentional and not an error state
+  - Validation 3: Inbox supports sorting by urgent status (urgent documents sort to top)
+  - Validation 4: Inbox supports filtering to show urgent documents only
+  - Validation 5: Urgency indicator is distinct from any task urgency categorisation (Urgent / Routine / Administrative)
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-002 (urgent documents deprioritised in high-volume inbox)
+- **Pass Criteria:** Red arrow visible on every urgent document row; absent on non-urgent rows; sort and filter by urgent status both functional
+
+### CHECK 3: CLIN-010 — Inbox Fails Closed on Error
+- **Trigger:** Inbox data fetch fails (e.g. source system unavailable, network error)
+- **Test Scenario:** Error state handling
+  - Simulate: source system returns error / times out
+  - Validation 1: Inbox displays a clear, explicit error state
+  - Validation 2: Error state is visually distinct from a genuinely empty inbox
+  - Validation 3: Error state does not expose internal error details (stack traces, system identifiers) to the user
+  - Validation 4: Error state includes guidance on next steps or retry
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-002 (documents missed due to silent failure appearing as empty inbox)
+- **Pass Criteria:** Error state clearly communicated; inbox never silently appears empty due to a failure condition
+
+### CHECK 4: IG-001 — Inbox List Response Contains Triage Fields Only
+- **Trigger:** Inbox list API response
+- **Test Scenario:** Data minimisation validation
+  - Allowed fields at list level: `urgency`, `documentTitle`, `documentType`, `documentDate`, `source`, `department`, `documentErn`
+  - Validation 1: Response contains ONLY allowed fields at list level
+  - Validation 2: Full document content (body, attachments) is NOT present in the list response
+  - Validation 3: Patient clinical record fields are NOT present in the list response
+  - Anti-pattern: Returning full document entity or patient record in list view
+- **Guardrail:** IG-001
+- **GDPR Article:** Article 5(1)(c) — data minimisation
+- **Pass Criteria:** Inbox list response contains only the 6 triage metadata fields + document ERN; no extraneous data
+
+### CHECK 5: AUTH-004 — Inbox Requires Authorisation
+- **Trigger:** Any inbox API endpoint
+- **Test Scenario:** Unauthorised access blocked
+  - Request WITHOUT authorisation header → expected: access denied (401)
+  - Request with invalid/expired JWT → expected: access denied (401)
+  - Request with valid JWT + correct scope → expected: inbox data returned (200)
+  - Request with valid JWT but insufficient scope/role → expected: access denied (403)
+- **Guardrail:** AUTH-004
+- **Hazard:** HAZ-DOC-003 (documents visible to unauthorised users)
+- **Pass Criteria:** No inbox data accessible without valid authorisation and correct role scope
+
+### CHECK 6: SEC-002 — Autosave State Not in Insecure Client Storage
+- **Trigger:** Autosave event triggered during document processing
+- **Test Scenario:** Autosave storage location validation
+  - Validation 1: In-progress document state persisted server-side, not in unencrypted `localStorage` or `sessionStorage`
+  - Validation 2: No patient document content written to browser storage
+  - Validation 3: If any client-side state is stored, it contains only non-sensitive identifiers (ERNs, not content)
+- **Guardrail:** SEC-002
+- **Hazard:** HAZ-DOC-004 (patient data exposed via client storage)
+- **Pass Criteria:** Autosave state persisted server-side; no sensitive document content in browser storage
+
+### CHECK 8: CLIN-007 + IG-002 — Sequential Queue Navigation Safety
+
+**Trigger:** User invokes the "Next document" action during document processing.
+
+**Test Scenario A:** Advance blocked when required steps are incomplete
+- **Setup:** Document in processing (e.g. filing queue); a required step (e.g. patient match/filing) not yet completed
+- **Action:** User invokes "Next document"
+- **Expected:** Action blocked; "Next document" control is disabled; user shown which required steps are outstanding
+- **Validation:** Document status unchanged; not progressed in the queue
+
+**Test Scenario B:** Advance available after all required steps complete
+- **Setup:** Document with all required workflow steps completed (filed, coded where required, tasked where required)
+- **Action:** User invokes "Next document"
+- **Validation 1:** Next document in queue loaded (respecting current sort and filter order)
+- **Validation 2:** Previous document's status updated to reflect its completed state in the queue
+- **Validation 3:** `documents.queue.next_document` OTEL span emitted with `previous_document_ern` and `next_document_ern` attributes
+
+**Test Scenario C:** "Back to queue" preserves in-progress state at any point
+- **Action:** User invokes "Back to queue" mid-action (before required steps complete)
+- **Validation 1:** In-progress state autosaved server-side (per MIT-DOC-003)
+- **Validation 2:** Document appears in queue list with a visible in-progress indicator
+- **Validation 3:** Reopening the document restores the autosaved in-progress state
+
+**Test Scenario D:** Patient context cleared on next-document navigation
+- **Setup:** User completes Document A (patient X) and invokes "Next document" to Document B (patient Y)
+- **Validation 1:** Document B presents patient Y's data only
+- **Validation 2:** No patient X data (patient identifier, filing suggestions, matched patient ERN) is visible anywhere in the Document B context
+- **Validation 3:** Any patient-specific state derived from Document A (e.g. pre-populated filing fields, matched patient) is absent when Document B loads
+
+**Applicable Guardrail:** CLIN-007 (Hazard Mitigation Evidence), IG-002 (Privacy by Design — patient context must not leak between sequential documents)
+**Hazard Addressed:** HAZ-DOC-028 — partially processed document invisible as incomplete; patient data cross-contamination risk
+**Pass Criteria:** "Next document" disabled until all required steps confirmed complete; "Back to queue" available at all times; autosaved in-progress state restored on reopen; patient context from previous document absent when next document loads.
+
+---
+
+---
+
+
+### CHECK 17: PXD-001 — Queue List Primary Flow Completion
+
+**Trigger:** Practice admin executes the full Inbox → gallery → workflow → "Next document" flow
+
+**Test Scenario:**
+- User navigates to inbox; skeleton rows appear then resolve to document list
+- User clicks an urgent document row; gallery view opens
+- User completes Patient Match → File steps; "Next document" becomes enabled
+- User clicks "Next document"; next document loads; previous patient context cleared
+
+**Pass Criteria:** Primary flow completes without errors; "Next document" disabled until all required steps done; patient context fully cleared on advance (CHECK 8 prerequisite)
+
+---
+
+### CHECK 18: PXD-002 — Accessibility: Inbox Passes axe Audit
+
+**Trigger:** `jest-axe` audit of `InboxScreen` component
+
+**Test Scenario:**
+- `render(<InboxScreen />)` with loaded documents state
+- `expect(await axe(container)).toHaveNoViolations()`
+- Manual: Tab through all interactive elements — row → ⋮ button → menu items → tab strip
+- Manual: Screen reader (VoiceOver/NVDA) — urgency announced as text, not icon only; loading state announced
+
+**Pass Criteria:** Zero axe violations; urgency conveyed without colour alone; all inputs have accessible labels; loading/error states use `aria-live`
+
+---
+
+### CHECK 19: PXD-003 — Responsive: Mobile Card View
+
+**Trigger:** Viewport width set to 375px
+
+**Test Scenario:**
+- Queue list renders as card-per-document layout (not table)
+- Each card displays: urgency indicator, title, date received, matched patient name
+- No horizontal scroll
+- Touch targets ≥44×44px
+
+**Pass Criteria:** Card layout renders at <768px; all specified fields visible; no overflow; touch targets meet minimum size
+
+---
+
+### CHECK 20: PXD-004 — ⋮ Menu Interaction and Focus Management
+
+**Trigger:** User opens ⋮ menu via mouse or keyboard
+
+**Test Scenario A (mouse):** Hover row → ⋮ becomes visible → click → menu opens; click outside → menu closes
+**Test Scenario B (keyboard):** Tab to ⋮ button (visible on focus) → Enter → menu opens; Arrow keys navigate items; Enter activates item; Escape closes; focus returns to ⋮ trigger
+**Test Scenario C (reject):** *(Deferred — Increment 2)*
+
+**Pass Criteria:** ⋮ visible on hover and focus; all menu interactions keyboard-accessible; focus management correct on open/close/action
+
+---
+
+### CHECK 21: PXD-005 — Error vs Empty State Visual Distinction
+
+**Trigger:** (A) API returns 500; (B) API returns 200 with empty list
+
+**Test Scenario A (error):** `Alert` component rendered with error variant, error icon, retry action; not visually similar to empty state
+**Test Scenario B (empty):** Neutral illustration/icon + contextual guidance message; no red/error colour; `role="status"`
+
+**Pass Criteria:** Error and empty states use visually distinct components and iconography; empty state never shown as a result of a failure condition (per CHECK 3 / CLIN-010)
+
+---
+
+
+
+#### CHECK 22: CLIN-009 - Provisional Document Status Gate
+
+**Status:** BLOCKED - Parking Lot item 12 (technical confirmation required)
+
+**Trigger:** Any document fetch, queue list, or viewer API request where document is in Provisional status
+
+**Test (pending technical confirmation):** Provisional document returned in API response includes explicit status field; UI does not render document as Filed; direct-URL access enforced at API layer not client only
+
+**Pass criteria:** To be finalised once technical team confirms status gate implementation boundary
+
+**HAZ-DOC references:** HAZ-DOC-001 (Causes 1-3)
+
+---
+
+#### CHECK 23: CLIN-009 - Default Inbox Sort Prioritises Urgent Documents
+
+**Trigger:** Inbox loaded for the first time or after session reset
+
+**Test:** Inbox API default sort returns urgent documents at the top without explicit sort parameter from client
+**Test:** Inbox with mixed urgent/non-urgent documents - urgent documents appear before non-urgent on initial load
+**Test:** Sort-by-urgency option available and functional in all queue views
+
+**Pass criteria:** Urgent documents sorted to top on first load without client-side sort request; urgency sort always available in all queue views
+
+**HAZ-DOC references:** HAZ-DOC-002 (Cause 2)
+
+---
+
+#### CHECK 24: CLIN-009 - JWT/Role Enforcement at Document API Boundary
+
+**Trigger:** Any request to document open, view, or fetch endpoint
+
+**Test:** Request without valid JWT -> HTTP 401; no document data in response
+**Test:** Valid JWT but missing document-access scope -> HTTP 403; no document data in response
+**Test:** Valid JWT and scope but no patient relationship -> HTTP 403; no document data in response
+**Test:** Stale or expired session -> HTTP 401; no fallback to previous user context
+
+**Pass criteria:** All unauthorised access attempts rejected at API boundary before any document data is retrieved or returned
+
+**HAZ-DOC references:** HAZ-DOC-003 (Causes 1-3)
+
+---
+
+#### CHECK 25: CLIN-005 - In-Progress Marker Persisted Server-Side Within Transaction
+
+**Trigger:** User begins processing a document; secondary action completes in any queue context
+
+**Test:** Begin processing document -> interrupt (close browser) -> reopen -> in-progress marker present and correct from server state
+**Test:** Secondary action completes -> re-fetch document state -> completion reflected from server; no optimistic/stale client state
+**Test:** In-progress marker write fails -> explicit error returned; no silent success with lost state
+
+**Pass criteria:** In-progress and completion state always sourced from server; client holds no authoritative state; transaction rollback on failure
+
+**HAZ-DOC references:** HAZ-DOC-004 (Causes 1,3), HAZ-DOC-029 (Cause 1)
+
+---
+
+#### CHECK 26: CLIN-004 - Autosave Failure and Completion-Gate Errors Surfaced Explicitly
+
+**Trigger:** Autosave request fails; required-step computation fails; status badge re-fetch fails
+
+**Test:** Autosave endpoint returns error -> UI surfaces explicit save-failed notification; not silent
+**Test:** Required-step completion endpoint returns error -> document treated as incomplete (fail-closed); explicit error shown to user
+**Test:** Status badge sourced from server re-fetch after action; stale client value discarded
+**Test:** Resume flow calls server to re-fetch state; local cached state not used as authoritative
+
+**Pass criteria:** No silent failures on autosave, completion computation, or status update; all failures produce explicit user-facing feedback or fail-closed state
+
+**HAZ-DOC references:** HAZ-DOC-004 (Causes 2,4), HAZ-DOC-028 (Causes 2,3), HAZ-DOC-029 (Cause 2)
+
+---
+
+#### CHECK 27: CLIN-009 - Server-Side Completion Gate Cannot Be Bypassed
+
+**Trigger:** User attempts to advance a document without completing required steps
+
+**Test:** Attempt to advance document with incomplete required steps -> server rejects; document state unchanged
+**Test:** Client-side completion state manipulated -> server re-validates and rejects advancement if steps not confirmed complete
+**Test:** Completion only succeeds when server confirms all required steps fulfilled
+
+**Pass criteria:** Document advancement gate enforced exclusively server-side; no client-side bypass path; completion requires server confirmation of all-step success
+
+**HAZ-DOC references:** HAZ-DOC-028 (Cause 1), HAZ-DOC-029 (Cause 3)
+
+---
+
+
+## Deferred Checks — Increment 2
+
+*(These checks become active when REQ-009, REQ-010, and REQ-012 are delivered. Do not include in Increment 1 test suites.)*
+
+### CHECK 7 (Deferred — Increment 2): CLIN-007 — Reject Requires Reason, Confirmation, and Is Audited
+- **Trigger:** User initiates a Reject action on a document in the inbox
+- **Test Scenario A:** Reason is mandatory — cannot skip
+  - Action: Submit Reject without selecting a reason
+  - Expected: Action blocked; validation error displayed; document status unchanged
+- **Test Scenario B:** Confirmation step required before status applied
+  - Action: Select reason → confirm
+  - Validation 1: Document status updates to `rejected`
+  - Validation 2: Audit log entry created containing: `action: rejected`, `reason`, `user_ern`, `document_ern`, `timestamp`
+  - Validation 3: Document removed from active inbox queue
+- **Test Scenario C:** Admin retrieval within 30-day window
+  - Setup: Document in `rejected` state, within 30 days of rejection
+  - Action: Admin user retrieves rejected document
+  - Validation 1: Document status returns to previous queue
+  - Validation 2: Original triage metadata intact
+  - Validation 3: Retrieval recorded in audit trail
+- **Test Scenario D:** Retrieval blocked after 30-day window
+  - Setup: Document in `rejected` state, beyond 30 days
+  - Action: Attempt to retrieve
+  - Expected: Retrieval blocked; document remains rejected
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-027
+- **Pass Criteria:** Reject cannot be submitted without a reason; audit log created on confirmation; admin retrieval possible within 30-day window; retrieval blocked after 30 days
+
+### CHECK 10 (Deferred — Increment 2): ADR-008 — EMIS Web State Write-Back and Bidirectional Warning
+- **Trigger:** User action in EMIS-X transitions a document to a state with a corresponding EMIS Web workflow state (e.g. Complete); or EMIS Web state changes while document is open in EMIS-X
+- **Test Scenario A:** EMIS-X → EMIS Web write-back
+  - Action: User marks document Complete in EMIS-X
+  - Validation 1: `document_queue_state` in Aurora PG updated to `Complete`
+  - Validation 2: Corresponding EMIS Web workflow state written back to `Complete` in EMIS Web MS SQL
+  - Validation 3: Visible warning displayed to user explaining the EMIS Web state change and model difference
+- **Test Scenario B:** EMIS Web → EMIS-X detection
+  - Setup: Document is open in EMIS-X Filing Queue; state changed to Complete in EMIS Web
+  - Validation 1: EMIS-X detects the state change (via polling or CDC — TBD CONCURRENCY-001)
+  - Validation 2: `document_queue_state` in Aurora PG updated to reflect the change
+  - Validation 3: Warning displayed to any active EMIS-X user working on that document
+- **Test Scenario C:** EMIS-X Activity Queue state has no EMIS Web equivalent
+  - Validation: No write-back to EMIS Web occurs for Activity Queue state; Aurora PG is sole source of truth
+- **Guardrail:** CLIN-007, ADR-008
+- **Hazard:** CONCURRENCY-001 (concurrent state modification)
+- **Pass Criteria:** Write-back occurs for all shared terminal states; warning displayed in both directions; Aurora-only states do not trigger spurious write-backs
+
+---
+
+## Deferred Checks — Increment 3
+
+*(These checks become active when REQ-013 is delivered. Do not include in Increment 1 or Increment 2 test suites.)*
+
+### CHECK 9 (Deferred — Increment 3): CLIN-007 + CLIN-005 — Cross-Queue Secondary Actions Expose Full Panel with Same Validation
+
+**Trigger:** A user activates or completes a secondary action (coding or task creation) from a queue where it is not the primary action.
+
+**Test Scenario A:** Coding panel from Filing Queue — full Code Picker with same validation as native Coding Queue
+- **Setup:** Document opened from the Filing Queue; patient match and filing confirmed
+- **Action:** User activates the secondary coding panel
+- **Validation 1:** Code Picker component rendered — same component as used in the native Coding Queue
+- **Validation 2:** All mandatory confirmation requirements enforced — codes not auto-committed; explicit user confirmation required for each code
+- **Validation 3:** Coding action audited (CLIN-002) with `queue_context: filing` attribute
+- **Validation 4:** `documents.action.secondary_complete` OTEL span emitted with `action_type: code`, `queue_context: filing`
+
+**Test Scenario B:** Coding panel blocked before filing is confirmed
+- **Setup:** Document in Filing Queue; patient match not yet confirmed
+- **Action:** User attempts to activate secondary coding panel
+- **Expected:** Coding panel disabled; user shown dependency message (coding requires patient to be filed first)
+- **Validation:** No code entry possible; no audit entry created
+
+**Test Scenario C:** Document skips Coding Queue after coding completed as secondary action in Filing Queue
+- **Setup:** User completes filing (primary) and coding (secondary) from the Filing Queue; advances via "Next document" or "Back to queue"
+- **Validation 1:** Document does not appear in the Coding Queue for re-coding
+- **Validation 2:** Document's next queue is the Task Queue (or Complete if tasks also satisfied)
+- **Validation 3:** Queue-skip event recorded in audit trail
+
+**Test Scenario D:** Action completion state visible in all queue contexts
+- **Setup:** Document has been filed and coded in the Filing Queue; document now appears in Task Queue
+- **Validation 1:** Task Queue document view shows filed and coded status as confirmed
+- **Validation 2:** Coding panel in Task Queue context shows coding as already complete; does not prompt re-coding
+
+**Applicable Guardrail:** CLIN-007 (Hazard Mitigation Evidence), CLIN-005 (Clinical Decision Support Transparency — secondary coding must be as explicit as primary coding)
+**Hazard Addressed:** HAZ-DOC-029 — ambiguous action completion state; incomplete secondary actions not detected
+**Pass Criteria:** Secondary action panels expose full functionality with same validation as primary queue; coding panel blocked until filing prerequisite met; completed secondary actions cause document to skip corresponding downstream queues; completion state visible and accurate in all queue contexts.
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-001 | HAZ-DOC-001 | Role-based access control | AUTH-004 | CHECK 5 |
+| REQ-001 | HAZ-DOC-002 | Urgency surfaced visibly in UI | CLIN-007 | CHECK 2 |
+| REQ-001 | HAZ-DOC-002 | Fail closed on error | CLIN-010 | CHECK 3 |
+| REQ-001 | HAZ-DOC-003 | Audit log on document access | CLIN-002 | CHECK 1 |
+| REQ-001 | HAZ-DOC-004 | Autosave state server-side | SEC-002 | CHECK 6 |
+| REQ-001 | — | Data minimisation at list level | IG-001 | CHECK 4 |
+| REQ-001 | HAZ-DOC-027 | Reject: reason + audit + 30-day retrieval *(Deferred — Increment 2)* | CLIN-007 | CHECK 7 *(Deferred — Increment 2)* |
+| REQ-001 | HAZ-DOC-028 | Next document blocked until all required steps complete | CLIN-007 | CHECK 8 |
+| REQ-001 | HAZ-DOC-028 | Patient context cleared on queue navigation | IG-002 | CHECK 8 |
+| REQ-001 | HAZ-DOC-029 | Action completion state visible in all queue contexts | CLIN-007 | CHECK 9 *(Deferred — Increment 3)* |
+| REQ-001 | HAZ-DOC-029 | Secondary actions expose full validation | CLIN-005 | CHECK 9 *(Deferred — Increment 3)* |
+| REQ-001 | CONCURRENCY-001 | EMIS Web write-back + bidirectional state warning | CLIN-007 | CHECK 10 *(Deferred — Increment 2)* |
+| REQ-001 | HAZ-DOC-001 | Role-based access control | AUTH-004 | CHECK 5 | — |
+| REQ-001 | HAZ-DOC-002 | Urgency surfaced visibly in UI | CLIN-007 | CHECK 2 | Document Urgency Arrow |
+| REQ-001 | HAZ-DOC-002 | Fail closed on error | CLIN-010 | CHECK 3 | Error state `Alert` |
+| REQ-001 | HAZ-DOC-003 | Audit log on document access | CLIN-002 | CHECK 1 | — |
+| REQ-001 | HAZ-DOC-004 | Autosave state server-side | SEC-002 | CHECK 6 | — |
+| REQ-001 | — | Data minimisation at list level | IG-001 | CHECK 4 | — |
+| REQ-001 | HAZ-DOC-027 | Reject: reason + audit + 30-day retrieval *(Deferred — Increment 2)* | CLIN-007 | CHECK 7 *(Deferred — Increment 2)* | Reject Dialogue *(Deferred)* |
+| REQ-001 | HAZ-DOC-028 | Next document blocked until steps complete | CLIN-007 | CHECK 8 | "Next document" Button |
+| REQ-001 | HAZ-DOC-028 | Patient context cleared on navigation | IG-002 | CHECK 8 | — |
+| REQ-001 | HAZ-DOC-029 | Action completion state visible in all contexts | CLIN-007 | CHECK 9 | Workflow panel tab badges |
+| REQ-001 | HAZ-DOC-029 | Secondary actions expose full validation | CLIN-005 | CHECK 9 | — |
+| REQ-001 | CONCURRENCY-001 | EMIS Web write-back + bidirectional warning | CLIN-007 | CHECK 10 | — |
+| REQ-001 | — | Primary flow UX completion | UX-001 | CHECK 17 | Queue list + gallery |
+| REQ-001 | — | WCAG 2.1 AA compliance | A11Y-001 | CHECK 18 | All interactive components |
+| REQ-001 | — | Mobile responsive card view | RWD-001 | CHECK 19 | Mobile card layout |
+| REQ-001 | — | ⋮ menu keyboard + focus management | UX-002 | CHECK 20 | 3-dot Actions Menu |
+| REQ-001 | — | Error vs empty state distinction | UX-003 | CHECK 21 | `Alert` vs empty state |
+| REQ-001 | HAZ-DOC-001 | Provisional status gate (server-side) | CLIN-009 | CHECK 22 [BLOCKED — PL-12] | — |
+| REQ-001 | HAZ-DOC-002 | Default sort prioritises urgent documents | CLIN-009 | CHECK 23 | — |
+| REQ-001 | HAZ-DOC-003 | JWT/role enforcement at document API boundary | CLIN-009 | CHECK 24 | — |
+| REQ-001 | HAZ-DOC-004 | In-progress marker persisted server-side in transaction | CLIN-005 | CHECK 25 | — |
+| REQ-001 | HAZ-DOC-004/028/029 | Autosave failure and completion-gate errors surfaced explicitly | CLIN-004 | CHECK 26 | — |
+| REQ-001 | HAZ-DOC-028/029 | Server-side completion gate cannot be bypassed | CLIN-009 | CHECK 27 | — |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement has been updated to reflect Increment 1 scope (2-tab inbox model — Unmatched Documents + Patient Matched Documents). Reject/Won’t-be-filed is deferred to Increment 2.
+- V1b: Architecture section already added (preserved below)
+- V1c: Update API contracts to use `filter[queue]=unmatched` and `filter[queue]=matched` as the Increment 1 values
+- V1d: PxD section already added (preserved below); Reject Dialogue and reject flow deferred to Increment 2
+- V1e: HAZ-DOC-027 annotated as deferred Increment 2; full hazard log entry required when Reject feature is implemented
+
+---
+
+## PxD (Added by V1d)
+
+### User Flow
+
+**Primary Flow — Approach B (Filing Queue — Confirmed):**
+1. Practice admin navigates to Documents Manager via sidebar nav
+2. **Filing Queue** screen renders as the default landing view; skeleton rows displayed while data loads (`Skeleton.Area` + `role="status"`)
+3. Documents appear in table, sorted newest first; count badges update on each `Tabs.Tab`; Unmatched tab badge shows count of unresolved documents
+4. Admin scans urgent documents (red arrow, sorted to top) — no document open required
+5. Admin clicks a document row (or presses Enter on focused row)
+6. Gallery view opens: Document Viewer (left ~60%) + Workflow panel (right ~40%)
+7. Patient Match panel active by default; admin confirms or overrides the suggested patient match
+8. Admin completes filing fields; optionally completes Code and Tasks secondary panels from the same view
+9. Admin clicks "Next document" (only enabled when all required steps complete) — advances to next in queue
+10. When queue exhausted: "Next document" absent; returned to queue list with empty-state message
+
+**Unmatched Documents Tab Flow:**
+1. Admin clicks the **Unmatched Documents** tab — shows documents where no patient match was determined
+2. Admin opens a document from the Unmatched Documents tab
+3. Gallery view opens; Patient Match panel shown; admin performs manual patient search
+4. Admin confirms a match — document moves out of Unmatched Documents tab and into **Patient Matched Documents** tab
+5. Document is now visible in Patient Matched Documents tab (filing workflow continues in Increment 2)
+
+**Alternative Flow — Won’t be filed / Reject:** *(Deferred — Increment 2. See Acceptance Criteria — Deferred to Increment 2.)*
+
+**Exit Types:**
+- **Match confirmed:** Patient match step complete → “Next document” advances; document moves to Patient Matched Documents tab
+- **Cancel:** “Back to queue” at any point — autosave preserves in-progress state; row shows in-progress badge
+- **Queue-Peek Navigate:** Click a different document in the peek sidebar — autosave triggers; current doc retains in-progress state; new doc loads
+- **Navigate-away:** Browser/SPA navigation while gallery is open — state autosaved server-side; document marked in-progress
+- **Reject (Abandon):** *(Deferred — Increment 2)*
+
+---
+
+### Wireframes
+
+**Screen 1: Queue List (Inbox tab)**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ [EMIS-X logo]  [Documents ▾]  [Patients]  [Settings]   [User ▾]    │
+├─────────────────────────────────────────────────────────────────────┤
+│ Documents Manager                                                    │
+│                                                                      │
+│ [Unmatched Documents 12*] [Patient Matched Documents 8]             │
+│  (* active / default tab)                                           │
+│                                                                      │
+│ ┌──────────────────────────────┐  [Filter ▾]  [Sort: Newest ▾]     │
+│ │ 🔍 Search documents...       │                                    │
+│ └──────────────────────────────┘                                    │
+│                                                                      │
+│ ↑  │ Title              │ Received     │ Patient      │ Type │ Src  │
+│ ───┼────────────────────┼──────────────┼──────────────┼──────┼───── │
+│ ▲  │ Cardiology Ltr...  │ 22 May 2026  │ Smith, John  │ Ltr  │ NHSm │ ⋮
+│    │ GP Referral Note   │ 21 May 2026  │ —            │ Ref  │ AccM │ ⋮
+│    │ Blood Results      │ 20 May 2026  │ Jones, Mary  │ Lab  │ Path │ ⋮
+│    │ ...                │ ...          │ ...          │ ...  │ ...  │
+│                                                                      │
+│   Showing 47 documents · The Birches Surgery                        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+*(▲ = red urgency arrow; ⋮ = hidden at rest, visible on hover/focus; Dept column omitted for wireframe brevity)*
+
+**Layout:** Full-width single-column, 8px grid. Tab strip spans full width. Table below search bar.
+
+**Screen 2: Gallery View (document open)**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ ← Back to queue   Cardiology Letter · Smith, John · 22 May 2026     │
+├───────────────────────────────────┬─────────────────────────────────┤
+│                                   │ [Patient Match][File][Code][Task]│
+│                                   │                                  │
+│   DOCUMENT VIEWER                 │  Patient Match tab (active)     │
+│   (pre-built component)           │  ─────────────────────────────  │
+│                                   │  ● Smith, John (High confidence) │
+│   [Zoom] [Page 1/3] [Annotate]    │    DOB: 01/01/1975 · M          │
+│                                   │    NHS: 485 777 3456             │
+│                                   │  ○ Smith, Jonathan (Low)        │
+│                                   │                                  │
+│                                   │  [Confirm match]                 │
+│                                   │                                  │
+│                                   │  ─────────────────────────────  │
+│                                   │  [Next document ▶]  (disabled)  │
+└───────────────────────────────────┴─────────────────────────────────┘
+```
+
+**Responsive:**
+- Desktop ≥1024px: Side-by-side viewer (60%) + panel (40%)
+- Tablet 768–1023px: Panel collapses to bottom sheet; viewer full-width
+- Mobile <768px: Gallery hidden; only queue list accessible (read-only)
+
+---
+
+### Component Specifications
+
+> 🚫 All components use `@emisgroup/ui-*` exclusively. No native HTML interactive elements.
+
+**Document Urgency Arrow (shared — spec here; referenced in all queue REQs):**
+- Component: `Icon` from `~icons/ic/outline-arrow-upward`
+- Colour: `var(--token-colour-feedback-error-base)` (#DA291C)
+- Size: 20px
+- Visible: urgent documents only (binary — present or absent)
+- ARIA: `aria-label={t('inbox.urgency.urgent')}` on Icon wrapper; non-urgent rows have `aria-label={t('inbox.urgency.routine')}` on a visually hidden span
+- Placement: leftmost table cell, vertically centred
+
+**Document Status Badge (shared — spec here; referenced in all queue REQs):**
+- Component: `Badge`
+- `variant="primary"` for in-progress
+- `variant="inactive"` for pending/unactioned
+- `variant="disabled"` for completed (greyed out)
+- ARIA: `role="status"` (built into `Badge`)
+
+**3-dot Actions Menu (shared — spec here; referenced in all queue REQs):**
+- Trigger: `Button variant="mono" size="small" circular ariaLabel={t('inbox.actions.menu', { title })}`
+- Icon: `~icons/ic/outline-more-vert` (20px)
+- Visibility: `opacity: 0` at rest; `opacity: 1` on `tr:hover` and `tr:focus-within` (CSS)
+- Menu: `DropdownMenu` (Radix) wrapping trigger + `DropdownMenu.Content align="end"`
+- Items: `DropdownMenu.Item` per action; rendered conditionally by queue context
+- Keyboard: Arrow keys navigate; Enter activates; Escape closes; focus returns to trigger on close
+
+**Queue Tab Strip:**
+- Container: `Tabs` (Radix) with `activationMode="manual"`
+- Tab list: `Tabs.TabList`
+- Each tab: `Tabs.Tab value={queueType}` with `Count` badge as child: `<Tabs.Tab>{t('inbox.tab.allInbound')} <Count>{allCount}</Count></Tabs.Tab>`
+- Active indicator: built-in Radix/EMIS-X underline (uses `var(--token-colour-brand-primary)`)
+- Keyboard: Arrow keys move focus; Enter/Space activates and triggers data fetch
+- **Increment 1:** Renders 2 tabs only — `value="unmatched"` (Unmatched Documents) and `value="matched"` (Patient Matched Documents). Additional tabs (filing, coding, tasks, completed, rejected) are deferred to later increments.
+
+**Search Input:**
+- Component: `Input clearable aria-label={t('inbox.search.ariaLabel')} placeholder={t('inbox.search.placeholder')}`
+- Clear button: built-in (`clearable` prop)
+- Debounce: 300ms before filter applied
+
+**Reject Dialogue:** *(Deferred — Increment 2. See Acceptance Criteria — Deferred to Increment 2 and CHECK 7 Deferred.)*
+- Component: `Dialog` with `preventBackdropClose`
+- `Dialog.Header`: "Reject document" (`t('inbox.reject.heading')`)
+- `Dialog.Content`: reason `Select` with `aria-label={t('inbox.reject.reasonLabel')} invalid={!reasonSelected && attempted}`; inline error span when invalid
+- `Dialog.Footer`: `Button variant="mono"` Cancel + `Button variant="danger" disabled={!reasonSelected}` Confirm
+- Focus: moves to reason Select on open; returns to ⋮ trigger on close
+- Escape: closes dialogue (cancels, no state change)
+
+**Queue-Peek Sidebar (shared — spec here; referenced in all gallery REQs):**
+- Container: `<aside aria-label={t('gallery.peek.region')}>` fixed-width 250px; `overflow-y: auto`; collapsible via toggle
+- Toggle: `Button variant="mono" circular ariaLabel={t('gallery.peek.toggle')} aria-expanded={isExpanded}`; icon `~icons/ic/outline-menu` 20px
+- Collapsed state: 44px icon-only strip showing toggle button only
+- Peek item: `<button>` wrapping title (bold, 12px) + meta line (date received + document type, 11px, `var(--text-dim)`)
+- Active document: `border-left: 3px solid var(--primary)` + `background: var(--hover)`; `aria-current="true"`
+- In-progress document: `Badge variant="info"` label `t('gallery.peek.inProgress')` shown on peek item
+- On click: autosave current document state → load selected document → reset workflow panel to selected document's state
+- Keyboard: Tab to toggle; when expanded, Tab cycles through peek items; Enter navigates to that document
+
+**Patient Banner (shared — spec here; referenced in REQ-001, REQ-010, REQ-011, REQ-012, REQ-013):**
+- Placement: pinned at top of workflow panel; visible only after patient match is confirmed (step ① complete)
+- Hidden: `display: none` when no match confirmed
+- Content: patient full name (bold, 14px, `var(--text)`), DOB `DD/MM/YYYY`, sex initial, NHS number (monospace, formatted `XXX XXX XXXX`)
+- Container: `<div role="region" aria-label={t('gallery.panel.patientBanner')} aria-live="polite">`
+- Background: `var(--background-dim)`; `border-bottom: 1px solid var(--border-light)`; padding 12px 16px
+- ARIA `aria-live="polite"`: screen reader announces when patient context changes between documents
+
+**Workflow Panel — StepIndicator (shared — spec here; referenced in REQ-001, REQ-010, REQ-012, REQ-013):**
+
+> **Increment 1 scope:** StepIndicator renders **① Match only**. Steps ② File (REQ-012), ③ Code (REQ-013), and ④ Task (REQ-010) are deferred to their respective increments and must not be rendered in Increment 1.
+
+- Component: `StepIndicator currentStep={currentWorkflowStep} onStepChange={handleStepChange} orientation="horizontal"`
+- **Increment 1 steps (1):** `<StepIndicatorStep>` labelled via `t('gallery.step.match')` only
+- **Deferred steps — Increment 2:** `t('gallery.step.file')` (REQ-012), `t('gallery.step.task')` (REQ-010)
+- **Deferred steps — Increment 3:** `t('gallery.step.code')` (REQ-013)
+- `displayOnly={false}`: completed steps are clickable — user can navigate back
+- `currentStep` = furthest required incomplete step (1-indexed)
+- Locked steps: `<StepIndicatorStep disabled>` for steps requiring prior completion
+- Placement: immediately below patient banner, above step content area
+- Keyboard: Tab to `StepIndicator`; Arrow keys navigate steps; Enter activates a completed step
+
+---
+
+### Interaction Patterns
+
+**Row click (mouse):**
+- Trigger: `onClick` on `<tr>`
+- Result: navigate to gallery view; URL updated (SPA router)
+- Loading: gallery skeleton shown immediately; data fetches in parallel
+
+**Row keyboard activation:**
+- Trigger: `onKeyDown` — Enter key when `<tr tabIndex={0}>` is focused
+- Result: same as row click
+
+**⋮ button reveal:**
+- CSS: `tr .actionsButton { opacity: 0; transition: opacity 150ms; }` + `tr:hover .actionsButton, tr:focus-within .actionsButton { opacity: 1; }`
+- Keyboard: button gains focus via Tab; browser renders focus ring regardless of opacity
+
+**Tab switch:**
+- Trigger: Enter/Space on focused `Tabs.Tab`
+- Result: data fetch for selected queue type; skeleton rows shown during fetch
+- Loading announcement: `aria-live="polite"` region updated with `t('inbox.loading')` then `t('inbox.loaded', { count })`
+
+**Reject modal submit:** *(Deferred — Increment 2)*
+- Trigger: Click "Confirm" (only enabled when reason selected)
+- Sequence: `Dialog` closes → `PATCH /documents/{guid}/queue-state` → on success: `Notification variant="success"` shown (5000ms); on failure: `Notification variant="error"` shown (persistent)
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AA)
+
+**Compliance Checklist:**
+- [x] Perceivable: urgency conveyed by icon + `aria-label`, not colour alone; text contrast ≥4.5:1
+- [x] Operable: all rows keyboard-navigable (Tab → row → Enter); ⋮ reachable by Tab; modal focus-trapped
+- [x] Understandable: every input has `aria-label`; loading states use `aria-live`; error messages inline + actionable
+- [x] Robust: `jest-axe ^9.0.0` in devDependencies; no native `<button>` or `<input>` outside `@emisgroup/ui-*`
+
+**Mandatory Rule A — all inputs labelled:**
+```tsx
+<Input aria-label={t('inbox.search.ariaLabel')} clearable ... />
+<Button ariaLabel={t('inbox.actions.menu', { title: doc.title })} circular ...>
+  <Icon ... />
+</Button>
+```
+
+**Mandatory Rule B — loading and error states announced:**
+```tsx
+// Loading
+<Skeleton.Area role="status" aria-live="polite" aria-label={t('inbox.loading')} />
+// Error
+<div role="alert" aria-live="assertive">{t('inbox.error.loadFailed')}</div>
+// Empty (polite)
+<div role="status" aria-live="polite">{t('inbox.empty.allDone')}</div>
+```
+
+**Mandatory Rule C — `jest-axe` test pattern:**
+```tsx
+it('inbox has no accessibility violations', async () => {
+  const { container } = render(<InboxScreen />);
+  expect(await axe(container)).toHaveNoViolations();
+});
+```
+
+**Screen reader — urgency:**
+```tsx
+// Urgent row: icon with label
+<Icon aria-label={t('inbox.urgency.urgent')} ... />
+// Non-urgent row: visually hidden text so row still conveys urgency state
+<span className="sr-only">{t('inbox.urgency.routine')}</span>
+```
+
+---
+
+### Visual Design
+
+**Colour tokens (all `var(--token-*)` — no hardcoded hex):**
+- Row hover background: `var(--token-colour-neutral-100)`
+- Table header background: `var(--token-colour-neutral-100)`
+- Row separator: `var(--token-colour-neutral-200)`
+- Page background: `var(--token-colour-neutral-50)`
+- Primary text: `var(--token-colour-neutral-900)`
+- Secondary/meta text: `var(--token-colour-neutral-600)`
+- NHS Blue (tabs active, links): `var(--token-colour-brand-primary)`
+- Urgency arrow: `var(--token-colour-feedback-error-base)`
+- Success toast: `var(--token-colour-feedback-success-base)`
+- Error/alert: `var(--token-colour-feedback-error-base)`
+
+**Typography:**
+- Page heading: `var(--token-font-size-2xl)` / `var(--token-font-weight-bold)`
+- Table body: `var(--token-font-size-sm)` / `var(--token-font-weight-normal)`
+- Document title (row): `var(--token-font-weight-semibold)`
+- Meta text (date, source): `var(--token-font-size-sm)` / `var(--token-colour-neutral-600)`
+
+**Spacing:** 8px grid throughout — `var(--token-spacing-2)` cell padding, `var(--token-spacing-4)` section gap
+
+**Icons:** Iconify `~icons/ic/outline-*` exclusively (per DS-004). Size 20px default; 24px for standalone actions.
+
+**Border radius:** `var(--token-radius-sm)` (4px) for badges/pills; `var(--token-radius-base)` (8px) for cards/panels
+
+---
+
+### Micro-interactions
+
+**Skeleton rows (initial load + tab switch):**
+```tsx
+<Skeleton.Area role="status" aria-live="polite" aria-label={t('inbox.loading')}>
+  {Array.from({ length: 8 }).map((_, i) => (
+    <Skeleton.Item key={i} style={{ height: 44, marginBottom: 1 }} />
+  ))}
+</Skeleton.Area>
+```
+Shimmer pulse built into `Skeleton.Item`. No additional CSS animation required.
+
+**Row hover reveal:** `transition: opacity 150ms ease-in-out` on ⋮ button. Background `transition: background-color 150ms ease-in-out` on `tr`.
+
+**Notification toasts:**
+- Success: `Notification variant="success" duration={5000}` — auto-dismiss
+- Error (persistent): `Notification variant="error"` — manual close only (`duration={Infinity}`)
+
+**Tab count update:** Immediate re-render on queue data refresh; no transition (clinical data — avoid distracting motion).
+
+---
+
+### Error States
+
+| Scenario | Component | i18n key | Behaviour |
+|---|---|---|---|
+| Inbox API 500 / network fail | `Alert` variant error + retry `Button` | `inbox.error.loadFailed` | Replaces table; retry triggers refetch |
+| Document action fails | `Notification variant="error"` | `inbox.error.actionFailed` | Toast; manual close; `role="alert"` |
+| Autosave fail | `Notification variant="error"` | `inbox.error.autosaveFailed` | Persistent toast; retry link included |
+
+Error state must be visually distinct from empty state — `Alert` component (coloured border, icon) vs neutral empty-state illustration. Per CHECK 3 (CLIN-010).
+
+---
+
+### Empty States
+
+| State | Icon | i18n key | Action |
+|---|---|---|---|
+| Queue empty (all done) | `~icons/ic/outline-check-circle` 48px success-base | `inbox.empty.allDone` | None — congratulatory message |
+| Search/filter no results | `~icons/ic/outline-search` 48px neutral-400 | `inbox.empty.noResults` | `Button variant="mono"` clear filters |
+| No documents yet | `~icons/ic/outline-inbox` 48px neutral-400 | `inbox.empty.noDocuments` | `Button variant="filled"` upload |
+
+All empty state wrappers: `role="status" aria-live="polite"`.
+
+---
+
+### Design System
+
+**`@emisgroup/ui-*` components used in REQ-001:**
+`Button`, `Input`, `Tabs` (`Tabs.Tab`, `Tabs.TabList`, `Tabs.TabContent`), `Count`, `Badge`, `DropdownMenu` (`DropdownMenu.Content`, `DropdownMenu.Item`), `Dialog` *(deferred — Increment 2, Reject feature only)* (`Dialog.Inner`, `Dialog.Header`, `Dialog.Content`, `Dialog.Footer`), `Notification`, `NotificationContainer`, `Skeleton` (`Skeleton.Area`, `Skeleton.Item`), `Alert`, `Icon`, `StepIndicator`, `StepIndicatorStep`
+
+**Design tokens used:** All `var(--token-colour-*)`, `var(--token-spacing-*)`, `var(--token-font-*)`, `var(--token-radius-*)`, `var(--token-shadow-*)` — never hardcoded hex.
+
+**i18n:** All UI strings via `useTranslation()` / `t()`. No string literals in JSX. Keys namespaced under `inbox.*` in `src/locales/en-GB/translation.json`. British English throughout.
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation — Approach A (separate inbox) documented |
+| 1.1 | 2026-05-20 | V1a Requirements (amendment) | Added Approach B (direct to Filing Queue) as alternative under evaluation. Restructured ACs by approach. Added HAZ-DOC-027 and MIT-DOC-027. Added CHECK 7 eval spec. Added OTEL span for won't-be-filed event. Added flow variant decision gate note. |
+| 1.2 | 2026-05-21 | V1a Requirements (amendment) | Added sequential queue navigation: "Next document" and "Back to queue" actions. Added HAZ-DOC-028, MIT-DOC-028, CHECK 8, `documents.queue.next_document` OTEL span, and next-document advance SLO. |
+| 1.3 | 2026-05-21 | V1a Requirements (amendment) | Added cross-queue action availability model: secondary actions (coding, task creation) available from Filing Queue and Coding Queue respectively. Added HAZ-DOC-029, MIT-DOC-029, CHECK 9, `documents.action.secondary_complete` OTEL span. |
+| 1.4 | 2026-05-21 | V1a Requirements (amendment) | Added row hover highlight acceptance criterion. |
+| 1.5 | 2026-05-21 | V1a Requirements (amendment) | Added AC: completed documents excluded from aggregated active queue list views. |
+| 1.6 | 2026-05-21 | V1a Requirements (amendment) | Updated minimum triage metadata fields AC: each queue document list row now includes Matched Patient name (when a match exists) and Match Confidence rating (High / Low / Unmatched). |
+| 1.7 | 2026-05-21 | V1b Architecture | Added bidirectional EMIS Web state warning ACs. Added Architecture section (BDAT, ADRs, Platform Boundaries, Service Classification, Failure Modes, Integration Points, AWS WAF, EMIS Principles, Operations, Performance & Cost, Security, Diagrams). Added CHECK 10 (EMIS Web write-back + bidirectional warning). Added traceability row. |
+| 1.8 | 2026-05-21 | V1b Architecture | Corrected new endpoint paths (removed erroneous `/api/v1/` path prefix; header-based versioning confirmed — ADR-010). Added ADR-010 to ADR table and sequence diagram. |
+| 1.9 | 2026-05-22 | V1a Requirements (amendment) | Reordered filing queue table columns: Matched Patient column is now first. Updated minimum triage metadata fields AC accordingly. |
+| 2.0 | 2026-05-22 | V1a Requirements (amendment) | Removed Match Confidence column. Patient matching is binary (Matched / Unmatched); no confidence rating shown. Updated AC, API endpoint description, service classification, and sequence diagram. |
+| 2.1 | 2026-05-22 | V1a Requirements (amendment) | Added explicit AC: Urgency is a dedicated colour-coded badge column in every queue list view, not embedded within another column. |
+| 2.2 | 2026-05-22 | V1d PxD (amendment) | Corrected urgency model: document urgency is a binary red arrow indicator to the left of the row, not a badge column. Urgency categorisation (Urgent / Routine / Administrative) belongs to the Task Queue only. Removed Urgency from triage metadata fields list. Updated AC, MIT-DOC-001, and CHECK 2 accordingly. |
+| 2.3 | 2026-05-22 | V1d PxD (amendment) | Corrected column order from wireframe validation: ↑ (urgency) \| Title \| Date Received \| Matched Patient \| Type \| Source \| Dept. Matched Patient is no longer first. Updated triage metadata fields AC accordingly. |
+| 2.4 | 2026-05-22 | V1d PxD | Added PxD section (user flows, wireframes, component specs, accessibility, responsive, visual design, micro-interactions, error states, empty states, design system). Added CHECK 17–21. Added 4 new ACs from AC Delta Gate (⋮ visibility, tab activation, reject dialogue guard, mobile card view). Updated traceability table. |
+| 2.5 | 2026-05-26 | V1a Requirements (amendment) | **Approach B confirmed.** Approach A rejected. Added Unmatched tab as a dedicated tab within Filing Queue for documents without auto-matched patients. Filing Queue set as default landing view. PxD user flow updated to Approach B. Flow variant decision gate removed. |
+
+| 2.7 | 2026-05-28 | Product Decision (amendment) | Scope reduced for Increment 1: removed Filing Queue, Reject/Won’t-be-filed feature, and multi-step workflow from active scope. Inbox restructured to 2 tabs — Unmatched Documents (default) and Patient Matched Documents. Reject/Won’t-be-filed deferred to Increment 2 (CHECK 7, HAZ-DOC-027, MIT-DOC-027, Reject Dialogue, reject user flows annotated as deferred). API filter[queue] values simplified. OTEL span `wont_be_filed` removed. StepIndicator updated to Match step only. Deferred ACs and checks moved to respective deferred sections. |
+| 2.8 | 2026-05-29 | V1e Clinical Safety | Added Clinical Safety section (IF678 hazard cards for HAZ-DOC-001/002/003/004/028/029; per-cause HIT Design controls with CLIN-004/005/007/009; CHECK 22-27 added to Evaluation Function Specification; CHECK 22 BLOCKED pending PL-12). Updated traceability table. Severity/likelihood deferred to CSO manual entry (D-008). CSO sign-off deferred (D-031). |
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+**Business:** Single inbox-first triage surface presenting two primary queues — a matched document queue (tasks with confirmed patient) and an unmatched queue (TaskTypeId 803, no patient link). Clinicians see a unified view with tabs, reducing context switching and providing a safety-first posture where unmatched items are surfaced prominently.
+
+**Data:** Phase 1 reads directly from the existing EMIS Web MS SQL database per patching domain.
+
+- **Matched queue** data source: `InboundDocuments.GetTasks` SP — joins `WorkflowManager.TaskPatient`, `InboundDocuments.WorkflowTask`, `CareRecord.Document`, `CareRecord.Observation`, `Patient`, `InboundDocuments.WorkflowTaskMessage`, `DocumentManagement.DocumentViewers`, `WorkflowManager.StickyNote`
+- **Unmatched queue** data source: `InboundDocuments.GetUnmatchedTasks` SP — joins `WorkflowManager.Task`, `InboundDocuments.WorkflowTask`, `InboundDocuments.WorkflowTaskMessage`, `WorkflowManager.StickyNote`
+- **Outstanding tasks linkage source:** `UserTasks.Document` — links `DocumentGuid` to related user task records used for non-document operational/admin work tracking
+- **Outstanding tasks detail source:** `UserTasks.UserTask` — authoritative task records for linked admin tasks (e.g. appointment booking follow-up, forms completion)
+- **Aggregate status** source: `InboundDocuments.DocumentTaskStatusDetail` view — per `(OrganisationId, DocumentGuid)`, exposes `PatientMatchingStatus` ('Auto-matched' | 'Unmatched' | 'Manually matched' | 'Unknown'), `FilingStatus` ('Filed' | 'Unfiled'), `OverAllStatus` ('Completed' | 'Open'), `OverdueActions`, `AssignedActions`
+- **Legacy field → canonical model mapping (matched queue):** `TaskGuid → task.id`, `Priority → task.priority`, `ActionByDate → task.actionByDate`, `CreatedDate → task.createdDate`, `DocumentGUID → document.id`, `FileName → document.filename`, `Size → document.sizeBytes`, `DisplayName (Patient) → patient.displayName`, `DateOfBirth → patient.dateOfBirth`, `Sex → patient.sex`, `NHS (PatientIdentifier type 1) → patient.nhsNumber`, `OriginalTerm (Observation) → document.documentType`, `EffectiveDate → document.letterDate`, `SourceNacsCode → document.sourceNacsCode`, `IsClinicalDocument → document.isClinical`, `ViewedByUser → task.viewedByCurrentUser`, `StickyNotePresent → task.hasStickyNote`, `ActiveCodingTaskExists / ActiveFilingTaskExists / CompleteCodingTaskExists / CompleteFilingTaskExists → task.taskExistsFlags`
+- **Legacy field → canonical model mapping (unmatched queue):** `TaskGuid → task.id`, `Priority → task.priority`, `DocumentGuid → document.id`, `Filename → document.filename`, `Size → document.sizeBytes`, `MatchStatus → document.matchStatus`, `SourceNacsCode → document.sourceNacsCode`, `MessageDirection → message.direction` — no patient fields (DisplayName='', PatientId=null, ConsultationId=null)
+- **Pagination/sort params from legacy SP** (must be preserved in new API): `@Page`, `@PageSize`, `@SortColumn` (values: CreatedDate, AuthorisingUserInRoleName, DisplayName, DocumentType, Priority, StickyNotePresent, SourceService, ActionByDate, SourceNacsCode, IsClinicalDocument — default Priority), `@SortAscending`, `@GlobalView`, `@FilterTypeId`, `@ShowTasksForDeputies`
+- **Phase 2:** New Aurora PostgreSQL 17 schema replaces direct EMIS Web DB reads after per-source ingestion cutover
+
+**Application:** DocumentsInboxService (new) exposes paginated task list endpoints consumed by the React inbox microfrontend. Phase 1 anti-corruption layer translates legacy SP contracts into JSON:API responses. User identity resolved to `GlobalUserInRoleId` + `OrganisationId` via `Admin.LocalUserInRoleGlobalMap` before SP dispatch. Task set selection via `WorkflowManager.fnSelectAllTasksforUser(ModuleId, TaskGroupId, GlobalUserInRoleId, OrganisationId, null, GlobalView, ShowTasksForDeputies)`.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+**Technology:** React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17 (Phase 2), S3, ECS Fargate, GitHub Actions. Phase 1: per-domain MS SQL Server connection via Service Registry.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsInboxService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsInboxService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /documents/inbox/queues (GET), /documents/{documentGUID}/reject (POST), /documents/{documentGUID}/restore (POST) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+**Phase 1 — EMIS Web MS SQL (per-domain, read-only via anti-corruption layer):**
+
+| Legacy SP / View | Purpose | Key Inputs | Key Outputs |
+|---|---|---|---|
+| `InboundDocuments.GetTasks` | Matched document queue (all tabs except Unmatched) | `@UserInRoleId`, `@TaskGroupId`, `@Page`, `@PageSize`, `@SortColumn`, `@SortAscending`, `@GlobalView`, `@FilterTypeId` | Task + patient + document + observation records (paginated) |
+| `InboundDocuments.GetUnmatchedTasks` | Unmatched queue (TaskTypeId 803) | `@UserInRoleId`, `@TaskGroupId`, `@Page`, `@PageSize`, `@SortColumn`, `@SortAscending` | Task + document rows, no patient link |
+| `InboundDocuments.DocumentTaskStatusDetail` | Status rollup per document | `OrganisationId`, `DocumentGuid` | `PatientMatchingStatus`, `FilingStatus`, `OverAllStatus`, `OverdueActions`, `AssignedActions` |
+| `UserTasks.Document` | Link document records to user tasks for Outstanding Tasks view | `DocumentGuid` | Related user task identifiers |
+| `UserTasks.UserTask` | Outstanding user task details and status | Related user task identifiers | Task title/type/status/due/assignee fields |
+| `WorkflowManager.fnSelectAllTasksforUser` | Resolve visible task set for user (including deputies) | `ModuleId`, `TaskGroupId`, `GlobalUserInRoleId`, `OrganisationId`, `GlobalView`, `ShowTasksForDeputies` | TaskId set |
+| `Admin.LocalUserInRoleGlobalMap` | Resolve `UserInRoleId → GlobalUserInRoleId + OrganisationId` | `LocalUserInRoleId` | `GlobalUserInRoleId`, `OrganisationId` |
+
+**Existing modernisation dependency:** A separate User Tasks microservice writes and maintains user tasks in the existing EMIS Web DB (`UserTasks.UserTask` and linkage in `UserTasks.Document`). Documents Manager must consume this as the source of truth for Outstanding Tasks related to a document.
+
+**Per-domain connection resolution:** Service Registry (EMIS Web) → per-domain SQL endpoint → MS SQL connection string. Each of ~100 patching domain databases is queried independently. The new service layer constructs a domain-specific connection based on the authenticated user's organisation context.
+
+**Phase 2 (post-cutover):** EMIS Web DB reads replaced by native Aurora PostgreSQL 17 queries with equivalent indexed access patterns.
+
+**Existing API baseline (openapi-docs.yml):** Endpoints `GET /persons/{personGUID}/documents`, `POST /persons/{personGUID}/document`, `GET /documents/presignedurl`, `GET /persons/{personGUID}/documents/{documentGUID}/metadata`, `GET /persons/{personGUID}/documents/{documentGUID}/file`, `GET /documents/{documentGUID}/temporary-file` are accepted as-is. V1c will add inbox-specific endpoints (`GET /documents/inbox/tasks`, `GET /documents/inbox/unmatched-tasks`) as extensions.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+---
+
+## Clinical Safety (Added by V1e)
+
+> Full IF678 hazard cards: `requirements/HAZARD-REGISTRY.md`
+
+**Hazard IDs:** HAZ-DOC-001, HAZ-DOC-002, HAZ-DOC-003, HAZ-DOC-004, HAZ-DOC-028, HAZ-DOC-029
+**CLIN Guardrails:** CLIN-004 (Fail-Safe Error Handling), CLIN-005 (Clinical Data Transactional Integrity), CLIN-007 (Hazard Log Traceability), CLIN-009 (Safe Defaults)
+**HIT Design Controls:**
+- HAZ-DOC-001: see HAZARD-REGISTRY.md (CHECK 22 [BLOCKED])
+- HAZ-DOC-002: see HAZARD-REGISTRY.md (CHECK 2 (existing), CHECK 23, CHECK 3 (existing))
+- HAZ-DOC-003: see HAZARD-REGISTRY.md (CHECK 24)
+- HAZ-DOC-004: see HAZARD-REGISTRY.md (CHECK 25, CHECK 26)
+- HAZ-DOC-028: see HAZARD-REGISTRY.md (CHECK 27, CHECK 26)
+- HAZ-DOC-029: see HAZARD-REGISTRY.md (CHECK 25, CHECK 26, CHECK 27)
+**Residual Risk Level:** [TBD — ALARP pending CSO Phase 6 assessment], CSO: Dan Watts
+
+---
+
+### DCB0129/0160 Compliance
+
+- Clinical Risk Management Plan: ✅ In place
+- Hazard Log (IF678): ✅ Documented in `requirements/HAZARD-REGISTRY.md`
+- Risk Assessment: Partial - Severity/likelihood deferred to CSO manual entry (D-008)
+- Mitigations: ✅ Defined and CLIN-referenced
+- Residual Risk: ⏳ Pending — ALARP assessment deferred pending risk scores (Phase 6)

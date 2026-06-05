@@ -40,7 +40,7 @@ seed: ## Run seed data manually (idempotent — safe to re-run)
 	@echo "Checking for existing seed data..."
 	$(DOCKER_COMPOSE) up seed 2>&1 | tail -5
 
-regenerate-seed: ## Regenerate seed-local.sql from current database state
+regenerate-seed: ## Regenerate db/seeds/<project-code>.sql from current database state
 	@echo "Usage: make regenerate-seed PROJECT_ID=<project-id>"
 	@echo "       Omit PROJECT_ID to list available projects."
 	./db/generate-seed.sh $(PROJECT_ID)

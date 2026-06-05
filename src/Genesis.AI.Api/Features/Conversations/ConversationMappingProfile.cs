@@ -31,5 +31,9 @@ public class ConversationMappingProfile : Profile
             .ForMember(
                 dest => dest.Role,
                 opts => opts.MapFrom(src => src.Role.ToString().ToLowerInvariant()));
+
+        CreateMap<MessageImage, MessageImageResource>();
+
+        CreateMap<MessageDocument, MessageDocumentResource>();
     }
 }

@@ -37,8 +37,8 @@ services:
       flyway:
         condition: service_completed_successfully
     volumes:
-      - ./db/seed-local.sql:/seed-local.sql:ro
-    entrypoint: ["sh", "-c", "if PGPASSWORD=postgres psql -h postgres -U postgres -d genesis_ai_requirements -tAc \"SELECT 1 FROM project WHERE code = 'QABOT-001'\" | grep -q 1; then echo 'Seed data already exists — skipping'; else PGPASSWORD=postgres psql -h postgres -U postgres -d genesis_ai_requirements -f /seed-local.sql; fi"]
+      - ./db/seeds:/seeds:ro
+    entrypoint: ["sh", "-c", "for f in /seeds/*.sql; do [ -e \"$$f\" ] || { echo 'No seed files found in /seeds — skipping'; break; }; echo \"Applying seed: $$f\"; PGPASSWORD=postgres psql -h postgres -U postgres -d genesis_ai_requirements -f \"$$f\"; done"]
     networks:
       default:
 

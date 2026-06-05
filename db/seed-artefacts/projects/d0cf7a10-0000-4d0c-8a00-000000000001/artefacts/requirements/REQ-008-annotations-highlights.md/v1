@@ -1,0 +1,673 @@
+﻿# REQ-008: Annotations & Highlights
+
+**Priority:** Must Have
+**Effort:** Medium
+**Risk:** High (system annotation boundary means EMIS Web annotations are not visible in EMIS-X; user must be clearly notified)
+**Depends On:** REQ-004 (Document Viewer & Navigation), REQ-005 (File Format Support & Conversion)
+
+---
+
+## User Story
+
+As a practice administrator or clinician,
+I need to add highlights, comments, and drawings to documents in EMIS-X, and be clearly informed about which system annotations were created in and where they are visible,
+So that I can communicate context and instructions to colleagues without missing clinical notes that exist only in EMIS Web, and without exposing patient-sensitive annotations inappropriately.
+
+**Acceptance Criteria:**
+- [ ] Users can highlight text within a document in EMIS-X. *(Must Have)*
+- [ ] Users can add free-text comments/notes to a document in EMIS-X. *(Must Have)*
+- [ ] Users can add drawings/markup to a document in EMIS-X. *(Must Have)*
+- [ ] Annotations created in EMIS-X are visible to all users within the same practice when using EMIS-X. *(Must Have)*
+- [ ] Annotations created in EMIS-X are **not** visible in EMIS Web (Phase 2 deferred — see constraint below). *(Must Have — explicit boundary)*
+- [ ] Annotations created in EMIS Web are visible in EMIS Web as normal; they are **not** visible in EMIS-X (Phase 2 deferred — see constraint below). *(Must Have — explicit boundary)*
+- [ ] When a document is opened in EMIS-X and EMIS Web annotations exist for that document, the EMIS-X viewer displays a clear, persistent notice informing the user that this document has annotations in EMIS Web that are not visible in EMIS-X, and directing them to EMIS Web to view those annotations. *(Must Have)*
+- [ ] Every annotation displays a system-origin indicator showing which system it was created in ("EMIS-X" or "EMIS Web") and which system(s) it is visible in. *(Must Have)*
+- [ ] Each annotation has a per-annotation toggle controlling whether the patient can see it when viewing their record via online access (e.g. NHS App / Patient Access). *(Must Have)*
+- [ ] All filed documents are audited. *(Must Have)*
+
+---
+
+## System Annotation Boundary (Architectural Constraint)
+
+> **Documents Management Core operates with a clean system annotation boundary: each system displays only the annotations created within it.**
+>
+> - **EMIS-X annotations:** Created and visible in EMIS-X only. Not visible in EMIS Web in Core.
+> - **EMIS Web annotations:** Created and visible in EMIS Web only (via Atalasoft). Not visible in EMIS-X in Core.
+>
+> **Why:** EMIS Web uses an Atalasoft component to store and render document annotations. This component is not accessible from EMIS-X. Rather than generating burnt-in copies (which adds architectural complexity and risk to Core delivery), the boundary is made explicit to the user in both systems.
+>
+> **Clinical safety implication:** A user viewing a document in EMIS-X will not see any annotations added in EMIS Web. This is a real clinical risk (HAZ-DOC-021). The mitigation is a mandatory, persistent system notice in the EMIS-X viewer whenever EMIS Web annotations exist for that document, directing the user to EMIS Web to review them.
+>
+> **Phase 2 deferred:** Cross-system annotation visibility (EMIS-X annotations visible in EMIS Web and vice versa) is deferred beyond the 30-day Core delivery window. V1b to define the architecture for cross-system annotation sync. V1e to assess clinical safety implications before cross-system visibility is enabled.
+
+---
+
+## Patient Visibility Toggle — IG Note
+
+> ⚠️ **Clinically and IG-sensitive control.**
+> The per-annotation patient visibility toggle directly controls what a patient sees when accessing their record online. This must default to **not visible to patient** (privacy-preserving default per IG-002) and require an explicit action to make an annotation patient-visible. The toggle state must be auditable.
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-002:** Patient Data Audit Trail — annotation creation, amendment, deletion, and patient visibility toggle changes must all be audited
+- **CLIN-005:** Clinical Decision Support Transparency — annotations used to convey clinical context/instructions must be clearly attributed to their author and timestamp
+- **CLIN-007:** Hazard Mitigation Evidence — when a document has EMIS Web annotations, the EMIS-X viewer must display a persistent, unmissable notice; the user must not open a document in EMIS-X and be unaware that annotations exist in EMIS Web
+
+### Hazards Addressed
+
+- **HAZ-DOC-021:** Clinician reads a document in EMIS-X without seeing EMIS Web annotations — clinical context or instructions from EMIS Web missed; incorrect clinical action taken
+  - **Severity:** Critical
+  - **Likelihood:** Medium (affects all documents that have been annotated in EMIS Web or DocMan)
+  - **Risk Level:** Critical — mitigated by mandatory persistent EMIS-X system boundary notice; residual risk remains until cross-system annotation visibility is delivered in Phase 2
+
+- **HAZ-DOC-023:** Patient-sensitive annotation (e.g. clinician note not intended for patient) inadvertently visible to patient via online record access
+  - **Severity:** High
+  - **Likelihood:** Medium (if toggle defaults to visible)
+  - **Risk Level:** High
+
+- **HAZ-DOC-024:** Annotation attribution lost or incorrect — clinician cannot determine who added a note or when
+  - **Severity:** Medium
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+### Mitigations
+
+- **MIT-DOC-020:** When a document has EMIS Web annotations, EMIS-X displays a persistent, unmissable system boundary notice in the document viewer; notice includes a prompt directing the user to EMIS Web to view those annotations
+  - **Type:** UI Control
+  - **Effectiveness:** Partial (informs user; does not show the annotation content — residual risk until Phase 2 cross-system sync)
+
+- **MIT-DOC-020a:** Every annotation displays a system-origin indicator ("Created in EMIS-X — visible in EMIS-X only" / "Created in EMIS Web — visible in EMIS Web only") so users are never ambiguous about annotation scope
+  - **Type:** UI Control
+  - **Effectiveness:** Complete (for transparency)
+- **MIT-DOC-021:** Patient visibility toggle defaults to **not visible to patient**; explicit action required to make annotation patient-visible
+  - **Type:** Business Logic + UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-022:** Every annotation stores author ERN and creation timestamp; displayed to all practice users viewing the annotation
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-002:** Privacy by Design and Default — patient visibility toggle defaults to not visible; opt-in to patient visibility, not opt-out
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(e) public task + Article 9(2)(h) health data; patient visibility decision is a clinical/administrative judgement
+- **IG-004:** Special Category Data Protection — annotations are special category data; stored encrypted at rest (AES-256-GCM)
+- **IG-005:** Data Subject Rights — patient has right of access to annotations marked as patient-visible; annotations marked not-visible are withheld under appropriate exemption (clinical privilege / third-party information)
+- **IG-008:** Consent Management — patient visibility toggle state must be auditable; changes logged with user ERN and timestamp
+
+### Data Handling
+- Annotation content stored server-side, encrypted at rest, scoped to practice
+- Patient visibility toggle state stored as a boolean flag per annotation with full change history
+- Burnt-in copy stored as a separate document rendition; original preserved and never modified
+- Annotation author ERN stored; never plain username or NHS number
+
+### GDPR Articles
+- **Article 5(1)(f):** Integrity and confidentiality — annotations treated as special category health data
+- **Article 9(2)(h):** Special category — medical purposes
+- **Article 15:** Right of access — patient-visible annotations accessible to patient on subject access request
+- **Article 17:** Right to erasure — annotation deletion must be auditable; consider retention obligations before erasure
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — annotation endpoints require valid JWT; patient visibility toggle changes require appropriate role scope
+- **SEC-001:** TLS Encryption — annotation content transmitted over TLS 1.2+
+
+### Security Requirements
+- Free-text comment content sanitised to prevent XSS when rendered in the viewer
+- Drawing/markup data validated server-side; malformed annotation payloads rejected
+- Patient visibility toggle state changes restricted to users with appropriate role (e.g. clinician or senior admin); configurable per practice
+
+---
+
+## Dimension 4: Observability & Performance
+
+### KPIs
+- Annotation creation rate by type (highlight / comment / drawing)
+- Patient visibility toggle usage rate (proportion of annotations marked patient-visible)
+- System boundary notice display rate (proportion of document opens where the EMIS Web annotation notice is shown)
+- Annotation load time (document opened with annotations → annotations rendered)
+
+### OTEL Spans
+- `documents.annotation.created` — new annotation created; type, author ERN, and origin system recorded
+- `documents.annotation.amended` — existing annotation edited
+- `documents.annotation.deleted` — annotation deleted
+- `documents.annotation.patient_visibility_changed` — patient visibility toggle state changed; new state recorded
+- `documents.annotation.emis_web_notice_shown` — EMIS-X system boundary notice displayed because EMIS Web annotations exist for this document
+
+### SLOs
+- Annotation render (document with annotations): p95 < 2 seconds
+- Annotation save (create/amend): p95 < 1 second
+- System boundary notice render: p95 < 500ms from document open to notice displayed
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Primary resources:**
+- `document-annotations`
+- `annotation-comments`
+
+**Core endpoints:**
+- `GET /documents/{documentGuid}/annotations`
+- `POST /documents/{documentGuid}/annotations`
+- `PATCH /annotations/{annotationId}`
+- `DELETE /annotations/{annotationId}`
+
+**Boundary rule:** EMIS Web annotations remain in legacy store; EMIS-X displays an explicit notice and does not attempt cross-system write-back in Phase 1.
+
+### Component Interfaces
+
+```csharp
+public interface IAnnotationService
+{
+  Task<Result<PaginatedList<AnnotationResource, AnnotationFilter>>> GetByDocumentAsync(Guid documentGuid, AnnotationFilter filter, CancellationToken cancellationToken = default);
+  Task<Result<AnnotationResource>> CreateAsync(CreateAnnotationCommand command, CancellationToken cancellationToken = default);
+  Task<Result<AnnotationResource>> UpdateAsync(Guid annotationId, UpdateAnnotationCommand command, CancellationToken cancellationToken = default);
+  Task<Result> DeleteAsync(Guid annotationId, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-007 — EMIS Web Annotation Boundary Notice is Persistent and Unmissable
+- **Trigger:** User opens a document in EMIS-X that has annotations in EMIS Web
+- **Test Scenario:** System boundary notice
+  - Validation 1: A clear notice is displayed in the EMIS-X viewer informing the user that EMIS Web annotations exist for this document and are not visible in EMIS-X
+  - Validation 2: The notice includes a prompt or link directing the user to open the document in EMIS Web to view those annotations
+  - Validation 3: The notice is visible without any additional user action (not hidden in a menu or collapsed by default)
+  - Validation 4: The notice cannot be permanently dismissed in a way that prevents it appearing on future opens of the same document
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-021
+- **Pass Criteria:** Notice always displayed when EMIS Web annotations exist; persistent; includes EMIS Web redirect prompt
+
+### CHECK 2: CLIN-007 — System-Origin Indicator on Every Annotation
+- **Trigger:** Document opened with one or more EMIS-X annotations
+- **Test Scenario:** System-origin indicator visibility
+  - Validation 1: Each annotation clearly indicates it was created in EMIS-X and is visible in EMIS-X only
+  - Validation 2: No annotation appears without a system-origin label
+  - Validation 3: System-origin label is not removable or hideable by the viewing user
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-021
+- **Pass Criteria:** Every annotation has a system-origin indicator; always visible
+
+### CHECK 3: IG-002 — Patient Visibility Toggle Defaults to Not Visible
+- **Trigger:** New annotation created
+- **Test Scenario:** Default toggle state
+  - Validation 1: Newly created annotation has patient visibility = false by default
+  - Validation 2: No annotation is patient-visible without an explicit user action to enable it
+  - Validation 3: Default cannot be changed via a user-supplied parameter in the creation request (server enforces default)
+- **Guardrail:** IG-002
+- **Hazard:** HAZ-DOC-023
+- **Pass Criteria:** Patient visibility always defaults to false; server-enforced
+
+### CHECK 4: CLIN-002 — Annotation Actions Audited
+- **Trigger:** Any annotation action (create, amend, delete, toggle patient visibility)
+- **Test Scenario:** Audit log completeness
+  - Validation 1: Audit entry created for each action containing: `action`, `user_ern`, `document_ern`, `annotation_id`, `timestamp` (ISO 8601)
+  - Validation 2: Patient visibility toggle change audit entry records both previous and new state
+  - Validation 3: Audit entries do not contain annotation free-text content (content stored separately)
+- **Guardrail:** CLIN-002
+- **Hazard:** HAZ-DOC-023, HAZ-DOC-024
+- **Pass Criteria:** All annotation actions audited; toggle state changes include before/after values
+
+### CHECK 5: CLIN-005 — Annotation Attribution Always Displayed
+- **Trigger:** Document opened with one or more annotations
+- **Test Scenario:** Author and timestamp visibility
+  - Validation 1: Each annotation displays the author's name (derived from ERN) and creation timestamp
+  - Validation 2: Attribution cannot be hidden or removed by the viewing user
+  - Validation 3: Author ERN stored server-side; display name resolved at render time (not stored as plain text)
+- **Guardrail:** CLIN-005
+- **Hazard:** HAZ-DOC-024
+- **Pass Criteria:** Every annotation attributed to author + timestamp; attribution always visible
+
+### CHECK 6: SEC — Free-text Comment XSS Prevention
+- **Trigger:** Free-text annotation content rendered in viewer
+- **Test Scenario:** XSS injection in comment
+  - Input: Annotation comment containing `<script>alert('xss')</script>`
+  - Validation 1: Script tag not executed in viewer
+  - Validation 2: Content rendered as escaped plain text
+  - Validation 3: No browser alert or DOM manipulation triggered
+- **Guardrail:** SEC-001
+- **Pass Criteria:** Free-text annotation content always HTML-escaped on render; XSS not possible
+
+---
+
+
+### CHECK 17: PXD-001 — EMIS Web Boundary Notice
+
+**Trigger:** Document opened in EMIS-X viewer where EMIS Web annotations count > 0
+
+**Test Scenario:**
+- Validation 1: `Banner variant="warning"` (non-dismissable) shown at top of annotation panel
+- Validation 2: Count of EMIS Web annotations displayed
+- Validation 3: "Open in EMIS Web →" button present and triggers EMIS Web deep link
+- Validation 4: Notice cannot be dismissed (no close button; persists on panel re-open)
+- Validation 5: Compliance attribution (CLIN-007 · HAZ-DOC-021 · MIT-DOC-020) visible in notice footer
+- Validation 6: `axe(container)` 0 violations
+
+**Pass Criteria:** EMIS Web boundary notice present, undismissable, and attributable on every document open where EMIS Web annotations exist — CLIN-007 satisfied
+
+---
+
+### CHECK 18: PXD-002 — Patient Visibility Default
+
+**Trigger:** Clinician opens add-annotation form
+
+**Test Scenario:**
+- Validation 1: Patient visibility `Select` default = "Not visible to patient"
+- Validation 2: Default is pre-selected even if clinician has previously set "Visible to patient" on another annotation (per-annotation setting, not persisted as user preference)
+- Validation 3: Aria-label on Select is present
+- Validation 4: Visibility field label explicitly states "(default — IG-002)"
+
+**Pass Criteria:** Patient visibility always defaults safe; IG-002 / HAZ-DOC-023 satisfied
+
+---
+
+### CHECK 19: PXD-003 — System-Origin Attribution
+
+**Trigger:** Annotation list rendered
+
+**Test Scenario:**
+- Validation 1: Every EMIS-X annotation shows `Badge variant="primary"` "EMIS-X" system-origin marker
+- Validation 2: Author display name and role visible on every annotation
+- Validation 3: Timestamp visible and human-readable (British date format DD MMM YYYY HH:mm)
+- Validation 4: System-origin badge cannot be removed from view by any user action
+
+**Pass Criteria:** All annotations unambiguously attributed to author, role, system, and time — CLIN-005 / HAZ-DOC-024 satisfied
+
+---
+
+### CHECK 20: PXD-004 — Annotation Accessibility
+
+**Trigger:** Full accessibility audit on annotation panel
+
+**Test Scenario:**
+- Validation 1: `jest-axe ^9.0.0` 0 violations on annotation panel with form open and list populated
+- Validation 2: All inputs have accessible labels (Rule A)
+- Validation 3: `aria-live="polite"` on annotation list announces new annotation to screen reader
+- Validation 4: Tool buttons have `aria-pressed` reflecting active state
+- Validation 5: Focus management: Save closes form and returns focus to tool button; Cancel same
+
+**Pass Criteria:** WCAG 2.1 AAA for annotation form; 0 axe violations
+
+---
+
+### CHECK 21: PXD-005 — Annotation Delete Safety
+
+**Trigger:** Clinician deletes own annotation
+
+**Test Scenario:**
+- Validation 1: Confirmation `Dialog` shown before deletion executes
+- Validation 2: Annotation author and content visible in confirmation dialog
+- Validation 3: Admin can delete any annotation; non-admin can only delete own
+- Validation 4: Deleted annotation removed from list immediately; `Notification variant="success"` shown
+- Validation 5: Deletion audit event recorded with actor ID, annotation ID, document ID, timestamp
+
+**Pass Criteria:** No accidental deletion; role-scoped delete; audit trail preserved — CLIN-002 / HAZ-DOC-024 satisfied
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Full PxD.** UI surfaces: annotation panel (side panel inside viewer), EMIS Web boundary notice (persistent, undismissable), annotation type toolbar (highlight / comment / drawing), add-annotation form, annotation list with author attribution, patient visibility toggle, annotation delete confirmation.
+
+---
+
+### User Flow
+
+**Primary Flow — Add a comment annotation:**
+1. Clinician opens a document in the viewer; annotation panel is visible in the right pane (Protocol Panel)
+2. Clinician clicks "✏️ Annotations" button in the viewer toolbar — annotation panel scrolls to annotation section (or panel opens if collapsed)
+3. EMIS Web boundary notice is shown at top of panel if EMIS Web annotations exist for this document — this notice cannot be dismissed
+4. Clinician clicks "Comment" tool button — add-annotation form expands below the toolbar
+5. Clinician types comment text in `Textarea`; patient visibility defaults to "Not visible to patient"
+6. Clinician clicks "Save annotation" — annotation saved; appears in annotation list with author name, role, timestamp, and system-origin badge ("EMIS-X")
+7. `Notification variant="success"` shown: `{t('annotations.saved.success')}`
+
+**Primary Flow — Add a highlight:**
+1. Clinician selects text in the document viewer by clicking and dragging
+2. A "Highlight" contextual button appears near the selection (or clinician clicks "Highlight" in annotation toolbar)
+3. Highlight applied; optionally clinician adds a note in the form that appears
+4. Highlight saved; appears in annotation list with page/position reference
+
+**Error Flow — Viewer unavailable:**
+- Annotation panel shown but form disabled; `Banner variant="warning"` + `{t('annotations.viewerUnavailable')}`
+
+**Exit Types:**
+- Save: annotation saved; form collapses; list updates
+- Cancel: form collapses; no annotation created
+- Navigate away: annotation list persists; panel state restored on return
+
+---
+
+### Wireframes
+
+**Annotation panel (right pane, inside Protocol Panel):**
+
+```
+┌────────────────────────────────────────────────────────┐
+│ VIEWER (centre)         │ PROTOCOL PANEL (right 38%)   │
+│                         │ ┌──────────────────────────┐ │
+│ [document content]      │ │ ✏️ Annotations            │ │
+│ [text with highlights]  │ │ ────────────────────────  │ │
+│                         │ │ ⚠️ EMIS Web boundary     │ │
+│                         │ │ notice (if applicable)    │ │
+│                         │ │ [Open in EMIS Web →]      │ │
+│                         │ │ (cannot be dismissed)     │ │
+│                         │ │ ────────────────────────  │ │
+│                         │ │ Add annotation:           │ │
+│                         │ │ [Highlight][Comment]      │ │
+│                         │ │ [Drawing]                 │ │
+│                         │ │ ────────────────────────  │ │
+│                         │ │ ▼ Comment form (shown     │ │
+│                         │ │   when tool selected)     │ │
+│                         │ │ [Textarea              ]  │ │
+│                         │ │ 👁 Patient visibility:    │ │
+│                         │ │ [Not visible to patient]  │ │
+│                         │ │ [Save][Cancel]            │ │
+│                         │ │ ────────────────────────  │ │
+│                         │ │ Annotations on document:  │ │
+│                         │ │ • [EMIS-X] Smith, J       │ │
+│                         │ │   22 May 2026 · Comment   │ │
+│                         │ │   "Refer urgently"   [⋮]  │ │
+│                         │ └──────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+**EMIS Web boundary notice (always shown, cannot be dismissed):**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ ⚠️ EMIS Web annotations exist for this document              │
+│ This document has 2 annotation(s) created in EMIS Web that   │
+│ are not visible in EMIS-X. Open this document in EMIS Web to │
+│ view them before taking clinical action.                      │
+│ [Open in EMIS Web →]                                         │
+│ ─────────────────────────────────────────────────────────── │
+│ This notice appears every time this document is opened in    │
+│ EMIS-X while EMIS Web annotations exist. It cannot be        │
+│ permanently dismissed. (CLIN-007 · HAZ-DOC-021 · MIT-DOC-020)│
+└──────────────────────────────────────────────────────────────┘
+```
+
+*(Rendered as `Banner variant="error"` or `Banner variant="warning"` + non-dismissable props. Must render on every open whilst EMIS Web annotations exist.)*
+
+---
+
+### Component Specifications
+
+> 🚫 All interactive elements use `@emisgroup/ui-*` exclusively.
+
+**Annotation Type Toolbar:**
+- Container: `<div role="group" aria-label={t('annotations.toolbar.label')}>` flex row
+- Tool buttons: `Button variant="mono"` for Highlight, Comment, Drawing
+- Active tool: `Button variant="filled"` (selected state); `aria-pressed="true"`
+- Each button: `ariaLabel` = `{t('annotations.tool.highlight')}` etc.
+
+**Add-Annotation Form:**
+- Shown/hidden by CSS `display:none` → block when tool selected; `aria-expanded` on toolbar button
+- Comment textarea: `Textarea aria-label={t('annotations.comment.label')} placeholder={t('annotations.comment.placeholder')} rows={4}`
+- Patient visibility: `Select aria-label={t('annotations.patientVisibility.label')}` with options: "Not visible to patient (default)" / "Visible to patient"
+- Default: "Not visible to patient" — MANDATORY (IG-002, HAZ-DOC-023)
+- Save: `Button variant="filled"` `{t('annotations.save')}`
+- Cancel: `Button variant="mono"` `{t('annotations.cancel')}`
+
+**Annotation List Item:**
+- Container: `<article aria-label={t('annotations.item.label', { author, date })}>` per annotation
+- System-origin badge: `Badge variant="primary"` "EMIS-X" — always visible; cannot be removed from display
+- Author: `<strong>{author.displayName}</strong>` + role `<span className="text-dim">` + timestamp
+- Content: rendered as text (HTML-escaped); highlight content shows with `background: var(--cautionary)` tint
+- Actions: `Button variant="mono" size="small" circular` 3-dot menu → Edit / Delete (own annotations only; admin can delete any)
+
+**EMIS Web Boundary Notice:**
+- Component: `Banner variant="warning"` with `dismissible={false}` (or equivalent non-dismissable prop)
+- Must include: heading + count of EMIS Web annotations + "Open in EMIS Web →" `Button variant="mono"` + footer attribution text (CLIN-007 · HAZ-DOC-021 · MIT-DOC-020)
+- Rendered on every document open where EMIS Web annotations count > 0
+- Position: top of annotation panel, above add-annotation toolbar
+
+**Annotation Delete Confirmation:**
+- `Dialog` (standard, not preventBackdropClose)
+- Copy: `{t('annotations.delete.confirm')}` — confirms annotation will be permanently removed; author details shown
+- Confirm: `Button variant="danger"` `{t('annotations.delete.confirm.action')}`
+- Cancel: `Button variant="mono"`
+
+---
+
+### Interaction Patterns
+
+**Text selection → Highlight:**
+- Clinician selects text in viewer; `mouseup` triggers highlight affordance (floating `Button variant="mono" size="small"`)
+- Click "Highlight" → text wrapped in `<mark>` with highlight style; annotation entry created; panel scrolls to new entry
+
+**Annotation form lifecycle:**
+- Tool click → form animates in (`max-height` 0 → auto, 200ms ease-out); focus moves to textarea (Comment) or auto-applies (Highlight)
+- Save → form collapses; `Notification variant="success"` auto-dismiss 5s
+- Cancel → form collapses; no annotation created; focus returns to tool button
+
+**Keyboard navigation:**
+- Tab into annotation panel; Tab navigates toolbar → form fields → list items
+- Escape while form open: collapses form (same as Cancel)
+- Enter on annotation list item: expands/collapses full text
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AAA — clinical data)
+
+> AAA required: annotations are clinical metadata; patient visibility setting has direct clinical safety impact (HAZ-DOC-023).
+
+- [x] Perceivable: EMIS Web boundary notice uses `Banner variant="warning"` (colour + icon + text); system-origin badge uses `Badge` with text label (not colour alone)
+- [x] Operable: all annotation tools keyboard-accessible; `Tab` navigates toolbar; `Space/Enter` activates; annotation list navigable by keyboard
+- [x] Understandable: patient visibility defaults to "Not visible to patient" with label confirming this is the IG-safe default; EMIS Web boundary notice includes source reference (CLIN-007 · HAZ-DOC-021 · MIT-DOC-020) so clinician understands why it appears
+- [x] Robust: `jest-axe ^9.0.0`; all interactive elements are `@emisgroup/ui-*`; live region on annotation list
+
+**Rule A — all inputs labelled:**
+```tsx
+<Textarea aria-label={t('annotations.comment.label')} ... />
+<Select aria-label={t('annotations.patientVisibility.label')} ... />
+```
+
+**Rule B — live regions:**
+```tsx
+<div role="status" aria-live="polite">{isLoading && t('annotations.saving')}</div>
+<div role="alert" aria-live="assertive">{error && t('annotations.error.save')}</div>
+<ul role="list" aria-label={t('annotations.list.label')} aria-live="polite">
+  {annotations.map(a => <li key={a.id}><AnnotationItem annotation={a} /></li>)}
+</ul>
+```
+
+---
+
+### Visual Design
+
+**Tokens:**
+- Highlight tint: `color-mix(in srgb, var(--cautionary) 30%, transparent)`
+- System-origin badge: `Badge variant="primary"` ("EMIS-X" label)
+- EMIS Web boundary notice background: `Banner variant="warning"` (`var(--cautionary)` tint)
+- Annotation panel background: `var(--background-dim)`
+- Author attribution: `var(--text-dim)` 12px
+
+**i18n keys (British English, selection):**
+```json
+{
+  "annotations.toolbar.label": "Annotation tools",
+  "annotations.tool.highlight": "Highlight selected text",
+  "annotations.tool.comment": "Add comment",
+  "annotations.comment.label": "Annotation text",
+  "annotations.patientVisibility.label": "Patient visibility",
+  "annotations.save": "Save annotation",
+  "annotations.cancel": "Cancel",
+  "annotations.saved.success": "Annotation saved.",
+  "annotations.emisWebBoundary.heading": "EMIS Web annotations exist for this document"
+}
+```
+
+---
+
+### Error States
+
+**Save fails (API error):** `Notification variant="error"` `{t('annotations.error.save')}`; form remains open with content preserved
+
+**Viewer unavailable (cannot establish highlight position):** `Banner variant="warning"` above annotation toolbar; Highlight tool disabled; Comment still available
+
+**EMIS Web annotation count unavailable:** EMIS Web boundary notice hidden; `Banner variant="info"` `{t('annotations.emisWebStatus.unavailable')}` informing check is not available
+
+---
+
+### Empty States
+
+**No annotations yet:** `{t('annotations.empty')}` = "No annotations on this document. Select a tool above to add one."
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-008 | HAZ-DOC-021 | EMIS Web boundary notice persistent and unmissable | CLIN-007 | CHECK 1 |
+| REQ-008 | HAZ-DOC-021 | System-origin indicator on every annotation | CLIN-007 | CHECK 2 |
+| REQ-008 | HAZ-DOC-023 | Patient visibility defaults to false | IG-002 | CHECK 3 |
+| REQ-008 | HAZ-DOC-023/024 | All annotation actions audited | CLIN-002 | CHECK 4 |
+| REQ-008 | HAZ-DOC-024 | Author attribution always displayed | CLIN-005 | CHECK 5 |
+| REQ-008 | — | XSS prevention in free-text comments | SEC-001 | CHECK 6 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — EMIS-X annotation storage model (new store, scoped to EMIS-X); mechanism for detecting whether a document has EMIS Web annotations (to trigger the system boundary notice); patient visibility propagation to online record access systems; Phase 2 cross-system annotation sync architecture (deferred, but V1b should define the technical approach so it can be planned)
+- V1c will ADD: Design section — annotation API contracts (CRUD + toggle), annotation data schema, system-origin field, patient visibility flag schema, EMIS Web annotation detection endpoint
+- V1d will ADD: UI/UX section — annotation toolbar design, highlight/comment/drawing interaction patterns, system boundary notice design (persistent, unmissable), system-origin indicator placement, patient visibility toggle placement and labelling, attribution display
+- V1e will ADD: Clinical Safety section — DCB0129 entries for HAZ-DOC-021/023/024; HAZ-DOC-021 residual risk assessment (Critical risk remains until Phase 2 cross-system sync); review of patient visibility control and online record access systems
+- **Cross-system annotation visibility:** Deferred beyond 30-day Core delivery. Phase 2 entry condition: V1b cross-system sync architecture agreed; V1e clinical safety case for cross-system annotation exposure approved.
+- **EMIS Web annotations in EMIS-X:** Not visible in Core. System boundary notice is the mandatory mitigation for HAZ-DOC-021 (Critical risk) until Phase 2.
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Preserve EMIS-X annotations with explicit deferral of cross-system annotation sync.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsAnnotationService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsAnnotationService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /documents/{documentGUID}/annotations (POST/GET/DELETE) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+Existing viewer overlay path and boundary from EMIS Web annotation system.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+

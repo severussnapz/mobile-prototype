@@ -1,0 +1,403 @@
+﻿# REQ-004: Document Viewer & Navigation
+
+**Priority:** Must Have
+**Effort:** None — pre-built ✅
+**Risk:** Low
+**Increment:** 1 — Inbox & Triage
+**Depends On:** REQ-001 (Unified Inbound Document Inbox), REQ-005 (File Format Support)
+
+> ⚠️ **Implementation note:** The document viewer is already built as a reusable component. **Do not re-implement.** V1b/V1c/V1d agents should reference and integrate the existing component rather than designing a new one. Confirm component interface/API contract with the owning team before V1b.
+
+---
+
+## User Story
+
+As a practice administrator or clinician,
+I need to view documents with clear navigation controls,
+So that I can read multi-page documents accurately and efficiently without missing content.
+
+**Acceptance Criteria:**
+- [ ] Documents open in an integrated viewer within the application (no external application required).
+- [ ] Multi-page documents support both scroll-based navigation and explicit page pagination controls (previous/next page).
+- [ ] Users can zoom in and out of document content.
+- [ ] A fit-to-page control resets the view to display the full page within the available viewport.
+- [ ] Users can rotate the document view (clockwise and anticlockwise) to correct orientation of scanned documents.
+- [ ] Viewer state (zoom level, rotation, current page) is preserved while the user is working on that document.
+- [ ] Viewer works consistently across all supported file formats (see REQ-005).
+
+---
+
+### Acceptance Criteria — Deferred to Increment 3 (Clinical & Operational Actions)
+
+*(Active when REQ-006 and REQ-008 are delivered. Do not implement in Increment 1 or Increment 2.)*
+
+- [ ] *(REQ-006)* A print/export action is available from within the document viewer, allowing the user to print or download a copy of the document. The action is audited (document ERN, user ERN, timestamp, action type).
+- [ ] *(REQ-008)* An annotations panel is surfaceable from within the document viewer, allowing the user to add highlights and text annotations to the current document.
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-007:** Hazard Mitigation Evidence — viewer must not obscure, truncate, or misrepresent document content; all pages must be accessible
+- **CLIN-010:** Error Handling Patient Safety — viewer failures (failed to render, missing pages) must fail closed with explicit error; never silently show partial content as complete
+
+### Hazards Addressed
+
+- **HAZ-DOC-011:** Clinician or administrator misses content on a multi-page document due to poor pagination or scroll behaviour — clinical action taken on incomplete information
+  - **Severity:** High
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+
+- **HAZ-DOC-012:** Document rendered incorrectly (wrong orientation, truncated content) — misread or missed clinical information
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+- **HAZ-DOC-013:** Viewer silently fails to render all pages — user believes document is single-page when it is not
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+### Mitigations
+
+- **MIT-DOC-010:** Page count displayed explicitly in viewer (e.g. "Page 2 of 7") so user always knows total page count
+  - **Type:** UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-011:** Rotation controls available for scanned documents to correct orientation before review
+  - **Type:** UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-012:** If viewer fails to render any page, explicit error shown for that page; total page count still displayed so user knows content is missing
+  - **Type:** Error Handling
+  - **Effectiveness:** Complete
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — viewer does not cache document content beyond the active session
+- **IG-002:** Privacy by Design — document content not exposed in URL parameters, browser history, or print headers beyond what the user intentionally prints
+- **IG-004:** Special Category Data Protection — document content served over TLS; not written to unencrypted client storage
+
+### Data Handling
+- Document content loaded on demand per viewing session; not pre-fetched in bulk
+- Viewer does not persist document content to local disk, browser cache, or localStorage
+- Print action (REQ-006, Increment 3) is a separate controlled action, not triggered by viewer navigation and **deferred to Increment 3**
+
+### GDPR Articles
+- **Article 5(1)(f):** Integrity and confidentiality — document content protected in transit and during display
+- **Article 9(2)(h):** Special category health data — appropriate controls on display and access
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — document content endpoint requires valid JWT with correct scope; viewer cannot load documents for unauthorised users
+- **SEC-001:** TLS Encryption — document content served over TLS 1.2+
+
+### Security Requirements
+- Document content served via authenticated, time-limited URLs or session-scoped tokens — not persistent public URLs
+- Viewer does not expose raw document storage path or internal document identifier in client-side URL
+- Rotation and zoom state stored in memory only; not persisted to server or browser storage
+
+---
+
+## Dimension 4: Observability & Performance
+
+### Product KPIs
+- Document open time (user clicks document → first page rendered)
+- Page navigation latency (user navigates to next/previous page → page rendered)
+- Viewer error rate (failed renders per total document opens)
+- Zoom/rotate usage rate (proxy for document orientation/legibility issues)
+
+### Observable Events (OTEL Instrumentation)
+- `documents.viewer.opened` — user opens document; first page render initiated
+- `documents.viewer.page_navigated` — user navigates to a different page
+- `documents.viewer.zoom_changed` — user adjusts zoom level
+- `documents.viewer.rotated` — user applies rotation
+- `documents.viewer.render_failed` — page or document failed to render
+
+### Performance SLOs
+- First page render: p95 < 2 seconds for standard documents (PDF up to 50 pages, JPEG/PNG single page)
+- Page navigation: p95 < 1 second per page turn
+- Viewer error rate: < 0.5% of document opens result in a render failure
+
+### Alerting Conditions
+
+| Condition | Threshold | Severity | Channel |
+|---|---|---|---|
+| First page render p95 breach | > 2 seconds sustained for 5 min | HIGH | Ops alert |
+| Viewer error rate spike | > 0.5% of document opens result in render failure | HIGH | Ops alert |
+| Page navigation latency breach | p95 > 1 second sustained for 5 min | MEDIUM | Ops alert |
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Implementation rule:** Use existing pre-built viewer component; no replacement viewer implementation.
+
+**Core endpoints consumed by viewer integration:**
+- `GET /documents/{documentGuid}/rendition`
+- `GET /documents/{documentGuid}/metadata`
+
+**Viewer state rules:**
+- Zoom, rotation, and page index are session-scoped runtime state only.
+- Viewer state is not persisted to server profile data or browser storage.
+
+### Database Schema
+
+**N/A — pre-built viewer component.** REQ-004 integrates the existing document viewer component. No dedicated database table is owned by this requirement; rendition metadata is managed by the file format service (REQ-005).
+
+### Component Interfaces
+
+```typescript
+interface DocumentViewerAdapter {
+  open(documentGuid: string): Promise<void>;
+  getRendition(documentGuid: string): Promise<ViewerRenditionResource>;
+  getMetadata(documentGuid: string): Promise<DocumentMetadataResource>;
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-007 — Page Count Always Visible
+- **Trigger:** Multi-page document opened in viewer
+- **Test Scenario:** Page count display
+  - Input: A 7-page PDF document
+  - Validation 1: Viewer displays total page count (e.g. "Page 1 of 7") immediately on open
+  - Validation 2: Page count updates correctly as user navigates
+  - Validation 3: Page count is visible without scrolling or additional interaction
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-011, HAZ-DOC-013
+- **Pass Criteria:** Total page count always visible; updates on navigation
+
+### CHECK 2: CLIN-010 — Partial Render Failure Surfaced Explicitly
+- **Trigger:** Viewer fails to render one or more pages of a document
+- **Test Scenario:** Page render failure handling
+  - Simulate: Page 3 of a 5-page document fails to render
+  - Validation 1: Pages 1, 2, 4, 5 render normally
+  - Validation 2: Page 3 displays an explicit error state (not blank, not spinner stuck)
+  - Validation 3: Total page count (5) still displayed correctly
+  - Validation 4: User is not misled into thinking the document has fewer pages than it does
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-013
+- **Pass Criteria:** Failed pages show explicit error; page count unaffected; no silent truncation
+
+### CHECK 3: CLIN-010 — Full Viewer Failure Surfaced Explicitly
+- **Trigger:** Document viewer fails to load entirely (e.g. document content unavailable)
+- **Test Scenario:** Full viewer failure
+  - Simulate: Document content endpoint returns error
+  - Validation 1: Explicit error state shown (not blank white screen, not spinner)
+  - Validation 2: Error message does not expose internal system details (stack trace, file path)
+  - Validation 3: User presented with a next step (e.g. retry, contact support)
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-013
+- **Pass Criteria:** Full viewer failure communicated clearly; no silent or ambiguous empty state
+
+### CHECK 4: AUTH-004 — Document Content Requires Authorisation
+- **Trigger:** Document content endpoint
+- **Test Scenario:** Unauthorised content access
+  - Request document content without authorisation header → access denied (401)
+  - Request document content with valid JWT + correct scope → content served
+  - Attempt to access document content URL from a different authenticated user session → access denied (403)
+- **Guardrail:** AUTH-004
+- **Hazard:** HAZ-DOC-003 (cross-reference from REQ-001)
+- **Pass Criteria:** Document content not accessible without valid, correctly scoped authorisation
+
+### CHECK 5: Rotation and Zoom Are Session-Scoped Only
+- **Trigger:** User applies rotation or zoom; session ends
+- **Test Scenario:** State persistence boundary
+  - Action: User rotates document 90° clockwise and zooms to 150%
+  - User closes viewer and reopens same document
+  - Validation 1: Document opens at default orientation and default zoom
+  - Validation 2: Rotation/zoom state not persisted to server or browser storage
+  - Validation 3: No rotation/zoom preference written to localStorage, sessionStorage, or cookies
+- **Hazard:** IG-004 (viewer state must not leak session data)
+- **Pass Criteria:** Rotation and zoom reset on each new viewer session; not persisted
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-004 | HAZ-DOC-011 | Page count always visible | CLIN-007 | CHECK 1 |
+| REQ-004 | HAZ-DOC-012 | Rotation controls available | CLIN-007 | CHECK 1 |
+| REQ-004 | HAZ-DOC-013 | Partial render failure explicit | CLIN-010 | CHECK 2 |
+| REQ-004 | HAZ-DOC-013 | Full viewer failure explicit | CLIN-010 | CHECK 3 |
+| REQ-004 | HAZ-DOC-003 | Auth required for document content | AUTH-004 | CHECK 4 |
+| REQ-004 | — | Rotation/zoom session-scoped only | IG-004 | CHECK 5 |
+| REQ-004 | HAZ-DOC-013 | Full failure Banner + retry (Document Manager layer) | CLIN-010 | CHECK 3 | ViewerErrorBanner |
+| REQ-004 | HAZ-DOC-047 | Page count/navigation safe defaults (canonical ID — remapped from HAZ-DOC-011 per D-001) | CLIN-009 | CHECK 6 |
+| REQ-004 | HAZ-DOC-047 | Viewer state persistence during interaction | CLIN-009 | CHECK 7 |
+| REQ-004 | HAZ-DOC-012 | Rendering integrity; unsupported format explicit warning | CLIN-010 | CHECK 8 |
+| REQ-004 | HAZ-DOC-013 | Viewer fail-closed on partial and full failure | CLIN-004 | CHECK 9 |
+| REQ-004 | — | Patient banner state readiness and context presence gate | WCLIN-001/002 | CHECK 10 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section (document rendering service, format-to-viewer pipeline, CDN/streaming strategy for large documents)
+- V1c will ADD: Design section (document content API contract, page streaming schema, auth token pattern for content URLs)
+- V1d will ADD: UI/UX section (viewer layout, pagination controls, zoom/rotate control placement, error state designs)
+- V1e will ADD: Clinical Safety section (DCB0129 entries for HAZ-DOC-011/012/013)
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation |
+| 1.1 | 2026-05-21 | V1b Architecture | Added Architecture section |
+| 1.2 | 2026-05-28 | V1d PxD | Added Minimal PxD section: integration notes (gallery column placement, wrapper ARIA), full-viewer-failure error state (Banner + retry), accessibility notes. Pre-built component owns pagination/zoom/rotate. Traceability updated. |
+| 1.3 | 2026-05-28 | Product Decision (amendment) | Added `**Increment:** 1` header. Deferred print/export (REQ-006) and annotations (REQ-008) to Increment 3 — added `### Acceptance Criteria — Deferred to Increment 3` section. Updated IG Data Handling note to clarify print action is deferred. All 5 CHECKs remain active in Increment 1. |
+| 1.4 | 2026-05-29 | V1e Clinical Safety | Added Clinical Safety section (IF678 hazard cards for HAZ-DOC-047/012/013; per-cause HIT Design controls with CLIN-004/009/010 and WCLIN-001/002; CHECK 6-10 added to Evaluation Function Specification). HAZ-DOC-047 canonical ID confirmed per D-001 (remapped from HAZ-DOC-011). Severity/likelihood deferred to CSO manual entry (D-008). CSO sign-off deferred (D-031). Traceability updated. |
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Use existing viewer component for consistent multi-page navigation without re-implementation.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_WEBAPP_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: @emisgroup/document-viewer
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | @emisgroup/document-viewer |
+| service_scope | existing_use |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | null |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+Existing file retrieval endpoint and ACP shell auth token flow.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+---
+
+## Clinical Safety (Added by V1e)
+
+> Full IF678 hazard cards: `requirements/HAZARD-REGISTRY.md`
+
+**Hazard IDs:** HAZ-DOC-047, HAZ-DOC-012, HAZ-DOC-013
+**CLIN Guardrails:** CLIN-009 (Safe Defaults), CLIN-004 (Fail-Safe Error Handling), CLIN-010 (Third-Party Clinical Risk)
+**HIT Design Controls:**
+- HAZ-DOC-047: see HAZARD-REGISTRY.md (CHECK 6, CHECK 7)
+- HAZ-DOC-012: see HAZARD-REGISTRY.md (CHECK 8)
+- HAZ-DOC-013: see HAZARD-REGISTRY.md (CHECK 9)
+**Residual Risk Level:** [TBD — ALARP pending CSO Phase 6 assessment], CSO: Dan Watts
+
+---
+
+### DCB0129/0160 Compliance
+
+- Clinical Risk Management Plan: ✅ In place
+- Hazard Log (IF678): ✅ Documented in `requirements/HAZARD-REGISTRY.md`
+- Risk Assessment: ⏳ Pending — severity/likelihood to be entered by CSO (D-008)
+- Mitigations: ✅ Defined and CLIN-referenced
+- Residual Risk: ⏳ Pending — ALARP assessment deferred pending risk scores (Phase 6)

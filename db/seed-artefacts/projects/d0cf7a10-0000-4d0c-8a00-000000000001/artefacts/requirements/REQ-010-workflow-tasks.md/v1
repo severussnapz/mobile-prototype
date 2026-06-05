@@ -1,0 +1,938 @@
+﻿# REQ-010: Workflow Tasks & Metadata-Based Routing Rules
+
+**Priority:** Must Have
+**Effort:** Medium
+**Risk:** High — regulatory blocker; see 🔴 Legal Blocker below
+**Phase:** Documents Management Core (30-day delivery)
+**Depends On:** REQ-001 (Unified Inbound Document Inbox), REQ-002 (Electronic Inbound Ingestion), REQ-009 (Audit Trail), REQ-011 (Patient Matching)
+
+---
+
+## 🔴 Legal Blocker — Must Resolve Before Go-To-Market
+
+> **The metadata-based routing rules engine described in this requirement must not be shipped without a written legal and regulatory position from EMIS Health's regulatory and legal teams on the following question:**
+>
+> *When EMIS ships a configurable document routing rules engine (no default rules; all clinical logic entered by the practice), does EMIS bear any manufacturer responsibility under UK Medical Devices Regulations 2002 (as amended) for routing decisions made by practice-configured rules?*
+>
+> **Current analysis (⚠️ Confidence: MEDIUM — not a substitute for formal legal advice):**
+>
+> EMIS's position is likely defensible provided:
+> 1. EMIS ships the rules engine with **no default routing rules** — no clinical logic is pre-configured by EMIS
+> 2. EMIS does not claim or market this capability as a clinical routing tool (see Go-To-Market Constraint below)
+> 3. EMIS surfaces an in-product disclaimer at the point of rule creation (see Acceptance Criteria — Disclaimer)
+> 4. EMIS does not conduct or claim to have conducted a clinical safety assessment of any practice-configured rule
+>
+> Under this analysis, **the practice** bears responsibility for any rules it configures, potentially as an in-house manufacturer under the own-use exemption (UK MDR 2002). The own-use exemption may reduce (but does not eliminate) the practice's regulatory obligations provided they do not place the configured rules on the market.
+>
+> **Explicitly out of scope — these scenarios are not supported by the product and must not be enabled:**
+> - A practice selling or licensing its configured rule set to another practice
+> - EMIS shipping pre-built recommended routing rule templates for common document types
+>
+> These exclusions are enforced by product design and must be reflected in the customer contract and terms of use.
+>
+> **Resolution required by:** Before go-to-market. This is a go-live blocker.
+> **Owner:** EMIS Head of Regulatory + General Counsel
+> **Action:** Obtain written legal opinion. Update this requirement with outcome before V1c design phase.
+
+---
+
+## Go-To-Market Constraint
+
+> **This constraint applies to all marketing, sales, product copy, help documentation, and in-product messaging for the routing rules feature.**
+>
+> The routing rules capability must be positioned and described exclusively as an **administrative efficiency tool** — reducing the manual effort of triaging and routing documents to the appropriate person or team.
+>
+> The following framings are **prohibited** in any customer-facing material:
+> - ❌ "Automatically routes clinical documents to the right clinician"
+> - ❌ "Intelligently directs documents based on clinical content"
+> - ❌ "Clinical decision support for document triage"
+> - ❌ Any framing that implies the product makes clinical routing decisions
+>
+> Permitted framings:
+> - ✅ "Reduce administrative triage time by setting rules that pre-assign documents to the right team"
+> - ✅ "Configure routing rules based on document type, source, and urgency to streamline your document management workflow"
+> - ✅ "Administrative routing rules — you define the logic, your team saves the time"
+>
+> This constraint must be reviewed by EMIS Marketing and Legal before any go-to-market materials are published. Breach of this constraint could undermine EMIS's regulatory position on manufacturer responsibility.
+
+---
+
+## Scope — Documents Management Core
+
+**Included in this release:**
+- Manual task creation linked to a document (individual or role-group assignee)
+- Metadata-based routing rules engine (practice-configured; no EMIS-supplied defaults)
+- In-product disclaimer at point of rule creation
+- Task trail visible on document
+- Document blocked as done until all tasks complete
+
+**Deferred to Phase 2:**
+- User-defined group management (create and manage custom groups)
+- Task reassignment with notification to original assignee
+- Task trail permanence policy (pending V1e clinical safety review)
+- Any routing logic that reads document body content
+
+---
+
+## User Story
+
+As a practice administrator,
+I need to create tasks linked to inbound documents and either assign them manually or have them routed automatically by rules I have configured based on document metadata,
+So that clinical and administrative work arising from documents reaches the right person quickly without requiring manual triage of every document.
+
+**Acceptance Criteria:**
+
+### Task Creation (manual)
+- [ ] A task can be created from any document in the inbox. *(Must Have)*
+- [ ] Each task has: **Task Type** (required; sourced from EMIS Web user task types), due date, priority (Urgent / Routine / Administrative), assignee (individual or role-group), and free-text instructions. *(Must Have)*
+- [ ] Multiple tasks can be created simultaneously from a single document, each routed independently. *(Must Have)*
+- [ ] For NHSmail-source documents, Document Manager task creation follows the same queue flow as other sources: ingest first, match in Document Manager (REQ-011), then create filing/coding/tasks in Documents workflow. NHSmail service task records are not authoritative for Document Manager queue decisions. *(Must Have)*
+- [ ] A document cannot be marked as fully done until all associated tasks are completed. *(Must Have)*
+- [ ] The task trail (task creation, completion) is visible on the document. *(Must Have)*
+- [ ] The **Assign to** selector in task creation uses the current EMIS-X user picker as its source of assignable users/role-groups. *(Must Have)*
+- [ ] The tasking panel must not display the warning text "Completing this document will update the corresponding EMIS". *(Must Have)*
+
+**Task Type values source:**
+Task Type values are sourced from the EMIS Web user task type configuration at runtime; a hardcoded fixed list is not used in this release.
+
+### Task Queue List View
+- [ ] The Task Queue lists all open tasks assigned to the current user or their role-group(s). *(Must Have)*
+- [ ] Each row in the Task Queue displays the following columns in order: Urgency, Document Title, Patient, Assigned To, **Task Type**, **Created** (date the task was created), Due, Actions. The Urgency column displays a red arrow indicator for Urgent documents; non-urgent documents display no indicator. *(Must Have)*
+- [ ] The Tasks list can be **filtered by the Assigned To field**. When an Assigned To filter is active, it is displayed as a removable tag above the document list. The filter can be cleared by removing the tag. *(Must Have)*
+- [ ] Selecting a row navigates the user directly to the associated document in the document viewer. *(Must Have)*
+- [ ] Tasks in the Task Queue can be completed in any order, regardless of the sequence in which they were created or assigned. The order of task completion is at the user's discretion. *(Must Have)*
+
+### Routing Rules (metadata-based)
+- [ ] A practice administrator can create, edit, and delete routing rules. *(Must Have)*
+- [ ] A routing rule consists of one or more AND conditions evaluated against document metadata fields only: document type, urgency, source, department, and document title (exact string match). *(Must Have)*
+- [ ] Rules are evaluated in priority order; the first matching rule fires; subsequent rules are not evaluated. *(Must Have)*
+- [ ] A configurable fallback rule applies when no rule matches (default: route to Administrators). *(Must Have)*
+- [ ] When no metadata is available on an inbound document, no rule is evaluated and the document is placed in the unmatched/manual triage queue. This is an accepted constraint of the rules engine. *(Must Have)*
+- [ ] Rule evaluation never reads or analyses document body content. *(Must Have — SaMD boundary enforcement)*
+- [ ] Rule evaluation never uses AI, machine learning, NLP, or semantic similarity. *(Must Have — SaMD boundary enforcement)*
+
+### In-Product Disclaimer — Rule Creation
+- [ ] A disclaimer is surfaced to the user **before** they save any new or edited routing rule. The user must explicitly acknowledge the disclaimer before the rule is saved. *(Must Have — regulatory)*
+- [ ] The disclaimer text states, in substance: *"Routing rules you configure here may constitute a medical device under UK Medical Devices Regulations 2002 (as amended). By saving this rule, your organisation accepts responsibility for the clinical appropriateness of this routing rule. EMIS Health is not responsible for routing decisions made by rules configured by your organisation. This tool is intended to support administrative efficiency in document management."*
+- [ ] Disclaimer acknowledgement is recorded in the audit trail (user ERN, timestamp, rule ID). *(Must Have)*
+- [ ] The disclaimer is re-surfaced if an existing rule is materially edited (condition change or assignee change). *(Must Have)*
+
+### Out of Scope — Explicitly Prohibited
+- [ ] EMIS must not ship default routing rule templates. The rules engine must be empty on first use. *(Hard constraint)*
+- [ ] The product must not enable a practice to export, share, or sell its routing rule configuration to another practice. *(Hard constraint)*
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-002:** Patient Data Audit Trail — task creation, routing rule firing, disclaimer acknowledgement, and task completion events all audited
+- **CLIN-007:** Hazard Mitigation Evidence — task trail must be visible on the document to evidence that required actions were taken
+- **CLIN-010:** Error Handling Patient Safety — routing failures must be explicit; a task that fails to reach its assignee must never appear as successfully delivered
+
+### SaMD Boundary Enforcement
+The following constraints are non-negotiable and enforce the SaMD boundary. Any future change to these constraints requires a formal regulatory assessment before implementation:
+- Rules evaluate document metadata fields only (type, urgency, source, department, title string-match)
+- Document body content is never read by the rules engine
+- No AI, ML, NLP, or semantic similarity is used at any point in rule evaluation
+- EMIS ships no default rules — all routing logic is practice-authored
+
+### Hazards Addressed
+
+- **HAZ-DOC-028:** Task not received by intended assignee — clinical action not taken because routing failed silently
+  - **Severity:** Critical
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-029:** Multiple tasks created from one document but one is missed — partial action taken; clinical context incomplete
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-031:** Document marked done while outstanding tasks remain — incomplete clinical actions missed
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-032:** Routing rule fires on document with no metadata — document silently misdirected or lost
+  - **Severity:** High
+  - **Likelihood:** Medium (some inbound sources supply incomplete metadata)
+  - **Risk Level:** High
+  - **Mitigation:** No rule fires when metadata is absent; document placed in manual triage queue (accepted constraint)
+
+- **HAZ-DOC-033:** Practice configures a routing rule that constitutes a medical device without understanding the regulatory implications
+  - **Severity:** Medium (regulatory/liability risk rather than direct patient harm)
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+  - **Mitigation:** In-product disclaimer with mandatory acknowledgement before rule is saved; audit trail of acknowledgement; go-to-market framing constraint
+
+### Mitigations
+
+- **MIT-DOC-027:** Task routing failure surfaces explicit error to task creator; failed delivery never shown as successful
+- **MIT-DOC-028:** Document cannot be marked fully done while any associated task remains incomplete
+- **MIT-DOC-031:** No rule evaluated when document metadata is absent; document placed in manual triage queue
+- **MIT-DOC-032:** Mandatory disclaimer acknowledged before rule saved; acknowledgement audited
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — task notifications contain only the minimum information needed (task ID, document type, due date); full document content not included in notifications
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(e) public task + Article 9(2)(h) health data
+- **IG-004:** Special Category Data Protection — task free-text instructions may reference patient clinical information; stored encrypted at rest
+
+### Data Handling
+- Task free-text instructions stored encrypted at rest (may contain clinical context)
+- Task notifications contain task metadata only; not full document content or patient clinical data
+- Routing rule configuration (conditions + assignee) stored per practice; not shared with or visible to other practices
+- Rule sharing between practices is explicitly not supported by the product
+- Task trail retained per document retention schedule (NHS IF3005)
+
+### GDPR Articles
+- **Article 6(1)(e):** Lawful basis — public task
+- **Article 9(2)(h):** Special category health data — medical purposes
+- **Article 5(1)(f):** Integrity and confidentiality — task content and rule configuration protected at rest and in transit
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — task creation, rule management, and disclaimer acknowledgement endpoints require valid JWT with correct scope
+- **SEC-001:** TLS Encryption — task content, rule configuration, and notifications over TLS 1.2+
+
+### Security Requirements
+- Task assignee validation: assignee must be an active user or role-group within the same practice; cross-practice assignment not possible (server-side enforcement)
+- Routing rule management restricted to users with Practice Administrator role or above
+- Rule configuration scoped to practice; no API endpoint permits reading or writing another practice's rule configuration
+- Task free-text instructions sanitised to prevent XSS when rendered in task views
+- Rule condition values (e.g. document title string-match) treated as plain string literals; never executed as code or queries
+
+---
+
+## Dimension 4: Observability & Performance
+
+### KPIs
+- Task creation rate (per document, per practice)
+- Routing rule hit rate (% of documents matched by a rule vs. falling through to fallback)
+- Routing rule fallback rate (% of documents reaching fallback — high rate indicates rules need tuning)
+- No-metadata rate (% of documents with insufficient metadata for rule evaluation — operational signal for source quality)
+- Task completion time (task created → task marked complete)
+- Disclaimer acknowledgement rate (% of rule saves where disclaimer was acknowledged — monitoring compliance)
+
+### OTEL Spans
+- `documents.task.created` — task created; assignee type (individual / role-group) recorded
+- `documents.task.routed` — task successfully delivered to assignee queue
+- `documents.task.routing_failed` — task failed to reach assignee; error type recorded
+- `documents.task.completed` — task marked complete by assignee
+- `documents.task.document_done` — all tasks on a document completed; document marked fully done
+- `documents.routing_rule.evaluated` — rule evaluation triggered; match result (matched/fallback/no-metadata) recorded; rule ID if matched
+- `documents.routing_rule.created` — new routing rule saved; disclaimer acknowledged flag recorded
+- `documents.routing_rule.amended` — existing routing rule edited; disclaimer re-acknowledged flag recorded
+- `documents.routing_rule.disclaimer_acknowledged` — user explicitly acknowledged disclaimer; rule ID, user ERN, timestamp
+
+### SLOs
+- Task routing: p95 < 2 seconds from task creation to appearance in assignee's task queue
+- Rule evaluation: p99 < 200ms (deterministic lookup; no AI inference)
+- Task creation: p95 < 1 second
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Primary resources:**
+- `workflow-tasks`
+- `routing-rules`
+
+**Core endpoints:**
+- `GET /workflow/documents/{documentGuid}/tasks`
+- `POST /workflow/documents/{documentGuid}/tasks`
+- `PATCH /workflow/tasks/{taskGuid}`
+- `GET /workflow/routing-rules`
+- `POST /workflow/routing-rules`
+- `PATCH /workflow/routing-rules/{ruleId}`
+
+**Important request rules:**
+- Routing rule create/update requires `disclaimer_acknowledged=true`.
+- Task creation accepts metadata-only routing inputs (`document_type`, `urgency`, `source`, `department`, `document_title`).
+- No endpoint accepts document body content for routing decisions.
+
+**Response shape:**
+- JSON:API `data`, `included`, `links`, and `meta` for collections.
+- Failures use JSON:API `errors[]` with ERN-compatible error codes.
+
+### Component Interfaces
+
+```csharp
+public interface IWorkflowTaskService
+{
+  Task<Result<WorkflowTaskResource>> CreateTaskAsync(CreateWorkflowTaskCommand command, CancellationToken cancellationToken = default);
+  Task<Result<WorkflowTaskResource>> CompleteTaskAsync(Guid taskGuid, CompleteWorkflowTaskCommand command, CancellationToken cancellationToken = default);
+  Task<Result<PaginatedList<WorkflowTaskResource, TaskQueryFilter>>> GetDocumentTasksAsync(Guid documentGuid, TaskQueryFilter filter, CancellationToken cancellationToken = default);
+}
+
+public interface IRoutingRuleService
+{
+  Task<Result<RoutingRuleResource>> CreateRuleAsync(CreateRoutingRuleCommand command, CancellationToken cancellationToken = default);
+  Task<Result<RoutingRuleResource>> UpdateRuleAsync(Guid ruleId, UpdateRoutingRuleCommand command, CancellationToken cancellationToken = default);
+  Task<Result<PaginatedList<RoutingRuleResource, RoutingRuleQueryFilter>>> GetRulesAsync(RoutingRuleQueryFilter filter, CancellationToken cancellationToken = default);
+}
+```
+
+### NHSmail Workflow Boundary
+
+- NHSmail is treated as source metadata only (`source=nhsmail`) in routing decisions.
+- NHSmail-side task records are not authoritative for Document Manager workflow queues.
+- For NHSmail documents: ingest -> match/unmatched (REQ-011) -> create workflow tasks in DocumentsWorkflowService.
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-010 — Task Routing Failure is Explicit
+- **Trigger:** Task routing fails (e.g. assignee group has no active members)
+- **Test Scenario:** Routing failure handling
+  - Simulate: Task assigned to a role-group with no active members
+  - Validation 1: Task creator shown an explicit error — not a success confirmation
+  - Validation 2: Task does not appear as successfully delivered in the task trail
+  - Validation 3: Task creator prompted to reassign or resolve
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-028
+- **Pass Criteria:** `POST /tasks` with unresolvable assignee → HTTP 422 + `{"error": "assignee_group_empty"}` + no task trail entry created
+
+### CHECK 2: CLIN-007 — Document Cannot Be Marked Done with Open Tasks
+- **Trigger:** User attempts to mark a document as fully done
+- **Test Scenario:** Outstanding task blocking completion
+  - Setup: Document has 2 tasks; 1 completed, 1 open
+  - Action: `PATCH /documents/{id}/status` with `{"status": "done"}`
+  - Expected: HTTP 409 + `{"error": "open_tasks_remaining", "open_task_count": 1}`
+  - Validation: Document status not updated; open task IDs listed in response
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-031
+- **Pass Criteria:** `PATCH /documents/{id}/status` → HTTP 409 when any associated task has `status != "complete"`
+
+### CHECK 3: CLIN-002 — Task and Rule Events Audited
+- **Trigger:** Any task event (create, complete) or rule lifecycle event (create, edit, disclaimer acknowledged)
+- **Test Scenario:** Audit completeness
+  - Validation 1: Audit entry created for: task created, task completed, rule created, rule edited, disclaimer acknowledged
+  - Validation 2: Each entry contains: `action`, `user_ern`, `document_ern` (where applicable), `timestamp`
+  - Validation 3: Disclaimer acknowledgement entry contains: `rule_id`, `user_ern`, `timestamp`, `action: "disclaimer_acknowledged"`
+- **Guardrail:** CLIN-002
+- **Pass Criteria:** All listed events produce an immutable audit entry containing the required fields
+
+### CHECK 4: SaMD Boundary — Rule Engine Never Reads Document Body
+- **Trigger:** Rule evaluation is triggered for any inbound document
+- **Test Scenario:** Rule evaluation data scope
+  - Inspect rule evaluation logic: confirm inputs to rule evaluation are limited to: `document_type`, `urgency`, `source`, `department`, `document_title`
+  - Validation 1: No call to document body content store during rule evaluation
+  - Validation 2: No NLP, ML model, or semantic similarity function called during rule evaluation
+  - Validation 3: Rule condition values are compared using exact string equality only
+- **Guardrail:** SaMD boundary enforcement (non-negotiable)
+- **Hazard:** HAZ-DOC-033
+- **Pass Criteria:** Rule evaluation module has zero dependencies on document body content retrieval, NLP libraries, or ML inference
+
+### CHECK 5: No-Metadata Fallback — Document Placed in Manual Triage
+- **Trigger:** Rule evaluation triggered for a document with one or more missing metadata fields
+- **Test Scenario:** Absent metadata handling
+  - Setup: Inbound document with `document_type = null`, `urgency = null`
+  - Action: Rule evaluation triggered
+  - Validation 1: No rule fires
+  - Validation 2: Document placed in manual triage queue (status: `unmatched_metadata`)
+  - Validation 3: No task auto-created
+  - Validation 4: `documents.routing_rule.evaluated` OTEL span emitted with `result: "no_metadata"`
+- **Hazard:** HAZ-DOC-032
+- **Pass Criteria:** Documents with absent metadata never auto-routed; always placed in manual triage queue
+
+### CHECK 6: Disclaimer — Mandatory Acknowledgement Before Rule Save
+- **Trigger:** User attempts to save a new or materially edited routing rule
+- **Test Scenario 1:** Save without acknowledgement
+  - Action: `POST /routing-rules` without `disclaimer_acknowledged: true` in request body
+  - Expected: HTTP 400 + `{"error": "disclaimer_not_acknowledged"}`
+  - Validation: Rule not saved
+- **Test Scenario 2:** Save with acknowledgement
+  - Action: `POST /routing-rules` with `disclaimer_acknowledged: true`
+  - Expected: HTTP 201 + rule created
+  - Validation: Audit entry with `action: "disclaimer_acknowledged"` created
+- **Guardrail:** Regulatory — in-product disclaimer (🔴 legal blocker must be resolved before deployment)
+- **Hazard:** HAZ-DOC-033
+- **Pass Criteria:** `POST /routing-rules` without `disclaimer_acknowledged: true` → HTTP 400; with acknowledgement → HTTP 201 + audit entry
+
+### CHECK 7: AUTH-004 — Cross-Practice Task Routing Blocked
+- **Trigger:** Task creation with assignee from a different practice
+- **Test Scenario:** Cross-practice assignment attempt
+  - Action: `POST /tasks` with assignee ERN from Practice B, authenticated as Practice A user
+  - Expected: HTTP 403 + `{"error": "assignee_not_in_practice"}`
+  - Validation: Enforcement server-side; client-supplied assignee ERN validated against authenticated practice context
+- **Guardrail:** AUTH-004
+- **Hazard:** HAZ-DOC-028 (misdirected task)
+- **Pass Criteria:** `POST /tasks` with out-of-practice assignee ERN → HTTP 403
+
+### CHECK 8: Rule Sharing Between Practices Not Possible
+- **Trigger:** Any API request to read or write another practice's routing rule configuration
+- **Test Scenario:** Cross-practice rule access attempt
+  - Action: `GET /routing-rules` authenticated as Practice A, with practice context header set to Practice B
+  - Expected: HTTP 403
+  - Validation: No Practice B rule data returned; practice scope enforced server-side
+- **Guardrail:** AUTH-004, IG-001
+- **Pass Criteria:** Rule configuration API scoped to authenticated practice; cross-practice access returns HTTP 403
+
+### CHECK 9: AUTH-004 — Task Type and Assignee Sources Use Authoritative Systems
+- **Trigger:** User opens task creation panel
+- **Test Scenario A:** Task type source
+  - Validation 1: Task Type options are populated from EMIS Web user task type source
+  - Validation 2: No hardcoded fallback list is used when EMIS Web source is available
+- **Test Scenario B:** Assign-to source
+  - Validation 1: Assign-to options are populated from current EMIS-X user picker source
+  - Validation 2: Users outside current practice scope are not shown
+- **Guardrail:** AUTH-004
+- **Pass Criteria:** Task Type values resolve from EMIS Web source and Assign-to values resolve from EMIS-X user picker source
+
+### CHECK 10: CLIN-007 — Tasking Warning Text Removed
+- **Trigger:** User views tasking panel while processing a document
+- **Test Scenario:** Warning suppression
+  - Validation 1: UI does not render the text "Completing this document will update the corresponding EMIS"
+  - Validation 2: Tasking workflow remains functional without this warning copy
+- **Guardrail:** CLIN-007
+- **Pass Criteria:** Specified warning text is absent in tasking panel
+
+### CHECK A: DS-001 — No Native HTML Interactive Elements (Rule Builder UI)
+- **Trigger:** Rule creation and editing UI components
+- **Setup:** Mount rule builder component
+- **Expected:** `document.querySelector('button, input, select, textarea, form')` returns `null`
+- **Pass Criteria:** Zero native HTML interactive elements; all interaction via `@emisgroup/ui-*`
+
+### CHECK B: DS-002 — No Hardcoded Colour Values
+- **Trigger:** Any SCSS/CSS file introduced for this requirement
+- **Expected:** No match for `/(#[0-9a-fA-F]{3,8}|rgb\(|rgba\()/m`
+- **Pass Criteria:** Zero hardcoded colour literals; all colours via `var(--token-*)`
+
+### CHECK C: A11Y-010 — jest-axe in Component Tests
+- **Trigger:** Any rendered component for this requirement
+- **Expected:** `jest-axe` + `toHaveNoViolations()` present in component test file
+- **Pass Criteria:** Axe passes with zero violations
+
+### CHECK D: WCS-007a/b — All UI Text via t() in British English
+- **Trigger:** Any JSX text node or prop value in rule builder or task UI
+- **Expected:** Zero multi-word English string literals in JSX; corresponding key in `locales/en-GB/translation.json` with British English spelling
+- **Pass Criteria:** No hardcoded strings; British English in translation file
+
+---
+
+
+### CHECK 17: PXD-001 — Task Form Accessibility and AI Suggestion
+
+**Trigger:** Admin reaches Step 4 (Task) in document workflow
+
+**Test Scenario:**
+- Validation 1: Task type `Select` pre-populated with AI suggestion; `Banner variant="info"` hint visible
+- Validation 2: All form fields have accessible labels (Rule A)
+- Validation 3: EMIS Web write-back `Banner variant="warning"` shown and non-dismissable
+- Validation 4: "Complete document" disabled until Task type selected
+- Validation 5: `axe(container)` 0 violations on task form
+
+**Pass Criteria:** Task form accessible; AI suggestion disclosed; EMIS Web write-back warning visible
+
+---
+
+### CHECK 18: PXD-002 — Routing Disclaimer Mandatory Acknowledgement
+
+**Trigger:** Admin attempts to save a routing rule
+
+**Test Scenario:**
+- Validation 1: Disclaimer `Dialog` opens before rule is saved
+- Validation 2: Acknowledge button disabled until `Checkbox` checked
+- Validation 3: `Dialog` has `preventBackdropClose` — cannot be dismissed without a choice
+- Validation 4: Cancel closes dialog; rule is NOT saved
+- Validation 5: Acknowledged disclaimer triggers audit event (CLIN-002) with actor, timestamp, rule ID
+
+**Pass Criteria:** No routing rule saved without disclaimer acknowledgement — HAZ-DOC-029 / Regulatory satisfied
+
+---
+
+### CHECK 19: PXD-003 — Rule Conditions Metadata Only
+
+**Trigger:** Practice admin builds a routing rule
+
+**Test Scenario:**
+- Validation 1: Condition field `Select` only offers metadata fields (type, urgency, source, department, title contains)
+- Validation 2: No option to filter on document body content, patient data, or free text beyond title
+- Validation 3: SaMD `Banner variant="success"` confirms "metadata only — no AI, ML, or NLP" is visible in rule builder
+- Validation 4: Saved rule conditions JSON contains only permitted metadata field names
+
+**Pass Criteria:** SaMD boundary enforced in UI — only metadata fields selectable; HAZ-DOC-033 satisfied
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Full PxD.** UI surfaces: Task step in document workflow (Step 4 of StepIndicator), Tasks tab queue list, Routing Rules admin screen, Rule Builder screen, routing disclaimer modal. Shared components from REQ-001 (StepIndicator, Protocol Panel, Queue-Peek Sidebar) reused — not re-specified here.
+
+---
+
+### User Flow
+
+**Primary Flow — Create a task during document workflow (Step 4):**
+1. Admin completes Steps 1–3 (Match → File → Code); StepIndicator advances to Step 4 "Task"
+2. Protocol Panel shows Task form: AI-suggested task type (confirmed or overridable), description, assignee (from EMIS-X user picker), urgency, due date
+3. `Banner variant="warning"` shown: EMIS Web workflow state write-back warning (models are not equivalent)
+4. Admin clicks "Complete document ✓" — task created; document moves to Completed tab; `Notification variant="success"`
+5. Skip option: Admin can click "Skip task →" to complete without creating a task (if permitted by practice policy)
+
+**Primary Flow — Work from Tasks queue tab:**
+1. Admin clicks "Tasks" tab — Tasks queue list shows: Matched Patient, Urgency, Document Title, Task Title, Assigned Person
+2. Admin filters by "Assigned to" (own tasks / all tasks / specific user)
+3. Admin opens a task → document viewer opens; Protocol Panel shows task details
+4. Admin marks task complete → `Notification variant="success"` + audit event; task removed from Tasks tab
+
+**Primary Flow — Configure a routing rule (Practice Admin):**
+1. Admin navigates to Settings → Routing Rules
+2. Admin sees `Banner variant="warning"` with SaMD / legal disclaimer (persistent — not dismissible)
+3. Admin clicks "+ Create rule" — Rule Builder screen opens
+4. Admin enters: rule name, conditions (AND logic; metadata only), assignee (from user picker), task type (from EMIS Web task types), priority order
+5. Admin clicks "Save rule" — routing disclaimer `Dialog` opens; admin must acknowledge before save commits
+6. Rule appears in priority-ordered list; fallback shown (Routes to Administrators)
+7. Audit event recorded (CLIN-002)
+
+**Exit Types:**
+- Task step: "Skip task" (no task created, document completed) / "Complete document" (task created, document completed)
+- Rule builder: Cancel returns to Routing Rules list; no rule created
+- Routing disclaimer: Cancel = rule not saved; rule builder remains open
+
+---
+
+### Wireframes
+
+**Task step — Step 4 in Protocol Panel:**
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ← Back to queue   Cardiology Outpatient Letter   ✓ Filed · ✓ Coded       │
+├──────────────────────────────────────────────────────────────────────────┤
+│ QUEUE PEEK (250px) │  VIEWER (flex)            │ PROTOCOL PANEL (38%)    │
+│ ────────────────── │ ─────────────────────────  │ [1.Match✓][2.File✓]   │
+│ ● Current doc      │ [doc content + highlights] │ [3.Code✓][4.Task ←]   │
+│ ○ Next doc         │                             │ ────────────────────  │
+│ ○ Then doc         │                             │ ⚠️ Create a task to   │
+│                    │                             │ hand to clinical team  │
+│                    │                             │                        │
+│                    │                             │ Task type *            │
+│                    │                             │ [Clinical Review ▾]   │
+│                    │                             │ 💡 AI suggestion —    │
+│                    │                             │ confirm or change      │
+│                    │                             │                        │
+│                    │                             │ Description            │
+│                    │                             │ [Urgent follow-up…  ] │
+│                    │                             │                        │
+│                    │                             │ Assign to              │
+│                    │                             │ [Dr Sarah Mitchell ▾] │
+│                    │                             │                        │
+│                    │                             │ Urgency                │
+│                    │                             │ [Urgent ▾]            │
+│                    │                             │ Due date [29/05/2026] │
+│                    │                             │                        │
+│                    │                             │ ⚠️ EMIS Web workflow  │
+│                    │                             │ state write-back note  │
+│                    │                             │ ─────────────────────  │
+│                    │                             │ [← Back] [Skip task →]│
+│                    │                             │ [Complete document ✓] │
+└────────────────────────────────────────────────────────────────────────── ┘
+```
+
+**Routing Rules admin list:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ← Back to Inbox   Routing Rules   Practice administrator · Settings      │
+│                                                        [+ Create rule]   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ ⚠️ Administrative efficiency tool only.                                  │
+│ Rules route documents using metadata only — no AI, ML, or NLP.          │
+│ Legal: may constitute a medical device. Your org accepts responsibility. │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Active rules (3)             First match fires; subsequent rules skipped │
+│                                              Fallback: Administrators    │
+│ ┌────────────────────────────────────────────────────────────────────┐  │
+│ │ 1  Urgent Cardiology → Clinical Review                             │  │
+│ │    Conditions: [Type=Letter] [Urgency=Urgent] [Source=MESH]        │  │
+│ │    → Assign to: Dr Sarah Mitchell · Task: Clinical Review          │  │
+│ │                                               [Edit] [Delete]      │  │
+│ ├────────────────────────────────────────────────────────────────────┤  │
+│ │ 2  Pathology Results → Practice Nurse                              │  │
+│ │    Conditions: [Type=Pathology]                                    │  │
+│ │    → Assign to: Practice Nurse Team · Task: Review & Action        │  │
+│ │                                               [Edit] [Delete]      │  │
+│ └────────────────────────────────────────────────────────────────────┘  │
+│ No EMIS-supplied default rules. All routing logic is practice-authored.  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Component Specifications
+
+> 🚫 All interactive elements use `@emisgroup/ui-*` exclusively.
+
+**Task Form (Step 4 — Protocol Panel):**
+- Task type: `Select aria-label={t('task.type.label')}` — options loaded from EMIS Web task types API; no hardcoded list
+- AI suggestion hint: `Banner variant="info"` (or inline hint text `var(--text-dim)` 12px) beneath task type
+- Description: `Input aria-label={t('task.description.label')}` — pre-populated from AI suggestion; editable
+- Assign to: `Select aria-label={t('task.assignee.label')}` — populated from EMIS-X user picker API
+- Urgency: `Select aria-label={t('task.urgency.label')}` — options: Urgent / Routine / Administrative
+- Due date: `DatePicker aria-label={t('task.dueDate.label')}`
+- EMIS Web write-back notice: `Banner variant="warning"` persistent (not dismissable in this step)
+- Footer: `Button variant="mono"` ← Back + `Button variant="mono"` Skip task + `Button variant="success"` Complete document ✓
+
+**Tasks Queue List:**
+- Uses shared Queue Tab Strip from REQ-001 (reference only)
+- Filter bar: `Select aria-label={t('tasks.filter.assignedTo')}` with options: All tasks / My tasks / [specific user]
+- List: same `<table>` pattern as Filing queue; columns: Matched Patient, Urgency, Document Title, Task Title, Assigned Person
+- Urgency: Document Urgency Arrow component (shared, from REQ-001)
+
+**Routing Rules List:**
+- SaMD callout: `Banner variant="warning"` persistent at top of page — cannot be dismissed
+- Rule rows: `<article>` per rule; priority badge (number, `Badge variant="primary"`), rule name, condition chips, assignee/task type, Edit + Delete
+- Condition chip: `Tag` component per condition (type/value pair)
+- Edit: `Button variant="mono"` `{t('rules.edit')}`
+- Delete: `Button variant="danger"` `{t('rules.delete')}` → confirmation `Dialog`
+- Priority order: display-only numbered badge; reordering via Edit (explicit priority field) — drag deprioritised (no design system support)
+- Fallback notice: static text `var(--text-dim)` 12px
+
+**Rule Builder Form:**
+- Rule name: `Input aria-label={t('rules.name.label')}` required
+- SaMD notice: `Banner variant="success"` (green, positive confirmation) — "Conditions evaluate metadata only. No AI, ML, or NLP used."
+- Condition rows: each row has `Select` (field), `Select` (operator, always "equals"), `Input` (value), `Button variant="danger" circular` remove (×)
+- Add condition: `Button variant="mono"` `{t('rules.conditions.add')}`
+- Assign to: `Select aria-label={t('rules.assignee.label')}` from user picker
+- Task type: `Select aria-label={t('rules.taskType.label')}` from EMIS Web task types
+- Priority: `Input type="number" aria-label={t('rules.priority.label')}` (lower = higher priority)
+- Footer: `Button variant="mono"` Cancel + `Button variant="filled"` Save rule (triggers disclaimer dialog)
+
+**Routing Disclaimer Dialog (`preventBackdropClose`):**
+- `Dialog.Header`: `{t('rules.disclaimer.heading')}`
+- `Dialog.Description`: full regulatory text as i18n-keyed string (British English); references UK Medical Devices Regulations 2002
+- `Checkbox aria-label={t('rules.disclaimer.accept')}` — "I have read and understood this disclaimer…"; confirm button disabled until checked
+- Acknowledge: `Button variant="filled" disabled={!accepted}` `{t('rules.disclaimer.acknowledge')}`
+- Cancel: `Button variant="mono"` `{t('rules.disclaimer.cancel')}`
+
+---
+
+### Interaction Patterns
+
+**AI task type suggestion:**
+- Field pre-populated on Step 4 load; `Banner variant="info"` explains suggestion source
+- Admin can change; no re-suggestion after change (one-shot suggestion per document open)
+
+**Rule condition rows:**
+- "+ Add condition" appends a new condition row with empty field/value; focus moves to new row's field `Select`
+- Remove (×) button removes row; minimum 1 condition required (Save disabled if 0 conditions)
+
+**Task complete:**
+- "Complete document ✓" — if Task type not selected: `Banner variant="error"` inline validation
+- On success: StepIndicator all steps done; `Notification variant="success"`; document moves to Completed tab
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AA)
+
+- [x] Perceivable: condition chips use `Tag` with text label (not colour alone); urgency uses shared Document Urgency Arrow component
+- [x] Operable: all form fields keyboard-accessible; routing disclaimer dialog focus-trapped; Escape not available on `preventBackdropClose` dialog
+- [x] Understandable: AI suggestion badge explicit; routing disclaimer requires explicit checkbox before save
+- [x] Robust: `jest-axe ^9.0.0`; all interactive elements are `@emisgroup/ui-*`
+
+**Rule A — all inputs labelled:**
+```tsx
+<Select aria-label={t('task.type.label')} ... />
+<Select aria-label={t('rules.assignee.label')} ... />
+<Input aria-label={t('rules.name.label')} ... />
+```
+
+**Rule B — live regions:**
+```tsx
+<div role="status" aria-live="polite">{isLoading && t('tasks.loading')}</div>
+<div role="alert" aria-live="assertive">{error && t('tasks.error.save')}</div>
+```
+
+---
+
+### Visual Design
+
+**Tokens:**
+- SaMD callout background: `var(--cautionary)` tint via `Banner variant="warning"`
+- SaMD boundary confirmation: `var(--positive)` tint via `Banner variant="success"` (positive = enforced)
+- Condition chip: `Tag` component (uses `var(--border)` + `var(--text)`)
+- EMIS Web write-back notice: `Banner variant="warning"` (`var(--cautionary)` tint)
+- Priority badge: `Badge variant="primary"`
+
+**i18n keys (British English, selection):**
+```json
+{
+  "task.type.label": "Task type",
+  "task.type.aiHint": "AI suggestion based on document content — confirm or change",
+  "task.description.label": "Task description",
+  "task.assignee.label": "Assign to",
+  "task.urgency.label": "Urgency",
+  "task.dueDate.label": "Due date",
+  "task.complete": "Complete document",
+  "task.skip": "Skip task",
+  "rules.disclaimer.heading": "Routing Rule — Regulatory Acknowledgement"
+}
+```
+
+---
+
+### Error States
+
+**Task type not selected on Complete:** `Banner variant="error"` inline below Task type field
+
+**Routing rule save fails (API error):** `Notification variant="error"` `{t('rules.error.save')}`; form remains open
+
+**Rule delete confirmation:** `Dialog` (not preventBackdropClose); confirms rule name; Delete `Button variant="danger"` + Cancel `Button variant="mono"`
+
+---
+
+### Empty States
+
+**No routing rules:** `{t('rules.empty')}` = "No routing rules configured. Create a rule to automatically assign documents to the right person." + `Button variant="filled"` + Create rule
+
+**No tasks in Tasks queue:** `{t('tasks.queue.empty')}` = "No tasks assigned." (filtered) or "No tasks to action." (unfiltered)
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-010 | HAZ-DOC-028 | Routing failure explicit | CLIN-010 | CHECK 1 |
+| REQ-010 | HAZ-DOC-031 | Done blocked until all tasks complete | CLIN-007 | CHECK 2 |
+| REQ-010 | HAZ-DOC-028 | Task and rule events audited | CLIN-002 | CHECK 3 |
+| REQ-010 | HAZ-DOC-033 | Rule engine never reads document body | SaMD boundary | CHECK 4 |
+| REQ-010 | HAZ-DOC-032 | No-metadata → manual triage | CLIN-010 | CHECK 5 |
+| REQ-010 | HAZ-DOC-033 | Disclaimer mandatory before rule save | Regulatory | CHECK 6 |
+| REQ-010 | HAZ-DOC-028 | Cross-practice routing blocked | AUTH-004 | CHECK 7 |
+| REQ-010 | — | Rule sharing between practices not possible | AUTH-004 / IG-001 | CHECK 8 |
+| REQ-010 | — | Task type + assignee source integrity | AUTH-004 | CHECK 9 |
+| REQ-010 | — | Tasking warning text removed | CLIN-007 | CHECK 10 |
+
+---
+
+## Parking Lot
+
+- ⚪ **Task trail permanence** — whether completed task trails can be archived is deferred to V1e clinical safety review. Working assumption: permanently visible.
+- ⚪ **Task reassignment** — deferred to Phase 2. Manual routing and initial assignment only in Core.
+- ⚪ **User-defined group management** — deferred to Phase 2. Role-groups (GPs, Pharmacists, etc.) available in Core; custom groups not.
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — routing rules engine design (metadata lookup, priority ordering, fallback), task queue design, role-group resolution, no-metadata detection, disclaimer enforcement model
+- V1c will ADD: Design section — routing rules CRUD API (including `disclaimer_acknowledged` field), task CRUD API, rule evaluation trace in response, audit schema for disclaimer events
+- V1d will ADD: UI/UX section — rule builder (condition editor, priority ordering, assignee selector), in-product disclaimer modal (non-dismissible until acknowledged), task creation panel, task trail display on document
+- V1e will ADD: Clinical Safety section — formal DCB0129 entries for HAZ-DOC-028/029/031/032/033; task trail permanence decision; regulatory position outcome from legal blocker review
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation |
+| 1.1 | 2026-05-22 | V1a Requirements (amendment) | Added Task Queue List View AC section: columns are Matched Patient, Urgency, Document Title, Task Title, Assigned Person. Columns Document Type, Source, and Department excluded from queue list view. |
+| 1.2 | 2026-05-26 | V1a Requirements (amendment) | Updated Task Type source to EMIS Web task types (removed fixed hardcoded list). Added AC that Assign-to uses current EMIS-X user picker source. Removed tasking warning text "Completing this document will update the corresponding EMIS" from UI requirements. Added CHECK 9 and CHECK 10. |
+| 1.3 | 2026-05-27 | V1c Design | Aligned NHSmail integration boundary with REQ-002 and REQ-011: NHSmail is upstream ingestion only for Document Manager workflow; matching and workflow task truth are owned by Document Manager services. |
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+**Business:** Create, assign, and complete filing/coding tasks consistently across document inbound and upload paths. Task routing uses organisation-level defaults from `InboundDocuments.TaskCreationOrganisationConfiguration` — each document type can route to a specific user, role, or team per organisation. Task type 803 is reserved for Unmatched tasks. NHSmail is an upstream ingestion source only; workflow task truth used by Document Manager is owned within DocumentsWorkflowService boundaries.
+
+**Data:** Phase 1 reads/writes to existing EMIS Web MS SQL per patching domain via anti-corruption layer.
+
+- **Task creation:** `InboundDocuments.CreateTask` SP — params: `@OrganisationId`, `@TaskTypeId` (803 for unmatched), `@Priority`, `@DocumentGuid uniqueidentifier`, `@Filename varchar(500)`, `@Size bigint`, `@PatientId int` (null for unmatched), `@UserInRoleIds varchar(max)` (CSV), `@TeamIds varchar(max)` (CSV), `@UsualGPGuid uniqueidentifier`. If no explicit assignees provided, resolves from `WorkflowManager.OrganisationTaskTypeConfiguration` (org-level default team/user routing).
+- **Task routing config:** `InboundDocuments.GetOrganisationTaskCreationOption` SP — params: `@OrganisationId int`, `@DocumentTypeId tinyint` → returns `TaskCreationOptionId` from `InboundDocuments.TaskCreationOrganisationConfiguration`. Drives the routing rules UI (REQ-010 routing configuration screen).
+- **Task completion:** `InboundDocuments.CompleteTask` SP — params: `@TaskId bigint`, `@UserInRoleId int`, `@PatientId int` (optional; if provided, calls `WorkflowManager.AssignPatient`). Calls `WorkflowManager.ChangeTaskStatus(@TaskStatus=2)` to mark complete. Generates audit via `InboundDocuments.fn_GetTaskChangeDirectionDescription`.
+- **Outstanding user tasks linkage:** `UserTasks.Document` links a `DocumentGuid` to one or more user task records.
+- **Outstanding user tasks source of truth:** `UserTasks.UserTask` stores the actual user tasks (including related admin tasks such as appointment booking and forms completion).
+- **Existing modernisation microservice dependency:** A separate User Tasks microservice creates/updates these records in legacy EMIS Web DB. Documents Manager reads these linked tasks for Outstanding Tasks surfaces and does not become the owner of UserTasks task truth in Phase 1.
+- **NHSmail boundary:** Existing NHSmail service may create local tasks in its own PostgreSQL store for its legacy UI flow, but those records are not authoritative workflow state for Document Manager queues. NHSmail attachments are ingested as documents and workflow tasks are created after Document Manager matching state is resolved.
+- **Phase 2 mapping (Aurora PostgreSQL 17):** `workflow_tasks(task_id uuid PK, document_guid uuid FK, task_type_id smallint, priority smallint, organisation_id uuid, patient_id uuid nullable, status smallint, assigned_user_role_id uuid nullable, assigned_team_id uuid nullable, action_by_date timestamptz, created_at timestamptz, completed_at timestamptz, idempotency_key uuid UNIQUE NOT NULL)`
+- **Phase 2 routing config table:** `organisation_task_routing(id uuid PK, organisation_id uuid, document_type_id smallint, task_creation_option_id smallint, assigned_user_role_ids uuid[], assigned_team_ids uuid[], created_at timestamptz)`
+
+**Application:** DocumentsWorkflowService exposes task creation, completion, and routing-rule CRUD endpoints. Phase 1 delegates to EMIS Web SPs. Phase 2 native implementation with MediatR command handlers: `CreateTaskCommand`, `CompleteTaskCommand`, `GetTaskRoutingConfigQuery`, `UpdateTaskRoutingConfigCommand`.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+**Technology:** React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions. Phase 1: per-domain MS SQL connection via Service Registry.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsWorkflowService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsWorkflowService |
+| service_scope | existing_modify |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /workflow/documents/tasks (POST/GET), /workflow/documents/routing-rules (POST/GET), /workflow/documents/{documentGUID}/linked-user-tasks (GET), /workflow/users/{userERN}/outstanding-linked-user-tasks (GET) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+**Phase 1 — EMIS Web MS SQL (per-domain):**
+
+| Legacy SP | Purpose | Key Params | Key Output |
+|---|---|---|---|
+| `InboundDocuments.CreateTask` | Create filing/coding/unmatched task | `OrganisationId`, `TaskTypeId`, `DocumentGuid`, `PatientId`, `UserInRoleIds` CSV, `TeamIds` CSV | `TaskId bigint`, `TaskGuid uniqueidentifier` |
+| `InboundDocuments.CompleteTask` | Mark task complete (status=2) | `TaskId`, `UserInRoleId`, `PatientId` (opt) | Side-effect: `WorkflowManager.ChangeTaskStatus` + optional `AssignPatient` + audit row |
+| `InboundDocuments.GetOrganisationTaskCreationOption` | Read routing config for org+doctype | `OrganisationId`, `DocumentTypeId` | `TaskCreationOptionId` from `TaskCreationOrganisationConfiguration` |
+| `WorkflowManager.OrganisationTaskTypeConfiguration` | Fallback routing defaults when no explicit assignee | Lookup by `OrganisationId` | Default team/user for task type |
+| `UserTasks.Document` | Link documents to related user tasks for Outstanding Tasks | `DocumentGuid` | Related UserTask identifiers |
+| `UserTasks.UserTask` | Authoritative user/admin tasks linked to documents | Related UserTask identifiers | Task title/type/status/due/assignee |
+
+**Existing modernisation dependency:** User Tasks microservice is the writer for `UserTasks.UserTask` and related linkage in `UserTasks.Document`. DocumentsWorkflowService consumes these records as read-side truth for outstanding linked admin tasks.
+
+**NHSmail handoff (EMIS-X existing service):**
+- Current NHSmail service behavior: reads mailbox, downloads attachments, creates tasks in its own PostgreSQL database, and supports manual patient association in its own UI.
+- Document Manager integration behavior: NHSmail attachments are published into the Documents ingestion pipeline as source `nhsmail`; matching is performed in Document Manager (REQ-011), then workflow tasks are created and routed by DocumentsWorkflowService.
+- Authority boundary: NHSmail-side task records are not treated as authoritative for Document Manager workflow queues.
+- Target state: NHSmail-source documents follow the same queue lifecycle as all other sources (ingested -> matched/unmatched -> filing/coding/task workflow).
+
+### API Contract Note (V1c Handoff)
+
+The linked Outstanding Tasks capability must be exposed as read-only contracts in Phase 1. Documents Manager does not own create/update/delete for User Tasks records.
+
+**1) GET /workflow/documents/{documentGUID}/linked-user-tasks**
+
+- Purpose: Return all user tasks linked to a specific document via `UserTasks.Document`.
+- Source of truth: `UserTasks.Document` (link) + `UserTasks.UserTask` (task details).
+- Expected response shape (logical fields):
+  - `documentGuid`
+  - `linkedUserTasks[]`:
+    - `taskGuid`
+    - `taskTitle`
+    - `taskType`
+    - `status`
+    - `priority`
+    - `dueDate`
+    - `createdDate`
+    - `assignedTo` (user/team display)
+    - `source` = `UserTasks`
+
+**2) GET /workflow/users/{userERN}/outstanding-linked-user-tasks**
+
+- Purpose: Return open linked user tasks for the current/target user, for Outstanding Tasks list view composition.
+- Source of truth: `UserTasks.UserTask` filtered by assignee and open-state, joined via `UserTasks.Document` to resolve related `documentGuid`.
+- Expected response shape (logical fields):
+  - `userErn`
+  - `outstandingTasks[]`:
+    - `taskGuid`
+    - `documentGuid`
+    - `taskTitle`
+    - `taskType`
+    - `status`
+    - `priority`
+    - `dueDate`
+    - `assignedTo`
+    - `isOverdue`
+
+**Phase 1 contract constraints:**
+
+- Read-only integration in Documents Manager for User Tasks entities.
+- All mutation commands for User Tasks remain in the existing User Tasks microservice boundary.
+- If User Tasks source is unavailable, return document workflow tasks as normal and mark linked user tasks as temporarily unavailable (no synthetic fallback task creation).
+
+**Task type constants (legacy):** TaskTypeId 803 = Unmatched task (no patient). Other task type IDs (Filing, Coding) resolved from `WorkflowManager.TaskType` table at runtime.
+
+**Phase 2 (post-cutover):** Native Aurora PostgreSQL — `workflow_tasks` and `organisation_task_routing` tables owned by DocumentsWorkflowService. No cross-domain SQL; per-org routing stored in new DB.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+

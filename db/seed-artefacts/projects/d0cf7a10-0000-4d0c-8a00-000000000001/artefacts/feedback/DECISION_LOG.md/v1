@@ -1,0 +1,414 @@
+# V1e Clinical Safety — CSO Decision Log
+
+**Product:** Documents Management Core  
+**Project Code:** DOC  
+**CSO:** Dan Watts  
+**Agent Version:** V1e v8  
+**Started:** 2026-05-28  
+**Status:** In Progress
+
+> This log records every CSO decision made during the V1e clinical safety review.
+> Entries are numbered sequentially. To revise a decision, add a "Superseded by" note
+> and add a new entry — do not delete old entries.
+
+---
+
+## Decision Index
+
+| # | Phase | Topic | Decision | Date |
+|---|-------|-------|----------|------|
+| D-001 | Phase 1 | HAZ-ID collision resolution | Accept — HAZ-DOC-047 to HAZ-DOC-055 assigned | 2026-05-28 |
+| D-002 | Phase 1 | Document lifecycle clarification | Filing alone removes Provisional — coding/tasks not required | 2026-05-28 |
+| D-003 | Phase 1 | HAZ-DOC-001 split | Split into HAZ-DOC-001a (wrong-patient match) and HAZ-DOC-001b (unreviewed content) | 2026-05-28 |
+| D-004 | Phase 1 | IF678 entry structure | Hazard → Potential Clinical Impact → Cause(s) → Controls per cause | 2026-05-28 |
+| D-005 | Phase 1 | Clinical impact wording standard | CSO-authored: concise, patient-outcome focused, no over-specification of document types | 2026-05-28 |
+| D-006 | Phase 1 | HAZ-DOC-002 confirmed | Confirmed as written — hazard description, causes (manual match error, PDS failure, GUID mismatch), and clinical impact agreed | 2026-05-28 |
+| D-007 | Phase 1 | HAZ-DOC-003 description decision | Revised description accepted: "Patient document is accessed by a user without the appropriate role or patient relationship" | 2026-05-29 |
+| D-008 | Phase process | Sequencing decision | Complete hazard+cause definition for all remaining hazards first; perform severity/likelihood/risk scoring afterward in batch | 2026-05-29 |
+| D-009 | Phase 1 gate | Hazard-cause register approval | Option 3 selected: do not approve yet; continue refinement of hazard and cause definitions | 2026-05-29 |
+| D-010 | Phase 1 format | Hazard/cause separation rule | Hazard must be the hazardous state only; causes documented separately (example: hazard "document processed twice or missed", cause "inbox state lost on interruption") | 2026-05-29 |
+| D-011 | Phase 1 presentation | Book2-style confirmation cards | Present each hazard to CSO using Book2 field structure while continuing to store authoritative decisions in existing V1e logs | 2026-05-29 |
+| D-012 | Phase 1 presentation | Detailed hazard confirmation format | Present each hazard using extended sections: Hazard ID, Date Added, Hazard Description, Possible Effects, Potential Clinical Impact, Possible Causes with Existing Controls and Control Evidence | 2026-05-29 |
+| D-013 | Phase 1 presentation | Exact requested hazard template enforced | Regenerated hazard confirmation file to exact CSO-requested field order and section labels with realistic cause-specific controls and evidence | 2026-05-29 |
+| D-011 | Phase 1 format | Register normalization checkpoint | Remaining 52 hazards normalized to strict hazard-only statements with separate cause sets; ready for one-by-one CSO confirmation | 2026-05-29 |
+| D-012 | Phase 1 | HAZ-DOC-003 cause confirmation | Cause set approved as drafted (3 causes) | 2026-05-29 |
+| D-013 | Phase 1 | HAZ-DOC-004 cause confirmation | Cause set approved as drafted (4 causes) | 2026-05-29 |
+| D-014 | Phase 1 | HAZ-DOC-027 scope decision | Removed from hazard set: "Won't be filed" is no longer part of requirements | 2026-05-29 |
+| D-015 | All phases | EMIS Web / EMIS-X terminology boundary | EMIS Web references in hazard cards must relate to backend storage and ingestion only. All document presentation, UI, and user-facing controls are EMIS-X. Retrospective check required on HAZ-DOC-003 and HAZ-DOC-004 existing controls wording. | 2026-05-29 |
+| D-016 | All phases | Role terminology — clinician → user | Hazard cards must use "user" not "clinician" throughout, as document workflows are performed by both clinical and administrative staff. Applies retrospectively to HAZ-DOC-003 and HAZ-DOC-004 and going forward to all cards. | 2026-05-29 |
+| D-017 | All phases | KB and PR references deferred | KB-NNN (training/knowledge base) and PR-NNN (process/policy) references will not be assigned during V1e card review. They will be captured and assigned before go-live. Cards show these columns as deferred. CHECK-NNN and CUST-NNN remain assigned during V1e review. | 2026-05-29 |
+| D-018 | Phase 1 | HAZ-DOC-020 removed | HAZ-DOC-020 (search returns documents outside authorised scope) removed from Increment 1 hazard set — not relevant at this stage. | 2026-05-29 |
+| D-019 | Phase 1 | HAZ-DOC-025 rewritten | Hazard description rewritten to: "Clinically significant result, instruction or referral is not processed as expected." Cause reframed in user-friendly terms. Cause 2 existing control is training material (KB articles). | 2026-05-29 |
+| D-020 | Phase 1 | HAZ-DOC-026 deferred to Increment 3 | AI-suggested tag hazard not applicable at Increment 1 stage; deferred to Increment 3 scope. | 2026-05-29 |
+| D-021 | Phase 1 | HAZ-DOC-030 deferred to Increment 3 | Bulk coding incorrect SNOMED code hazard not applicable at Increment 1 stage; deferred to Increment 3 scope. | 2026-05-29 |
+| D-022 | Phase 1 | HAZ-DOC-031 deferred to Increment 3 | Partial bulk action failure hazard not applicable at Increment 1 stage; deferred to Increment 3 scope. | 2026-05-29 |
+| D-023 | Phase 1 | REQ-009 audit store architecture — pre-coding blocker | Audit store location and guaranteed-delivery pattern must be confirmed in solution design before coding begins on REQ-009. Affects HAZ-DOC-049 (all causes) and HAZ-DOC-048 Cause 2. Added as 🔴 CRITICAL item 8 in parking lot. | 2026-05-29 |
+| D-024 | All phases | Technical team validation of HIT Design controls | All HIT Design controls across the Increment 1 hazard set must be validated by the technical team for feasibility, correct implementation boundary, and testability before clinical safety sign-off. Added as 🟡 HIGH item 9 in parking lot. | 2026-05-29 |
+| D-025 | Phase 1 | Phase 1 bulk confirmation — all 22 Increment 1 hazards | CSO confirmed all 22 hazards: hazard descriptions accurate; cause sets correct; potential clinical impact accepted as proposed; existing controls complete with none missed. Phase 1 now complete for Increment 1. Proceed to Phase 2 severity scoring. | 2026-05-29 |
+| D-026 | Phase 5 | Phase 5 HIT Design controls — bulk acceptance (non-blocked rows) | CSO accepted all proposed HIT Design controls for all non-blocked causes across all 22 Increment 1 hazards. Blocked items remain: HAZ-DOC-049 (all causes, Parking Lot item 8 CRITICAL), HAZ-DOC-006 Cause 2 (PL-2), HAZ-DOC-007 Cause 2 (PL-3), HAZ-DOC-014 Cause 2 (PL-6), HAZ-DOC-019 Cause 2 (PL-7), HAZ-DOC-035 (awaiting CSO sign-off). Two open questions outstanding: HAZ-DOC-050 Cause 3 (integrity mechanism scope) and HAZ-DOC-035 (CSO sign-off). | 2026-05-29 |
+| D-027 | Phase 5 | HAZ-DOC-035 — defer, keep blocked | HAZ-DOC-035 (document visible before patient match confirmed) remains BLOCKED. No controls to be proposed. Flagged for Increment 1 go/no-go gate — implementation must not proceed without explicit CSO clinical safety sign-off. | 2026-05-29 |
+| D-028 | Phase 5 | HAZ-DOC-050 Cause 3 — audit integrity mechanism deferred | Hash/sequence integrity check for audit entries deferred. Append-only RBAC enforcement (no role may edit or delete audit entries) is the sole integrity control for Increment 1. Hash/sequence check flagged for Increment 1 go/no-go gate review. | 2026-05-29 || D-029 | Phase 9 | Genesis AI skill mapping — bulk acceptance | CSO accepted all proposed CLIN/WCLIN mappings across REQ-001, 002, 004, 005, 007, 009, 011. Mappings subject to later CSO revision. CLIN rules applied: CLIN-001/002/004/005/006/007/009/010. WCLIN-001 and WCLIN-002 applied to REQ-004, 007, 011. WCLIN-002 on REQ-011 HAZ-DOC-035 remains BLOCKED (D-027). | 2026-05-29 |
+| D-030 | Phase 10 | DCB0129/0160 compliance check confirmed | CSO confirmed compliance picture is correct. Go/no-go blockers acknowledged: PL-8 (audit architecture CRITICAL), PL-9 (technical controls validation HIGH), PL-10 (HAZ-DOC-035 sign-off HIGH), PL-11 (audit integrity mechanism HIGH). Proceeding to Phase 11. | 2026-05-29 |
+| D-031 | Phase 11 | CSO formal sign-off deferred | Phase 11 pre-deployment checklist, go/no-go gate conditions, and post-deployment monitoring cadence to be signed off by CSO at a later date. Phase 11.5 completeness gate and Phase 12 file writes to proceed on the basis of work completed to date. Formal CSO signature block will be populated in the REQ files when sign-off is provided. | 2026-05-29 |
+| D-032 | Phase 11.5 CHECK A | HAZ-DOC-001 and HAZ-DOC-002 included in IF678 | CSO decision: both hazards found in V1d traceability tables to be treated as reviewed Increment 1 hazards and included in Phase 12 IF678 card set. Phase 1 cause confirmation to be completed before Phase 12 write. Increment 1 hazard count increases from 22 to 24. | 2026-05-29 |
+| D-033 | Phase 1 (late) | HAZ-DOC-001 and HAZ-DOC-002 Phase 1 confirmation | CSO accepted both hazards as proposed. HAZ-DOC-001: "A document in Provisional status is accessible to users before filing is complete" — 3 causes accepted. HAZ-DOC-002: "Clinically urgent document is not actioned promptly due to poor visibility in a high-volume inbox" — 3 causes accepted. Clinical impact and existing controls accepted as proposed. Severity/likelihood deferred to manual entry per D-008. | 2026-05-29 |
+| D-034 | Phase 5 (late) | HAZ-DOC-001 controls — technical confirmation required; HAZ-DOC-002 controls accepted | HAZ-DOC-002 HIT Design controls accepted (CLIN-007 Cause 1, CLIN-009 Cause 2, CLIN-004 Cause 3). HAZ-DOC-001 HIT Design controls (all 3 causes, CLIN-009) require technical team confirmation before card can be finalised — added to parking lot. | 2026-05-29 |
+---
+
+## Decisions
+
+### D-001 — HAZ-ID Collision Resolution
+**Phase:** 1 (Hazard Identification — Administrative)  
+**Date:** 2026-05-28  
+**Decision:** Accept proposed collision resolution scheme
+
+**Collisions resolved:**
+
+| Original ID | Retained by | Retained description | New ID | New description |
+|---|---|---|---|---|
+| HAZ-DOC-011 | REQ-003 | Multi-file batch contains wrong/corrupt/incomplete document committed without individual review | HAZ-DOC-047 | Clinician misses content on multi-page document due to poor pagination or scroll behaviour (REQ-004) |
+| HAZ-DOC-025 | REQ-007 | User believes tagging a document constitutes actioning it | HAZ-DOC-048 | Inappropriate document access goes undetected — data breach not identified (REQ-009) |
+| HAZ-DOC-026 | REQ-007 | AI-suggested tag applied without user confirmation | HAZ-DOC-049 | Audit trail incomplete due to EMIS Web filing failure (REQ-009) |
+| HAZ-DOC-027 | REQ-001 | Document incorrectly marked "Won't be filed" — clinically significant letter never filed | HAZ-DOC-050 | Audit trail tampered with — entries modified or deleted to conceal activity (REQ-009) |
+| HAZ-DOC-028 | REQ-001 | User navigates away before completing all processing steps — document remains unactioned and invisible as incomplete | HAZ-DOC-051 | Task not received by intended assignee — clinical action not taken because routing failed silently (REQ-010) |
+| HAZ-DOC-029 | REQ-001 | Action completion state is ambiguous across queue contexts — document advances to Complete with missing clinical information | HAZ-DOC-052 | Multiple tasks created from one document but one is missed — partial action; clinical context incomplete (REQ-010) |
+| HAZ-DOC-031 | REQ-007 | Partial bulk action failure occurs silently — unprocessed documents invisible as incomplete | HAZ-DOC-053 | Document marked done while outstanding tasks remain — incomplete clinical actions missed (REQ-010) |
+| HAZ-DOC-032 | REQ-011 | Document filed against wrong patient — clinical decisions made using another patient's document | HAZ-DOC-054 | Routing rule fires on document with no metadata — document silently misdirected or lost (REQ-010) |
+| HAZ-DOC-033 | REQ-011 | Unmatched document silently lost — no patient match found and document discarded without user awareness | HAZ-DOC-055 | Practice configures a routing rule that constitutes a medical device without understanding regulatory implications (REQ-010) |
+
+**CSO:** Dan Watts  
+**Status:** ✅ Accepted
+
+---
+
+---
+
+### D-002 — Document Lifecycle Clarification
+**Phase:** 1 (Hazard Identification — Context)  
+**Date:** 2026-05-28  
+**Clarification provided by CSO:**
+
+| State | Care record visibility |
+|---|---|
+| Unmatched | Not visible in care record |
+| Matched (auto or manual) | Visible in EMIS Web care record as **Provisional** |
+| **Filed** (filing complete — mandatory) | Provisional status removed — committed to patient record |
+
+**Key ruling:** Filing alone is sufficient to remove Provisional status and commit the document to the patient record. Coding and task completion are **not** prerequisites for commitment — they are independent workflow steps that may occur before or after filing.
+
+**Impact on HAZ-DOC-001:** Description must be updated to reflect that the hazard is specifically scoped to the window between match and filing completion (the Provisional window), not a broader "before clinical review" concern.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+### D-004 — Canonical IF678 Entry Structure
+**Phase:** 1 (Hazard Identification — Structural)  
+**Date:** 2026-05-28  
+**Decision:** All IF678 entries throughout V1e will use the following structure:
+
+```
+Hazard
+  └── Potential Clinical Impact
+        └── Cause 1
+              └── Control 1a
+              └── Control 1b
+        └── Cause 2
+              └── Control 2a
+              └── Control 2b
+```
+
+- **Hazard** = the potentially harmful state (not the cause)
+- **Potential Clinical Impact** = the harm that results if the hazard is realised
+- **Cause** = a distinct pathway that leads to the hazardous state
+- **Control** = a specific mitigation for that cause (mapped to CLIN guardrail at Phase 5)
+
+Mitigations are mapped per cause, not per hazard as a whole. Severity and likelihood assessments (Phases 2–3) apply at the hazard level (worst credible case across all causes).
+
+**Retrofit:** HAZ-DOC-001a and HAZ-DOC-001b descriptions from D-003 will be re-expressed under this structure in the final IF678 write (Phase 12).
+
+**CSO:** Dan Watts  
+**Status:** ✅ Accepted
+
+---
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-28  
+**Decision:** Split HAZ-DOC-001 into two separate IF678 entries
+
+**HAZ-DOC-001 (original):** "Documents visible to users before appropriate clinical review" — superseded
+
+**HAZ-DOC-001a** (REQ-001):
+> "Document matched to wrong patient is visible as Provisional in EMIS Web care record — clinician acts on another patient's document believing it belongs to their patient; clinical decision made on incorrect patient information"
+
+**HAZ-DOC-001b** (REQ-001):
+> "Correctly matched document is visible as Provisional in EMIS Web care record before filing admin has reviewed and filed it — clinician acts on unvalidated, untriaged content; document may contain errors, be a duplicate, or lack necessary context that the admin would have resolved during filing"
+
+**CSO:** Dan Watts  
+**Status:** ✅ Accepted
+
+---
+
+### D-003 — HAZ-DOC-001 Split
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-28  
+**Decision:** HAZ-DOC-001 split into two separate hazards:
+
+- **HAZ-DOC-001a:** Clinically significant document matched to wrong patient — wrong patient's care record updated; clinical decision made using another patient's document
+- **HAZ-DOC-001b:** Clinically significant document visible in care record as Provisional before clinical review — Provisional document acted upon without full context
+
+**Rationale:** The two hazards have different causes, controls, and residual risks. Combining them would obscure the mitigation mapping.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Accepted
+
+---
+
+### D-005 — Clinical Impact Wording Standard
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-28  
+**Standard established:** Clinical impact descriptions must be:
+
+- Concise — one to two sentences maximum
+- Patient-outcome focused — describe the harm to the patient, not the administrative failure
+- Not over-specified for document type — use "clinical document" or "patient document" rather than enumerating specific types
+- Written from the perspective of: "what is the worst credible patient outcome if this hazard is realised?"
+
+**Example (HAZ-DOC-001a):** "Clinician makes a clinical decision — prescribing, referral, or clinical coding — based on a document from the wrong patient's record. Patient may receive inappropriate treatment or be denied necessary treatment."
+
+**CSO:** Dan Watts  
+**Status:** ✅ Accepted
+
+---
+
+### D-006 — HAZ-DOC-002 Confirmed
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-28  
+**Hazard:** Document incorrectly routed to wrong patient via erroneous manual matching or PDS lookup failure
+
+**Agreed description:** Document matched to wrong patient record — through manual matching error by the admin user, a failed/incorrect PDS lookup returning the wrong patient, or an EMIS GUID mismatch — causing clinical decisions to be made using another patient's document.
+
+**Causes agreed:**
+1. Admin user selects wrong patient from search results during manual matching
+2. PDS lookup returns incorrect patient due to NHS Number validation failure or PDS service error
+3. EMIS GUID mismatch — internal patient reference resolves to a different patient than intended
+
+**Clinical impact agreed:** Clinician accesses a document filed to the wrong patient record and makes a clinical decision — prescribing, referral, diagnosis, or coding — based on that document. Patient may receive inappropriate treatment or be denied necessary treatment.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-007 — HAZ-DOC-003 Description Decision
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+**Hazard:** HAZ-DOC-003
+
+**Decision:** Revised hazard description accepted as custom wording:
+
+> "Patient document is accessed by a user without the appropriate role or patient relationship"
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-008 — Phase Sequencing Decision
+**Phase:** Process Control  
+**Date:** 2026-05-29  
+
+**Decision:** Complete Phase 1 hazard and cause definition for all remaining hazards first, then complete severity/likelihood/risk scoring (Phases 2–4) as a separate batch.
+
+**Scope impact:** Applies to remaining hazards across REQ-001 to REQ-014.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-009 — Phase 1 Register Gate Decision
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+
+**Decision:** Option 3 selected for the Phase 1 hazard-and-cause register gate.
+
+**Outcome:** Do not approve the full register yet. Continue hazard-by-hazard refinement of hazard descriptions and causes before severity scoring begins.
+
+**CSO:** Dan Watts  
+**Status:** ✅ In progress (refinement continues)
+
+---
+
+### D-010 — Hazard and Cause Formatting Rule
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+
+**Decision:** Hazard log entries must keep hazard and cause as separate statements.
+
+**Standard:**
+- Hazard = hazardous state/outcome only
+- Cause = pathway or failure condition leading to the hazard
+
+**Example:**
+- Hazard: "Document processed twice or missed"
+- Cause: "Inbox state lost on interruption"
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-011 — Register Normalization Checkpoint
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+
+**Decision:** The Phase 1 hazard register has been normalized across the remaining 52 hazards to enforce strict structure:
+- Hazard field contains hazardous state only
+- Cause set contains causal pathways only
+
+**Outcome:** Register is ready for one-hazard-at-a-time CSO confirmation before severity scoring.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed (checkpoint)
+
+---
+
+### D-012 — HAZ-DOC-003 Cause Confirmation
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+**Hazard:** HAZ-DOC-003
+
+**Decision:** Cause set approved as drafted.
+
+**Confirmed causes:**
+1. JWT/scope validation gap at document endpoint
+2. Role-to-patient relationship check missing on open/view
+3. Session reuse/stale context after user switch
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-013 — HAZ-DOC-004 Cause Confirmation
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+**Hazard:** HAZ-DOC-004
+
+**Decision:** Cause set approved as drafted.
+
+**Confirmed causes:**
+1. Inbox state lost on interruption
+2. Autosave failure not surfaced
+3. In-progress marker not persisted server-side
+4. Resume flow restores stale/incomplete state
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-014 — HAZ-DOC-027 Scope Decision
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+**Hazard:** HAZ-DOC-027
+
+**Decision:** Remove from current hazard set.
+
+**Reason (CSO input):** "Won't be Filed" is no longer part of the requirements.
+
+**Classification:** Out of scope for IF678 in this release scope.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-011 — Book2-Style Presentation for CSO Confirmation
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+
+**Decision:** Use Book2-style hazard fields when presenting each hazard for CSO confirmation, but keep existing V1e files as the system of record for stored decisions.
+
+**Implementation:** the CSO confirmation card format provides the reusable card format and seeded cards.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-012 — Detailed Hazard Confirmation Presentation
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+
+**Decision:** Present each hazard using the expanded CSO confirmation structure:
+- Hazard ID and Date Added
+- Hazard Description
+- Possible Effects
+- Potential Clinical Impact
+- Possible Causes with Existing Controls and Control Evidence for each cause
+
+**Implementation:** the CSO confirmation record generated for active hazard set.
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+### D-013 — Exact Requested Template Enforcement
+**Phase:** 1 (Hazard Identification)  
+**Date:** 2026-05-29  
+
+**Decision:** Hazard confirmation presentation is enforced in the exact requested format and field sequence.
+
+**Implementation:** the CSO confirmation record regenerated with:
+- Hazard ID / Date Added
+- Hazard Description
+- Possible Effects
+- Potential Clinical Impact
+- Possible Causes & Existing Controls
+- Cause-specific Existing Controls and Control Evidence
+
+**CSO:** Dan Watts  
+**Status:** ✅ Confirmed
+
+---
+
+*Severity assessments (Phase 2), likelihood assessments (Phase 3), mitigation acceptances (Phase 5),
+residual risk acceptances (Phase 6), and IF678 approvals (Phase 7) will be recorded here.*
+
+---
+
+### D-015 — EMIS Web / EMIS-X Terminology Boundary
+**Phase:** All phases (retrospective and going forward)
+**Date:** 2026-05-29
+
+**Ruling (CSO Dan Watts):**
+
+> "Going forward the EMIS Web reference should only relate to the backend storage and ingestion. The actual presentation of the documents is all in EMIS-X. When EMIS Web is referenced it is causing confusion."
+
+**Binding rule for all hazard cards:**
+
+| Layer | System reference |
+|---|---|
+| Backend storage, data ingestion, patient record persistence, SNOMED/filing back-end | **EMIS Web** |
+| Document presentation, user interface, viewer, inbox UI, workflow screens, notifications | **EMIS-X** |
+
+**Retrospective check — HAZ-DOC-003 and HAZ-DOC-004:**
+
+| Card | Field | Previous wording | Status |
+|---|---|---|---|
+| HAZ-DOC-003 | Existing Controls | "EMIS Web practice-level patient list scoping" | ✅ Acceptable — patient list scoping is backend |
+| HAZ-DOC-004 | Existing Controls | "EMIS Web inbox queue provides a persistent server-side record of inbound documents" | ✅ Acceptable — inbox queue persistence is backend storage |
+
+No retrospective corrections required for HAZ-DOC-003 or HAZ-DOC-004. Rule applies from this point forward to all new hazard cards.
+
+**CSO:** Dan Watts
+**Status:** ✅ Confirmed
+
+---
+
+## Revision History
+
+| Revision | Decision # | Change | Date | CSO |
+|----------|-----------|--------|------|-----|
+| — | — | — | — | — |

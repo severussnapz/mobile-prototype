@@ -1,0 +1,571 @@
+﻿# REQ-014: Confidentiality & Visibility Settings
+
+**Priority:** Must Have
+**Effort:** Medium
+**Risk:** High (confidentiality breaches are patient safety and IG incidents)
+**Depends On:** REQ-012 (Filing), REQ-009 (Audit Trail), REQ-001 (Unified Inbound Document Inbox)
+
+---
+
+## User Story
+
+As a practice administrator or clinician,
+I need to control whether a document is confidential and whether it is visible to the patient online,
+So that sensitive documents are protected in line with practice confidentiality policies and patient preferences.
+
+**Acceptance Criteria:**
+- [ ] **The Confidentiality and Patient Online Visibility controls are accessible inline from the document filing panel** during the standard filing workflow. Users do not need to navigate to a separate settings screen to set these values at the time of filing. *(Must Have — cross-ref REQ-001)*
+- [ ] A document can be marked as confidential at the time of filing. *(Must Have)*
+- [ ] Confidentiality access control honours the existing EMIS Web confidentiality policies — the same rules that govern document visibility in EMIS Web apply in EMIS-X Documents Manager. *(Must Have)*
+- [ ] A user with appropriate authority can override the confidentiality policy for a specific document. *(Must Have)*
+- [ ] All confidentiality overrides are audited — who overrode, which document, when, and what the previous and new confidentiality state was. *(Must Have)*
+- [ ] Patient online visibility can be controlled per document — a document can be marked as visible or not visible to the patient via online record access (e.g. NHS App / Patient Access). *(Must Have)*
+- [ ] Patient online visibility defaults to **not visible to patient** unless explicitly set otherwise. *(Must Have)*
+- [ ] Confidentiality defaults to **Standard access** unless explicitly changed. *(Must Have)*
+- [ ] When either default (Standard access or Not visible to patient) is changed during filing, a visible warning is displayed to the user confirming the non-default choice. *(Must Have — CLIN-007, CLIN-010)*
+- [ ] Changes to patient online visibility are audited. *(Must Have)*
+- [ ] Confidentiality status and patient online visibility are displayed clearly on the document in the care record so users can see the current state without opening a settings panel. *(Must Have)*
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-002:** Patient Data Audit Trail — all confidentiality changes and overrides audited before taking effect
+- **CLIN-007:** Hazard Mitigation Evidence — confidentiality status and patient visibility state must be clearly visible on the document at all times
+- **CLIN-009:** Clinical Safety Logging — confidentiality override events logged as safety-critical events using ERN identifiers
+- **CLIN-010:** Error Handling Patient Safety — confidentiality policy enforcement must fail closed; if policy cannot be evaluated, default to most restrictive access
+
+### Hazards Addressed
+
+- **HAZ-DOC-042:** Confidential document visible to unauthorised user — sensitive clinical information (e.g. sexual health, mental health) accessed without appropriate authority
+  - **Severity:** Critical
+  - **Likelihood:** Low
+  - **Risk Level:** Critical
+
+- **HAZ-DOC-043:** Confidential document visible to patient online without authorisation — patient sees sensitive information before appropriate clinical review
+  - **Severity:** High
+  - **Likelihood:** Low–Medium (if patient visibility defaults to visible)
+  - **Risk Level:** High
+
+- **HAZ-DOC-044:** Confidentiality override not audited — access control change undetectable; potential data breach not evidenced
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-045:** Confidentiality policy not honoured due to EMIS Web/X policy sync failure — document treated as non-confidential when it should be restricted
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+### Mitigations
+
+- **MIT-DOC-041:** Confidentiality and patient visibility state displayed on document; not hidden in settings panel
+  - **Type:** UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-042:** Patient online visibility defaults to not visible; opt-in required
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-043:** All confidentiality and visibility changes audited before taking effect; override captures before/after state
+  - **Type:** Observability
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-044:** Confidentiality policy evaluation fails closed — if EMIS Web policy cannot be retrieved, most restrictive access applied
+  - **Type:** Error Handling
+  - **Effectiveness:** Complete
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-002:** Privacy by Design and Default — patient online visibility defaults to not visible; confidentiality defaults to most restrictive applicable policy
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(e) public task + Article 9(2)(h) health data; confidentiality obligations under common law duty of confidence
+- **IG-004:** Special Category Data Protection — confidential documents are special category data; encrypted at rest; access strictly controlled
+- **IG-005:** Data Subject Rights — patient online visibility directly affects patient's ability to exercise Article 15 (right of access); changes must be auditable and defensible
+- **IG-008:** Consent Management — patient online visibility changes are a consent-adjacent action; must be auditable
+- **IG-009:** Data Breach Notification — unauthorised access to a confidential document is a data breach; must be detectable via audit
+
+### Data Handling
+- Confidentiality status stored as a structured flag on the document record; not embedded in the document file
+- Patient online visibility flag stored per document; separate from confidentiality flag
+- Confidentiality policy resolution references EMIS Web policy definitions; EMIS-X does not maintain a separate policy store
+- Override audit entries capture: user ERN, document ERN, previous state, new state, timestamp, reason (if captured)
+
+### GDPR Articles
+- **Article 5(1)(f):** Integrity and confidentiality — confidential documents protected from unauthorised access
+- **Article 9(2)(h):** Special category health data — medical purposes; enhanced protection required
+- **Article 15:** Right of access — patient online visibility setting affects what patients can access
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — confidentiality change and override endpoints require valid JWT with appropriate role scope; patient visibility change requires appropriate role scope
+- **SEC-001:** TLS Encryption — all confidentiality settings transmitted over TLS 1.2+
+
+### Security Requirements
+- Confidentiality override action restricted to users with an elevated role (as defined by EMIS Web policy); not available to all users
+- Patient online visibility change restricted to users with appropriate clinical or administrative authority
+- Confidentiality policy enforcement performed server-side; client-supplied confidentiality overrides validated against user role before being accepted
+- Policy resolution from EMIS Web authenticated; not open to manipulation via unauthenticated requests
+
+---
+
+## Dimension 4: Observability & Performance
+
+### KPIs
+- Confidentiality override rate (frequency of overrides — anomalous spikes may indicate misuse)
+- Patient online visibility change rate
+- Confidentiality policy resolution success rate (EMIS Web policy retrieved successfully)
+- Policy resolution latency
+
+### OTEL Spans
+- `documents.confidentiality.set` — document marked confidential
+- `documents.confidentiality.overridden` — confidentiality policy overridden; before/after state recorded
+- `documents.visibility.patient_set` — patient online visibility changed; new state recorded
+- `documents.confidentiality.policy_resolved` — EMIS Web confidentiality policy successfully retrieved
+- `documents.confidentiality.policy_failed` — EMIS Web policy retrieval failed; fallback to most restrictive applied
+
+### SLOs
+- Confidentiality policy resolution: p95 < 500ms
+- Confidentiality change audit write: p99 before change takes effect
+- Policy resolution success rate: ≥ 99.9% (failure triggers fail-closed behaviour)
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Primary resource:** `document-visibility-settings`
+
+**Core endpoints:**
+- `GET /documents/{documentGuid}/visibility-settings`
+- `PATCH /documents/{documentGuid}/visibility-settings`
+
+**Business contract:**
+- Defaults: confidentiality `standard`, patient online visibility `not-visible`.
+- Policy resolution relies on EMIS Web confidentiality policy source.
+- On policy retrieval failure, enforce fail-closed most restrictive behavior.
+- Overrides and visibility changes require immutable audit entries before state change.
+
+### Component Interfaces
+
+```csharp
+public interface IConfidentialityService
+{
+  Task<Result<VisibilitySettingsResource>> GetAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+  Task<Result<VisibilitySettingsResource>> UpdateAsync(Guid documentGuid, UpdateVisibilitySettingsCommand command, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-010 — Policy Evaluation Fails Closed
+- **Trigger:** EMIS Web confidentiality policy cannot be retrieved (e.g. service unavailable)
+- **Test Scenario:** Policy resolution failure
+  - Simulate: EMIS Web policy endpoint returns error
+  - Validation 1: Document access defaults to most restrictive policy (confidential / restricted)
+  - Validation 2: User shown explicit message that confidentiality policy could not be evaluated
+  - Validation 3: Document content not exposed during policy failure
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-045
+- **Pass Criteria:** Policy failure always fails closed; no document exposure during failure
+
+### CHECK 2: IG-002 — Patient Online Visibility Defaults to Not Visible
+- **Trigger:** Document filed or patient visibility flag not explicitly set
+- **Test Scenario:** Default state validation
+  - Validation 1: Newly filed document has patient online visibility = false by default
+  - Validation 2: Default cannot be overridden via a client-supplied parameter at filing time without explicit authorised action
+  - Validation 3: Server enforces default; client cannot set visibility = true at creation without role check
+- **Guardrail:** IG-002
+- **Hazard:** HAZ-DOC-043
+- **Pass Criteria:** Patient online visibility always false by default; server-enforced
+
+### CHECK 3: CLIN-002 — Confidentiality Override Audited with Before/After State
+- **Trigger:** Confidentiality policy overridden for a document
+- **Test Scenario:** Override audit completeness
+  - Validation 1: Audit entry created before override takes effect
+  - Validation 2: Audit entry contains: `action` ("ConfidentialityOverridden"), `user_ern`, `document_ern`, `previous_state`, `new_state`, `timestamp`
+  - Validation 3: Override does not take effect if audit write fails
+- **Guardrail:** CLIN-002, CLIN-009
+- **Hazard:** HAZ-DOC-044
+- **Pass Criteria:** Override audited before taking effect; before/after state captured; blocked if audit fails
+
+### CHECK 4: CLIN-002 — Patient Visibility Change Audited
+- **Trigger:** Patient online visibility flag changed
+- **Test Scenario:** Visibility change audit
+  - Validation 1: Audit entry created for each visibility change: `action` ("PatientVisibilityChanged"), `user_ern`, `document_ern`, `previous_state`, `new_state`, `timestamp`
+  - Validation 2: Audit entry written before change takes effect
+- **Guardrail:** CLIN-002
+- **Hazard:** HAZ-DOC-043, HAZ-DOC-044
+- **Pass Criteria:** Every visibility change audited with before/after state
+
+### CHECK 5: CLIN-007 — Confidentiality and Visibility Status Visible on Document
+- **Trigger:** Document opened in viewer
+- **Test Scenario:** Status indicator presence
+  - Validation 1: Confidentiality status (confidential / not confidential) displayed on document without requiring user to open a settings panel
+  - Validation 2: Patient online visibility status displayed on document
+  - Validation 3: Indicators present for both confidential and non-confidential states (not only shown when confidential)
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-042
+- **Pass Criteria:** Both status indicators always visible; no additional navigation required to see current state
+
+### CHECK 6: AUTH-004 — Confidentiality Override Restricted to Authorised Role
+- **Trigger:** Confidentiality override request
+- **Test Scenario:** Role enforcement
+  - Request override with insufficient role → access denied (403)
+  - Request override with authorised role → override accepted and audited
+- **Guardrail:** AUTH-004
+- **Hazard:** HAZ-DOC-042
+- **Pass Criteria:** Override restricted to authorised roles; enforced server-side
+
+---
+
+
+### CHECK 17: PXD-001 — Fail-Closed Defaults on Load
+
+**Trigger:** Step 2 filing form loads
+
+**Test Scenario:**
+- Validation 1: Confidentiality `Select` default = "Standard access"
+- Validation 2: Patient online visibility `Select` default = "Not visible to patient"
+- Validation 3: Fail-closed notice `Banner variant="warning"` present and non-dismissable in Step 2
+- Validation 4: `axe(container)` 0 violations on Access & Visibility group
+
+**Pass Criteria:** Both fields fail-closed on load; defaults cannot be bypassed without explicit change — HAZ-DOC-043 / IG-002 satisfied
+
+---
+
+### CHECK 18: PXD-002 — Confidentiality Status Badge Visible
+
+**Trigger:** Document list and viewer header rendered
+
+**Test Scenario:**
+- Validation 1: Each document row shows confidentiality `Badge` with correct variant for current level
+- Validation 2: Badge uses icon + text (not colour alone)
+- Validation 3: "Standard access" badge present even for default (not hidden)
+- Validation 4: Badge renders correctly for all three levels (standard / restricted / confidential)
+
+**Pass Criteria:** Confidentiality level always visible; WCAG-compliant (icon + text) — HAZ-DOC-042 / CLIN-007 satisfied
+
+---
+
+### CHECK 19: PXD-003 — Override Requires Confirmation and Audit
+
+**Trigger:** Authorised admin changes confidentiality post-filing
+
+**Test Scenario:**
+- Validation 1: "Change confidentiality" button not visible to non-authorised roles
+- Validation 2: Confirmation `Dialog` shown before value changes
+- Validation 3: Audit notice text present in dialog before confirm
+- Validation 4: On confirm: audit event recorded with actor, before-value, after-value, timestamp
+- Validation 5: On cancel: no change; no audit event
+
+**Pass Criteria:** Override requires confirmation; audit event captured — HAZ-DOC-044 / CLIN-002 / AUTH-004 satisfied
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Full PxD.** UI surfaces: Confidentiality and Online Visibility controls embedded in the Step 2 Filing form (REQ-012 PxD — cross-reference); standalone confidentiality status indicator in document list row and viewer; override flow for authorised roles. Prototype: `.conf-group` CSS block in Filing panel (lines 434–453).
+
+---
+
+### User Flow
+
+**Primary Flow — Set confidentiality at filing (Step 2):**
+1. Confidentiality and online visibility selects are presented as a grouped section within the Step 2 filing form (see REQ-012 PxD)
+2. Both default to most restrictive option (Standard access / Not visible to patient) — fail-closed
+3. Admin changes only if clinically appropriate; `Banner variant="warning"` appears on any change from default
+4. Values saved with document on "File document →"
+
+**Alternative Flow — Override confidentiality post-filing (authorised role):**
+1. Authorised admin opens a filed document in viewer
+2. Confidentiality status badge visible in Protocol Panel or document header
+3. Admin clicks "Change confidentiality" (role-gated; only shown to authorised roles)
+4. Confirmation `Dialog` opens: shows current and proposed setting; states audit event will be recorded
+5. Admin confirms → value saved; audit event recorded (before/after values); `Notification variant="success"`
+
+**Exit Types:**
+- Save (filing step): confidentiality saved with document
+- Cancel (override): dialog closed; no change
+- Confirm (override): new value saved; audit event recorded
+
+---
+
+### Wireframes
+
+**Confidentiality group in Step 2 (Protocol Panel):**
+
+```
+┌──────────────────────────────────────────────┐
+│ 🔒 Access & Visibility                        │
+│ ─────────────────────────────────────────── │
+│ Confidentiality                               │
+│ Controls who can view this document in        │
+│ EMIS Web                                      │
+│ [Standard access                          ▾] │
+│                                               │
+│ Patient online visibility                     │
+│ Controls visibility via NHS App /             │
+│ Patient Access                                │
+│ [Not visible to patient (default)         ▾] │
+│                                               │
+│ ⚠️ Defaults: Standard + Not visible           │
+│    (fail-closed). Change only if clinically   │
+│    appropriate.                               │
+└──────────────────────────────────────────────┘
+```
+
+*(This section is embedded in REQ-012 filing form. Shown here for completeness. Do not re-specify in V3 coding — use REQ-012 PxD as single source of truth.)*
+
+**Confidentiality status indicator (document list row):**
+
+```
+Cardiology Outpatient Letter  22 May  Smith, J  [🔒 Restricted]  [⋮]
+```
+
+*(`Badge variant="inactive"` for Standard; `Badge variant="info"` for Restricted; `Badge variant="primary"` for Confidential — all with lock icon `~icons/ic/outline-lock` 16px)*
+
+---
+
+### Component Specifications
+
+> 🚫 All interactive elements use `@emisgroup/ui-*` exclusively.
+
+**Confidentiality Select (in Filing form):**
+- `Select aria-label={t('filing.confidentiality.label')}`
+- Options (from EMIS Web policy): Standard access / Restricted — clinical staff only / Confidential — GP & admin lead only
+- Default: Standard access
+- On change from default: `Banner variant="warning"` inline: `{t('filing.confidentiality.changedWarning')}`
+- Selected Restricted: field tinted `var(--cautionary)` tint; bold label
+- Selected Confidential: field tinted `var(--negative)` tint; bold label
+
+**Patient Online Visibility Select:**
+- `Select aria-label={t('filing.onlineVisibility.label')}`
+- Options: Not visible to patient (default — IG-002) / Visible to patient
+- Default: Not visible to patient — MANDATORY (HAZ-DOC-043)
+- On change from default: same `Banner variant="warning"` pattern
+
+**Fail-Closed Defaults Notice (always shown when either control is present):**
+- `Banner variant="warning"` — persistent during filing step; cannot be dismissed
+- Copy confirms both defaults and that change should only be made if clinically appropriate
+
+**Confidentiality Status Badge (document list row + viewer header):**
+- Standard: `Badge variant="inactive"` `{t('confidentiality.standard')}` + `~icons/ic/outline-lock-open` 16px
+- Restricted: `Badge variant="info"` `{t('confidentiality.restricted')}` + `~icons/ic/outline-lock` 16px + `var(--cautionary)` tint
+- Confidential: `Badge variant="primary"` `{t('confidentiality.confidential')}` + `~icons/ic/outline-lock` 16px + `var(--negative)` tint
+
+**Override Flow (Post-Filing):**
+- "Change confidentiality": `Button variant="mono" size="small"` visible only to authorised roles (server-side role check; also hidden client-side)
+- Confirmation `Dialog` (non-preventBackdropClose):
+  - Current setting displayed as `Badge`
+  - New setting `Select`
+  - Audit notice: `{t('confidentiality.override.auditNotice')}`
+  - Confirm: `Button variant="filled"` + Cancel: `Button variant="mono"`
+
+---
+
+### Interaction Patterns
+
+**Confidentiality change from default:**
+- `Select` onChange → `Banner variant="warning"` appears below the group with confirmation message
+- Banner dismissable by admin (unlike filing-step notice — this is a post-selection nudge, not a blocking notice)
+
+**Override dialog:**
+- Focus moves to dialog on open; Escape closes (Cancel behaviour)
+- Confirm disabled until new value differs from current
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AAA — clinical data)
+
+> AAA required: confidentiality misconfiguration is a patient safety and IG risk (HAZ-DOC-042/043/044).
+
+- [x] Perceivable: confidentiality level communicated via badge with icon + text label (not colour alone); restricted/confidential badge uses distinct visual + semantic distinction
+- [x] Operable: both selects keyboard-accessible; override dialog focus-trapped
+- [x] Understandable: fail-closed default explicitly labelled in each select option (" (default — IG-002)"); audit notice in override dialog informs admin before confirming
+- [x] Robust: `jest-axe ^9.0.0`; all interactive elements are `@emisgroup/ui-*`
+
+**Rule A — all inputs labelled:**
+```tsx
+<Select aria-label={t('filing.confidentiality.label')} ... />
+<Select aria-label={t('filing.onlineVisibility.label')} ... />
+```
+
+---
+
+### Visual Design
+
+**Tokens:**
+- Restricted field tint: `color-mix(in srgb, var(--cautionary) 10%, transparent)` + `border-color: var(--cautionary)`
+- Confidential field tint: `color-mix(in srgb, var(--negative) 10%, transparent)` + `border-color: var(--negative)`
+- Standard badge: `Badge variant="inactive"` (neutral grey)
+- Restricted badge: `Badge variant="info"` with `var(--cautionary)` override
+- Confidential badge: `Badge variant="primary"` (NHS Blue) with elevated visual weight
+
+**i18n keys (British English, selection):**
+```json
+{
+  "confidentiality.standard": "Standard access",
+  "confidentiality.restricted": "Restricted",
+  "confidentiality.confidential": "Confidential",
+  "filing.confidentiality.changedWarning": "You have changed a fail-closed default. Ensure this is clinically appropriate.",
+  "confidentiality.override.auditNotice": "This change will be recorded in the audit trail with your name, timestamp, and before/after values."
+}
+```
+
+---
+
+### Error States
+
+**Override fails (API error):** `Notification variant="error"` `{t('confidentiality.override.error')}`; current value unchanged; dialog closes
+
+**Policy unavailable (fail-closed):** Document shown with `Badge variant="inactive"` "Access restricted" and `Banner variant="error"` explaining policy service unavailable — document blocked from display (CLIN-010)
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-014 | HAZ-DOC-045 | Fail closed on policy failure | CLIN-010 | CHECK 1 |
+| REQ-014 | HAZ-DOC-043 | Patient visibility defaults to false | IG-002 | CHECK 2 |
+| REQ-014 | HAZ-DOC-044 | Override audited with before/after | CLIN-002 | CHECK 3 |
+| REQ-014 | HAZ-DOC-043/044 | Visibility change audited | CLIN-002 | CHECK 4 |
+| REQ-014 | HAZ-DOC-042 | Status visible on document | CLIN-007 | CHECK 5 |
+| REQ-014 | HAZ-DOC-042 | Override role-restricted | AUTH-004 | CHECK 6 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — EMIS Web confidentiality policy integration, policy caching strategy, fail-closed fallback design, patient online visibility propagation to NHS App / Patient Access
+- V1c will ADD: Design section — confidentiality flag schema, patient visibility flag schema, policy resolution API contract, override audit schema
+- V1d will ADD: UI/UX section — confidentiality and visibility status indicator design, override flow UI, patient visibility toggle placement and labelling
+- V1e will ADD: Clinical Safety section — DCB0129 entries for HAZ-DOC-042/043/044/045; review of EMIS Web confidentiality policy coverage and any gaps for document management scenarios
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Apply confidentiality and patient-visibility controls inline with fail-closed defaults.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsConfidentialityService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsConfidentialityService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /documents/{documentGUID}/confidentiality (PATCH), /documents/{documentGUID}/visibility (PATCH) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+Existing confidentiality status endpoint, filing controls, and audit logging.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+

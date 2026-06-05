@@ -1,0 +1,163 @@
+# Q & A Interop Bot — Requirements Manifest
+**Version:** 1.0
+**Created:** 2026-05-31
+**Project Code:** QABOT-001
+**Regulatory Classification:** Not safety-critical
+**Compliance Domain:** Generic
+---
+## Product Overview
+The Q & A Interop Bot is a conversational chat agent embedded in the existing partner portal (built on Astro/Starlight with a React wrapper). It indexes interoperability documentation and answers external partner developers' questions by reformulating content in clearer language with concrete examples — rather than quoting documentation verbatim.
+The bot is available as a floating widget in the bottom-right corner on every portal page and as a dedicated full-page experience at a fixed portal route. Both modes require EMIS-X authentication. When the bot cannot answer from the indexed documentation, it escalates the query to the internal team via a Teams webhook notification and sends a confirmation email to the partner developer via AWS SES.
+**Core Problem Solved:**
+Internal developers are spending approximately 20% of sprint time answering repetitive interop capability questions from external partners. This is causing developer burnout, backlog delays, and potential partner revenue loss. The bot targets reducing this to under 5% of sprint time.
+**Primary Users:**
+- **External partner developers:** Primary audience — technically literate developers (junior to senior) integrating with EMIS APIs and the SMART-on-FHIR-style app launch system
+- **Internal staff:** Secondary beneficiaries — freed from answering repetitive questions
+---
+## Global Standards
+### Design System
+- **Primary Colour:** NHS Blue (#005EB8)
+- **Border Radius:** 8px
+- **Typography:** TBD — defined in Pipeline 05 PxD
+- **Spacing:** 8px grid system
+### Technical Standards
+- **Authentication:** EMIS-X OAuth2
+- **API Protocol:** REST over HTTPS (TLS 1.2+)
+- **Infrastructure:** AWS, eu-west-2 region
+- **Email:** AWS SES
+- **Notifications:** Microsoft Teams webhook
+- **CI/CD:** GitHub Actions
+- **Encryption:** TLS 1.2+ in transit; AES-256-GCM for any special category data at rest (N/A for this system)
+### Genesis AI Skills (Applicable Guardrails)
+**Information Governance:**
+- **IG-001:** Data Minimisation — only necessary data collected and returned in all requirements
+- **IG-003:** Lawful Basis Declaration — GDPR Article 6 lawful basis required for personal data processing
+**Security:**
+- **AUTH-004:** Authorisation Required — EMIS-X authentication enforced on all chat access points
+- **SEC-001:** TLS Encryption — all HTTP communication over TLS 1.2+
+- **WSEC-006a:** URL Encoding — encodeURIComponent() for all user-supplied URL values
+- **WSEC-013:** Security Headers — @emisgroup/acp-security-headers in package.json
+**Observability:**
+- OTEL instrumentation required for all critical paths (chat query, escalation, indexing)
+- Span naming convention: `qabot.{feature}.{action}.{state}`
+### EMIS-X Platform Standards (Frontend — Non-Negotiable)
+| Mandate | Guardrail | Version/Note |
+|---|---|---|
+| **Package manager:** pnpm only — pnpm-lock.yaml required | WA-005 | No npm/yarn |
+| **Components:** `@emisgroup/ui-*` — no native button/input/select/textarea/table/dialog/fieldset/legend/form | DS-001 | Import from @emisgroup/ui-* |
+| **Colours:** `var(--token-*)` only in CSS/SCSS — no hardcoded hex/rgb/hsl | DS-002 | Design tokens only |
+| **Icons:** Iconify `~icons/ic/outline-*` | DS-004 | No lucide-react/react-icons/heroicons |
+| **Security headers:** `@emisgroup/acp-security-headers` in dependencies | WSEC-013 | pnpm add @emisgroup/acp-security-headers |
+| **App discovery:** `applicationDiscovery` in package.json | AD-001 | See EMIS-X schema |
+| **HTTP client:** `axios.create({ timeout: 30_000 })` — no fetch()/bare axios calls | HTTP-002a | Configured instance always |
+| **No Node.js agents:** httpAgent/httpsAgent/keepAlive forbidden | HTTP-003a | Browser manages connections |
+| **URL encoding:** `encodeURIComponent()` for all user-supplied URL values | WSEC-006a | No bare template literal interpolation |
+| **i18n:** `t()` from react-i18next; translations in `src/locales/en-GB/translation.json` | WCS-007a | No hardcoded English strings in JSX |
+| **British English:** translation JSON uses British spellings | WCS-007b | colour, centre, grey, behaviour, licence |
+| **jest-axe:** `toHaveNoViolations()` in every component test file | A11Y-010 | Exempt: root.component, App, providers |
+### Regulatory Framework
+- **Clinical Safety:** Not safety-critical — DCB0129/0160 not applicable
+- **Data Protection:** UK GDPR, Data Protection Act 2018
+- **NHS Standards:** NHS DSPT (Data Security and Protection Toolkit)
+- **Accessibility:** WCAG 2.1 Level AA (matching EMIS-X platform standard)
+---
+## Requirement Index
+| ID | Name | Priority | Dimensions | Status |
+|----|------|----------|------------|--------|
+| [REQ-001](requirements/REQ-001.md) | Conversational Q&A Chat Widget | Must Have | IG, SEC, OBS, FE | ⏳ Pipeline 01 Complete |
+| [REQ-002](requirements/REQ-002.md) | Escalation to Human Support | Must Have | IG, SEC, OBS, FE | ⏳ Pipeline 01 Complete |
+| [REQ-003](requirements/REQ-003.md) | Full-Page Chat Mode | Must Have | SEC, OBS, FE | ⏳ Pipeline 01 Complete |
+| [REQ-004](requirements/REQ-004.md) | Documentation Indexing via CI | Must Have | SEC, OBS | ⏳ Pipeline 01 Complete |
+| [REQ-005](requirements/REQ-005.md) | Conversation Management | Must Have | IG, SEC, OBS, FE | ⏳ Pipeline 01 Complete |
+| [REQ-006](requirements/REQ-006.md) | Bot Loading & Status States | Must Have | SEC, OBS, FE | ⏳ Pipeline 01 Complete |
+**Total Requirements:** 6
+**Must Have:** 6 | **Should Have:** 0 | **Could Have:** 0 | **Won't Have:** 0
+---
+## Non-Functional Requirements
+| Category | Requirement | Target |
+|----------|-------------|--------|
+| Performance | Bot response p95 latency | < 10,000ms |
+| Performance | UI transition (widget ↔ full-page) | < 300ms |
+| Performance | Escalation dispatch (webhook + email) | < 5s |
+| Performance | Documentation indexing duration | < 5 minutes |
+| Availability | Bot service uptime | 99.9% |
+| Availability | Degraded mode | Bot outage → escalation form shown |
+| Concurrency | Concurrent authenticated users | TBD — Pipeline 03 Architecture |
+| Rate Limiting | Messages per session | 50 messages |
+| Rate Limiting | Messages per user per day | 200 messages |
+| Browser Support | Supported browsers/devices | Inherits EMIS-X platform matrix |
+| Accessibility | WCAG level | 2.1 Level AA |
+| Data Retention | Escalation records (email + chat history) | 1 year |
+| Infrastructure | Cloud provider and region | AWS eu-west-2 |
+| Cost | Implementation approach | Cost-optimised — Pipeline 03 to decide |
+---
+## Success Metrics
+| Metric | Baseline | Target | Timeline | Measurement Method |
+|--------|----------|--------|----------|--------------------|
+| Sprint time spent answering interop questions | ~20% | < 5% | Post-launch (2 sprints) | Sprint time tracking |
+| Bot answer rate (questions answered without escalation) | 0% | > 80% | 1 month post-launch | OTEL qabot.chat.query.complete |
+| Escalation rate (conversations escalated to human) | 100% | < 20% | 1 month post-launch | OTEL qabot.escalation.triggered |
+**North Star Metric:** Sprint time spent answering interop questions < 5%
+---
+## Constraints
+### Regulatory Constraints
+- UK GDPR and Data Protection Act 2018 — email addresses captured on escalation are personal data
+- GDPR Article 6 lawful basis for escalation email processing: `[UNVERIFIED — IG-OWNER: TBD — RESOLUTION DATE: TBD — GO-LIVE BLOCKER]`
+- Escalation data retention: 1 year maximum
+- Data residency: AWS eu-west-2 (UK/EU compliant)
+- WCAG 2.1 Level AA accessibility required
+### Technical Constraints
+- Must integrate with existing Astro/Starlight partner portal (React wrapper in place)
+- Infrastructure: AWS only, eu-west-2 region
+- CI/CD: GitHub Actions
+- Email: AWS SES
+- Notifications: Microsoft Teams webhook
+- Frontend: EMIS-X platform standards (pnpm, @emisgroup/ui-*, design tokens)
+- AI implementation approach: TBD — Pipeline 03 Architecture decision
+### Business Constraints
+- Cost-optimised implementation — lightweight/efficient AI approach preferred
+- Partner developer experience must not be degraded during indexing or bot outage
+### Timeline Constraints
+- 2 sprints, timeboxed
+---
+## Key Assumptions & Risks
+### High-Risk Assumptions
+1. **AI implementation approach** — Risk: High — Validation: Pipeline 03 Architecture decision (LLM vs RAG vs embeddings vs fine-tuned model)
+2. **Documentation corpus quality** — Risk: Medium — Assumption: Existing docs are accurate enough to index; bot reformulation will improve clarity not correctness
+### Key Risks
+1. **AI/ML implementation** — Likelihood: High — Impact: High — Mitigation: Pipeline 03 Architecture must decide approach before build starts; timeboxed to 2 sprints
+2. **GDPR lawful basis unconfirmed** — Likelihood: Medium — Impact: High — Mitigation: IG owner must confirm before go-live; currently a GO-LIVE BLOCKER
+3. **Teams webhook availability** — Likelihood: Low — Impact: Medium — Mitigation: User-visible error message on webhook failure; retry policy TBD in Pipeline 03
+---
+## Integration Points
+| System | Purpose | Authentication | Data Flow | Failure Mode |
+|--------|---------|---------------|-----------|--------------|
+| Microsoft Teams (webhook) | Escalation notifications to internal team | Webhook URL (environment secret) | Outbound — email, chat history, page URL, timestamp | User sees "system unavailable, try later" message |
+| AWS SES | Confirmation email to partner developer | AWS IAM (environment credentials) | Outbound — confirmation email | Silent failure — Teams webhook still fires |
+| GitHub Actions | CI/CD pipeline for documentation indexing | Repository permissions + secrets | Triggered on portal update | Deployment blocked if indexing fails |
+| EMIS-X Auth | Authentication for all chat access | EMIS-X OAuth2 | Inbound — session token validation | Redirect to EMIS-X login |
+---
+## Pipeline 01 → Pipeline 03 Handoff Notes
+> Read this section before starting Pipeline 03. These are known blockers that affect Pipeline 03 scope.
+### 🔴 Blockers — Do Not Skip
+- **AI implementation approach undefined:** LLM, embeddings, fine-tuned model, or RAG — must be decided in Pipeline 03 before build starts. This is the highest risk item for the 2-sprint timebox.
+- **GDPR Article 6 lawful basis unconfirmed:** Lawful basis for processing partner email addresses captured during escalation. IG-OWNER: TBD — RESOLUTION DATE: TBD — GO-LIVE BLOCKER.
+### 🟡 Decisions to Clarify in Pipeline 03
+- Teams channel webhook URL — needs to be configured before go-live
+- Astro/Starlight + React wrapper component boundary — how does the chat bot integrate with the existing shell?
+- Rate limiting enforcement point — client-side, API gateway, or bot service?
+- Concurrent user capacity planning
+- Index storage mechanism and artefact format (vector DB, JSON, etc.)
+- AWS SES retry policy on failure
+- Teams webhook retry policy on failure
+### 🟢 Deferred Items
+- Full WCAG 2.1 AA audit — Pipeline 05 PxD
+- Detailed UI/UX specifications — Pipeline 05 PxD
+- API contract definitions (OpenAPI) — Pipeline 04 Design
+- Full hazard/mitigation mapping — N/A (not safety-critical)
+---
+**Document Status:** ✅ Pipeline 01 Requirements Complete
+**Pipeline Status:** Pipeline 01 ✅ → Pipeline 03 ⏳ → Pipeline 04 ⏳ → Pipeline 05 ⏳ → Pipeline 06 ⏳ → Pipeline 07 ⏳ → Pipeline 08 ⏳ → Coding Agent
+**Next Phase:** Pipeline 03 Architecture (adds technical architecture to each requirement)
+**Pipeline:** Pipeline 01 → Pipeline 03 → Pipeline 04 → Pipeline 05 → Pipeline 06 → Pipeline 07 → Pipeline 08 → Coding Agent
+

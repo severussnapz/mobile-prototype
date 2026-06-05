@@ -1,0 +1,657 @@
+﻿# REQ-012: Filing
+
+**Priority:** Must Have
+**Effort:** Low (manual filing — pre-built ✅)
+**Risk:** High (mandatory fields enforce data quality; incorrect metadata could misattribute documents in patient record)
+**Depends On:** REQ-011 (Patient Matching), REQ-001 (Unified Inbound Document Inbox), REQ-009 (Audit Trail)
+
+> ⚠️ **Implementation note:**
+> - **Manual metadata capture** (including mandatory field enforcement for patient match, document type, date of care, date received, and document title) is already implemented as a reusable component. **Do not re-implement.** Integrate the existing component.
+
+---
+
+## User Story
+
+As a practice administrator,
+I need to file inbound documents against a patient record with complete, accurate metadata,
+So that documents are correctly attributed, findable, and clinically safe to act upon.
+
+**Acceptance Criteria:**
+- [ ] Where metadata is fully embedded in the inbound document (e.g. from MESH, Docman Connect, structured source) and the patient is auto-matched, the document is automatically routed to the tasking queue following the practice's routing rules — no manual filing action required. *(Must Have)*
+- [ ] Documents auto-routed to tasking are immediately visible on the patient record with a **Provisional** status, indicating they are awaiting processing through the tasking mechanism. Provisional status is cleared when the document has been actioned through tasking. *(Must Have)*
+- [ ] Where the patient match was not automatically confirmed (low-confidence path — see REQ-011), the user must complete the patient match before the document is routed to tasking. *(Must Have)*
+- [ ] The user can review and amend any auto-populated metadata field before filing. *(Must Have)*
+- [ ] The patient details area in filing includes Date of Birth (DOB). *(Must Have)*
+- [ ] Filing metadata includes both **Date of care** and **Date received** fields. *(Must Have)*
+- [ ] The following fields are mandatory and must be completed before a document can be filed: patient match, document type, date of care, date received, document title. *(Must Have)*
+- [ ] A document cannot be filed if any mandatory field is missing — the system must block submission and indicate which fields are incomplete. *(Must Have)*
+- [ ] All filed documents are assigned a unique document ERN on filing. *(Must Have)*
+- [ ] Filing action is audited. *(Must Have)*
+- [ ] Completing filing updates the corresponding EMIS Web workflow state via defined mapping rules. The EMIS-X and EMIS Web workflow models are not equivalent and mapping is handled by integration logic. *(Must Have)*
+
+---
+
+## Mandatory Filing Fields
+
+| Field | Source (if available) | Mandatory |
+|-------|----------------------|-----------|
+| Patient match | Auto-match (REQ-011) — high-confidence: automatic; low-confidence: manual | ✅ Yes |
+| Document type | Embedded metadata / user entry | ✅ Yes |
+| Date of care | Embedded metadata / user entry | ✅ Yes |
+| Date received | Ingestion timestamp / user entry override | ✅ Yes |
+| Document title | Embedded metadata / user entry | ✅ Yes |
+| Patient DOB (display) | Patient register | ✅ Required to display |
+| Source | Inbound integration metadata | No (auto-populated where available) |
+| Department | Embedded metadata / user entry | No (auto-populated where available) |
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-002:** Patient Data Audit Trail — filing action audited before document is committed to patient record
+- **CLIN-007:** Hazard Mitigation Evidence — mandatory field enforcement is the primary UI control preventing incomplete filing
+- **CLIN-010:** Error Handling Patient Safety — filing must fail closed if mandatory fields are absent; never file an incomplete document silently
+
+### Hazards Addressed
+
+- **HAZ-DOC-036:** Document filed with incorrect or missing metadata — document unfindable or misattributed; clinical decision made on incomplete information
+  - **Severity:** High
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+
+- **HAZ-DOC-037:** AI/OCR metadata suggestion accepted without review — incorrect metadata auto-filed; wrong document type or date in patient record
+  - **Severity:** High
+  - **Likelihood:** Medium (if suggestions auto-accepted)
+  - **Risk Level:** High — **OCR/AI suggestions must never be auto-accepted**
+
+- **HAZ-DOC-038:** Document filed against wrong patient due to unconfirmed match (cross-reference HAZ-DOC-032 from REQ-011)
+  - **Severity:** Critical
+  - **Likelihood:** Low
+  - **Risk Level:** Critical
+
+- **HAZ-DOC-046:** Auto-routed document has incorrect embedded metadata (trusted but wrong at source) — document appears on patient record with incorrect type, date, or title in Provisional state before tasking review
+  - **Severity:** Medium
+  - **Likelihood:** Low (structured inbound sources are generally reliable; error would originate at the sending system)
+  - **Risk Level:** Medium — mitigated by Provisional status and mandatory tasking review step
+
+### Mitigations
+
+- **MIT-DOC-035:** Mandatory fields enforced at submission; filing blocked if any mandatory field is empty
+  - **Type:** Business Logic + UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-036:** AI/OCR suggestions clearly labelled; user must explicitly confirm each suggested value before filing
+  - **Type:** UI Control
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-037:** Patient match confirmation required before filing panel is accessible (links to REQ-011 mitigation chain)
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — filing form captures only the defined metadata fields; no extraneous data collected
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(e) public task + Article 9(2)(h) health data
+- **IG-004:** Special Category Data Protection — document and associated metadata encrypted at rest on filing
+- **IG-010:** Retention Policy Enforcement — filed documents subject to NHS records retention schedules from point of filing
+
+### Data Handling
+- On filing, document is written to permanent encrypted patient record store
+- Document ERN generated at filing time; used as the persistent identifier for all subsequent operations
+- Filing metadata (type, date, title, source, department) stored alongside document; not embedded into the document file itself
+- OCR/AI suggestion inputs (document content analysed) not stored beyond the filing session
+
+### GDPR Articles
+- **Article 5(1)(d):** Accuracy — mandatory fields exist to ensure accuracy of patient record
+- **Article 9(2)(h):** Special category health data — medical purposes
+- **Article 5(1)(f):** Integrity and confidentiality — document protected from point of filing
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — filing endpoint requires valid JWT with filing role scope
+- **SEC-001:** TLS Encryption — filing requests over TLS 1.2+
+
+### Security Requirements
+- Filing scoped to authenticated user's practice; cross-practice filing not permitted
+- Document ERN generated server-side using UUID v4; not user-supplied
+- OCR/AI suggestion endpoint (when enabled) does not expose raw document content to third-party services without appropriate DPA in place
+
+---
+
+## Dimension 4: Observability & Performance
+
+### KPIs
+- Filing success rate (documents successfully filed vs. attempted)
+- Mandatory field completion rate (how often users arrive at filing with fields pre-populated vs. empty)
+- AI/OCR suggestion acceptance rate (proxy for suggestion quality)
+- Auto-route rate (proportion of inbound documents with fully embedded metadata routed directly to tasking without manual intervention)
+- Provisional document clearance time (time from auto-route to tasking action that clears Provisional status)
+- Filing latency (user confirms filing → document committed to patient record)
+- Incomplete filing abandonment rate (user starts filing but does not complete)
+
+### OTEL Spans
+- `documents.filing.initiated` — user opens filing panel for a document
+- `documents.filing.metadata_populated` — embedded metadata auto-populated into form
+- `documents.filing.suggestion_presented` — OCR/AI suggestion presented to user
+- `documents.filing.suggestion_accepted` — user accepts an OCR/AI suggestion
+- `documents.filing.auto_routed` — embedded-metadata document auto-routed to tasking; Provisional patient record status set
+- `documents.filing.provisional_cleared` — document actioned through tasking; Provisional status removed
+- `documents.filing.submitted` — user submits filing form
+- `documents.filing.blocked` — filing blocked due to missing mandatory fields; missing fields recorded
+- `documents.filing.completed` — document successfully filed; document ERN recorded
+
+### SLOs
+- Filing commit: p95 < 3 seconds from user submission to document filed in patient record
+- Metadata auto-population: p95 < 2 seconds from document load to form pre-populated
+- Filing success rate: ≥ 99.5% for submissions with all mandatory fields present
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Primary resource:** `filing-records`
+
+**Core endpoints:**
+- `GET /documents/{documentGuid}/filing`
+- `PATCH /documents/{documentGuid}/filing`
+- `POST /documents/{documentGuid}/filing/submit`
+
+**Business contract:**
+- Mandatory fields: patient match, document type, date of care, date received, document title.
+- Auto-populated metadata remains user-editable before submit.
+- Successful submit assigns document ERN and emits filing completion event.
+
+### Component Interfaces
+
+```csharp
+public interface IDocumentFilingService
+{
+  Task<Result<FilingRecordResource>> GetAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+  Task<Result<FilingRecordResource>> UpdateAsync(Guid documentGuid, UpdateFilingCommand command, CancellationToken cancellationToken = default);
+  Task<Result<FilingSubmitResource>> SubmitAsync(Guid documentGuid, SubmitFilingCommand command, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-007 — Mandatory Fields Enforced at Submission
+- **Trigger:** User attempts to file a document with one or more mandatory fields empty
+- **Test Scenario:** Missing mandatory field
+  - Input: Filing form with document type present but date of care absent
+  - Validation 1: Filing submission blocked
+  - Validation 2: Missing field(s) clearly indicated to the user
+  - Validation 3: No document written to patient record
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-036
+- **Pass Criteria:** Filing blocked for any missing mandatory field; missing fields named
+
+### CHECK 2: CLIN-005 — OCR/AI Suggestions Clearly Labelled (Should Have)
+- **Trigger:** OCR/AI metadata suggestion presented in filing form
+- **Test Scenario:** Suggestion labelling
+  - Validation 1: Each AI/OCR-suggested field is visually distinguished from user-entered or embedded-metadata fields
+  - Validation 2: Label explicitly indicates the value is a suggestion requiring confirmation
+  - Validation 3: User must perform an explicit action to accept each suggestion (not pre-ticked or auto-accepted)
+- **Guardrail:** CLIN-005
+- **Hazard:** HAZ-DOC-037
+- **Pass Criteria:** All AI/OCR suggestions labelled; explicit confirmation required for each
+- **Note:** OCR/AI metadata suggestions are in scope for Core; no SaMD sign-off gate applies. This check is unconditional for all documents where AI/OCR suggestions are present.
+
+### CHECK 3: CLIN-002 — Filing Action Audited
+- **Trigger:** Document successfully filed
+- **Test Scenario:** Audit entry on filing
+  - Validation 1: Audit entry created containing: `action` ("Filed"), `user_ern`, `document_ern`, `patient_ern`, `document_type`, `date_of_care`, `date_received`, `timestamp`
+  - Validation 2: Audit entry written before filing confirmation returned to user
+  - Validation 3: Audit entry does not contain raw NHS Number
+- **Guardrail:** CLIN-002
+- **Hazard:** HAZ-DOC-038
+- **Pass Criteria:** Filing audited before confirmation; required fields present; NHS Number absent
+
+### CHECK 4: CLIN-010 — Filing Fails Closed on Error
+- **Trigger:** Filing submission fails (e.g. patient record store unavailable)
+- **Test Scenario:** Filing failure handling
+  - Validation 1: Explicit error shown to user — not a success confirmation
+  - Validation 2: Document not partially written to patient record
+  - Validation 3: Document remains in inbox / filing queue for retry
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-036
+- **Pass Criteria:** Filing failure explicit; no partial writes; document recoverable
+
+### CHECK 5: Document ERN Generated Server-Side
+- **Trigger:** Document successfully filed
+- **Test Scenario:** ERN generation
+  - Validation 1: Document ERN is a UUID v4 format string
+  - Validation 2: ERN generated server-side; not accepted from client request
+  - Validation 3: ERN unique across all filed documents
+- **Guardrail:** CLIN-006
+- **Pass Criteria:** ERN is UUID v4; server-generated; unique
+
+### CHECK 6: Provisional Status — Auto-Routed Documents
+- **Trigger:** Inbound document with fully embedded metadata and auto-matched patient is routed directly to the tasking queue
+- **Test Scenario:** Provisional status lifecycle
+  - Validation 1: Document appears on patient record with status "Provisional" immediately after auto-routing
+  - Validation 2: Provisional status is removed when the document is actioned through the tasking mechanism
+  - Validation 3: A document with unconfirmed AI/OCR-suggested metadata does not auto-route — it remains in the filing queue pending user confirmation
+  - Validation 4: Provisional status is visible in the patient record and clearly distinguished from fully-filed documents
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-046
+- **Pass Criteria:** Auto-routed documents marked Provisional; status cleared on tasking action; AI/OCR-suggestion documents do not bypass the filing confirmation step
+
+### CHECK 7: CLIN-007 — DOB and Dual Date Metadata Present in Filing Flow
+- **Trigger:** User opens filing panel for matched document
+- **Test Scenario:** Filing data completeness fields
+  - Validation 1: Patient details panel includes DOB
+  - Validation 2: Filing form includes Date of care and Date received
+  - Validation 3: Filing is blocked if either Date of care or Date received is missing
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-036
+- **Pass Criteria:** DOB displayed and both date fields enforced before filing submission
+
+### CHECK 8: CLIN-007 — Filing Completion Writes Mapped EMIS Web Workflow State
+- **Trigger:** User completes filing action in EMIS-X
+- **Test Scenario:** Workflow state mapping and write-back
+  - Validation 1: Filing completion triggers EMIS Web workflow state update
+  - Validation 2: Mapping handles non-equivalent EMIS-X and EMIS Web workflow models
+  - Validation 3: State mapping outcome and write-back event are audited
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-046
+- **Pass Criteria:** Filing completion writes mapped EMIS Web state and records audit evidence
+
+---
+
+
+### CHECK 17: PXD-001 — AI Suggestion Disclosure on Every Suggested Field
+
+**Trigger:** Step 2 form loads with OCR/AI-suggested values
+
+**Test Scenario:**
+- Validation 1: Every OCR/AI-suggested field shows hint with robot icon + `{t('filing.aiSuggestion')}` text
+- Validation 2: Hint persists after admin modifies the field
+- Validation 3: Hint not shown on fields without OCR/AI suggestions
+- Validation 4: `axe(container)` 0 violations on filing form
+- Validation 5: All inputs have accessible labels
+
+**Pass Criteria:** AI suggestions clearly disclosed; admin confirmation mandatory — HAZ-DOC-037 / CLIN-005 satisfied
+
+---
+
+### CHECK 18: PXD-002 — Fail-Closed Defaults for Confidentiality and Online Visibility
+
+**Trigger:** Step 2 form loads
+
+**Test Scenario:**
+- Validation 1: Confidentiality `Select` defaults to "Standard access"
+- Validation 2: Patient online visibility `Select` defaults to "Not visible to patient"
+- Validation 3: Changing either default shows `Banner variant="warning"` inline warning
+- Validation 4: Defaults cannot be bypassed by form submit without explicit selection
+
+**Pass Criteria:** Both fields fail-closed on load; change requires explicit admin action — IG-002 / HAZ-DOC-046 satisfied
+
+---
+
+### CHECK 19: PXD-003 — Mandatory Field Validation Blocks Filing
+
+**Trigger:** Admin clicks "File document →" with empty mandatory field
+
+**Test Scenario:**
+- Validation 1: `invalid` prop set on each empty mandatory field; red border rendered
+- Validation 2: Error summary shown at top of panel with count and field links
+- Validation 3: Focus moves to first error field
+- Validation 4: Form does not submit; no partial filing recorded
+- Validation 5: All errors clear when fields are populated
+
+**Pass Criteria:** Incomplete forms cannot be filed; first error focused — HAZ-DOC-036 / CLIN-007 satisfied
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Full PxD.** UI surface: File step (Step 2 in StepIndicator) — Protocol Panel filing form. Shared components (StepIndicator, Patient Banner, Queue-Peek Sidebar) from REQ-001 reused — not re-specified here.
+
+---
+
+### User Flow
+
+**Primary Flow — File a document (Step 2):**
+1. Admin confirms patient match in Step 1; StepIndicator advances to Step 2 "File"
+2. Protocol Panel shows filing form; Patient Banner shows matched patient
+3. Fields pre-populated from OCR/AI suggestions or embedded metadata; each AI-suggested field has a disclosure hint
+4. Mandatory fields: Patient (read-only — locked to matched patient), Document Type, Document Date, Document Title
+5. Optional fields: Department
+6. Confidentiality + Online Visibility section (defaults: Standard access / Not visible to patient)
+7. Admin reviews, adjusts if needed, clicks "File document →"
+8. Validation: if any mandatory field empty, inline error shown; form does not submit
+9. On success: `Notification variant="success"` `{t('filing.success')}`; Step 2 tab shows ✓; Step 3 (Code) unlocks
+
+**Error Flow — Mandatory field missing:**
+- Inline `Banner variant="error"` below field: `{t('filing.error.required', { field })}`
+- Error summary at top of panel if multiple fields missing
+- Focus moves to first error field
+
+**Exit Types:**
+- ← Back: returns to Step 1 (Patient Match); filing not saved
+- File document: completes step; advances to Step 3
+- Save & close: saves current state (partial); returns to queue; document stays in Filing queue
+
+---
+
+### Wireframes
+
+**Step 2 — Filing form (Protocol Panel):**
+
+```
+┌──────────────────────────────────────────────┐
+│ PROTOCOL PANEL — Step 2: File                 │
+│ [1.Match✓][2.File ←][3.Code][4.Task]         │
+│ ─────────────────────────────────────────── │
+│ ✅ Patient matched: Smith, John Edward        │
+│    NHS 485 777 3456                           │
+│ ─────────────────────────────────────────── │
+│ Patient *    [Smith, John Edward · 485 777] │
+│              (read-only — match confirmed)    │
+│                                               │
+│ Document Type *                               │
+│ [Outpatient Letter          ▾]               │
+│ 🤖 OCR/AI suggestion — confirm or change     │
+│                                               │
+│ Document Date *                               │
+│ [19/05/2026                  ]               │
+│ 🤖 OCR/AI suggestion — confirm or change     │
+│                                               │
+│ Document Title *                              │
+│ [Cardiology Outpatient Letter — Follow-up  ] │
+│                                               │
+│ Department                                    │
+│ [Cardiology                  ]               │
+│ ─────────────────────────────────────────── │
+│ 🔒 Access & Visibility                        │
+│ Confidentiality: [Standard access         ▾] │
+│   ↳ Controls who can view in EMIS Web         │
+│ Patient online: [Not visible to patient   ▾] │
+│   ↳ Controls NHS App / Patient Access         │
+│ ⚠️ Defaults: Standard + Not visible           │
+│    (fail-closed). Change only if clinically   │
+│    appropriate.                               │
+│ ─────────────────────────────────────────── │
+│ [← Back]            [File document →]        │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+### Component Specifications
+
+> 🚫 All interactive elements use `@emisgroup/ui-*` exclusively.
+
+**Patient Field (read-only):**
+- `Input value={patientDisplayName} readOnly aria-label={t('filing.patient.label')}` styled with `var(--positive)` tint background (confirming successful match)
+
+**Document Type:**
+- `Select aria-label={t('filing.docType.label')} invalid={attempted && !docType}`
+- OCR/AI hint: `~icons/ic/outline-smart-toy` 16px + `{t('filing.aiSuggestion')}` in `var(--text-dim)` 12px below field
+- Options from configured document type taxonomy
+
+**Document Date:**
+- `DatePicker aria-label={t('filing.docDate.label')} invalid={attempted && !docDate}`
+- OCR/AI hint below field (same pattern as Document Type)
+- British format DD/MM/YYYY in display; ISO 8601 in API payload
+
+**Document Title:**
+- `Input aria-label={t('filing.docTitle.label')} invalid={attempted && !docTitle}`
+
+**Department:**
+- `Input aria-label={t('filing.department.label')}` — optional; no validation
+
+**Confidentiality Select:**
+- `Select aria-label={t('filing.confidentiality.label')}`
+- Options: Standard access / Restricted — clinical staff only / Confidential — GP & admin lead only
+- Default: Standard access
+- Helper text below: `{t('filing.confidentiality.helper')}` — "Controls who can view this document in EMIS Web"
+
+**Patient Online Visibility Select:**
+- `Select aria-label={t('filing.onlineVisibility.label')}`
+- Options: Not visible to patient (default) / Visible to patient
+- Default: Not visible to patient — MANDATORY (IG-002 / fail-closed)
+- Helper text below: `{t('filing.onlineVisibility.helper')}` — "Controls visibility via NHS App / Patient Access"
+
+**Fail-Closed Defaults Notice:**
+- `Banner variant="warning"` with static copy confirming both defaults are fail-closed and should only be changed if clinically appropriate
+
+**Inline Error:**
+- `Banner variant="error"` below field when `attempted && !value`
+- Error summary at top of panel: `{t('filing.error.summary', { count })}` with `<ul>` links to each field
+
+**Footer:**
+- `Button variant="mono"` ← Back
+- `Button variant="filled"` File document → (disabled during submission; shows spinner)
+
+---
+
+### Interaction Patterns
+
+**AI suggestion disclosure:**
+- Hint appears on every OCR/AI-suggested field; not removable by admin
+- On field change: hint remains (disclosure persists regardless of whether admin changed the value)
+
+**Mandatory field validation:**
+- Triggered on "File document →" click; not on blur (reduce interruption)
+- First validation error: focus moves to first error field; error summary at top of panel
+
+**Confidentiality + Visibility defaults:**
+- Both default to most restrictive option on form load
+- Changing either value shows `Banner variant="warning"` inline: "You have changed a fail-closed default. Ensure this is clinically appropriate."
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AAA — clinical data)
+
+> AAA required: filing is a clinical action; incorrect metadata is a patient safety risk (HAZ-DOC-036/037).
+
+- [x] Perceivable: OCR/AI hint uses robot icon + text label (not icon alone); confidentiality defaults communicated via text
+- [x] Operable: all fields keyboard-accessible; error summary focuses on submit; `Tab` order: Patient → Type → Date → Title → Dept → Confidentiality → Visibility → Submit
+- [x] Understandable: all fields have visible labels; mandatory fields marked `*`; AI suggestions clearly labelled as suggestions (not confirmed data)
+- [x] Robust: `jest-axe ^9.0.0`; all interactive elements are `@emisgroup/ui-*`
+
+**Rule A — all inputs labelled:**
+```tsx
+<Select aria-label={t('filing.docType.label')} invalid={attempted && !docType} ... />
+<DatePicker aria-label={t('filing.docDate.label')} ... />
+<Select aria-label={t('filing.confidentiality.label')} ... />
+<Select aria-label={t('filing.onlineVisibility.label')} ... />
+```
+
+---
+
+### Visual Design
+
+**Tokens:**
+- Patient field (matched): `background: color-mix(in srgb, var(--positive) 8%, transparent)`
+- AI suggestion hint: `var(--text-dim)` 12px
+- Fail-closed notice: `Banner variant="warning"` (`var(--cautionary)` tint)
+- Error state: `var(--negative)` border on invalid field
+
+**i18n keys (British English, selection):**
+```json
+{
+  "filing.patient.label": "Patient",
+  "filing.docType.label": "Document type",
+  "filing.docDate.label": "Document date",
+  "filing.docTitle.label": "Document title",
+  "filing.department.label": "Department",
+  "filing.confidentiality.label": "Confidentiality",
+  "filing.onlineVisibility.label": "Patient online visibility",
+  "filing.aiSuggestion": "OCR/AI suggestion — confirm or change before filing",
+  "filing.success": "Document filed successfully.",
+  "filing.error.required": "{{field}} is required."
+}
+```
+
+---
+
+### Error States
+
+**Mandatory field missing:** Inline `Banner variant="error"` below field + error summary at top of panel
+
+**File fails (API error):** `Notification variant="error"` `{t('filing.error.save')}`; form remains open with data preserved
+
+**Duplicate filing detected:** `Banner variant="error"` modal: document already filed to this patient record; admin must confirm intentional re-file or cancel
+
+---
+
+### Empty States
+
+Not applicable — Step 2 is always preceded by a matched patient (Step 1 must be complete).
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-012 | HAZ-DOC-036 | Mandatory fields enforced | CLIN-007 | CHECK 1 |
+| REQ-012 | HAZ-DOC-037 | OCR/AI suggestions labelled; user confirmation mandatory | CLIN-005 | CHECK 2 |
+| REQ-012 | HAZ-DOC-046 | Provisional status on auto-route; cleared by tasking | CLIN-007 | CHECK 6 |
+| REQ-012 | HAZ-DOC-038 | Filing audited | CLIN-002 | CHECK 3 |
+| REQ-012 | HAZ-DOC-036 | Fail closed on error | CLIN-010 | CHECK 4 |
+| REQ-012 | — | ERN server-generated | CLIN-006 | CHECK 5 |
+| REQ-012 | HAZ-DOC-036 | DOB visible; Date of care + Date received enforced | CLIN-007 | CHECK 7 |
+| REQ-012 | HAZ-DOC-046 | Filing completion mapped to EMIS Web workflow state | CLIN-007 | CHECK 8 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — metadata extraction pipeline, embedded metadata parsing per source format, OCR/AI suggestion service design, patient record write transaction model, Provisional status store schema
+- V1c will ADD: Design section — filing API contract, metadata schema, document ERN generation spec, OCR/AI suggestion API contract
+- V1d will ADD: UI/UX section — filing panel design, mandatory field indicators, AI/OCR suggestion labelling (clearly distinguished from embedded metadata), Provisional status indicator in patient record view, blocking error states
+- V1e will ADD: Clinical Safety section — DCB0129 entries for HAZ-DOC-036/037/038/046; confirmation that EMIS regulatory team written position on OCR/AI SaMD scope is in place before Production release
+- **OCR/AI metadata suggestion:** In scope for Core. Administrative metadata derivation with mandatory human confirmation is not SaMD per MHRA guidance. EMIS regulatory team to confirm this position in writing before Production release. No feature flag required.
+- **Provisional document status:** V1b to define the Provisional status lifecycle and patient record store schema. V1d to design the Provisional status indicator in the patient-facing record view. Cross-reference REQ-010 (routing rules trigger the auto-route path) and REQ-011 (auto-match triggers the embedded-metadata fast path).
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Deliver efficient filing with mandatory metadata and human-confirmed OCR/AI suggestions.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsFilingService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsFilingService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /documents/{documentGUID}/filing (POST), /documents/{documentGUID}/filing/suggestions (GET) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+Existing manual metadata capture component, workflow, and coding queues.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+

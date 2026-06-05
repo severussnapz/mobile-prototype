@@ -26,6 +26,24 @@ public interface IArtefactStorageService
     Task<string?> GetContentAsync(string storageKey, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Uploads binary artefact content (e.g. a spreadsheet) to object storage and
+    /// returns the storage key to persist against the artefact record.
+    /// </summary>
+    Task<string> SaveBinaryContentAsync(
+        Guid projectId,
+        string filePath,
+        int version,
+        byte[] content,
+        string contentType,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Retrieves binary artefact content from object storage by its storage key.
+    /// Returns <c>null</c> if the object does not exist.
+    /// </summary>
+    Task<byte[]?> GetBinaryContentAsync(string storageKey, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Deletes artefact content from object storage by its storage key.
     /// No-op if the object does not exist.
     /// </summary>

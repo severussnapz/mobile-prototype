@@ -9,6 +9,7 @@ using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using DocumentFormatType = Amazon.BedrockRuntime.DocumentFormat;
 
 namespace Genesis.AI.Infrastructure.Services;
 
@@ -396,19 +397,19 @@ public sealed class BedrockAiService : IAiService, IDisposable
         };
     }
 
-    private static DocumentFormat ParseDocumentFormat(string mediaType)
+    private static DocumentFormatType ParseDocumentFormat(string mediaType)
     {
         return mediaType.ToLowerInvariant() switch
         {
-            "application/pdf" => DocumentFormat.Pdf,
-            "text/csv" => DocumentFormat.Csv,
-            "application/msword" => DocumentFormat.Doc,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => DocumentFormat.Docx,
-            "application/vnd.ms-excel" => DocumentFormat.Xls,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => DocumentFormat.Xlsx,
-            "text/html" => DocumentFormat.Html,
-            "text/plain" => DocumentFormat.Txt,
-            "text/markdown" => DocumentFormat.Md,
+            "application/pdf" => DocumentFormatType.Pdf,
+            "text/csv" => DocumentFormatType.Csv,
+            "application/msword" => DocumentFormatType.Doc,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => DocumentFormatType.Docx,
+            "application/vnd.ms-excel" => DocumentFormatType.Xls,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => DocumentFormatType.Xlsx,
+            "text/html" => DocumentFormatType.Html,
+            "text/plain" => DocumentFormatType.Txt,
+            "text/markdown" => DocumentFormatType.Md,
             _ => throw new ArgumentException($"Unsupported document format: {mediaType}. Supported: pdf, csv, doc, docx, xls, xlsx, html, txt, md.")
         };
     }

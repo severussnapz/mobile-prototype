@@ -1,0 +1,458 @@
+﻿# REQ-015: Non-Functional Requirements
+
+**Priority:** Must Have
+**Effort:** Medium (testing & validation); High (scalability architecture)
+**Risk:** Medium
+**Depends On:** All functional requirements (REQ-001 to REQ-014)
+
+---
+
+## User Story
+
+As a product owner and engineering team,
+I need the system to meet defined performance, availability, scalability, accessibility, and compatibility targets,
+So that the solution is safe, reliable, and usable across the full range of GP practice sizes and user devices.
+
+---
+
+## NFR-001: Performance
+
+**Target:** p99 latency < 2 seconds for all user-facing interactions.
+
+**Acceptance Criteria:**
+- [ ] 99% of all user-facing page loads and interactions complete in under 2 seconds, measured end-to-end from user action to UI response.
+- [ ] This target applies across all functional areas: inbox load, document open, search, filing, coding, task creation, annotation.
+- [ ] Performance is measured under realistic concurrent load (see NFR-003 Scalability).
+- [ ] SLOs defined inline within individual REQ-*.md files are consistent with this overarching target and take precedence where more specific.
+
+**Notes:**
+- Document viewer first-render (REQ-004) and file conversion (REQ-005) have their own SLOs which may extend beyond 2 seconds for large files; these are explicitly carved out and documented in their respective requirements.
+
+---
+
+## NFR-002: Availability
+
+**Target:** 99.9% uptime measured on a rolling 30-day basis.
+
+**Acceptance Criteria:**
+- [ ] System availability ≥ 99.9% per calendar month (equivalent to ≤ 43.8 minutes downtime per month).
+- [ ] Planned maintenance windows are excluded from availability calculation provided they are communicated to practices with appropriate notice.
+- [ ] Partial degradation (e.g. a single inbound source unavailable per REQ-002) does not count as full system unavailability provided the core inbox and filing workflow remain functional.
+- [ ] Availability is monitored continuously; alerts triggered before SLO breach.
+- [ ] Recovery Time Objective (RTO): system restored within 1 hour of a full outage.
+- [ ] Recovery Point Objective (RPO): no more than 15 minutes of data loss in a full outage scenario.
+
+---
+
+## NFR-003: Scalability
+
+**Throughput model:**
+
+| Practice size | Patients | Documents/day (baseline) |
+|---------------|----------|--------------------------|
+| Smaller practice | 6,000 | 250 |
+| PCN Hub | 100,000 | 1,300 |
+
+**Scaling ratio:** ~0.0417 documents per patient per day (250 / 6,000). Linear scale applies as patient list size increases between these bounds and beyond.
+
+**Important population note:** Elderly patient populations generate significantly more inbound documents than younger populations. Practices with older demographic profiles should be expected to operate at the upper end of the scaling range even at lower total patient list sizes. The system must accommodate demographic-driven throughput variation without performance degradation.
+
+**Acceptance Criteria:**
+- [ ] System handles the documented per-practice throughput at the performance targets defined in NFR-001 without degradation.
+- [ ] System scales linearly as patient list size increases beyond 100,000 patients (e.g. large PCN or federated practice group).
+- [ ] Peak load handling: system must sustain 3× baseline throughput for periods of up to 1 hour (e.g. morning document burst, post-weekend backlog).
+- [ ] Concurrent users: system must support at least 10 concurrent active users per practice without performance degradation.
+- [ ] Scalability is achieved without manual infrastructure intervention (auto-scaling required).
+- [ ] Throughput targets may be refined following pilot data; current figures are working assumptions based on stated practice sizes.
+
+**Scaling formula (working assumption):**
+> `documents_per_day = (patient_list_size / 6,000) × 250`
+>
+> This may be adjusted upward for practices with above-average elderly populations.
+
+---
+
+## NFR-004: Accessibility
+
+**Target:** WCAG 2.1 Level AA compliance.
+
+**Acceptance Criteria:**
+- [ ] All screens and interactions meet WCAG 2.1 Level AA.
+- [ ] WCAG compliance is tested (not assumed) — `jest-axe` + `toHaveNoViolations()` required in every component test file per EMIS-X platform mandate (A11Y-010).
+- [ ] WCAG compliance validated using automated tooling (jest-axe) AND manual testing with assistive technologies (screen reader, keyboard-only navigation) prior to release.
+- [ ] WCAG standards are built into the EMIS-X UI design system; all components used must be from `@emisgroup/ui-*` to inherit baseline accessibility compliance (DS-001).
+
+**Notes:**
+- Accessibility compliance is a legal obligation under the Public Sector Bodies Accessibility Regulations 2018 and the Equality Act 2010.
+- Automated testing catches approximately 30–40% of WCAG issues; manual testing is required to achieve full AA compliance.
+
+---
+
+## NFR-005: Browser & Platform Compatibility
+
+**Supported browsers:**
+
+| Browser | Minimum version |
+|---------|----------------|
+| Google Chrome | Current - 1 |
+| Microsoft Edge | Current - 1 |
+| Mozilla Firefox | Current - 1 |
+| Apple Safari | Current - 1 |
+| Electron (Companion app) | As specified by EMIS-X Companion platform |
+
+**Responsive design:** Solution must support responsive layouts for:
+- Desktop (1280px+ width)
+- Tablet (768px–1279px width)
+- Mobile (320px–767px width)
+
+**Acceptance Criteria:**
+- [ ] All screens function correctly and meet performance targets across all supported browsers.
+- [ ] Responsive layout tested at desktop, tablet, and mobile breakpoints.
+- [ ] Companion app delivered via Electron; browser-specific APIs not used in Electron-incompatible ways.
+- [ ] No browser-specific polyfills that introduce security vulnerabilities.
+- [ ] All UI components from `@emisgroup/ui-*` (DS-001); no native HTML elements that may behave inconsistently across browsers.
+
+---
+
+## NFR-006: Security Baseline
+
+> These are the platform-level security NFRs. Individual REQ-*.md files contain requirement-specific security checks.
+
+**Acceptance Criteria:**
+- [ ] All HTTP traffic over TLS 1.2+ (SEC-001).
+- [ ] `@emisgroup/acp-security-headers` included in all frontend package.json dependencies (WSEC-013).
+- [ ] No secrets, credentials, or API keys in source code or environment variables — Azure Key Vault only (SEC-002).
+- [ ] All user-supplied URL values encoded with `encodeURIComponent()` (WSEC-006a).
+- [ ] Dependency vulnerability scanning run as part of CI pipeline; critical CVEs block deployment.
+
+---
+
+## NFR-007: Observability Baseline
+
+> These are the platform-level observability NFRs. Individual REQ-*.md files contain requirement-specific OTEL spans and SLOs.
+
+**Acceptance Criteria:**
+- [ ] All services instrumented with OpenTelemetry (OTEL); traces, metrics, and structured logs emitted.
+- [ ] p99 latency dashboards configured for all user-facing operations.
+- [ ] Availability monitoring configured; alerting triggers before 99.9% SLO breach.
+- [ ] Error rate dashboards configured; anomalous error rates trigger alerts.
+- [ ] All audit log writes monitored; failures trigger immediate alerts (see REQ-009).
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**NFR telemetry and health resources:**
+- `GET /health`
+- `GET /health/dependencies`
+- `GET /observability/slo-status`
+
+**Non-functional contract points:**
+- All user-facing APIs must emit trace identifiers and structured error envelopes.
+- Latency and error metrics must be tagged per operation and per organisation.
+- Availability status endpoints must not expose sensitive internals while still providing operational diagnostics.
+
+### Database Schema
+
+**N/A — Non-Functional Requirements document.** REQ-015 specifies cross-cutting performance, availability, accessibility, and observability targets. No dedicated database table is owned by this requirement.
+
+### Component Interfaces
+
+```csharp
+public interface INfrObservabilityService
+{
+  Task<Result<HealthStatusResource>> GetHealthAsync(CancellationToken cancellationToken = default);
+  Task<Result<DependencyHealthResource>> GetDependencyHealthAsync(CancellationToken cancellationToken = default);
+  Task<Result<SloStatusResource>> GetSloStatusAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### Alerting Conditions
+
+| Condition | Threshold | Severity | Channel |
+|---|---|---|---|
+| p99 latency SLO breach (any user-facing API) | p99 > 2 seconds sustained for 5 min | HIGH | Ops alert |
+| Availability SLO breach | Service availability < 99.9% over rolling 5-minute window | CRITICAL | On-call page |
+| Accessibility regression | `jest-axe` violations detected in CI build | HIGH | CI build fail |
+| Security header missing | `@emisgroup/acp-security-headers` check fails in deployment | CRITICAL | CI build fail |
+| Cross-browser smoke test failure | Any browser environment fails baseline smoke tests | HIGH | CI build fail |
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: NFR-001 — Performance Regression Test
+- **Trigger:** CI pipeline / load test run
+- **Test Scenario:** p99 latency under load
+  - Setup: Simulate concurrent load at baseline throughput (per NFR-003)
+  - Validation: p99 latency < 2 seconds for inbox load, search, document open, filing submission
+  - Validation: No user-facing operation exceeds 2 seconds at p99 (except carved-out document viewer/conversion SLOs)
+- **Pass Criteria:** p99 < 2 seconds confirmed under realistic load
+
+### CHECK 2: NFR-002 — Availability Monitoring Active
+- **Trigger:** Production deployment
+- **Test Scenario:** Availability monitoring configuration
+  - Validation 1: Uptime monitoring configured and active for all user-facing endpoints
+  - Validation 2: Alert configured to trigger when projected 30-day availability falls below 99.95% (early warning before 99.9% breach)
+  - Validation 3: RTO / RPO recovery procedures documented and tested
+- **Pass Criteria:** Monitoring active; alert thresholds configured; recovery procedures tested
+
+### CHECK 3: NFR-004 — Accessibility Automated Tests Pass
+- **Trigger:** CI pipeline
+- **Test Scenario:** jest-axe compliance
+  - Validation 1: Every component test file includes `jest-axe` + `toHaveNoViolations()`
+  - Validation 2: All automated accessibility tests pass with zero violations
+  - Validation 3: No `@emisgroup/ui-*` components replaced with native HTML equivalents
+- **Guardrail:** A11Y-010, DS-001
+- **Pass Criteria:** Zero axe violations in CI; all components from EMIS-X design system
+
+### CHECK 4: NFR-005 — Cross-Browser Smoke Tests Pass
+- **Trigger:** Pre-release testing
+- **Test Scenario:** Cross-browser compatibility
+  - Validation: Core user journeys (inbox → file → code → task → done) tested and passing in Chrome, Edge, Firefox, Safari, and Electron
+- **Pass Criteria:** No browser-specific failures in core journeys
+
+### CHECK 5: NFR-006 — Security Headers Present
+- **Trigger:** Any HTTP response from the application
+- **Test Scenario:** Security header validation
+  - Validation 1: `@emisgroup/acp-security-headers` security headers present in all responses
+  - Validation 2: No hardcoded secrets detected in source code scan
+  - Validation 3: TLS version ≥ 1.2 on all endpoints
+- **Guardrail:** WSEC-013, SEC-001, SEC-002
+- **Pass Criteria:** All security headers present; no secrets in code; TLS 1.2+ enforced
+
+---
+
+
+### CHECK 17: PXD-001 — WCAG 2.1 Compliance Baseline
+
+**Trigger:** Full accessibility audit across all Document Manager screens
+
+**Test Scenario:**
+- Validation 1: All screens pass `jest-axe ^9.0.0` with 0 violations
+- Validation 2: AAA screens (patient match, filing, coding, annotation, confidentiality) pass AAA-level manual audit
+- Validation 3: All interactive elements use `@emisgroup/ui-*` (no native HTML interactive elements)
+- Validation 4: All inputs have accessible labels (Rule A confirmed per REQ PxD sections)
+- Validation 5: All loading/error states have `aria-live` announcements (Rule B confirmed per REQ PxD sections)
+
+**Pass Criteria:** 0 axe violations across all screens; AAA for clinical surfaces — NFR-004 / A11Y-010 satisfied
+
+---
+
+### CHECK 18: PXD-002 — Responsive Layout at Breakpoints
+
+**Trigger:** Application loaded at each defined breakpoint
+
+**Test Scenario:**
+- Validation 1: Desktop (1024px): 3-column gallery renders (Queue-Peek + Viewer + Protocol Panel)
+- Validation 2: Tablet (768px): Protocol Panel collapses; Queue-Peek hidden
+- Validation 3: Mobile (375px): Queue list accessible; tapping a document opens viewer; tapping workflow button opens Protocol Panel as full-width overlay (100vw × 100%, fixed, scrollable); full workflow steps (Match → File → Code → Task) accessible within overlay; close button returns to document viewer
+- Validation 4: No horizontal scroll at any breakpoint
+
+**Pass Criteria:** Layout adapts correctly at all 4 breakpoints — NFR-005 / DS-001 satisfied
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Minimal PxD.** REQ-015 is cross-cutting NFRs. PxD contribution: WCAG 2.1 AA compliance confirmation, responsive breakpoints, performance budget per screen, and accessibility tooling requirements.
+
+---
+
+### Responsive Design Breakpoints (EMIS Standard — Document Manager)
+
+| Breakpoint | Width | Layout behaviour |
+|------------|-------|-----------------|
+| Mobile | 320px–767px | Single column queue list; full workflow available — Protocol Panel opens as a full-width overlay covering the document viewer (100vw × 100%, fixed position, scrollable within panel); upload zone available |
+| Tablet | 768px–1023px | 2-column; Protocol Panel collapses to bottom sheet; Queue Peek hidden |
+| Desktop | 1024px–1440px | Full 3-column gallery (Queue-Peek + Viewer + Protocol Panel); primary target |
+| Large Desktop | 1441px+ | Same as Desktop; max-width 1920px; centred content |
+
+> Primary device target: Desktop (GP surgery admin workstation). Mobile = Supported; Protocol Panel rendered as a full-width overlay at <768px — covers the document viewer completely (100vw × 100%, fixed position, scrollable within panel). Full workflow (Match → File → Code → Task) is available on mobile via this overlay pattern.
+
+---
+
+### Performance Budget (per screen)
+
+| Screen | Target (p99 interaction) | Notes |
+|--------|--------------------------|-------|
+| Queue list load | < 800ms | 50 rows; virtualised |
+| Document viewer open | < 1500ms | First render of pre-built viewer |
+| Search results | < 500ms | Debounced 300ms; results from API |
+| Tag picker open | < 200ms | From cached taxonomy |
+| Routing rule save | < 1000ms | Includes disclaimer check + audit write |
+
+---
+
+### WCAG 2.1 AA Compliance Summary
+
+All UI surfaces in Document Manager must meet WCAG 2.1 AA minimum. The following surfaces require WCAG 2.1 **AAA**:
+
+| Surface | Level | Reason |
+|---------|-------|--------|
+| Patient Match (REQ-011) | AAA | Clinical — wrong match is Critical risk |
+| Filing form (REQ-012) | AAA | Clinical — metadata errors affect patient record |
+| Coding panel (REQ-013) | AAA | Clinical — coding errors affect clinical record |
+| Annotation form (REQ-008) | AAA | Clinical — patient visibility setting |
+| Confidentiality controls (REQ-014) | AAA | Clinical + IG |
+
+**Automated testing:** `jest-axe ^9.0.0` in devDependencies is mandatory. Minimum test pattern per component:
+
+```tsx
+import { axe, toHaveNoViolations } from 'jest-axe';
+expect.extend(toHaveNoViolations);
+it('has no accessibility violations', async () => {
+  const { container } = render(<ComponentUnderTest />);
+  expect(await axe(container)).toHaveNoViolations();
+});
+```
+
+---
+
+### Design Tokens — Cross-Cutting Confirmation
+
+All Document Manager components use semantic tokens from `packages/design-tokens/tokens.json`. No hardcoded hex/rgb values in component code. Full token set confirmed in REQ-001 PxD. Extension tokens (if any) declared in the relevant REQ PxD Visual Design section.
+
+---
+
+## Traceability
+
+| NFR | Target | Guardrail | Evaluation Check |
+|-----|--------|-----------|------------------|
+| NFR-001 | p99 < 2s | — | CHECK 1 |
+| NFR-002 | 99.9% availability | — | CHECK 2 |
+| NFR-003 | Linear scale 250/6k ratio | — | CHECK 1 (load profile) |
+| NFR-004 | WCAG 2.1 AA | A11Y-010, DS-001 | CHECK 3 |
+| NFR-005 | Chrome, Edge, Firefox, Safari, Electron | DS-001 | CHECK 4 |
+| NFR-006 | Security baseline | WSEC-013, SEC-001, SEC-002 | CHECK 5 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — auto-scaling strategy, load balancing, CDN configuration, RTO/RPO implementation, performance testing approach
+- V1c will ADD: Design section — API rate limiting, pagination strategies to meet latency targets, caching strategy
+- V1d will ADD: UI/UX section — responsive layout breakpoint specifications, performance budget per screen
+- V1e will ADD: Clinical Safety section — availability SLO as a clinical safety consideration; impact of downtime on patient care
+- **Throughput model:** Working assumptions based on stated practice sizes; to be refined with pilot telemetry data
+- **Elderly population factor:** Monitor throughput per patient in pilot practices; adjust scaling model if demographic-driven variance is significant
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Enforce cross-cutting performance, reliability, security, and accessibility across 4000 practices.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: CrossCuttingArchitecture
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | CrossCuttingArchitecture |
+| service_scope | existing_modify |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | null |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+OTEL monitoring, security headers, IAM/auth, and CI quality gates across modules.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+

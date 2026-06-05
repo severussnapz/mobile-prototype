@@ -1,0 +1,392 @@
+﻿# REQ-005: File Format Support & Conversion
+
+**Priority:** Must Have
+**Effort:** None — pre-built ✅
+**Risk:** Low (existing component); Medium (RTF conversion quality — known issue)
+**Depends On:** REQ-004 (Document Viewer & Navigation)
+
+> ⚠️ **Implementation note:** File format support and conversion is already built as a reusable component. **Do not re-implement.** V1b/V1c/V1d agents should reference and integrate the existing component. Confirm supported format list, conversion pipeline interface, and known RTF issue workarounds with the owning team before V1b.
+
+---
+
+## User Story
+
+As a practice administrator or clinician,
+I need documents in any supported format to be rendered consistently in the viewer,
+So that I can read all inbound documents regardless of how they were created or transmitted.
+
+**Acceptance Criteria:**
+- [ ] The following inbound formats are supported: PDF, TIFF, JPEG, PNG, Word (.doc/.docx), RTF, CDA XML.
+- [ ] All formats except CDA XML are converted to PDF on ingestion and displayed via the PDF viewer (REQ-004).
+- [ ] CDA XML documents are rendered using an XSL stylesheet to produce a structured, human-readable view.
+- [ ] Where an RTF document fails to convert to PDF due to source file format issues, an explicit error is surfaced to the user (rather than silently failing or displaying a blank document).
+- [ ] The original source file is preserved alongside the converted rendition and is available for export in its original format (see REQ-006).
+
+---
+
+## Known Issue: RTF Conversion
+
+> RTF → PDF conversion has known failures caused by source file format quality issues (malformed or non-standard RTF). This is a pre-existing limitation of the reusable component. The requirement captures the expected failure behaviour; resolution of the underlying conversion issue is tracked separately by the owning team.
+
+---
+
+## Supported Format Matrix
+
+| Format | Inbound Source Examples | Conversion | Rendered As |
+|--------|------------------------|------------|-------------|
+| PDF | MESH, NHSmail, upload | None | PDF (native) |
+| TIFF | Scanner, MESH | → PDF | PDF rendition |
+| JPEG | Scanner, upload | → PDF | PDF rendition |
+| PNG | Scanner, upload | → PDF | PDF rendition |
+| Word (.doc/.docx) | NHSmail, upload | → PDF | PDF rendition |
+| RTF | Legacy systems, upload | → PDF (⚠️ known conversion issues) | PDF rendition / error state |
+| CDA XML | MESH, MIG, FHIR, EDT | XSL stylesheet | Structured HTML view |
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-010:** Error Handling Patient Safety — conversion failures must surface explicit errors; never render a blank or partial document silently
+- **CLIN-007:** Hazard Mitigation Evidence — original file preserved so content is recoverable even if rendition fails
+
+### Hazards Addressed
+
+- **HAZ-DOC-014:** Conversion failure results in blank or unreadable document displayed — clinician believes document has no content
+  - **Severity:** High
+  - **Likelihood:** Low–Medium (higher for RTF)
+  - **Risk Level:** High
+
+- **HAZ-DOC-015:** CDA XML stylesheet rendering omits or misrepresents structured clinical content
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-016:** Original file lost after conversion — content unrecoverable if rendition is incorrect
+  - **Severity:** Medium
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+### Mitigations
+
+- **MIT-DOC-013:** Explicit error state for conversion failures; never silent blank render
+  - **Type:** Error Handling
+  - **Effectiveness:** Complete (for awareness; does not recover content)
+
+- **MIT-DOC-014:** Original source file preserved at rest alongside PDF rendition
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-015:** CDA XML stylesheet validated against known CDA document structures; rendering reviewed as part of clinical safety assessment
+  - **Type:** Validation
+  - **Effectiveness:** Partial (stylesheet coverage must be maintained as CDA profiles evolve)
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-004:** Special Category Data Protection — original files and PDF renditions encrypted at rest (AES-256-GCM)
+- **IG-010:** Retention Policy Enforcement — both original and rendition subject to NHS records retention schedules (IF3005)
+
+### Data Handling
+- Original source file retained alongside PDF rendition; both subject to the same retention and deletion schedule
+- CDA XML stylesheet rendering does not write intermediate files to unencrypted storage
+- Conversion pipeline processes documents in memory or encrypted temporary storage; no plaintext intermediate files persisted to disk
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — document content (both original and rendition) accessible only to authorised users
+- **SEC-001:** TLS Encryption — all document content served over TLS 1.2+
+
+### Security Requirements
+- Conversion pipeline sandboxed; malformed RTF or XML files must not be able to exploit the conversion process (e.g. XML external entity injection in CDA XML)
+- CDA XML must be parsed with external entity resolution disabled (XXE prevention)
+- XSL stylesheet is a controlled, versioned artefact — not user-supplied
+
+---
+
+## Dimension 4: Observability & Performance
+
+### Product KPIs
+- Conversion success rate per format
+- Conversion latency (ingestion received → rendition available)
+- RTF conversion failure rate (tracked separately given known issue)
+- CDA XML stylesheet render success rate
+
+### Observable Events (OTEL Instrumentation)
+- `documents.conversion.initiated` — conversion triggered for an ingested document
+- `documents.conversion.completed` — rendition successfully produced
+- `documents.conversion.failed` — conversion failed; error type and source format recorded
+- `documents.conversion.cda_rendered` — CDA XML stylesheet rendering completed
+
+### Performance SLOs
+- Conversion success rate: ≥ 99% for PDF, TIFF, JPEG, PNG, Word
+- Conversion success rate: best-effort for RTF (known issue; tracked separately)
+- Conversion latency: p95 < 30 seconds from ingestion to rendition available
+- CDA stylesheet render: p95 < 5 seconds
+
+### Alerting Conditions
+
+| Condition | Threshold | Severity | Channel |
+|---|---|---|---|
+| Conversion failure rate spike | > 1% for any supported format (excluding RTF) | CRITICAL | On-call page |
+| RTF conversion failure spike | > 10% of RTF conversions (known issue — tracked separately) | HIGH | Ops alert |
+| Conversion latency breach | p95 > 30 seconds from ingestion to rendition | HIGH | Ops alert |
+| CDA stylesheet render failure | > 0.5% of CDA documents fail stylesheet rendering | HIGH | Ops alert |
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Implementation rule:** Use existing pre-built conversion component and pipeline; do not re-implement core converters.
+
+**Conversion resources and endpoints:**
+- `GET /documents/{documentGuid}/rendition-status`
+- `GET /documents/{documentGuid}/rendition`
+- `GET /documents/{documentGuid}/original`
+
+**Format policy:**
+- PDF/TIFF/JPEG/PNG/Word/RTF convert to PDF rendition.
+- CDA XML renders through stylesheet pipeline.
+- Original source file is preserved for REQ-006 export behaviors.
+
+### Database Schema
+
+**N/A — pre-built conversion component.** REQ-005 integrates the existing document conversion pipeline. No dedicated database table is owned by this requirement; rendition status is tracked in the shared `documents` table owned by the ingestion pipeline.
+
+### Component Interfaces
+
+```csharp
+public interface IDocumentRenditionService
+{
+  Task<Result<RenditionStatusResource>> GetStatusAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+  Task<Result<RenditionResource>> GetRenditionAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+  Task<Result<OriginalFileResource>> GetOriginalAsync(Guid documentGuid, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-010 — Conversion Failure Surfaces Explicit Error
+- **Trigger:** Document conversion fails (e.g. malformed RTF)
+- **Test Scenario:** RTF conversion failure
+  - Input: Malformed RTF file known to fail conversion
+  - Validation 1: Viewer displays an explicit, named error state (not blank, not spinner)
+  - Validation 2: Error message identifies that the document could not be rendered
+  - Validation 3: Error does not expose internal system details (file path, stack trace)
+  - Validation 4: Original file remains accessible for download/export despite render failure
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-014
+- **Pass Criteria:** Conversion failures always surface explicit error; original file preserved and accessible
+
+### CHECK 2: SEC — XXE Prevention in CDA XML Parsing
+- **Trigger:** CDA XML document ingested and parsed for stylesheet rendering
+- **Test Scenario:** XML External Entity (XXE) injection attempt
+  - Input: CDA XML document containing an external entity declaration (e.g. `<!ENTITY xxe SYSTEM "file:///etc/passwd">`)
+  - Validation 1: Parser rejects or ignores external entity declarations
+  - Validation 2: No file system or network access triggered by document content
+  - Validation 3: Document either renders safely (entity ignored) or fails with an explicit error
+- **Hazard:** Server-side request forgery / data exfiltration via malicious document
+- **Pass Criteria:** XXE injection blocked; external entities never resolved
+
+### CHECK 3: CLIN-007 — Original File Preserved Post-Conversion
+- **Trigger:** Any document ingested and converted to PDF
+- **Test Scenario:** Original file availability
+  - Validation 1: Original source file retrievable via API after PDF rendition is created
+  - Validation 2: Original file content matches pre-ingestion source (no corruption during conversion pipeline)
+  - Validation 3: Original file subject to same access controls as PDF rendition
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-016
+- **Pass Criteria:** Original file preserved, retrievable, and access-controlled post-conversion
+
+### CHECK 4: AUTH-004 — Both Original and Rendition Require Authorisation
+- **Trigger:** Requests for original file or PDF rendition
+- **Test Scenario:** Unauthorised access to original file
+  - Request original file without authorisation → access denied (401)
+  - Request PDF rendition without authorisation → access denied (401)
+  - Request with valid JWT + correct scope → both accessible
+- **Guardrail:** AUTH-004
+- **Pass Criteria:** Both original and rendition access-controlled consistently
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-005 | HAZ-DOC-014 | Explicit error on conversion failure | CLIN-010 | CHECK 1 |
+| REQ-005 | HAZ-DOC-015 | CDA XML XXE prevention | SEC | CHECK 2 |
+| REQ-005 | HAZ-DOC-016 | Original file preserved | CLIN-007 | CHECK 3 |
+| REQ-005 | — | Auth on original + rendition | AUTH-004 | CHECK 4 |
+| REQ-005 | HAZ-DOC-014 | Conversion failure Banner (Document Manager layer) | CLIN-010 | CHECK 1 | ConversionErrorBanner |
+| REQ-005 | HAZ-DOC-014 | Conversion failure surfaced explicitly — causes 1, 3, 4 (Cause 2 BLOCKED PL-6) | CLIN-004 | CHECK 5 |
+| REQ-005 | HAZ-DOC-015 | CDA rendering integrity — structured sections not omitted or misrepresented | CLIN-010 | CHECK 6 |
+| REQ-005 | HAZ-DOC-016 | Original file retained immutably; not overwritten by conversion | CLIN-005 | CHECK 7 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — reference existing conversion component; document integration point, format pipeline, original file storage strategy
+- V1c will ADD: Design section — document content API (original vs rendition endpoints), CDA stylesheet versioning strategy
+- V1d will ADD: UI/UX section — conversion error state design, CDA stylesheet rendered view design
+- V1e will ADD: Clinical Safety section — DCB0129 entries for HAZ-DOC-014/015/016; CDA stylesheet clinical review record
+- **RTF conversion issue:** Track as known defect in the existing component; resolution owned by component team
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation |
+| 1.1 | 2026-05-21 | V1b Architecture | Added Architecture section |
+| 1.2 | 2026-05-28 | V1d PxD | Added Minimal PxD section: integration notes (format list, CDA rendering, pre-built component boundary), conversion failure error state (Banner + download link). Document Manager layer owns error surfacing only. Traceability updated. |
+| 1.3 | 2026-05-29 | V1e Clinical Safety | Added Clinical Safety section (IF678 hazard cards for HAZ-DOC-014/015/016; per-cause HIT Design controls with CLIN-004/005/010; CHECK 5-7 added). HAZ-DOC-014 Cause 2 BLOCKED pending PL-6 resolution. Severity/likelihood deferred to CSO manual entry (D-008). CSO sign-off deferred (D-031). Traceability updated. |
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Maintain broad format support while preserving original files and reliable PDF viewability.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentConversionService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentConversionService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /documents/{documentGUID}/conversion-status (GET) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+Existing conversion component, upload flow, and viewer handoff.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+---
+
+## Clinical Safety (Added by V1e)
+
+> Full IF678 hazard cards: `requirements/HAZARD-REGISTRY.md`
+
+**Hazard IDs:** HAZ-DOC-014, HAZ-DOC-015, HAZ-DOC-016
+**CLIN Guardrails:** CLIN-004 (Fail-Safe Error Handling), CLIN-005 (Clinical Data Transactional Integrity), CLIN-010 (Third-Party Clinical Risk)
+**HIT Design Controls:**
+- HAZ-DOC-014: see HAZARD-REGISTRY.md (CHECK 5)
+- HAZ-DOC-015: see HAZARD-REGISTRY.md (CHECK 6)
+- HAZ-DOC-016: see HAZARD-REGISTRY.md (CHECK 7)
+**Residual Risk Level:** [TBD — ALARP pending CSO Phase 6 assessment], CSO: Dan Watts
+
+---
+
+### DCB0129/0160 Compliance
+
+- Clinical Risk Management Plan: ✅ In place
+- Hazard Log (IF678): ✅ Documented in `requirements/HAZARD-REGISTRY.md`
+- Risk Assessment: ⏳ Pending — severity/likelihood to be entered by CSO (D-008)
+- Mitigations: ✅ Defined and CLIN-referenced
+- Residual Risk: ⏳ Pending — ALARP assessment deferred pending risk scores (Phase 6)

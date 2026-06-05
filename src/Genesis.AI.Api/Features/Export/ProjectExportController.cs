@@ -120,6 +120,18 @@ public class ProjectExportController : ControllerBase
             var entryPath = "artefacts/" + artefact.FilePath.TrimStart('/');
             var entry = archive.CreateEntry(entryPath);
 
+            if (IsBinaryContent(artefact.ContentType))
+            {
+                var binaryContent = await _artefactStorageService.GetBinaryContentAsync(artefact.S3Key, cancellationToken);
+                if (binaryContent is { Length: > 0 })
+                {
+                    await using var binaryStream = entry.Open();
+                    await binaryStream.WriteAsync(binaryContent, cancellationToken);
+                }
+
+                continue;
+            }
+
             var content = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
 
             if (!string.IsNullOrEmpty(content))
@@ -128,6 +140,45 @@ public class ProjectExportController : ControllerBase
                 await writer.WriteAsync(content);
             }
         }
+    }
+
+    private static bool IsBinaryContent(string contentType)
+    {
+        return !IsTextContent(contentType);
+    }
+
+    /// <summary>
+    /// Returns true only for content types we can safely round-trip as UTF-8 text.
+    /// Everything else (office documents, PDFs, images, archives) is treated as
+    /// binary. We deliberately avoid a bare "contains xml" check because Office
+    /// Open XML types such as the xlsx spreadsheet content type contain the
+    /// substring "openxml" yet are binary zip containers.
+    /// </summary>
+    private static bool IsTextContent(string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+            return false;
+
+        // Strip any parameters (e.g. "; charset=utf-8") and normalise.
+        var mediaType = contentType.Split(';', 2)[0].Trim().ToLowerInvariant();
+
+        if (mediaType.StartsWith("text/", StringComparison.Ordinal))
+            return true;
+
+        if (mediaType.EndsWith("+json", StringComparison.Ordinal)
+            || mediaType.EndsWith("+xml", StringComparison.Ordinal))
+            return true;
+
+        return mediaType switch
+        {
+            "application/json" => true,
+            "application/xml" => true,
+            "application/markdown" => true,
+            "application/yaml" => true,
+            "application/x-yaml" => true,
+            "application/csv" => true,
+            _ => false
+        };
     }
 
     private async Task WritePrototypePromptAsync(ZipArchive archive, Domain.AggregatesModel.ProjectAggregate.Project project, CancellationToken cancellationToken)

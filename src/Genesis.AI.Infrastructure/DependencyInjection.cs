@@ -1,5 +1,6 @@
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.Enums;
+using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Repositories;
 using Genesis.AI.Infrastructure.Services;
@@ -30,6 +31,8 @@ public static class DependencyInjection
         services.AddSingleton<IAiService, BedrockAiService>();
         services.AddSingleton<IPromptService, EmbeddedPromptService>();
         services.AddSingleton<ISkillContentService, SkillContentService>();
+        services.AddSingleton<IHazardRegistryParser, HazardRegistryParser>();
+        services.AddSingleton<IHazardLogExcelBuilder, HazardLogExcelBuilder>();
 
         AddS3(services, configuration);
 

@@ -1,0 +1,468 @@
+# Documents Management Core — Requirements Manifest
+
+**Version:** 0.2 (V1a Requirements Amendment Complete)
+**Created:** 2026-05-18
+**Amended:** 2026-05-19
+**Status:** V1c Complete — Design sections added across REQ-001 to REQ-015; ready for V1d PxD
+
+**Pipeline Status:** V1a ✅ → V1b ✅ → V1c ✅ → V1d ✅ → V1e ✅ → V2 ✅ → V1f ✅ → Coding Agent ⏳
+**Last HAZ-ID Assigned:** HAZ-DOC-055
+
+## V1c → V1d Handoff Notes
+
+> Read this section before starting V1d. These are known blockers that affect V1d scope.
+
+### 🔴 Blockers — Do Not Skip
+- REQ-010 legal/regulatory blocker remains open for metadata-based routing rule manufacturer responsibility under UK MDR 2002.
+- REQ-002 NHSmail production access route confirmation with NHS England remains unresolved for production go-live.
+
+### 🟡 Decisions to Clarify in V1d
+- Final user-facing wording and interaction model for cross-system boundary notices (EMIS Web vs EMIS-X) in REQ-008.
+- UX treatment for non-authoritative NHSmail-origin task/match context in queue and document detail screens.
+- Final copy and placement for confidentiality and patient online visibility non-default warnings in REQ-014.
+
+### 🟢 Deferred Items
+- Fuzzy/partial patient matching remains deferred (REQ-011 Parking Lot), pending V1e safety analysis.
+- User-defined group management and task reassignment remain Phase 2 items (REQ-010).
+- Source availability user-facing banner remains out of current scope (REQ-002), with operational monitoring retained.
+
+---
+
+## V1f → V3 Coding Agent Handoff Notes
+
+> V3: Read ONLY your assigned TASK-NNN.json file. Do NOT read V2 JSON, Task_Plan.json, or requirements files.
+> 
+> Start with: `output/tasks/task_index.json` → find your task → load `output/tasks/TASK-NNN.json` only.
+
+### 🔴 Blockers — Do Not Skip
+
+- **PL-10 (HAZ-DOC-035):** `PatientMatchPanel` — TASK-039. CSO sign-off required before shipping to production. Build the component with `// TODO: BLOCKED-PL-10 CSO sign-off required` on the confirm handler. Do NOT remove this comment until CSO signs off HAZ-DOC-035.
+- **PL-12 (TECH-002):** InboxFlow autosave → provisional status transitions deferred until TECH-002 resolved. Autosave implemented; provisional status gate excluded from Increment 1.
+- **PL-6 (HAZ-DOC-014 C2):** Conversion error propagation path from Lambda → API layer unconfirmed. Build error path in IDocumentStorageService; full propagation TBC with infra team.
+- **PL-7 (HAZ-DOC-019 C2):** Search index latency SLO unconfirmed. DocumentSearchService built; p99 < 2s to be validated by load test post-deployment.
+
+### 🟡 TASK-001 Prerequisites
+
+- Clone `document-manager-api` repo: `git clone git@github.com:emisgroup/document-manager-api.git`
+- The solution currently has a Hello.World scaffold. TASK-001 renames it to DocumentsManager.*.
+- Start ALL API coding tasks from the `document-manager-api` repo.
+- Start ALL FE coding tasks from the `document-manager` webapp repo (clone separately at TASK-033).
+
+### 🟢 Deferred to Increment 2+
+
+- Filing, coding, tasking workflow (DOC_REQ003/006/008/010/012/013/014) — not in Increment 1.
+- NHSmail stored-copy notice (REQ-002) — Increment 1 build; production behind feature flag.
+- CloudWatch IaC — SRE team repo (see `deploy/alarms/ALARMS_SPEC.md` — TASK-046).
+
+### ⚠️ Agent Handoff Points
+
+- **GATE-3 (after TASK-032):** Stop using `EMIS-X_API_ENGINEER`. Switch to `EMIS-X_WEBAPP_ENGINEER` for all Layer 4+ tasks.
+- **GATE-4 (after TASK-049):** All coding complete. Fill in `ops-config.json` (copy from `ops-config.template.json`) then run **V1g Operations**.
+
+### 📋 V3 Operating Instructions
+
+- Read `output/tasks/task_index.json` for execution order and gate definitions
+- For each task: load ONLY `output/tasks/TASK-NNN.json` — all context is self-contained
+- The `context` section = your reference material (guardrails, interfaces, schema)
+- The `checks[]` array = your acceptance tests
+- The `verification` section = how to prove completion
+- Run `verification.analyser_command` before closing any session — binary pass/fail
+- Fix failures in the SAME session (cache exploitation — see Rule C6)
+- After each task: `git diff --name-only` — reject any edits outside `specification.file_path`
+
+---
+
+## Product Overview
+
+Documents Management Core is the initial 30-day delivery phase of the EMIS-X Documents Manager — a generic document management solution for General Practice in England, initially scoped to the EMIS Web install base. The product launches inbox-first — consolidating all inbound document management into a single, safe, efficient workflow — with a strategic intent to deliver functionality that makes third-party solutions (Docman, Anima) obsolete and replaces current EMIS Web document workflow capabilities.
+
+**North Star:** Design a document management module which is *safe*, *fast and easy to use*, *automates administrative actions* and *isn't reliant on 3rd party vendors*.
+
+**Delivery Channels:** Companion app + Browser (both required at launch)
+
+**Regulatory Classification:** DCB0129 (Clinical Risk Management — Manufacturer). SaMD classification assessment required pre go-live; current intent is to remain below medical device classification threshold.
+
+---
+
+## Target Environment
+
+| Item | Detail |
+|------|--------|
+| Market | General Practice, England |
+| Initial install base | EMIS Web practices |
+| In-use configurations | EMIS Web + EMIS-X; EMIS Web + Docman; EMIS Web + Anima |
+| Compliance domain | clinical-uk |
+
+---
+
+## Personas
+
+### Persona 1: Practice Admin / Document Processing Admin (Primary Operational User)
+- Handles high volumes; triage, filing, coding
+- May include dedicated coders in larger practices
+- Low–medium tech-savviness; change risk for long-tenured staff
+- Key need: low-friction UX at high volume
+
+### Persona 2: Clinician (GP / Pharmacist)
+- Primary goal: document content available as soon as possible
+- Top pain points:
+  1. Unclear what action is required / where to look
+  2. Delays before documents visible
+  3. Highlights/annotations not visible when viewing in EMIS
+
+---
+
+## Canonical Document Lifecycle (Happy Path)
+
+1. Document arrival
+2. Filing (match to patient + metadata)
+3. Coding (extract information + add codes)
+4. Handover (forward as task with highlighting/colour conventions)
+5. Clinician action
+6. Document task complete (actions completed; task trail remains visible)
+
+**Key determinant of positive flow:** accuracy of system suggestions.
+
+**Suggestion priority:**
+- Safety-critical: suggested actions, suggested codes
+- Efficiency: patient match, duplicate detection, document type, date, source/department, actions, codes
+
+**Accuracy benchmark:** Human-level accuracy, benchmarked against best human performance; gold standard defined by a dual review panel.
+
+**Autosave:** System must autosave state so users can resume after interruptions without data loss.
+
+**Definition of done:** A document is fully done when there is no further work required.
+
+---
+
+## Global Standards
+
+### Design System
+- **Primary Colour:** NHS Blue (#005EB8)
+- **Border Radius:** 8px standard
+- **Localisation:** British English (colour, centre, grey, behaviour, licence)
+- **Spacing:** 8px grid system
+- **Accessibility:** WCAG 2.1 Level AA
+
+### Technical Standards
+- **FHIR:** UK Core Implementation Guide v2.0+
+- **Authentication:** CIS2 OAuth2 with RBAC
+- **API Protocol:** REST over HTTPS (TLS 1.2+)
+- **Database:** Encryption at rest required (AES-256-GCM for special category data)
+
+### EMIS-X Platform Standards (Frontend — Non-Negotiable)
+
+| Mandate | Guardrail | Rule |
+|---------|-----------|------|
+| pnpm only — pnpm-lock.yaml required; package-lock.json/yarn.lock forbidden | WA-005 | CI fails without pnpm-lock.yaml |
+| `@emisgroup/ui-*` components — no native button/input/select/textarea/table/dialog/fieldset/legend/form | DS-001 | Guardrail scan per component file |
+| `var(--token-*)` tokens only in CSS/SCSS — no hardcoded hex/rgb/hsl | DS-002 | Guardrail scan per style file |
+| Iconify `~icons/ic/outline-*` — no lucide-react/react-icons/@heroicons/@fortawesome | DS-004 | Import pattern scan |
+| `@emisgroup/acp-security-headers` in package.json dependencies | WSEC-013 | package.json check |
+| `applicationDiscovery` block required in package.json | AD-001 | package.json schema check |
+| `axios.create({ timeout: 30_000 })` — no raw fetch(), no bare axios.get/post/put/patch/delete | HTTP-002a | Pattern scan |
+| No httpAgent/httpsAgent/keepAlive: true in browser code | HTTP-003a | Pattern scan |
+| `encodeURIComponent()` for all user-supplied URL values | WSEC-006a | URL template literal scan |
+| `t()` from react-i18next; translations in `src/locales/en-GB/translation.json` | WCS-007a | JSX text content scan |
+| British English in translation JSON | WCS-007b | JSON string value scan |
+| `jest-axe` + `toHaveNoViolations()` in every component test file | A11Y-010 | Test file scan |
+
+### Genesis AI Skills (Applicable Guardrails)
+- **Clinical Safety:** CLIN-001, CLIN-002, CLIN-003, CLIN-004, CLIN-005, CLIN-006, CLIN-007, CLIN-008, CLIN-009, CLIN-010
+- **Information Governance:** IG-001, IG-002, IG-003, IG-004, IG-005, IG-009, IG-010
+- **Security:** AUTH-004, SEC-001, SEC-002
+- **Observability:** OTEL spans, structured logging, SLO monitoring
+
+### Regulatory Framework
+- **Clinical Safety:** DCB0129 (Clinical Risk Management — Manufacturer)
+- **SaMD:** Assessment required; functionality and claims must remain below medical device classification threshold pending formal confirmation pre go-live
+- **Data Protection:** UK GDPR, Data Protection Act 2018
+- **NHS Standards:** NHS DSPT (Data Security and Protection Toolkit)
+- **Accessibility:** WCAG 2.1 Level AA
+
+---
+
+## Requirement Index
+
+Requirements are organised into three incremental delivery streams. Each increment has a defined outcome and builds on the previous.
+
+### 🟢 Increment 1 — Inbox & Triage
+**Outcome:** I can receive, view, and organize documents in one place.
+
+| ID | Name | Priority | Status |
+|----|------|----------|--------|
+| [REQ-001](requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md) | Unified Inbound Document Inbox | Must Have | ✅ Complete — Approach B confirmed (direct to Filing Queue); Unmatched tab added; Filing Queue is default landing view |
+| [REQ-002](requirements/increment-1-inbox-and-triage/REQ-002-electronic-inbound-ingestion.md) | Electronic Inbound Ingestion | Must Have | ✅ Complete |
+| [REQ-004](requirements/increment-1-inbox-and-triage/REQ-004-document-viewer-navigation.md) | Document Viewer & Navigation | Must Have | ✅ Complete — pre-built component (integrate only; do not re-implement) |
+| [REQ-005](requirements/increment-1-inbox-and-triage/REQ-005-file-format-support.md) | File Format Support & Conversion | Must Have | ✅ Complete — pre-built component (integrate only; do not re-implement) |
+| [REQ-007](requirements/increment-1-inbox-and-triage/REQ-007-search-filter-sort-folders.md) | Search, Filter, Sort, Tags & Smart Views | Must Have | ✅ Complete — metadata search, filter, sort; Tags + Smart Views model adopted (custom folders rejected — clinical safety); role-based tag creation (admin only); drag-to-Smart-View gesture preserves workflow state; AI tag suggestions via REQ-012 pipeline; full corpus full-text search deferred to future phase |
+| [REQ-011](requirements/increment-1-inbox-and-triage/REQ-011-patient-matching.md) | Patient Matching | Must Have | ✅ Complete |
+| [REQ-015](requirements/increment-1-inbox-and-triage/REQ-015-non-functional-requirements.md) | Non-Functional Requirements | Must Have | ✅ Complete |
+| [REQ-009](requirements/increment-1-inbox-and-triage/REQ-009-audit-trail.md) | Audit Trail | Must Have | ✅ Complete — moved to Increment 1: required for audit of patient matching, tagging, and triage actions |
+
+---
+
+### 🟡 Increment 2 — Safe Filing
+**Outcome:** I can safely file documents to care records and workflow with full governance.
+
+| ID | Name | Priority | Status |
+|----|------|----------|--------|
+
+| [REQ-010](requirements/increment-2-safe-filing/REQ-010-workflow-tasks.md) | Workflow & Tasks | Must Have | ✅ Complete |
+| [REQ-012](requirements/increment-2-safe-filing/REQ-012-filing.md) | Filing | Must Have | ✅ Complete — manual filing pre-built; OCR/AI metadata suggestions in scope with mandatory human confirmation; embedded metadata auto-routes to tasking (Provisional status) |
+| [REQ-014](requirements/increment-2-safe-filing/REQ-014-confidentiality-visibility.md) | Confidentiality & Visibility Settings | Must Have | ✅ Complete |
+
+---
+
+### 🔵 Increment 3 — Clinical & Operational Actions
+**Outcome:** I can act on documents clinically and operationally.
+
+| ID | Name | Priority | Status |
+|----|------|----------|--------|
+| [REQ-003](requirements/increment-3-clinical-and-operational-actions/REQ-003-scanning-and-upload.md) | Scanning & Document Upload | Must Have | ✅ Complete — upload from disk + mandatory preview; TWAIN integration deferred to Phase 2 |
+| [REQ-006](requirements/increment-3-clinical-and-operational-actions/REQ-006-document-export.md) | Document Export (Print, PDF, Original) | Must Have | ✅ Complete — print + PDF export pre-built; original format download is net-new |
+| [REQ-008](requirements/increment-3-clinical-and-operational-actions/REQ-008-annotations-highlights.md) | Annotations & Highlights | Must Have | ✅ Complete — EMIS-X annotations in Core; EMIS Web annotations visible in EMIS Web only; cross-system sync deferred to Phase 2 |
+| [REQ-013](requirements/increment-3-clinical-and-operational-actions/REQ-013-coding.md) | Coding | Must Have / Should Have | ✅ Complete — Code Picker pre-built; text-selection pre-population + practice dictionary suggestions in Core (Should Have); AI automated code suggestions deferred to Phase 2 |
+
+**Candidate requirements (to be confirmed during elicitation):**
+- Electronic inbound ingestion source coverage (MESH, MIG, FHIR, Docman Connect, NHSmail, EDT, 111)
+- Scanning & upload + preview + scanning hardware integration
+- Document viewer & navigation (multi-page, zoom, rotate)
+- File format support & conversion policy (PDF, TIFF, JPEG, PNG, Word, RTF, CDA XML)
+- Export (print / PDF / original file type)
+- Search, filter, sort, folders
+- Annotations / highlights (and extraction of highlighted text)
+- Audit trail
+- Workflow & tasks
+- Patient matching
+- Filing (metadata suggestions / automation)
+- Coding (code suggestions)
+- Confidentiality / visibility settings
+- Non-functional requirements (performance, availability, accessibility)
+
+**Total Requirements:** 15
+**Must Have:** 14 | **Must Have / Should Have:** 1 (REQ-013 — text-selection shortcut, dictionary suggestions) | **Phase 2 Deferred elements:** TWAIN (REQ-003), full corpus search (REQ-007), cross-system annotation sync (REQ-008), AI automated coding (REQ-013)
+
+---
+
+## Success Metrics
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Suggestion accuracy | Human-level (benchmarked against best human performance via dual review panel) | Dual review panel gold standard |
+| Document processing time | Measurable reduction vs. current EMIS Web baseline | Time-in-state telemetry |
+| Inbox zero rate | Measurable improvement vs. baseline | Proportion of documents actioned same day |
+| Error / mismatch rate | Below current baseline | Audit log analysis |
+| User-reported cognitive load | Reduced vs. current workflow | Structured usability testing |
+
+---
+
+## Constraints
+
+### Regulatory Constraints
+- DCB0129 compliance required (manufacturer)
+- SaMD classification must be assessed; features/claims must remain below medical device threshold until formal sign-off
+- UK GDPR Article 9 processing restrictions apply (patient health data)
+- NHS DSPT annual attestation required
+
+### Technical Constraints
+- EMIS Web install base integration required at launch
+- Must support existing practice configurations: EMIS Web + EMIS-X, + Docman, + Anima
+- Companion app + browser delivery both required
+
+#### Pre-built Components — Do Not Re-implement
+
+The following capabilities are already implemented as reusable EMIS-X components. **Do not re-implement any of them.** Architecture, design, and implementation agents must integrate the existing component and confirm the interface/API contract with the owning team before V1b.
+
+| Component | Used by | Mandatory fields / notes |
+|-----------|---------|--------------------------|
+| **Manual metadata capture** | REQ-012 (Filing) — also embedded in REQ-001, REQ-010, REQ-013 contexts | Mandatory: patient match, document type, document date, document title. Enforcement and validation are owned by the component. |
+| **Document viewer** | REQ-004 | Multi-page, zoom, rotate. Confirm component API contract with owning team. |
+| **File format support & conversion** | REQ-005 | PDF, TIFF, JPEG, PNG, Word, RTF. Known RTF conversion limitation tracked by component team. |
+| **Print** | REQ-006 | Evaluation checks owned by the component. |
+| **Export to PDF** | REQ-006 | Evaluation checks owned by the component. |
+| **Code Picker** (EMIS-X Terminology Service) | REQ-013 (Coding) | Manual code entry only. Text-selection pre-population and practice dictionary suggestions are net-new wrappers around the picker. |
+
+### Business Constraints
+- **Documents Management Core must be delivered within a 30-day development window.** Scope across all requirements is sized to this constraint.
+- Must not rely on 3rd-party document vendors post-launch
+- PCN requirements explicitly out of scope for V1 (parked)
+- GP admin templating explicitly out of scope for V1 (parked)
+- "Out of scope of first launch" items (from roadmap deck): recommended codes, content search, richer annotations, duplicate detection, metrics/reporting, summarisation, outbound sharing, agentic workflow
+
+### Known Risks
+- Long-tenured staff change risk (low–medium tech-savviness)
+- Docman integration behaviours (versioning visibility, annotation sync) require verification
+- SaMD boundary: "human-level accuracy" claim and AI assistance scope must be formally confirmed pre go-live
+
+---
+
+## Parking Lot
+
+### 🟡 Important — Must Revisit Before Final Outputs
+- **PCN requirements:** parked; solution should be PCN-ready in future but GP-first for V1
+- **GP admin templating:** explicitly parked
+- **SaMD boundary definition:** formal confirmation required pre go-live; constrain AI feature claims accordingly
+- **Task trail permanence (REQ-010):** Whether completed task trails remain permanently visible or can be archived is clinically sensitive. Working assumption: permanently visible. Must be confirmed in V1e Clinical Safety review.
+- **Patient match — binary model (REQ-011):** Patient matching is binary: Matched or Unmatched. No confidence score. The NHS Number (Modulus 11 validated) is the primary matching signal; where no valid NHS Number is extractable, or no patient record matches, the document is routed to the unmatched queue.
+- **Provisional clinician visibility on auto-match (REQ-011):** Proposal to allow provisional document visibility before match confirmation. Blocked pending formal clinical safety analysis and explicit CSO sign-off. Do not implement without sign-off.
+- **OCR/AI metadata suggestions for filing (REQ-012):** Administrative metadata derivation using OCR/AI with mandatory human confirmation is in scope for Documents Management Core. Not SaMD when: (a) human confirmation is required for all suggestions, (b) function is limited to administrative metadata and not clinical coding. EMIS regulatory team to confirm this position in writing before Production release. Narrow validation only — see REQ-012 SaMD Position section.
+
+### 🔴 Legal Blocker — Go-To-Market Gate
+- **Metadata-based routing rules (REQ-010):** Practice-configurable routing rules raise a potential conflict-of-interest concern: if EMIS ships or recommends default rule configurations, this could be characterised as clinical practice guidance, which EMIS is not authorised to provide. **Written legal opinion required from EMIS Head of Regulatory + General Counsel before this feature can go live.** This is a go-live blocker for the routing rules capability. See REQ-010 for full documentation.
+
+### 🔴 Architectural Blocker — Requires V1b Resolution
+- **EMIS Web audit trail compatibility (REQ-009):** EMIS-X currently has no native audit trail; entries are filed into EMIS Web. V1b must confirm whether EMIS Web audit trail supports all required document management fields, whether entries are queryable from EMIS-X, and whether EMIS Web unavailability can cause silent audit entry loss. This is a DCB0129 and UK GDPR compliance requirement.
+
+### ⚪ To Verify (Non-Blocking)
+- Docman integration behaviours (versioning visibility, annotation sync)
+
+---
+
+## V2 → V1f Handoff Notes
+
+> **Last updated: 2026-06-02 (V2 Pass 2 enrichment — check_v2.py: 0 FAILs, 4 WARNs)**
+> Read this section before starting V1f Planning. These are known blockers that affect V1f scope.
+
+### Output Structure
+V2 v8 produces per-requirement directories under `output/DOC_REQ{NNN}/` with 7 JSON files each.
+Cross-cutting files are in `output/cross_cutting/` including `reference_patterns.json` (12 BE + 11 FE reuse items).
+`output/CS_Guardrails.json` is the project-wide guardrails file (40 guardrails — use as cache prefix).
+
+### 🔵 Architecture Decisions Locked (V1f must NOT revisit)
+- **Audit (REQ-009):** `IAuditService.CreateAccessAuditAsync()` from `Emis.Xgp.Audit.EmisWebDb` NuGet package. Write-before-return pattern in every controller action touching patient-linked data. Destination: EMIS Web CR DB. **No new `IAuditTrailService`. No `audit_entries` Aurora table.**
+- **PDF conversion (REQ-004, REQ-005):** Reuse EXISTING Lambda + EXISTING S3 Object Lambda Access Point from documents-api. IaC = IAM grant only (`s3:GetObject` + `s3-object-lambda:GetObject` for document-manager-api ECS task role). **No new Lambda deployment.**
+- **IDocumentStorageService (REQ-004, REQ-005):** 2 read methods only in Increment 1: `GetDocumentAsync` + `GetDocumentAsPdfAsync`. Upload/Delete deferred to Increment 3.
+- **PatientMatchState (REQ-011):** Written directly to EMIS Web CR DB. **No Aurora `document_matches` table.**
+- **Aurora schema name:** `documentmanager` (all tables in this schema, set via `DocumentsManagerDbContext`).
+- **Scope names:** `doc-app.read`, `doc-app.create`, `doc-app.edit` — all controllers, all policies.
+- **Document viewer package:** `@emisgroup/document-viewer@2.2.7` — exact version pinned.
+- **Target repos:** API = `git@github.com:emisgroup/document-manager-api.git`; App = `git@github.com:emisgroup/document-manager.git`.
+
+### 🔴 Blockers — Do Not Schedule These Until Resolved
+- **PL-10** — `DOC_REQ011` HAZ-DOC-035 ALL CAUSES BLOCKED: PDS fuzzy-match algorithm and manual match UI require CSO sign-off per D-027 before implementation tasks are scheduled.
+- **PL-12** — `DOC_REQ001` CHECK-22 BLOCKED: provisional filing status gate (file-to-EMIS-Web pathway) requires TECH-002 resolution before tasks can be scheduled.
+- **PL-6** — `DOC_REQ005` HAZ-DOC-014 C2 BLOCKED: conversion error propagation path to viewer unconfirmed; control HAZ-DOC-014.2.1 has no guardrail or check until resolved.
+- **PL-7** — `DOC_REQ007` HAZ-DOC-019 C2 BLOCKED: search index latency profile and freshness indicator availability unconfirmed; control HAZ-DOC-019.2.1 has no guardrail or check until resolved.
+
+> Note: PL-8 (REQ-009 audit store decision) is RESOLVED. `IAuditService` (Emis.Xgp.Audit.EmisWebDb) confirmed. No longer a blocker.
+
+### 🟡 Decisions to Clarify in V1f
+- Residual risk fields across all hazards.json files are `MISSING: ALARP pending CSO Phase 6 assessment`. V1f tasks must NOT include hazard residual risk acceptance as a code-time gate — it is a CSO-time gate.
+- REQ-007 KPI-1 baseline is `MISSING: baseline TBC from pilot data`. V1f observability tasks should wire the instrumentation; baseline values will be filled post-pilot.
+- `DOC_REQ002` stored-copy vs real-time ingestion source of truth needs confirmation at Sprint 0 with Product.
+
+### 🟢 Deferred Items
+- HAZ-DOC-027 (Reject flow / reason codes) — deferred to Increment 2; do not schedule in V1f.
+- HAZ-DOC-026 (AI-assisted tag suggestions) — future increment; not in scope for V1f task generation.
+- Full-corpus cross-practice search — future phase; not in scope for V1f task generation.
+- Integrity hash/sequence check for audit entries (D-028) — deferred; no new audit table in Increment 1.
+
+### Per-REQ Extraction Summary (Pass 2 — final)
+| REQ | CHECKs | Hazards | Endpoints | Tables | Interfaces | Components | Status |
+|-----|--------|---------|-----------|--------|------------|------------|--------|
+| DOC_REQ001 | 18 | 6 | 4 | 0 | 0 | 11 | ✅ |
+| DOC_REQ002 | 13 | 3 | 2 | 2 | 1 | 2 | ✅ |
+| DOC_REQ004 | 10 | 3 | 2 | 0 | 2 | 0 | ✅ |
+| DOC_REQ005 | 7 | 3 | 3 | 0 | 2 | 0 | ✅ |
+| DOC_REQ007 | 22 | 2 | 10 | 3 | 1 | 8 | ✅ |
+| DOC_REQ009 | 9 | 3 | 0 | 0 | 1 | 0 | ✅ |
+| DOC_REQ011 | 14 | 4 | 4 | 0 | 1 | 4 | ✅ |
+| DOC_REQ015 | 7 | 0 | 3 | 0 | 1 | 0 | ✅ |
+| **TOTAL** | **100** | **24** | **28** | **5** | **9** | **25** | |
+
+> Interface count for REQ004/REQ005: 2 each (DocumentViewerAdapter TypeScript + IDocumentStorageService C#).
+> DOC_REQ009: endpoints=0 (IAuditService called inline; no dedicated audit REST endpoints in this service).
+> DOC_REQ011: tables=0 (PatientMatchState → EMIS Web CR DB direct write; no Aurora table).
+
+- NHSmail inbound integration (REQ-002): NHSmail capability is already built in EMIS-X. V1b to confirm production access route and any remaining integration steps.
+
+### 🔵 Phase 2 Deferred
+Items confirmed out of scope for Documents Management Core (30-day delivery window). Retained for Phase 2 planning.
+
+| Item | Requirement | Entry Condition |
+|------|-------------|------------------|
+| TWAIN scanner integration | REQ-003 | TWAIN driver procurement resolved |
+| Full corpus full-text search | REQ-007 | Infrastructure cost agreed (est. £300–3,000+/month); search architecture confirmed with engineering team |
+| Cross-system annotation sync (EMIS-X ↔ EMIS Web) | REQ-008 | V1b cross-system sync architecture agreed; V1e clinical safety case approved; HAZ-DOC-021 formally mitigated |
+| AI automated code suggestions | REQ-013 | MHRA SaMD assessment complete for automated coding inference; MHRA position obtained; DCB0129 clinical safety case for coding assistance approved |
+
+---
+
+## V1b → V1c Handoff Notes
+
+> Read this section before starting V1c. These are known blockers that affect V1c scope.
+
+### 🔴 Blockers — Do Not Skip
+- EMIS Web audit compatibility (REQ-009) remains unresolved: V1c must confirm full required audit field coverage, queryability from EMIS-X, and no silent loss when EMIS Web is unavailable.
+- Legal blocker (REQ-010) remains unresolved: written legal opinion is still required before go-live for metadata-based routing rule defaults.
+
+### 🟡 Decisions to Clarify in V1c
+- Confirm authoritative endpoint contracts for all new V1b-proposed endpoints against the existing `openapi-docs.yml` baseline.
+- Confirm concurrency and conflict-resolution model between EMIS Web monolith state and EMIS-X service state during phased coexistence.
+- Confirm ADR-level index strategy per requirement and formal Flyway migration plan per table.
+- Confirm this hard assumption for V1c: document binaries live in S3, Aurora PostgreSQL stores metadata/workflow overlays only, and patching-domain topology remains outside the Aurora schema (owned by the routing/service layer).
+
+### 🟢 Deferred Items
+- TWAIN scanner integration (REQ-003) remains deferred to Phase 2.
+- Full corpus full-text search (REQ-007) remains deferred to Phase 2 pending cost and architecture decision.
+- Cross-system annotation sync (REQ-008) remains deferred to Phase 2 pending V1e clinical safety approval.
+- AI automated coding suggestions (REQ-013) remains deferred to Phase 2 pending MHRA/SaMD and clinical safety approval.
+
+### V1c Hard Assumptions
+- Binary documents are stored in S3 and not in Aurora PostgreSQL.
+- Aurora PostgreSQL holds only metadata, workflow overlays, audit, and other net-new capability data.
+- Patching-domain resolution is performed outside Aurora PostgreSQL by the relevant service/routing layer.
+
+---
+
+## Phase 1 Architecture Decision
+
+### Approved Strategy
+- Option 1 selected: New EMIS-X UI and new service layer read/write against existing EMIS Web SQL data stores in Phase 1.
+- Option 2 rejected for Phase 1: Poller-based full copy into a new database before cutover is too high risk and high operational overhead across ~100 patching domains.
+
+### Decision Rationale
+- Lower migration risk: avoids introducing a second source of truth during initial release.
+- Faster delivery: aligns with 30-day Documents Management Core timeline.
+- Better operational control: preserves current EMIS Web workflow semantics while new APIs are introduced behind an anti-corruption layer.
+
+### Why Poller-First Is High Complexity (Rejected for Phase 1)
+- Estate scale: polling from thousands of legacy databases (estimated ~3000 practice/domain data stores) introduces major scheduler, connection-pool, and throughput orchestration complexity.
+- Fan-in architecture risk: consolidating high-volume change streams from ~3000 SQL sources into one new PostgreSQL target creates a high-contention ingestion bottleneck and larger blast radius on target outage.
+- Data model mismatch: legacy SQL schemas and stored-procedure-driven contracts do not map 1:1 to the new PostgreSQL domain model, requiring heavy transformation and replay-safe mapping logic.
+- Primary key strategy mismatch: new services standardise on UUID identifiers, while legacy systems expose mixed identifiers (including bigint/int IDs and GUIDs), requiring deterministic ID translation, cross-reference tables, and backward traceability guarantees.
+- Ordering and consistency risk: pollers must preserve per-document/task event ordering across many sources; out-of-order delivery can corrupt task state transitions (matching, filing, completion).
+- Idempotency burden at scale: duplicate and retry handling must be guaranteed across all sources, requiring durable dedupe keys and reconciliation jobs before production trust is achievable.
+- Operational overhead: monitoring lag, partial-failure retries, poison-message handling, and replay tooling must be built before go-live to avoid silent divergence.
+- Compliance and safety burden: proving parity and audit completeness across thousands of polled sources is slower and more expensive than direct read-through with source-by-source cutover.
+
+### Anti-Corruption Layer (Phase 1)
+- New ASP.NET Core 10 services translate EMIS Web stored procedure contracts into JSON:API responses for the new React microfrontend.
+- Per-domain SQL endpoint resolution is driven by organisation context and Service Registry lookup.
+- Core legacy dependencies for Phase 1 include:
+  - Inbound queue retrieval: `InboundDocuments.GetTasks`, `InboundDocuments.GetUnmatchedTasks`
+  - Task workflow: `InboundDocuments.CreateTask`, `InboundDocuments.CompleteTask`, `InboundDocuments.GetOrganisationTaskCreationOption`
+  - Patient matching: `InboundDocuments.MatchDocumentIfNotAlreadyFiled`, `InboundDocuments.UnmatchPatient`
+  - Status/read model: `InboundDocuments.DocumentTaskStatusDetail`, `InboundDocuments.TasksWithMatchingPatient`
+
+### Phase 2 Source-by-Source Cutover
+- Cut over one inbound source at a time (MESH first, then GP Connect, then MIG/others).
+- For each source, run shadow mode and parity checks before production promotion.
+- Retire EMIS Web DB dependency incrementally per source only after parity and safety gates are met.
+
+### Mandatory Gates Before Source Promotion
+- Functional parity gates: queue counts, task state transitions, patient match outcomes, filing outcomes.
+- Safety gates: no regression in unmatched handling, audit completeness, and legal/IG compliance.
+- Reliability gates: agreed SLOs met under expected load and domain failover tests.
+
+### Requirement Mapping and PostgreSQL Overlay Model
+- Detailed requirement-by-requirement mapping for Phase 1 net-new capabilities and the proposed PostgreSQL table set is documented in `PRODUCT_DECISIONS_2026-05-26.md` under **Architecture Decision Note — Phased Migration Approach**.
+- This mapping is the authoritative source for V1c schema/API design when implementing new features without any legacy EMIS Web database schema changes.
+- The detailed explanation of legacy queue/task truth vs new DB overlays and the V1c one-page field ownership matrix are documented in the same section and must be treated as the ownership contract for API and migration design.
+
+---
+
+**Document Status:** ✅ V1b Architecture Refresh Complete — fresh V1b sections written across REQ-001 to REQ-015
+**Next Step:** V1c Design
+**Subsequent Phases:** V1c Design → V1d PxD → V1e Clinical Safety → V2 Normalisation → V1f Planning

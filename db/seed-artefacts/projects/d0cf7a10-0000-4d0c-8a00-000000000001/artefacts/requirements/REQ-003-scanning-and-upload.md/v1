@@ -1,0 +1,743 @@
+﻿# REQ-003: Scanning & Document Upload
+
+**Priority:** Must Have (upload + preview)
+**Phase:** Documents Management Core (30-day delivery)
+**Effort:** Low
+**Risk:** Medium
+**Depends On:** REQ-001 (Unified Inbound Document Inbox)
+
+---
+
+## User Story
+
+As a practice administrator,
+I need to scan paper documents and upload files into the document management system with a preview step before committing,
+So that I can verify documents are complete and legible before they enter the inbox workflow.
+
+**Acceptance Criteria:**
+- [ ] Users can upload one or more documents from disk (any supported file format — see REQ-005) into the inbox. Multiple files may be selected in a single file-picker interaction. *(Must Have)*
+- [ ] Users can drag one or more files from the local file system and drop them onto the upload dialog to initiate an upload. Dropped files proceed through the same sequential individual preview workflow as file-picker uploads. *(Must Have)*
+- [ ] Before any document is committed to the inbox, the user is presented with a preview of that document using the same document viewer component used in the main workflow, rendering the actual uploaded document content. *(Must Have)*
+- [ ] When multiple files are selected, each file is previewed and confirmed or discarded individually and in sequence. Users cannot bulk-commit all selected files in a single action without reviewing each file’s preview. *(Must Have — clinical safety)*
+- [ ] If a user discards one file during a multi-file upload sequence, the remaining files in the batch continue through the preview sequence unaffected. *(Must Have)*
+- [ ] The user can confirm or discard each document from the preview step before it is submitted. *(Must Have)*
+- [ ] Upload entry points are clearly accessible from the inbox without navigating away. *(Must Have)*
+- [ ] During the preview step, the user can manually enter or edit filing metadata for the document (document type, date of care, date received, document title) before confirming. Metadata entered during upload is carried forward as pre-populated values in the Filing Queue. *(Must Have)*
+- [ ] For a single-document upload, preview and filing actions are completed in one continuous flow before submission. *(Must Have)*
+- [ ] For a multiple-document upload, confirmed documents are routed to the Unmatched list for review and processing. *(Must Have)*
+- [ ] Documents uploaded manually are assigned source status **Manual Upload** in triage metadata. *(Must Have)*
+- [ ] The upload experience must not show a user-facing banner for direct scanner TWAIN availability in this release. *(Must Have)*
+
+> **Out of scope for Documents Management Core:** Direct scanner integration via TWAIN driver is not included in this release. Deferred to Phase 2 pending driver procurement resolution. Upload from disk is the only supported ingest path in Core, and no user-facing TWAIN availability banner is shown.
+
+---
+
+## Risks & Dependencies
+
+| Risk | Impact | Status |
+|------|--------|--------|
+| TWAIN driver solution not yet procured | TWAIN integration deferred to Phase 2; no impact on Core delivery | ⚪ Deferred — Phase 2 |
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-007:** Hazard Mitigation Evidence — preview step is the primary UI control mitigating wrong-document-filed hazard; must be visible and non-bypassable
+- **CLIN-010:** Error Handling Patient Safety — upload/scan failures must fail closed with explicit error messaging; never silently succeed with a corrupt or incomplete document
+
+### Hazards Addressed
+
+- **HAZ-DOC-008:** Wrong or incomplete document filed — paper document scanned incorrectly (upside down, missing pages, wrong patient letter) and filed without review
+  - **Severity:** High
+  - **Likelihood:** Medium
+  - **Risk Level:** High
+
+- **HAZ-DOC-009:** Corrupt or zero-byte file uploaded silently — document appears filed but content is unreadable
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+- **HAZ-DOC-010:** Document uploaded to wrong practice / wrong queue due to misconfigured scanner or user error
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** Medium
+
+- **HAZ-DOC-011:** Multi-file batch contains a wrong, incomplete, or corrupt document that is committed without individual review — user selects multiple files and confirms through previews without adequately checking each one
+  - **Severity:** High
+  - **Likelihood:** Medium (increases with batch size; high volume of files reduces per-file attention)
+  - **Risk Level:** High
+
+### Mitigations
+
+- **MIT-DOC-007:** Preview step is mandatory and non-bypassable before document is committed — user must explicitly confirm
+  - **Type:** UI Control
+  - **Effectiveness:** Complete (for HAZ-DOC-008; reduces but does not eliminate user error)
+
+- **MIT-DOC-008:** File integrity check on upload — zero-byte, corrupt, or unreadable files rejected with explicit error message before preview is attempted
+  - **Type:** Validation
+  - **Effectiveness:** Complete (for HAZ-DOC-009)
+
+- **MIT-DOC-009:** Upload/scan is scoped to the authenticated user's practice context; cross-practice filing not possible without explicit re-authentication
+  - **Type:** Business Logic + Auth
+  - **Effectiveness:** Complete
+- **MIT-DOC-010:** Multi-file upload enforces sequential individual preview — each file in a batch must be explicitly confirmed or discarded before the next file is presented. No bulk-confirm mechanism is provided. A progress indicator shows position in the sequence (e.g. “Document 2 of 5”).
+  - **Type:** UI Control + Business Logic
+  - **Effectiveness:** Partial — enforces individual review step; cannot prevent inattentive confirmation, but eliminates the single-click bulk-commit failure mode
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — upload metadata captured: filename, file size, MIME type, upload timestamp, uploader ERN; no additional PII extracted at upload time
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(e) public task + Article 9(2)(h) health data
+- **IG-004:** Special Category Data Protection — uploaded documents treated as special category data from point of receipt; encrypted at rest AES-256-GCM immediately on commit
+- **IG-009:** Data Breach Notification — misdirected upload (wrong practice) is a potential data breach event; must be detectable and reportable
+
+### Data Handling
+- Documents in the preview stage (pre-commit) are held in a temporary secure buffer, not in the permanent inbox store
+- If the user discards from preview, the temporary buffer is purged immediately
+- On commit, document is moved from temporary buffer to permanent encrypted store
+- Upload metadata logged with uploader ERN (not username or NHS number)
+
+### GDPR Articles
+- **Article 6(1)(e):** Lawful basis — public task
+- **Article 9(2)(h):** Special category health data — medical purposes
+- **Article 5(1)(f):** Integrity and confidentiality — secure handling from point of upload
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — upload endpoints require valid JWT with correct scope; unauthenticated uploads rejected
+- **SEC-001:** TLS Encryption — file upload transport over TLS 1.2+
+### Security Requirements
+- File type validation performed server-side (not client-side only) — MIME type and file signature (magic bytes) checked
+- Maximum file size enforced server-side to prevent resource exhaustion
+- Uploaded files scanned for malware/malicious content before being placed in inbox (integration with platform-level AV scanning)
+- Temporary pre-commit buffer inaccessible to other users or sessions
+
+---
+
+## Dimension 4: Observability & Performance
+
+### KPIs
+- Upload success rate (completed without error)
+- Preview render time (file received → preview displayed to user)
+- Commit success rate (preview confirmed → document in inbox)
+- Discard rate at preview (proxy for scan/upload quality issues)
+
+### OTEL Spans
+- `documents.upload.initiated` — user triggers upload action; file count recorded (1 for single, n for multi-file batch); `upload_method` attribute records `file_picker` or `drag_drop`
+- `documents.upload.received` — file received by server, integrity check passed; batch sequence position recorded
+- `documents.upload.preview_rendered` — preview displayed to user; batch sequence position recorded
+- `documents.upload.committed` — user confirms; document moves to inbox; batch sequence position recorded
+- `documents.upload.discarded` — user discards at preview; temporary buffer purged; batch sequence position recorded
+- `documents.upload.failed` — upload failed with error type recorded
+
+### SLOs
+- Preview render: p95 < 3 seconds for files up to 50MB
+- Upload commit: p95 < 5 seconds from user confirmation to document appearing in inbox
+- Upload success rate: ≥ 99% for valid, non-corrupt files
+- File integrity check: 100% of uploads validated before preview is rendered
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Existing Documents API resources used:**
+- `document`
+- `documents`
+
+**Core endpoints (existing service):**
+- `POST /persons/{personGUID}/document` (upload document for person)
+- `GET /persons/{personGUID}/documents` (retrieve documents collection)
+
+**Workflow rules:**
+- Multi-file uploads are processed sequentially; each file requires explicit confirm/discard in UI before calling upload.
+- Preview is rendered using the uploaded file content locally in the viewer flow before `POST /persons/{personGUID}/document` is invoked.
+- Upload metadata edits (document type, date of care, date received, title) are captured in preview flow and mapped into the upload payload.
+- Source is set to `Manual Upload` for all confirmed files.
+
+### Component Interfaces
+
+```csharp
+public interface IDocumentsApiUploadAdapter
+{
+  Task<Result<DocumentUploadResource>> UploadForPersonAsync(Guid personGuid, UploadDocumentCommand command, CancellationToken cancellationToken = default);
+  Task<Result<PaginatedList<DocumentSummaryResource, PersonDocumentsFilter>>> GetPersonDocumentsAsync(Guid personGuid, PersonDocumentsFilter filter, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+### CHECK 1: CLIN-007 — Preview Step is Non-Bypassable (Single and Multi-file)
+- **Trigger:** User uploads one or more files from disk
+- **Test Scenario A:** Single file — attempt to bypass preview
+  - Validation 1: No API path or UI interaction allows a document to be committed to the inbox without a preview step being rendered
+  - Validation 2: Preview rendered before any permanent storage write occurs
+  - Validation 3: User must perform an explicit confirm action to commit (not auto-commit on upload completion)
+- **Test Scenario B:** Multi-file — no bulk-commit without individual preview
+  - Setup: User selects 3 files for upload
+  - Validation 1: Preview is rendered for file 1; files 2 and 3 are not committed before file 1 is confirmed or discarded
+  - Validation 2: Confirming file 1 advances to preview of file 2; does not commit files 2 and 3
+  - Validation 3: No API endpoint or UI control exists to confirm all files in a single action
+  - Validation 4: Progress indicator displayed showing current position in batch (e.g. “Document 1 of 3”)
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-008, HAZ-DOC-011
+- **Pass Criteria:** Preview is mandatory per file; no bypass path; no bulk-confirm; explicit per-file confirmation required
+
+### CHECK 2: CLIN-010 — Corrupt / Invalid Files Rejected with Explicit Error
+- **Trigger:** User uploads a zero-byte, corrupt, or unreadable file
+- **Test Scenario:** Invalid file handling
+  - Input: Zero-byte file, truncated PDF, file with mismatched MIME type and extension
+  - Validation 1: File rejected before preview is attempted
+  - Validation 2: User shown a clear, specific error message (not a generic failure)
+  - Validation 3: No partial or blank preview rendered for an invalid file
+  - Validation 4: No document written to temporary buffer or permanent store
+- **Guardrail:** CLIN-010
+- **Hazard:** HAZ-DOC-009
+- **Pass Criteria:** Invalid files rejected cleanly; explicit error displayed; no silent failure
+
+### CHECK 3: SEC-001 / AUTH-004 — Upload Endpoint Security
+- **Trigger:** File upload API endpoint
+- **Test Scenario:** Unauthorised upload attempt
+  - Request without authorisation header → access denied (401)
+  - Request with valid JWT but insufficient scope → access denied (403)
+  - Request with valid JWT + correct scope → upload accepted
+- **Test Scenario:** File type validation
+  - Upload file with valid extension but mismatched magic bytes (e.g. .pdf with ZIP magic bytes)
+  - Validation: File rejected server-side with explicit error; client-side MIME check alone is insufficient
+- **Guardrail:** AUTH-004, SEC-001
+- **Pass Criteria:** No unauthenticated uploads accepted; server-side file type validation enforced
+
+### CHECK 4: Discard Purges Temporary Buffer
+- **Trigger:** User discards document at preview step
+- **Test Scenario:** Pre-commit buffer cleanup
+  - Action: User uploads file, preview rendered, user selects discard
+  - Validation 1: Temporary buffer entry for that file is purged immediately
+  - Validation 2: File is not accessible via any API endpoint after discard
+  - Validation 3: No document appears in inbox
+- **Hazard:** HAZ-DOC-008 (wrong document not persisted), IG-004 (data minimisation)
+- **Pass Criteria:** Discarded files purged immediately; not accessible post-discard
+
+### CHECK 5: CLIN-007 — Multi-file Discard Does Not Affect Remaining Batch
+- **Trigger:** User discards one file during a multi-file upload sequence
+- **Test Scenario:** Discard mid-batch
+  - Setup: User selects 3 files (F1, F2, F3); F1 and F2 previewed; user discards F2
+  - Validation 1: F2 temporary buffer entry purged immediately
+  - Validation 2: F3 preview is displayed next; F3 is unaffected by the discard of F2
+  - Validation 3: F1 (already committed) remains in the inbox
+  - Validation 4: F2 does not appear in inbox
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-008, HAZ-DOC-011
+- **Pass Criteria:** Discard of one file in a batch purges only that file; remaining files continue through preview sequence unaffected
+
+### CHECK 6: CLIN-007 / CLIN-010 — Drag-and-Drop Follows Same Clinical Safety Controls as File-Picker
+- **Trigger:** User drags one or more files onto the upload dialog
+- **Test Scenario A:** Single file drag-and-drop — preview required
+  - Validation 1: Dropped file proceeds to the mandatory preview step; identical flow to file-picker single-file upload
+  - Validation 2: No direct commit path exists without preview being rendered
+  - Validation 3: File integrity check (zero-byte, corrupt, MIME mismatch) applied identically to the file-picker path
+- **Test Scenario B:** Multi-file drag-and-drop — sequential preview required
+  - Setup: User drops 3 files onto the upload dialog in a single drag-and-drop action
+  - Validation 1: Files proceed through sequential individual preview; each file previewed and confirmed/discarded before the next is presented
+  - Validation 2: No bulk-confirm available; progress indicator displayed (e.g. "Document 1 of 3")
+  - Validation 3: `upload_method` = `drag_drop` recorded on `documents.upload.initiated` OTEL span
+- **Guardrail:** CLIN-007, CLIN-010
+- **Hazard:** HAZ-DOC-008, HAZ-DOC-011
+- **Pass Criteria:** Drag-and-drop uploads follow identical clinical safety controls to file-picker uploads; no bypass path; same integrity checks applied; `upload_method` attribute recorded
+
+### CHECK 7: CLIN-007 — Single Upload Uses Viewer and Filing in One Continuous Flow
+- **Trigger:** User uploads one file from disk
+- **Test Scenario:** Single-file upload flow
+  - Validation 1: Uploaded file is rendered in the standard document viewer component using actual uploaded content
+  - Validation 2: User can complete filing metadata/actions from the same flow before submission
+  - Validation 3: Confirming submission commits exactly one document
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-008
+- **Pass Criteria:** Single-file upload provides viewer-based preview plus filing actions in one uninterrupted flow
+
+### CHECK 8: CLIN-007 — Multi-File Upload Routes to Unmatched and Sets Manual Source
+- **Trigger:** User uploads multiple files in a single upload action
+- **Test Scenario:** Multi-file route and metadata
+  - Setup: User uploads 3 files via file picker or drag-and-drop
+  - Validation 1: Each file requires individual preview confirmation/discard
+  - Validation 2: Confirmed files route to the Unmatched list for follow-on review
+  - Validation 3: Each routed document has `source = "Manual Upload"`
+  - Validation 4: No user-facing TWAIN availability banner is shown during flow
+- **Guardrail:** CLIN-007
+- **Hazard:** HAZ-DOC-011
+- **Pass Criteria:** Multi-file uploads route confirmed documents to Unmatched with `source = Manual Upload`; TWAIN banner absent
+
+---
+
+
+### CHECK 17: PXD-001 — Upload Zone Keyboard Accessibility
+
+**Trigger:** Keyboard-only user navigates to upload screen
+
+**Test Scenario:**
+- Validation 1: Tab reaches "⬆ Upload" button in toolbar from queue screen
+- Validation 2: Tab reaches Browse button on Upload Zone screen; Enter opens file picker
+- Validation 3: Tab order on preview screen: CLIN-007 callout → file header → viewer → metadata fields → Back → Discard → Confirm
+- Validation 4: `axe(container)` returns 0 violations on Upload Zone, Preview, and Complete screens
+
+**Pass Criteria:** All upload interactions completable via keyboard only; 0 axe violations
+
+---
+
+### CHECK 18: PXD-002 — CLIN-007 Non-Bypassable Preview Enforcement
+
+**Trigger:** User attempts to bulk-confirm without individual preview
+
+**Test Scenario:**
+- Validation 1: No "Confirm all" or bulk action is present for multi-file uploads
+- Validation 2: Confirm button on preview screen is disabled until document type is selected
+- Validation 3: Batch progress indicator shows correct fraction (e.g. "2 / 3") at each preview step
+- Validation 4: CLIN-007 callout visible and non-dismissable on both Upload Zone and Preview screens
+
+**Pass Criteria:** Bulk-confirm path does not exist; each file requires individual review and metadata entry before confirmation
+
+---
+
+### CHECK 19: PXD-003 — Invalid File Error State
+
+**Trigger:** User uploads a corrupt or zero-byte file
+
+**Test Scenario:**
+- Validation 1: Upload Preview renders error box with `role="alert"`; Confirm and Discard buttons absent
+- Validation 2: Error message includes filename and reason
+- Validation 3: CLIN-010 note confirms no buffer written
+- Validation 4: "← Back to upload" button returns user to Upload Zone; no document record created
+
+**Pass Criteria:** Invalid file rejected cleanly with accessible error announcement; no document stored; workflow unblocked
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope:** Full PxD. Three net-new screens: Upload Zone, Upload Preview, Upload Complete. All layout decisions from prototype v8 (Screen 10–12). TWAIN direct scanner out of scope for Phase 1.
+
+---
+
+### User Flow
+
+**Primary Flow — Single file upload:**
+1. Admin is on any Documents Manager screen; toolbar shows "⬆ Upload" `Button variant="filled"` (RHS, shared toolbar)
+2. Admin clicks "⬆ Upload" — navigates to Upload Zone screen (dedicated screen, SPA route)
+3. Upload Zone renders: drag-and-drop zone + CLIN-007 callout + TWAIN-deferred callout + supported formats list
+4. Admin selects one file via file picker (or drags file onto zone)
+5. Upload Preview screen renders immediately: CLIN-007 review prompt + filename/size header + document viewer rendering the file content + metadata form + Confirm / Discard actions
+6. Admin reviews document content and fills in metadata (document type, date of care, date received, title)
+7. Admin clicks "Confirm & continue" → Upload Complete screen renders
+8. Upload Complete: success icon + summary + CTA to Unmatched queue or "Upload more"
+
+**Alternative Flow — Batch upload (multiple files):**
+1–4. Same as primary flow; admin selects 2+ files
+5. Batch progress bar appears at top: fraction indicator (e.g. "1 / 3") + filename + step dots
+6. Each file previewed individually in sequence; Confirm advances to next file; Discard skips that file and advances
+7. Discarded files are purged immediately (no temporary buffer retained — CLIN-007, IG-001)
+8. After last file: Upload Complete screen; discard note shown if any files were discarded
+9. Confirmed documents routed to Unmatched queue with `source = Manual Upload`
+
+**Error Flow — Invalid / corrupt file:**
+1. Admin uploads file that fails integrity check (corrupt, unsupported format, zero-byte)
+2. Upload Preview renders with error state: red error box "File rejected — cannot be previewed or committed"; error detail message; CLIN-010 note confirming no buffer was written
+3. CLIN-007 review prompt and Confirm/Discard actions are hidden; only "← Back to upload" shown
+4. Admin returns to Upload Zone; no document stored
+
+**Exit Types:**
+- **Complete:** All files confirmed → Upload Complete screen → navigate to Unmatched queue
+- **Cancel:** "← Document Manager" back link at any upload screen → returns to Filing Queue; no documents stored if no files confirmed yet
+- **Discard (per file):** Discards individual file in batch; batch continues; purged immediately; audited
+- **Abandon:** Browser/SPA navigate-away from upload flow — any uncommitted files purged; no partial state retained
+
+---
+
+### Wireframes
+
+**Screen 10 — Upload Zone:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ ← Document Manager   Upload Documents                               │
+├─────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ 🖨️  Direct scanner (TWAIN) not available in this release        │ │
+│ │     Deferred to Phase 2 pending driver procurement              │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ ⚠️  Mandatory individual preview (CLIN-007): every document     │ │
+│ │     must be reviewed before entering the inbox.                 │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│ ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐ │
+│ │           📁                                                   │ │
+│ │     Drag and drop files here                                   │ │
+│ │     or click to browse                                         │ │
+│ │     PDF · TIFF · JPEG · PNG · DOCX · RTF                       │ │
+│ └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Screen 11 — Upload Preview (valid file):**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ [1 / 3]  filename.pdf  [● ● ○]   (batch bar — hidden for single)    │
+├─────────────────────────────────────────────────────────────────────┤
+│ ⚠️  Review this document carefully before confirming.               │
+│    Confirm to add to inbox or Discard to skip.                      │
+├─────────────────────────────────────────────────────────────────────┤
+│ 📄 filename.pdf  ·  142 KB · PDF                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   [Document viewer — renders actual uploaded file content]          │
+│                                                                      │
+├─────────────────────────────────────────────────────────────────────┤
+│ Document type [Select ▾]  Date of care [Date]  Title [Input]        │
+├─────────────────────────────────────────────────────────────────────┤
+│                    [← Back]  [✕ Discard]  [✓ Confirm & continue]   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Screen 11 — Upload Preview (invalid / corrupt file):**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ ⛔ File rejected — cannot be previewed or committed                  │
+│    corrupt-file.pdf cannot be previewed or committed.               │
+│    No temporary buffer written. No document stored. (CLIN-010)      │
+├─────────────────────────────────────────────────────────────────────┤
+│                    [← Back to upload]                               │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Screen 12 — Upload Complete:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                      │
+│                         ✅                                           │
+│               Documents added to inbox                              │
+│   Documents have been added to the Unmatched queue                  │
+│   for patient matching.                                             │
+│   [Discarded files note — shown only if any discarded]              │
+│                                                                      │
+│         [View Unmatched queue →]   [Upload more]                    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Responsive:**
+- Desktop ≥1024px: Upload zone max-width 640px centred; preview viewer full available height
+- Tablet 768–1023px: Same layout, narrower zone
+- Mobile <768px: Upload zone full-width; drag-and-drop replaced by "Browse files" button only (no drag on mobile)
+
+---
+
+### Component Specifications
+
+> 🚫 All components use `@emisgroup/ui-*` exclusively.
+
+**Upload Zone (drop target):**
+- Container: `<div>` with `onDragOver`, `onDragLeave`, `onDrop` handlers; `aria-label={t('upload.zone.label')}` `role="region"`
+- Hidden file input: `<input type="file" multiple accept=".pdf,.tiff,.tif,.jpg,.jpeg,.png,.docx,.rtf" className="sr-only" id="fileInput" />`; triggered by zone click
+- `Button variant="filled"` labelled `{t('upload.zone.browse')}` — keyboard-accessible alternative to drag; `htmlFor="fileInput"`
+- Drag-active state: `border-color: var(--primary); background: var(--hover)` via CSS class toggle
+- Supported formats label: `<p aria-live="off">` static text only
+- CLIN-007 callout: `Banner variant="warning"` — non-dismissable
+- TWAIN callout: `Banner variant="info"` — non-dismissable
+
+**Batch Progress Bar:**
+- Container: `<div role="status" aria-live="polite" aria-label={t('upload.batch.progress', { current, total })}>` 
+- Fraction: `<span>{t('upload.batch.fraction', { current, total })}</span>` (e.g. "1 / 3")
+- Filename: `<span>` truncated with `text-overflow: ellipsis`
+- Step dots: `<ol>` of `<li>` items; completed = filled dot `var(--positive)`; current = filled `var(--primary)`; pending = outline `var(--border)`
+- Visible only when `totalFiles > 1`
+
+**Preview File Header:**
+- Icon: `Icon ~icons/ic/outline-insert-drive-file` 20px `var(--text-dim)`
+- Filename: `<span>` 13px semibold `var(--text)`
+- Size + type: `<span>` 12px regular `var(--text-dim)`
+
+**Metadata Form (preview step):**
+- Document type: `Select aria-label={t('upload.meta.docType')} invalid={attempted && !docType}` — required
+- Date of care: `DatePicker aria-label={t('upload.meta.dateOfCare')}`
+- Date received: `DatePicker aria-label={t('upload.meta.dateReceived')}` — pre-populated with today
+- Title: `Input aria-label={t('upload.meta.title')} clearable`
+- Layout: single row on desktop; stacked on mobile
+
+**Confirm / Discard Actions:**
+- Back: `Button variant="mono"` `{t('upload.preview.back')}`
+- Discard: `Button variant="danger"` `{t('upload.preview.discard')}` — opens confirmation `Dialog` before purging
+- Confirm: `Button variant="filled"` `{t('upload.preview.confirm')}` — disabled until document type selected
+
+**Invalid File Error Box:**
+- Container: `<div role="alert" aria-live="assertive">`
+- Heading: `<h4>` `var(--negative)` — `{t('upload.error.rejected.heading')}`
+- Detail: `<p>` file-specific error message from API
+- CLIN-010 note: `<p>` `var(--text-dim)` small
+- Actions: Back `Button variant="mono"` only — no Confirm/Discard
+
+**Upload Complete CTA block:**
+- Primary: `Button variant="filled"` `{t('upload.complete.viewUnmatched')}` → navigates to Unmatched tab
+- Secondary: `Button variant="mono"` `{t('upload.complete.uploadMore')}` → returns to Upload Zone
+
+---
+
+### Interaction Patterns
+
+**Drag and drop:**
+- `onDragOver`: `event.preventDefault()`; add `drag-over` CSS class; `border-color: var(--primary)`
+- `onDragLeave`: remove `drag-over` class
+- `onDrop`: `event.preventDefault()`; read `event.dataTransfer.files`; validate types client-side; proceed to preview
+- Keyboard alternative: `Button` triggers hidden `<input type="file">` — required for accessibility
+
+**File picker (click):**
+- Zone click or Browse button → `inputRef.current.click()`
+- `onChange` on hidden input → read `FileList`; same validation + preview flow as drag-and-drop
+
+**Confirm (single file):**
+- Validates metadata (document type required)
+- `POST /documents/upload` with file + metadata
+- Loading: Confirm button shows spinner + `{t('upload.preview.confirming')}`; disabled
+- Success: navigate to Upload Complete
+- Error: `Notification variant="error"` persistent
+
+**Discard:**
+- Opens `Dialog preventBackdropClose` with heading `{t('upload.discard.heading')}`
+- Confirm in dialog → file purged; for batch: advance to next file; for single: return to Upload Zone
+- Cancel in dialog → return to preview; file not purged
+
+---
+
+### Accessibility Requirements (WCAG 2.1 AA)
+
+**Checklist:**
+- [x] Perceivable: drag-zone has `role="region"` + `aria-label`; file type list is text not icon-only; error state uses `role="alert"`
+- [x] Operable: full keyboard path via Browse button (no drag required); all actions Tab-navigable; Confirm disabled state communicated via `aria-disabled`
+- [x] Understandable: every form input has `aria-label`; inline error on document type when attempted without selection; CLIN-007 warning visible before any action
+- [x] Robust: `jest-axe ^9.0.0`; no native `<button>` or `<input>` outside `@emisgroup/ui-*` except hidden file input (browser-native, accessibility-neutral)
+
+**Rule A — all inputs labelled:**
+```tsx
+<Select aria-label={t('upload.meta.docType')} ... />
+<DatePicker aria-label={t('upload.meta.dateOfCare')} ... />
+<Input aria-label={t('upload.meta.title')} clearable ... />
+```
+
+**Rule B — loading and error states announced:**
+```tsx
+// Batch progress
+<div role="status" aria-live="polite">{t('upload.batch.progress', { current, total })}</div>
+// Invalid file
+<div role="alert" aria-live="assertive">{t('upload.error.rejected.heading')}</div>
+```
+
+**Rule C — automated testing:**
+```tsx
+it('upload zone has no accessibility violations', async () => {
+  const { container } = render(<UploadZone />);
+  expect(await axe(container)).toHaveNoViolations();
+});
+```
+
+---
+
+### Visual Design
+
+**Colour tokens:**
+- Drop zone border (default): `var(--border)` dashed
+- Drop zone border (drag-active): `var(--primary)` solid
+- Drop zone background (drag-active): `var(--hover)`
+- Page background: `var(--background)`
+- Preview content area: `var(--background-dim)` with `border: 1px solid var(--border)`
+- Error box: `var(--negative)` tint (via `<div role="alert">` with inline style `background: color-mix(in srgb, var(--negative) 10%, transparent)`)
+- Step dot complete: `var(--positive)`
+- Step dot current: `var(--primary)`
+- Step dot pending: `var(--border)`
+
+**Typography:** Enterprise Sans; heading 22px bold; body 13–14px; meta 12px `var(--text-dim)`
+
+**Spacing:** 8px grid; 48px vertical padding in upload zone; 16px between sections
+
+**Icons:** `~icons/ic/outline-cloud-upload` 40px in drop zone; `~icons/ic/outline-insert-drive-file` 20px in preview header
+
+---
+
+### Error States
+
+**Invalid / corrupt file:** `role="alert"` box — red heading, file-specific detail, CLIN-010 note, Back-only actions. No Confirm/Discard shown.
+
+**Unsupported file type (client-side):** Inline `Notification variant="error"` below drop zone: `{t('upload.error.unsupportedType', { filename, accepted })}`. File not passed to preview.
+
+**Upload API failure (server-side):** `Notification variant="error"` persistent (no auto-dismiss) on preview screen: `{t('upload.error.serverFailure')}`. Retry button shown.
+
+**Network timeout:** `Notification variant="error"` persistent: `{t('upload.error.timeout')}`. Retry button shown.
+
+---
+
+### Empty States
+
+No empty state needed — Upload Zone always renders drop zone content regardless of prior uploads.
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-003 | HAZ-DOC-008 | Mandatory non-bypassable preview | CLIN-007 | CHECK 1 |
+| REQ-003 | HAZ-DOC-009 | File integrity check; reject corrupt files | CLIN-010 | CHECK 2 |
+| REQ-003 | HAZ-DOC-010 | Practice-scoped upload; auth enforced | AUTH-004 | CHECK 3 |
+| REQ-003 | — | Discard purges temporary buffer | IG-004 | CHECK 4 |
+| REQ-003 | HAZ-DOC-011 | Multi-file discard isolated; batch continues | CLIN-007 | CHECK 5 |
+| REQ-003 | HAZ-DOC-008, HAZ-DOC-011 | Same preview + integrity controls apply to drag-and-drop path | CLIN-007, CLIN-010 | CHECK 6 |
+| REQ-003 | HAZ-DOC-008 | Single upload uses viewer preview + filing in one flow | CLIN-007 | CHECK 7 |
+| REQ-003 | HAZ-DOC-011 | Multi-file upload routes to Unmatched; source set to Manual Upload | CLIN-007 | CHECK 8 |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section (upload pipeline, temporary buffer design, AV scanning integration, file size limits)
+- V1c will ADD: Design section (upload API contract, file metadata schema)
+- V1d will ADD: UI/UX section (upload entry point, preview component, confirm/discard interaction, error states)
+- V1e will ADD: Clinical Safety section (DCB0129 entries for HAZ-DOC-008/009/010/011, hazard risk matrix)
+- **TWAIN:** Out of scope for Core. Phase 2 entry condition: TWAIN driver procurement resolved. V1b to assess integration pattern at that point.
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation |
+| 1.1 | 2026-05-20 | V1a Requirements (amendment) | Added multi-file selection support. Updated AC to allow multiple file selection in a single file-picker interaction. Added sequential individual preview AC (no bulk-confirm). Added discard-isolation AC. Added HAZ-DOC-011 (multi-file bulk-commit risk) and MIT-DOC-010 (sequential preview enforcement with batch position indicator). Extended CHECK 1 with multi-file test scenarios. Added CHECK 5 for mid-batch discard isolation. Updated OTEL spans to record batch file count and sequence position. |
+| 1.2 | 2026-05-21 | V1a Requirements (amendment) | Added drag-and-drop upload support. New AC: users can drag one or more files onto the upload dialog; same sequential individual preview workflow applies as file-picker path. Updated `documents.upload.initiated` OTEL span to record `upload_method` attribute (`file_picker` or `drag_drop`). Added CHECK 6 for drag-and-drop clinical safety parity. Added traceability row. |
+| 1.3 | 2026-05-26 | V1a Requirements (amendment) | Updated upload preview to require standard document viewer rendering of actual uploaded content. Added single-file continuous preview+filing flow, multi-file routing to Unmatched, Manual Upload source status, and explicit removal of user-facing TWAIN availability banner from this release. Added CHECK 7 and CHECK 8. |
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Fast manual upload with mandatory preview for safe filing initiation.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER", "EMIS-X_WEBAPP_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsUploadService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsUploadService |
+| service_scope | existing_extend |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | None. Uses existing `POST /persons/{personGUID}/document` and `GET /persons/{personGUID}/documents` contracts. |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+Existing upload endpoint, temporary file retrieval, conversion, and workflow services.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+

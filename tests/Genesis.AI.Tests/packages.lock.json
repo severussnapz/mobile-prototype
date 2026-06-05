@@ -49,10 +49,36 @@
           "System.Diagnostics.EventLog": "6.0.0"
         }
       },
+      "ClosedXML.Parser": {
+        "type": "Transitive",
+        "resolved": "1.2.0",
+        "contentHash": "w+/0tsxABS3lkSH8EUlA7IGme+mq5T/Puf3DbOiTckmSuUpAUO2LK29oXYByCcWkBv6wcRHxgWlQb1lxkwI0Tw=="
+      },
+      "DocumentFormat.OpenXml": {
+        "type": "Transitive",
+        "resolved": "3.1.1",
+        "contentHash": "2z9QBzeTLNNKWM9SaOSDMegfQk/7hDuElOsmF77pKZMkFRP/GHA/W/4yOAQD9kn15N/FsFxHn3QVYkatuZghiA==",
+        "dependencies": {
+          "DocumentFormat.OpenXml.Framework": "3.1.1"
+        }
+      },
+      "DocumentFormat.OpenXml.Framework": {
+        "type": "Transitive",
+        "resolved": "3.1.1",
+        "contentHash": "6APEp/ElZV58S/4v8mf4Ke3ONEDORs64MqdD64Z7wWpcHANB9oovQsGIwtqjnKihulOj7T0a6IxHIHOfMqKOng==",
+        "dependencies": {
+          "System.IO.Packaging": "8.0.1"
+        }
+      },
       "Emis.JsonApi.Resources": {
         "type": "Transitive",
         "resolved": "3.0.0",
         "contentHash": "iS56rvmnN0RDhFGYog9e/7kxwkFv+l5q8vf/4JUouVYPHxTTGeV5jXBcmGCNVSRPBYkgPzPG02kLyrPkCwNGzQ=="
+      },
+      "ExcelNumberFormat": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "R3BVHPs9O+RkExbZYTGT0+9HLbi8ZrNij1Yziyw6znd3J7P3uoIR07uwTLGOogtz1p6+0sna66eBoXu7tBiVQA=="
       },
       "FluentValidation": {
         "type": "Transitive",
@@ -341,6 +367,11 @@
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
       },
+      "RBush": {
+        "type": "Transitive",
+        "resolved": "4.0.0",
+        "contentHash": "j3GeRxxLUQdc+UrZnvythdQxi3bd8ayn87VDjfGXrvfodF550n9wR6SgQvpo+YiAv3GJezsu6lK0l47rRqnbdg=="
+      },
       "Serilog": {
         "type": "Transitive",
         "resolved": "4.2.0",
@@ -401,6 +432,11 @@
           "Serilog": "4.0.0"
         }
       },
+      "SixLabors.Fonts": {
+        "type": "Transitive",
+        "resolved": "1.0.0",
+        "contentHash": "LFQsCZlV0xlUyXAOMUo5kkSl+8zAQXXbbdwWchtk0B4o7zotZhQsQOcJUELGHdfPfm/xDAsz6hONAuV25bJaAg=="
+      },
       "Swashbuckle.AspNetCore.Swagger": {
         "type": "Transitive",
         "resolved": "9.0.1",
@@ -435,6 +471,11 @@
           "Microsoft.IdentityModel.JsonWebTokens": "8.0.1",
           "Microsoft.IdentityModel.Tokens": "8.0.1"
         }
+      },
+      "System.IO.Packaging": {
+        "type": "Transitive",
+        "resolved": "8.0.1",
+        "contentHash": "KYkIOAvPexQOLDxPO2g0BVoWInnQhPpkFzRqvNrNrMhVT6kqhVr0zEb6KCHlptLFukxnZrjuMVAnxK7pOGUYrw=="
       },
       "xunit.analyzers": {
         "type": "Transitive",
@@ -541,6 +582,7 @@
           "AWSSDK.BedrockRuntime": "[3.7.422, )",
           "AWSSDK.Extensions.NETCore.Setup": "[3.7.301, )",
           "AWSSDK.S3": "[3.7.416.7, )",
+          "ClosedXML": "[0.104.2, )",
           "Genesis.AI.Core": "[1.0.0, )",
           "Genesis.AI.Domain": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.0, )",
@@ -600,6 +642,19 @@
         "contentHash": "W5qaXzHVVxdnYgCPhYGTWRJpPoOkB8wt2xiaQ+htbYAqlrlBbJtPgEbnL2iU7PtqxddKJs81fIIFIXfBwmuTFA==",
         "dependencies": {
           "AWSSDK.Core": "[3.7.402.37, 4.0.0)"
+        }
+      },
+      "ClosedXML": {
+        "type": "CentralTransitive",
+        "requested": "[0.104.2, )",
+        "resolved": "0.104.2",
+        "contentHash": "gOkSjQ152MhpKmw70cBkJV+FnaZAWzDwM36luRf/7FlWYnNeH++9XYdGTd0Y4KQlVPkKVxy948M5MMsnsGC4GQ==",
+        "dependencies": {
+          "ClosedXML.Parser": "[1.2.0, 2.0.0)",
+          "DocumentFormat.OpenXml": "[3.1.1, 4.0.0)",
+          "ExcelNumberFormat": "1.1.0",
+          "RBush": "4.0.0",
+          "SixLabors.Fonts": "1.0.0"
         }
       },
       "Emis.JsonApi": {

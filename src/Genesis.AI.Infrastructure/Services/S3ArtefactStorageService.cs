@@ -71,6 +71,51 @@ public class S3ArtefactStorageService : IArtefactStorageService
         }
     }
 
+    public async Task<string> SaveBinaryContentAsync(
+        Guid projectId,
+        string filePath,
+        int version,
+        byte[] content,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
+        var storageKey = BuildStorageKey(projectId, filePath, version);
+
+        using var contentStream = new MemoryStream(content, writable: false);
+        var request = new PutObjectRequest
+        {
+            BucketName = _bucketName,
+            Key = storageKey,
+            InputStream = contentStream,
+            ContentType = contentType,
+            AutoCloseStream = false
+        };
+
+        await _s3Client.PutObjectAsync(request, cancellationToken);
+
+        _logger.LogInformation(
+            "Uploaded binary artefact content to S3: {StorageKey} ({Length} bytes)",
+            storageKey, content.Length);
+
+        return storageKey;
+    }
+
+    public async Task<byte[]?> GetBinaryContentAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await _s3Client.GetObjectAsync(_bucketName, storageKey, cancellationToken);
+            using var memoryStream = new MemoryStream();
+            await response.ResponseStream.CopyToAsync(memoryStream, cancellationToken);
+            return memoryStream.ToArray();
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            _logger.LogWarning("Binary artefact content not found in S3: {StorageKey}", storageKey);
+            return null;
+        }
+    }
+
     public async Task DeleteContentAsync(string storageKey, CancellationToken cancellationToken)
     {
         await _s3Client.DeleteObjectAsync(_bucketName, storageKey, cancellationToken);
