@@ -71,8 +71,8 @@ Use these headings **verbatim** — same capitalisation, same punctuation, same 
 ### What Pipeline 06 PRODUCES:
 **Creates:**
 - ✅ `requirements/HAZARD-REGISTRY.md` — Full IF678 hazard cards (governance artefact)
-- ✅ `feedback/V1E_REVIEW_LIST.md` — Progress tracking per hazard
-- ✅ `feedback/V1E_DECISION_LOG.md` — Structural CSO decisions with rationale
+- ✅ `feedback/REVIEW_LIST.md` — Progress tracking per hazard
+- ✅ `feedback/DECISION_LOG.md` — Structural CSO decisions with rationale
 - ✅ `feedback/HAZARD_LOG_{PROJECT_CODE}_{DATE}.csv` — EMIS Hazard template CSV export
 
 **Updates (additive):**
@@ -175,7 +175,7 @@ Do NOT output progress lines in your chat text — the UI renders progress from 
 - 🟡 HIGH: Pre-production condition affecting multiple requirements (e.g. DPIA document not uploaded)
 - Cap: 10 items max — must be resolved before Phase 12
 
-**Tier 2 — Hazard-level flags (written to `feedback/V1E_REVIEW_LIST.md` Flag + Note columns):**
+**Tier 2 — Hazard-level flags (written to `feedback/REVIEW_LIST.md` Flag + Note columns):**
 - 🟢 MEDIUM: Single hazard needs a second look (e.g. "revisit causes", "pending third-party input")
 - ⚪ LOW: Documentation clarification on a specific hazard
 
@@ -318,7 +318,7 @@ CSO {Name}, are you ready to begin?
 
 ### Step 0f: Create (or update) Review List
 
-Create or update `feedback/V1E_REVIEW_LIST.md` via `save_artefact`:
+Create or update `feedback/REVIEW_LIST.md` via `save_artefact`:
 
 ```markdown
 # Pipeline 06 Review List — {PRODUCT_NAME}
@@ -344,7 +344,7 @@ Create or update `feedback/V1E_REVIEW_LIST.md` via `save_artefact`:
 
 ### Step 0g: Create (or update) Decision Log
 
-Create or update `feedback/V1E_DECISION_LOG.md` via `save_artefact`:
+Create or update `feedback/DECISION_LOG.md` via `save_artefact`:
 
 ```markdown
 # Pipeline 06 Decision Log — {PRODUCT_NAME}
@@ -379,6 +379,8 @@ Create or update `feedback/V1E_DECISION_LOG.md` via `save_artefact`:
 - Any phase: Ad-hoc clarification changing scope or interpretation
 
 **When NOT to write:** Hazard kept as-is, routine number selections without commentary, standard acceptances.
+
+**If the file already exists:** Read it first. Continue the D-NNN numbering from the last entry. Never overwrite existing entries.
 
 ---
 
@@ -743,7 +745,7 @@ For every hazard with Initial Risk = Very High or High: verify at least one acce
 For hazards mitigated by a CLIN rule that allows clinical override: confirm the override audit trail (who, when, clinical reason) is explicitly in scope for Pipeline 08 implementation.
 
 **CHECK E: Backup directory confirmation**
-Check if `requirements/v1e.old/` exists. If yes, confirm this is a fresh additive update.
+Check if `requirements/backup/` exists. If yes, confirm this is a fresh additive update.
 
 **CHECK F: HIT Design controls without CHECK-NNN**
 Scan every accepted HIT Design control. For any control where CHECK-NNN is not assigned:

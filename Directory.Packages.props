@@ -34,6 +34,9 @@
     <PackageVersion Include="AWSSDK.S3" Version="3.7.416.7" />
     <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.301" />
 
+    <!-- Excel generation -->
+    <PackageVersion Include="ClosedXML" Version="0.104.2" />
+
     <!-- JSON:API -->
     <PackageVersion Include="Emis.JsonApi" Version="3.0.0" />
 

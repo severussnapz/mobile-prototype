@@ -1,0 +1,494 @@
+﻿# REQ-009: Audit Trail
+
+**Priority:** Must Have
+**Effort:** Medium
+**Risk:** High (EMIS Web audit trail compatibility unconfirmed — see blocker below)
+**Depends On:** REQ-001 (Unified Inbound Document Inbox)
+
+---
+
+## User Story
+
+As a practice manager or authorised user,
+I need a complete, tamper-evident audit trail of all user activity on documents,
+So that I can investigate incidents, demonstrate compliance, and identify inappropriate access or actions.
+
+**Acceptance Criteria:**
+- [ ] Every user action on a document is recorded in an audit trail (see minimum fields below).
+- [ ] Audit trail entries are immutable — no user can edit or delete an audit entry.
+- [ ] Audit trail is accessible to users with the appropriate RBAC role (e.g. practice manager).
+- [ ] Audit trail is viewable per document (all activity on a specific document) and per user (all document activity by a specific user).
+- [ ] Audit trail entries are filed into EMIS Web from EMIS-X. *(Current architecture — see constraint below)*
+- [ ] Audit trail is available for all document actions: view, create, upload, edit metadata, annotate, export, download, delete, file, code, assign, move folder, patient visibility toggle.
+
+---
+
+## Minimum Audit Fields (Baseline — to be confirmed in V1e)
+
+> These fields are the working baseline. Final field specification to be confirmed during V1e Clinical Safety / IG design phase.
+
+| Field | Description |
+|-------|-------------|
+| `action` | The action performed (e.g. "View", "Annotate", "Export", "Delete") |
+| `user_ern` | ERN of the user who performed the action |
+| `document_ern` | ERN of the document acted upon |
+| `document_type` | Type of document (e.g. discharge summary, test result) |
+| `patient_ern` | ERN of the patient the document relates to |
+| `timestamp` | ISO 8601 datetime of the action |
+| `ip_address` | IP address of the user's session |
+| `outcome` | Success or failure of the action |
+
+**Forbidden fields in audit log:**
+- Raw NHS number (use `patient_ern`)
+- Internal database integer primary keys
+- Document content or annotation free-text
+
+---
+
+## EMIS Web Audit Trail Constraint
+
+> ⚠️ **V1d PxD note (2026-05-22): Where audit trail data is stored remains under discussion.** The architecture described below (filing into EMIS Web) is the current working assumption but has not been confirmed. V1b/V1c/V1e agents must resolve this before implementation begins. PxD has proceeded on the basis that the audit data is accessible and queryable from EMIS-X, regardless of the underlying store.
+
+> ⚠️ **Architectural constraint — open question for V1b.**
+>
+> EMIS-X currently has no native audit trail capability. Audit trail entries are filed into EMIS Web from EMIS-X. Before committing to this architecture for Document Management, V1b must confirm:
+> - Whether the EMIS Web audit trail supports all minimum document management audit fields listed above
+> - Whether EMIS Web audit trail entries filed from EMIS-X are queryable/viewable within EMIS-X (or only accessible via EMIS Web)
+> - Whether filing audit entries into EMIS Web introduces latency or availability risk (i.e. if EMIS Web is unavailable, are audit entries lost?)
+> - Whether a native EMIS-X audit store is required as a fallback or primary mechanism
+>
+> **This is a blocker for V1b.** Audit trail integrity is a DCB0129 and UK GDPR requirement — it cannot be left unresolved.
+
+---
+
+## Dimension 1: Clinical Safety
+
+### Applicable Guardrails
+- **CLIN-002:** Patient Data Audit Trail — immutable audit log created before returning patient data; applies to all document access
+- **CLIN-009:** Clinical Safety Logging — safety-critical events logged using ERN identifiers; no plain NHS numbers in logs
+
+### Hazards Addressed
+
+- **HAZ-DOC-025:** Inappropriate document access goes undetected — data breach not identified; regulatory and patient safety implications
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+- **HAZ-DOC-026:** Audit trail incomplete due to EMIS Web filing failure — audit entries lost when EMIS Web unavailable
+  - **Severity:** High
+  - **Likelihood:** Low–Medium
+  - **Risk Level:** High
+
+- **HAZ-DOC-027:** Audit trail tampered with — entries modified or deleted to conceal activity
+  - **Severity:** High
+  - **Likelihood:** Low
+  - **Risk Level:** High
+
+### Mitigations
+
+- **MIT-DOC-024:** Audit entries are immutable once written; no update or delete operations permitted on audit records
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-025:** Audit entry written before action is completed (write-before-return pattern per CLIN-002)
+  - **Type:** Business Logic
+  - **Effectiveness:** Complete
+
+- **MIT-DOC-026:** EMIS Web audit filing failure handling to be defined in V1b — must not result in silent loss of audit entries
+  - **Type:** TBC at V1b
+  - **Effectiveness:** TBC
+
+---
+
+## Dimension 2: Information Governance
+
+### Applicable Guardrails
+- **IG-003:** Lawful Basis Declaration — Article 6(1)(c) legal obligation (NHS records management); Article 9(2)(h) health data
+- **IG-004:** Special Category Data Protection — audit records containing patient ERNs are special category adjacent; stored encrypted at rest
+- **IG-005:** Data Subject Rights — patients may request access to audit records relating to their own documents (subject access request)
+- **IG-008:** Consent Management — audit trail changes to patient visibility toggles (REQ-008) must be auditable
+- **IG-009:** Data Breach Notification — audit trail is the primary mechanism for detecting and evidencing data breaches within 72hr ICO notification window
+- **IG-010:** Retention Policy Enforcement — audit records subject to NHS retention schedules; minimum 8 years for adult records
+
+### GDPR Articles
+- **Article 6(1)(c):** Legal obligation — NHS records management requirements
+- **Article 5(1)(f):** Integrity and confidentiality — audit records protected from tampering
+- **Article 30:** Records of processing activities — audit trail supports Article 30 obligations
+
+---
+
+## Dimension 3: Security
+
+### Applicable Guardrails
+- **AUTH-004:** Authorization Required — audit trail viewable only by users with appropriate RBAC role; write access restricted to system (not user-initiated)
+- **SEC-001:** TLS Encryption — audit records transmitted over TLS 1.2+
+- **SEC-002:** No Secrets in Code — audit store credentials in Azure Key Vault
+
+### Security Requirements
+- Audit trail write operations are system-initiated only; no user-facing API to create or modify audit entries
+- Audit trail read access restricted to RBAC-authorised roles (e.g. practice manager, compliance officer)
+- Audit queries parameterised to prevent injection attacks
+- Audit records stored in append-only storage where possible (infrastructure-level immutability)
+
+---
+
+## Dimension 4: Observability & Performance
+
+### Product KPIs
+- Audit entry write success rate
+- Audit entry write latency (action occurs → audit entry committed)
+- Audit query response time
+- EMIS Web filing success rate (current architecture)
+
+### Observable Events (OTEL Instrumentation)
+- `documents.audit.entry_written` — audit entry successfully committed
+- `documents.audit.entry_failed` — audit entry failed to write; error type and action recorded
+- `documents.audit.query_executed` — authorised user queries audit trail
+- `documents.audit.emis_web_filed` — audit entry successfully filed to EMIS Web
+
+### Performance SLOs
+- Audit entry write: p99 < 500ms; p99.9 success rate ≥ 99.9%
+- Audit entry write must complete before action response is returned to user (write-before-return)
+- Audit query response: p95 < 2 seconds for standard date-range queries
+
+### Alerting Conditions
+
+| Condition | Threshold | Severity | Channel |
+|---|---|---|---|
+| Audit write failure | Any single audit write failure | CRITICAL | On-call page |
+| Audit write latency breach | p99 > 500ms sustained for 1 min | HIGH | Ops alert |
+| Audit query latency breach | p95 > 2 seconds sustained for 5 min | MEDIUM | Ops alert |
+| Audit entry gap detected | Expected entry count drops for a document action type | CRITICAL | On-call page |
+
+---
+
+## Design (Added by V1c)
+
+### API Contract (OpenAPI 3.0)
+
+**Versioning:** Header-based versioning only. API paths are unversioned.
+
+**JSON:API media type:** `application/vnd.api+json`
+
+**Primary resource:** `audit-entries`
+
+**Core endpoints:**
+- `GET /audit/entries`
+- `GET /audit/entries/{entryId}`
+
+**Audit write model:**
+- Audit records are written by domain services via internal command pipeline before response return.
+- External API for write is not exposed; read/query is exposed with RBAC and date-range filters.
+
+### Database Schema
+
+**Table:** `audit_entries`
+
+```sql
+CREATE TABLE audit_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organisation_id UUID NOT NULL,
+    document_guid UUID,
+    patient_ern VARCHAR(64),
+    action VARCHAR(128) NOT NULL,
+    actor_user_id UUID NOT NULL,
+    actor_role VARCHAR(64) NOT NULL,
+    occurred_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    metadata JSONB
+);
+
+-- No UPDATE or DELETE — audit entries are immutable; enforced at application layer
+-- Indexes
+CREATE INDEX idx_audit_entries_org_occurred ON audit_entries (organisation_id, occurred_at DESC);
+CREATE INDEX idx_audit_entries_document ON audit_entries (document_guid, occurred_at DESC) WHERE document_guid IS NOT NULL;
+CREATE INDEX idx_audit_entries_patient ON audit_entries (patient_ern, occurred_at DESC) WHERE patient_ern IS NOT NULL;
+```
+
+### Component Interfaces
+
+```csharp
+public interface IAuditTrailService
+{
+  Task<Result> WriteAsync(AuditWriteCommand command, CancellationToken cancellationToken = default);
+  Task<Result<PaginatedList<AuditEntryResource, AuditQueryFilter>>> QueryAsync(AuditQueryFilter filter, CancellationToken cancellationToken = default);
+  Task<Result<AuditEntryResource>> GetByIdAsync(Guid entryId, CancellationToken cancellationToken = default);
+}
+```
+
+---
+
+## ✨ Evaluation Function Specification
+
+> **Note:** Final audit field specification to be confirmed in V1e. Checks below use the baseline field set.
+
+### CHECK 1: CLIN-002 — Audit Entry Written Before Response Returned
+- **Trigger:** Any document action (view, annotate, export, etc.)
+- **Test Scenario:** Audit timing verification
+  - Action: User views a document
+  - Validation 1: Audit entry exists before document content is returned to client
+  - Validation 2: Audit entry `timestamp` is earlier than or equal to response timestamp
+  - Validation 3: If audit write fails, the action is blocked — document content not returned
+- **Guardrail:** CLIN-002
+- **Hazard:** HAZ-DOC-025
+- **Pass Criteria:** Audit written before response; action blocked if audit write fails
+
+### CHECK 2: Audit Entries Are Immutable
+- **Trigger:** Attempt to update or delete an audit entry
+- **Test Scenario:** Immutability enforcement
+  - Validation 1: No API endpoint exists to update an audit entry
+  - Validation 2: No API endpoint exists to delete an audit entry
+  - Validation 3: Direct database update/delete on audit table rejected at infrastructure level (append-only)
+- **Hazard:** HAZ-DOC-027
+- **Pass Criteria:** No update or delete path exists for audit entries at any layer
+
+### CHECK 3: AUTH-004 — Audit Trail Access is RBAC-Controlled
+- **Trigger:** Request to view audit trail
+- **Test Scenario:** Unauthorised access attempt
+  - Request audit trail without authorisation → access denied (401)
+  - Request with valid JWT but insufficient role → access denied (403)
+  - Request with valid JWT + audit-read role → audit data returned
+- **Guardrail:** AUTH-004
+- **Hazard:** HAZ-DOC-025
+- **Pass Criteria:** Audit trail inaccessible without correct RBAC role
+
+### CHECK 4: CLIN-009 — Forbidden Fields Absent from Audit Entries
+- **Trigger:** Any audit entry written
+- **Test Scenario:** Forbidden field validation
+  - Validation 1: Audit entry does NOT contain raw NHS number
+  - Validation 2: Audit entry does NOT contain internal database integer primary keys
+  - Validation 3: Audit entry does NOT contain document content or annotation free-text
+  - Validation 4: Patient referenced by `patient_ern` only
+- **Guardrail:** CLIN-009
+- **Pass Criteria:** All forbidden fields absent from every audit entry
+
+### CHECK 5: Audit Trail Covers All Required Actions
+- **Trigger:** Each document action type performed
+- **Test Scenario:** Action coverage
+  - For each action (view, upload, annotate, export, download, delete, file, code, assign, move folder, patient visibility toggle):
+    - Validation: Audit entry created with correct `action` value
+- **Pass Criteria:** All listed action types produce audit entries with correct action labels
+
+---
+
+
+### CHECK 17: PXD-001 — Audit Events Written (Backend Only)
+
+**Trigger:** Any document action occurs (view, annotate, file, code, match, export, tag, route)
+
+**Test Scenario:**
+- Validation 1: Audit event written to audit store before action response returned
+- Validation 2: Event contains all Minimum Audit Fields (see §26); no forbidden fields
+- Validation 3: Event is immutable after write (no UPDATE or DELETE path)
+- Validation 4: Audit write failure does not silently succeed — action fails closed (CLIN-010)
+
+**Pass Criteria:** All document actions produce a valid, immutable audit event — CLIN-002 satisfied. No UI required for Phase 1.
+
+---
+
+
+## PxD (Added by V1d)
+
+> **Scope: Backend-only (Phase 1).** No audit trail viewer UI is in scope for Document Manager Core. The audit trail is a backend write capability — all document actions emit structured audit events (see Minimum Audit Fields). A viewer UI is intentionally deferred.
+>
+> **Future phase — Cross-EMIS-X Audit Section:** A common audit viewer should be built as a shared EMIS-X capability (not per-product). All EMIS-X products (including Document Manager) would feed into this central section. Document Manager emits audit events in the format required by that future shared viewer; no Document Manager–specific viewer will be built.
+>
+> **Impact on V3 coding:** No UI components to implement for REQ-009. The audit write pipeline (service + API) is the full Phase 1 delivery.
+
+---
+
+### User Flow
+
+**Phase 1 (in scope):** No user-visible audit trail flow. Audit events are written automatically by backend services on every document action. No user interaction required or available.
+
+**Future phase (out of scope for Phase 1):** A shared EMIS-X audit section will surface a filterable, exportable view of all audit events across products, accessible to authorised roles from a central location in EMIS-X navigation.
+
+---
+
+### Component Specifications
+
+No UI components required for Phase 1.
+
+**Future phase reference — design constraints to carry forward:**
+- Audit events are read-only; no editing or deletion
+- Forbidden fields must never be rendered: no NHS number, no ERN, no full IP address
+- Timestamps in British format (DD MMM YYYY HH:mm) with `<time datetime="{ISO}">` for semantic markup
+- Admin-only export (CSV); role-gated server-side
+- Filter by event type and date range
+- `jest-axe ^9.0.0` required when the shared viewer is built
+
+---
+
+## Traceability
+
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-009 | HAZ-DOC-025 | Write-before-return | CLIN-002 | CHECK 1 |
+| REQ-009 | HAZ-DOC-027 | Immutable entries | — | CHECK 2 |
+| REQ-009 | HAZ-DOC-025 | RBAC-controlled access | AUTH-004 | CHECK 3 |
+| REQ-009 | — | Forbidden fields absent | CLIN-009 | CHECK 4 |
+| REQ-009 | HAZ-DOC-025 | All actions covered | — | CHECK 5 |
+| REQ-009 | — | Audit panel read-only display | CLIN-009 | CHECK 17 |
+| REQ-009 | HAZ-DOC-025 | Admin-only CSV export; correct fields | AUTH-004 | CHECK 18 |
+| REQ-009 | — | Filter controls WCAG 2.1 AA | A11Y-001 | CHECK 19 |
+| REQ-009 | HAZ-DOC-048 | Access events logged at document open boundary; write-before-return enforced | CLIN-002 | CHECK 18 |
+| REQ-009 | HAZ-DOC-049 | ALL CAUSES BLOCKED — PL-8: audit store architecture decision required | TBD | TBD (BLOCKED) |
+| REQ-009 | HAZ-DOC-050 | Audit store append-only/immutable; no role permits edit or delete of audit entries | CLIN-005/CLIN-009 | CHECK 19/20 |
+
+---
+
+## Change Log
+
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-18 | V1a Requirements | Initial creation — audit trail requirements |
+| 1.1 | 2026-05-26 | V1b Architecture | Architecture section added |
+| 1.2 | 2026-05-26 | V1c Design | Design section added |
+| 1.3 | 2026-05-28 | V1d PxD | Added PxD section (per-document audit panel, filter controls, export CSV, per-user admin view, accessibility). Added CHECK 17–19. Updated Traceability. |
+| 1.4 | 2026-05-28 | V1d PxD (correction) | PxD UI viewer descoped to Phase 1 backend-only. Removed audit panel UI, filter controls, CSV export, and per-user admin view. Added forward note for future cross-EMIS-X common audit section. CHECK 17 revised to backend write test only; CHECKs 18 and 19 removed. |
+| 1.5 | 2026-05-29 | V1e Clinical Safety | Added Clinical Safety section (IF678 hazard cards for HAZ-DOC-048/049/050; HIT Design controls with CLIN-002/005/009; CHECK 18-20 added). HAZ-DOC-049 ALL CAUSES BLOCKED pending PL-8 (audit store architecture). HAZ-DOC-050 Cause 3 BLOCKED per D-028. Severity/likelihood deferred to CSO manual entry (D-008). CSO sign-off deferred (D-031). Traceability updated. |
+
+---
+
+**NOTE FOR V1b–V1e AGENTS:**
+This requirement will be updated by subsequent agents:
+- V1b will ADD: Architecture section — EMIS Web audit filing compatibility assessment; native EMIS-X audit store decision; append-only storage strategy; failure handling for EMIS Web filing outages
+- V1c will ADD: Design section — audit entry schema, audit query API contract, RBAC role definitions for audit access
+- V1d will ADD: UI/UX section — audit trail viewer design (per-document and per-user views), filter/search within audit trail
+- V1e will ADD: Clinical Safety section — DCB0129 entries for HAZ-DOC-025/026/027; final audit field specification; EMIS Web compatibility assessment outcome
+- **Minimum audit fields:** To be formally confirmed and expanded in V1e Clinical Safety / IG design phase
+
+---
+
+## Architecture (Added by V1b)
+
+### BDAT Analysis
+
+Business: Provide immutable audit trace for all document actions, including outage-safe recording.
+
+Data: Reads and writes requirement-specific workflow metadata, audit evidence, and bounded operational state.
+
+Application: Extends or reuses service capability based on service classification.
+
+v3_agents: ["EMIS-X_API_ENGINEER"]
+
+Technology: React 18.3+, TypeScript 5.8+, ASP.NET Core 10, C# 13, Aurora PostgreSQL 17, S3, ECS Fargate, GitHub Actions.
+
+### Architecture Decision Records
+
+- ADR-001: Backend standard is ASP.NET Core 10 with layered architecture.
+- ADR-002: Database standard is Aurora PostgreSQL 17 with Flyway 11 migrations and explicit index strategy.
+- ADR-003: Authentication is OAuth2 JWT with CIS2 or Azure AD B2C federation.
+- ADR-004: API style is REST with JSON:API conventions.
+- ADR-005: Hosting standard is ECS Fargate over Lambda for consistency.
+- ADR-006: Phased rollout uses strangler pattern alongside EMIS Web monolith.
+- ADR-007: Binary documents are stored in S3 with application-layer access control.
+- ADR-008: SQS consumers are idempotent with database-enforced uniqueness.
+- ADR-009: Frontend HTTP clients use axios.create timeout 30_000 and no browser agents.
+- ADR-010: User-supplied URL values must use encodeURIComponent.
+
+### Platform Boundaries
+
+- Service: DocumentsAuditService
+- Ownership: Requirement-specific capability and data contract.
+- Dependencies: Shared auth, audit, and observability capabilities.
+- Phased rollout: Cohort rollout by practice and patching domain with feature flags.
+
+### Service Classification
+
+| Field | Value |
+|-------|-------|
+| service_name | DocumentsAuditService |
+| service_scope | new |
+| target_repository | emisgroup/emisx-documents-manager |
+| target_repository_url | null |
+| default_branch | main |
+| existing_endpoints_affected | Existing baseline APIs in openapi-docs.yml |
+| existing_files_affected | TBC in V1c |
+| new_endpoints | /documents/audit/events (POST), /documents/audit/query (GET) |
+
+### Failure Modes & Resilience
+
+1. Dependency timeout or unavailable: Circuit breaker and bounded retries with explicit fail-closed UX.
+2. Message duplication or replay: Idempotency keys and dedupe checks at persistence boundaries.
+3. Partial write risk: Transactional outbox or compensating action with audit evidence.
+4. EMIS Web downstream outage: Queue and replay integration calls with no silent data loss.
+
+### Integration Points
+
+EMIS Web audit compatibility verification and shared audit event contract.
+
+### AWS Well-Architected
+
+| Pillar | Implementation | Status |
+|--------|----------------|--------|
+| Operational Excellence | CI/CD, runbooks, phased release controls | Yes |
+| Security | OAuth2 JWT, IAM least privilege, encrypted transport and storage | Yes |
+| Reliability | Multi-AZ services, retries, circuit breakers, idempotent handlers | Yes |
+| Performance Efficiency | Indexed query paths, autoscaling, explicit latency SLOs | Yes |
+| Cost Optimisation | Reuse existing services and right-sized scaling policies | Yes |
+| Sustainability | Region-aligned deployment and efficient managed services use | Yes |
+
+### EMIS Principles
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| 1. User, Customer and Business Needs First | Yes | Supports safe and efficient document processing outcomes. |
+| 2. Public Cloud First | Yes | AWS-managed architecture retained. |
+| 3. Internet First | Yes | Browser-first secure access model. |
+| 4. Web Based | Yes | React microfrontend delivery pattern. |
+| 5. Cloud Managed Services | Yes | Managed data and compute services preferred. |
+| 6. Prefer Native Cloud Offerings | Yes | AWS-native stack predominates. |
+| 7. Reuse Before Buy or Build | Yes | Existing EMIS-X capabilities reused where available. |
+| 8. AWS Well-Architected Framework | Yes | Six-pillar controls embedded. |
+| 9. Documentation Standards | Yes | Architecture decisions and checks documented. |
+
+### Operations
+
+- Deployment: Progressive delivery by practice cohort and patching domain.
+- Monitoring: OTEL traces, SLO dashboards, queue depth and error-rate alerts.
+- Logging: Structured logs with ERN identifiers only.
+- Runbooks: Incident, rollback, and data-reconciliation procedures required pre-go-live.
+
+### Performance & Cost
+
+- Performance baseline: Maintain p99 user interactions under 2 seconds unless requirement-specific carve-outs apply.
+- Scalability baseline: Support baseline and 3x burst workloads with autoscaling.
+- Cost approach: Minimise net-new spend by extending existing services first.
+
+### Security
+
+- Authentication and authorisation: JWT scope checks on every API path.
+- Encryption: TLS 1.2+ in transit and KMS-backed encryption at rest.
+- Network: Private service tiers with ALB ingress and least-privilege security groups.
+- Frontend safety: URL value encoding and security headers mandated.
+
+### Diagrams
+
+Architecture flow:
+User or External Source -> Documents Manager Microfrontend -> Documents APIs on ECS Fargate -> Aurora PostgreSQL and S3.
+Documents APIs also integrate with workflow and audit services and EMIS Web integration boundary.
+
+---
+
+## Clinical Safety (Added by V1e)
+
+> Full IF678 hazard cards: `requirements/HAZARD-REGISTRY.md`
+
+**Hazard IDs:** HAZ-DOC-048, HAZ-DOC-049, HAZ-DOC-050
+**CLIN Guardrails:** CLIN-002 (Patient Data Audit Trail), CLIN-005 (Clinical Data Transactional Integrity), CLIN-009 (Safe Defaults)
+**HIT Design Controls:**
+- HAZ-DOC-048: see HAZARD-REGISTRY.md (CHECK 18)
+- HAZ-DOC-049: see HAZARD-REGISTRY.md (see HAZARD-REGISTRY.md)
+- HAZ-DOC-050: see HAZARD-REGISTRY.md (CHECK 19, CHECK 20)
+**Residual Risk Level:** [TBD — ALARP pending CSO Phase 6 assessment], CSO: Dan Watts
+
+---
+
+### DCB0129/0160 Compliance
+
+- Clinical Risk Management Plan: ✅ In place
+- Hazard Log (IF678): ✅ Documented in `requirements/HAZARD-REGISTRY.md`
+- Risk Assessment: ⏳ Pending — severity/likelihood to be entered by CSO (D-008)
+- Mitigations: ✅ Defined and CLIN-referenced
+- Residual Risk: ⏳ Pending — ALARP assessment deferred pending risk scores (Phase 6)

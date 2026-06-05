@@ -1,0 +1,203 @@
+# REQ-002: Escalation to Human Support
+**Priority:** Must Have
+**Effort:** Medium
+**Risk:** Medium
+**Depends On:** REQ-001
+---
+## User Story
+As an external partner developer,
+I need to escalate my unanswered question to a human by providing my email address,
+So that I can get a response when the bot cannot help me from the documentation.
+**Acceptance Criteria:**
+- [ ] When the bot cannot answer from the documentation, it prompts the user to escalate by providing their email address
+- [ ] Email address validated against standard RFC 5322 pattern; invalid format shows "Please enter a valid email address"
+- [ ] On submission, a Teams channel notification is sent via webhook containing: email, full chat history, triggering question, current page URL, and timestamp
+- [ ] A confirmation email is sent to the partner developer's provided address
+- [ ] User sees a polite confirmation in the widget: "Thanks for reaching out — we've received your question and will be in touch soon."
+---
+## Dimension 1: Clinical Safety
+### Applicable Guardrails
+- N/A — system is not safety-critical; no patient data involved
+### Hazards Addressed
+- None identified — not a clinical system
+### Mitigations
+- None required for clinical safety
+---
+## Dimension 2: Information Governance
+### Applicable Guardrails
+- **IG-001:** Data Minimisation — only email, chat history, page URL, and timestamp collected; no additional personal data
+- **IG-003:** Lawful Basis — email address is personal data under UK GDPR
+### GDPR Articles
+- **Article 6 Lawful Basis:** Legitimate interest (likely) — [UNVERIFIED — IG-OWNER: TBD — RESOLUTION DATE: TBD — GO-LIVE BLOCKER]
+- **Article 5(1)(c):** Data minimisation — only data necessary for escalation collected
+### Data Handling Requirements
+- **Data Categories:** Contact data (email address), behavioural data (chat history, page URL)
+- **Data Subjects:** External partner developers
+- **Retention Period:** TBD — to be confirmed with IG owner; recommend deletion after escalation is resolved
+- **Data Minimisation:** Email, chat history, triggering question, page URL, timestamp only — no additional fields
+---
+## Dimension 3: Security
+### Applicable Guardrails
+- **SEC-001:** TLS encryption in transit — all webhook and email traffic over HTTPS
+- **WSEC-006a:** encodeURIComponent() for any user-supplied values embedded in URLs
+- **WSEC-013:** @emisgroup/acp-security-headers in dependencies
+### Security Requirements
+- **Authentication:** No authentication required to submit escalation (widget is public-facing)
+- **Authorisation:** N/A for end user; Teams webhook URL must be stored as environment secret, not hardcoded
+- **Encryption in Transit:** TLS 1.2+ for webhook POST and confirmation email dispatch
+- **Encryption at Rest:** Email addresses stored only transiently for dispatch; no long-term storage unless retention policy confirmed
+- **Teams Webhook URL:** Must be stored as environment variable / secret — never committed to source code
+### Data Subject Rights
+- **Article 15 (Access):** Partner developer may request access to their escalation data
+- **Article 17 (Erasure):** Email and chat history must be erasable on request
+- **Article 20 (Portability):** Escalation data exportable on request
+- Note: Retention policy and erasure mechanism to be confirmed with IG owner before go-live
+---
+## Dimension 4: Observability & Performance
+### Product KPIs
+- **KPI 1:** Escalation rate — % of conversations that result in escalation (target: decreasing over time as bot improves)
+- **KPI 2:** Webhook delivery success rate — target: > 99%
+- **KPI 3:** Confirmation email delivery rate — target: > 99%
+### Observable Events (OTEL Instrumentation)
+- **Span 1:** `qabot.escalation.triggered` — Attributes: page_url, conversation_length, triggering_question
+- **Span 2:** `qabot.escalation.email_submitted` — Attributes: timestamp, email_domain (not full address)
+- **Span 3:** `qabot.escalation.webhook_dispatched` — Attributes: status_code, duration_ms
+- **Span 4:** `qabot.escalation.confirmation_email_sent` — Attributes: status, duration_ms
+### Performance SLOs
+- **Webhook + confirmation email dispatched:** within 5s of submission
+- **Availability:** > 99.9%
+- **Error Rate:** < 0.1%
+### Alerting Conditions
+- **Critical:** Webhook delivery failure → alert via monitoring channel
+- **Warning:** Confirmation email delivery failure rate > 1% → alert via monitoring channel
+---
+## ✨ Evaluation Function Specification
+**PURPOSE:** Define DETERMINISTIC pass/fail criteria for coding agents to verify implementation.
+---
+### CHECK 1: Email Format Validation (RFC 5322)
+**Trigger:** User submits email address in escalation form
+**Test Scenario 1: Invalid email rejected**
+- **Input:** `"notanemail"` (no @ symbol)
+- **Expected Response:** Inline validation error displayed
+- **Expected Message:** "Please enter a valid email address"
+- **Validation:** No webhook fired, no confirmation email sent
+**Test Scenario 2: Another invalid format rejected**
+- **Input:** `"user@"` (missing domain)
+- **Expected Response:** Inline validation error displayed
+- **Expected Message:** "Please enter a valid email address"
+**Test Scenario 3: Valid email accepted**
+- **Input:** `"developer@partner.com"`
+- **Expected Response:** Submission proceeds, confirmation shown
+- **Pass Criteria:** Invalid emails blocked with error message; valid emails proceed to dispatch
+**Applicable Guardrail:** IG-001 (Data Minimisation — only valid data collected)
+**Pass Criteria:** Invalid email formats REJECTED with user-friendly message; valid formats ACCEPTED
+---
+### CHECK 2: Teams Webhook Payload Completeness
+**Trigger:** Valid escalation submitted
+**Test Scenario: Webhook payload contains all required fields**
+- **Setup:** Submit valid escalation after bot fails to answer
+- **Validation 1:** Webhook POST fired to configured Teams URL
+- **Validation 2:** Payload contains `email` field
+- **Validation 3:** Payload contains `chat_history` (array of messages)
+- **Validation 4:** Payload contains `triggering_question` (string)
+- **Validation 5:** Payload contains `page_url` (string, valid URL)
+- **Validation 6:** Payload contains `timestamp` (ISO 8601 format)
+- **Forbidden in payload:** Full email address in plain text in logs
+**Applicable Guardrail:** SEC-001 (TLS in transit), IG-001 (Data Minimisation)
+**Pass Criteria:** All 6 fields present in webhook payload; dispatched within 5s of submission
+---
+### CHECK 3: Confirmation Email Sent to Partner
+**Trigger:** Valid escalation submitted
+**Test Scenario: Confirmation email dispatched**
+- **Setup:** Submit valid escalation with `developer@partner.com`
+- **Validation 1:** Email dispatched to `developer@partner.com`
+- **Validation 2:** Email contains polite confirmation message
+- **Validation 3:** Email dispatched within 5s of submission
+- **Anti-pattern:** Email sent before webhook confirmation (webhook must fire first)
+**Applicable Guardrail:** SEC-001 (TLS in transit)
+**Pass Criteria:** Confirmation email sent to provided address within 5s; polite message included
+---
+### CHECK 4: In-Widget Confirmation Message
+**Trigger:** Successful escalation submission
+**Test Scenario: User sees confirmation in widget**
+- **Input:** Valid email submitted
+- **Expected UI State:** Escalation form replaced with confirmation message
+- **Expected Message:** "Thanks for reaching out — we've received your question and will be in touch soon."
+- **Validation:** Form inputs no longer visible after submission (prevent double-submit)
+**Applicable Guardrail:** DS-001 (@emisgroup/ui-* components used for confirmation state)
+**Pass Criteria:** Confirmation message displayed; form hidden; double-submit prevented
+---
+### CHECK 5: Idempotency — No Double Escalation
+**Trigger:** User clicks submit twice (double-click or network delay)
+**Test Scenario: Second submission within same session**
+- **Action:** Submit escalation, then submit again immediately
+- **Expected:** Only ONE webhook fired, ONE confirmation email sent
+- **Expected UI:** Submit button disabled after first successful submission
+- **Anti-pattern:** Two identical Teams notifications for same conversation
+**Applicable Guardrail:** SEC-001
+**Pass Criteria:** Exactly one webhook and one email per escalation event; submit button disabled post-submission
+---
+### CHECK 6: Webhook URL Stored as Secret
+**Trigger:** Code review / deployment check
+**Test Scenario: Webhook URL not hardcoded**
+- **Validation 1:** No Teams webhook URL present in source code or committed config files
+- **Validation 2:** Webhook URL loaded from environment variable (e.g. `TEAMS_WEBHOOK_URL`)
+- **Validation 3:** Application fails to start with meaningful error if `TEAMS_WEBHOOK_URL` not set
+**Applicable Guardrail:** SEC-001, WSEC-013
+**Pass Criteria:** Webhook URL ONLY in environment config; never in source code
+---
+### CHECK A: DS-001 — @emisgroup Components Only
+**Trigger:** Any UI component in escalation flow rendered
+**Test Scenario: No native HTML interactive elements**
+- **Validation:** No `<input>`, `<button>`, `<form>`, `<textarea>` in escalation component source
+- **Expected:** `@emisgroup/ui-*` equivalents used throughout
+- **Pass Criteria:** Zero native interactive HTML elements in component tree
+---
+### CHECK B: A11Y-004a — Input Accessibility
+**Trigger:** Email input field rendered
+**Test Scenario: Input has accessible label**
+- **Validation 1:** Email input has `aria-label`, `aria-labelledby`, or associated `htmlFor`
+- **Validation 2:** Error message linked to input via `aria-describedby`
+- **Pass Criteria:** All inputs labelled; error messages programmatically associated
+---
+### CHECK C: A11Y-010 — jest-axe
+**Trigger:** Component test file executed
+**Test Scenario: No accessibility violations**
+- **Validation:** `toHaveNoViolations()` passes for escalation form component
+- **Pass Criteria:** Zero axe violations reported
+---
+### CHECK D: WCS-007a / WCS-007b — i18n and British English
+**Trigger:** Any user-facing string rendered
+**Test Scenario: All strings use t() and British English**
+- **Validation 1:** No hardcoded English strings in JSX
+- **Validation 2:** All strings in `src/locales/en-GB/translation.json`
+- **Validation 3:** British English spellings used (e.g. "colour", "centre")
+- **Pass Criteria:** Zero hardcoded strings; all translations in en-GB file
+---
+## Traceability
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check |
+|-------------|--------|------------|-----------|------------------|
+| REQ-002 | — | Email format validation | IG-001 | CHECK 1 |
+| REQ-002 | — | Webhook payload completeness | SEC-001 | CHECK 2 |
+| REQ-002 | — | Confirmation email dispatch | SEC-001 | CHECK 3 |
+| REQ-002 | — | In-widget confirmation | DS-001 | CHECK 4 |
+| REQ-002 | — | Idempotent submission | SEC-001 | CHECK 5 |
+| REQ-002 | — | Webhook URL as secret | WSEC-013 | CHECK 6 |
+| REQ-002 | — | @emisgroup components | DS-001 | CHECK A |
+| REQ-002 | — | Input accessibility | A11Y-004a | CHECK B |
+| REQ-002 | — | jest-axe | A11Y-010 | CHECK C |
+| REQ-002 | — | i18n / British English | WCS-007a/b | CHECK D |
+---
+## Change Log
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-31 | Pipeline 01 Requirements | Initial creation |
+**Pipeline Status:**
+- ✅ Pipeline 01 Complete (Requirements with eval specs)
+- ⏳ Pipeline 03 Pending (Architecture)
+- ⏳ Pipeline 04 Pending (Design)
+- ⏳ Pipeline 05 Pending (PxD)
+- ⏳ Pipeline 06 Pending (Clinical Safety)
+- ⏳ Pipeline 07 Pending (Normalisation)
+- ⏳ Pipeline 08 Pending (Planning)
+

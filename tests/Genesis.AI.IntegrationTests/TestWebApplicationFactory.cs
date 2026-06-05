@@ -73,6 +73,7 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
             // Keeps content in memory so save/read round-trips work.
             var storageMock = new Mock<IArtefactStorageService>();
             var contentStore = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
+            var binaryStore = new System.Collections.Concurrent.ConcurrentDictionary<string, byte[]>();
             storageMock
                 .Setup(storage => storage.SaveContentAsync(
                     It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(),
@@ -87,6 +88,20 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
                 .Setup(storage => storage.GetContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns((string key, CancellationToken _) =>
                     Task.FromResult(contentStore.TryGetValue(key, out var stored) ? stored : null));
+            storageMock
+                .Setup(storage => storage.SaveBinaryContentAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(),
+                    It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns((Guid projectId, string filePath, int version, byte[] content, string _, CancellationToken _) =>
+                {
+                    var key = $"projects/{projectId}/artefacts/{filePath}/v{version}";
+                    binaryStore[key] = content;
+                    return Task.FromResult(key);
+                });
+            storageMock
+                .Setup(storage => storage.GetBinaryContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns((string key, CancellationToken _) =>
+                    Task.FromResult(binaryStore.TryGetValue(key, out var stored) ? stored : null));
             services.AddSingleton(storageMock.Object);
         });
 

@@ -1,0 +1,129 @@
+# REQ-004: Documentation Indexing via CI
+**Priority:** Must Have
+**Effort:** Medium
+**Risk:** High
+**Depends On:** REQ-001
+---
+## User Story
+As a portal maintainer,
+I need the documentation to be automatically re-indexed when the portal is updated,
+So that the chat bot always answers questions from the most current documentation.
+**Acceptance Criteria:**
+- [ ] Documentation is indexed automatically as part of the GitHub Actions CI pipeline on every portal update
+- [ ] Indexing runs as a pre-deployment gate — new index must complete successfully before site deployment proceeds
+- [ ] If indexing fails, the CI pipeline is blocked and deployment does not proceed
+- [ ] Bot continues serving from the previous index until the new index is successfully built and deployed
+- [ ] Indexing completes within 5 minutes (CI timeout threshold) given corpus size of tens of pages
+---
+## Dimension 1: Clinical Safety
+### Applicable Guardrails
+- N/A — system is not safety-critical (confirmed Phase 2)
+### Hazards Addressed
+- None identified — no patient data involved
+### Mitigations
+- None required
+---
+## Dimension 2: Information Governance
+### Applicable Guardrails
+- N/A — documentation content is non-personal data
+### GDPR Articles
+- Not applicable — no personal data processed during indexing
+### Data Handling Requirements
+- **Data Categories:** Developer portal documentation (non-personal)
+- **Data Subjects:** None
+- **Retention Period:** Index retained until superseded by next successful index
+- **Data Minimisation:** Only documentation content indexed — no personal data
+---
+## Dimension 3: Security
+### Applicable Guardrails
+- **SEC-001:** TLS encryption for all data in transit
+### Security Requirements
+- **Authentication:** GitHub Actions pipeline access controlled via repository permissions and secrets
+- **Authorisation:** Only CI pipeline may trigger indexing — no public endpoint
+- **Encryption in Transit:** TLS 1.2+ for any index artefact transfer
+- **Encryption at Rest:** Index artefact stored securely in deployment environment
+---
+## Dimension 4: Observability & Performance
+### Product KPIs
+- **KPI 1:** Indexing success rate — Baseline: TBD, Target: 100%, Timeline: From go-live
+- **KPI 2:** Indexing duration — Baseline: TBD, Target: < 5 minutes, Timeline: From go-live
+### Observable Events (OTEL Instrumentation)
+- **Span 1:** `qabot.indexing.start`
+  - **Attributes:** trigger (ci_pipeline), commit_sha, timestamp
+- **Span 2:** `qabot.indexing.complete`
+  - **Attributes:** trigger, commit_sha, pages_indexed, duration_ms, status (success/failure)
+- **Span 3:** `qabot.indexing.failed`
+  - **Attributes:** trigger, commit_sha, error_message, duration_ms
+### Performance SLOs
+- **Indexing Duration p95:** < 5 minutes
+- **Availability:** Indexing step available on every CI run
+- **Error Rate:** < 1% of CI runs result in indexing failure
+### Alerting Conditions
+- **Critical:** Indexing step fails → CI pipeline blocked → notify team via GitHub Actions failure notification
+- **Warning:** Indexing duration exceeds 3 minutes → warning logged
+---
+## ✨ Evaluation Function Specification
+**PURPOSE:** Define DETERMINISTIC pass/fail criteria for coding agents to verify implementation.
+---
+### CHECK 1: CI Gate — Indexing Failure Blocks Deployment
+**Trigger:** GitHub Actions CI pipeline runs indexing step
+**Test Scenario 1: Indexing failure blocks deployment**
+- **Setup:** Simulate indexing step failure (e.g. source docs unavailable)
+- **Expected Result:** CI pipeline exits with non-zero status code
+- **Expected Behaviour:** Deployment step does NOT execute
+- **Expected Notification:** GitHub Actions failure notification triggered
+**Test Scenario 2: Indexing success allows deployment**
+- **Setup:** Valid documentation corpus available
+- **Expected Result:** CI pipeline indexing step exits with status code 0
+- **Expected Behaviour:** Deployment step proceeds
+- **Pass Criteria:** Deployment BLOCKED on indexing failure, ALLOWED on indexing success
+---
+### CHECK 2: Index Freshness — Bot Uses Latest Index
+**Trigger:** Documentation updated and new index deployed
+**Test Scenario 1: Bot answers from updated docs**
+- **Setup:** Add new content to documentation, trigger CI pipeline
+- **Action:** Ask bot a question about the new content after successful deployment
+- **Expected Response:** Bot returns answer referencing new content
+- **Anti-pattern:** Bot returns stale answer from previous index after successful re-index
+**Pass Criteria:** Bot answers reflect most recently deployed index
+---
+### CHECK 3: Indexing Duration SLO
+**Trigger:** CI pipeline indexing step executes
+**Test Scenario: Indexing completes within timeout**
+- **Input:** Corpus of tens of pages
+- **Expected Duration:** < 5 minutes (300 seconds)
+- **Expected CI Behaviour:** Step completes before CI timeout threshold
+- **Anti-pattern:** Indexing step times out and fails CI
+**Applicable Guardrail:** SEC-001 (secure artefact handling)
+**Pass Criteria:** Indexing completes within 5 minutes for current corpus size
+---
+### CHECK 4: Previous Index Preserved Until New Index Ready
+**Trigger:** Re-indexing in progress
+**Test Scenario: Bot remains functional during indexing**
+- **Setup:** Trigger CI pipeline with valid docs
+- **During indexing:** Bot should still serve answers from previous index
+- **After successful deployment:** Bot serves answers from new index
+- **Anti-pattern:** Bot returns errors or empty responses during indexing
+**Pass Criteria:** No bot downtime during indexing process
+---
+## Traceability
+| Requirement | Hazard | Mitigation | Guardrail | Evaluation Check | Pipeline 06 Status |
+|-------------|--------|------------|-----------|------------------|-------------------|
+| REQ-004 | - | CI gate blocks bad deploys | SEC-001 | CHECK 1 | N/A — not safety-critical |
+| REQ-004 | - | Index freshness | SEC-001 | CHECK 2 | N/A |
+| REQ-004 | - | Duration SLO | SEC-001 | CHECK 3 | N/A |
+| REQ-004 | - | Continuity during re-index | SEC-001 | CHECK 4 | N/A |
+---
+## Change Log
+| Version | Date | Agent | Changes |
+|---------|------|-------|---------|
+| 1.0 | 2026-05-31 | Pipeline 01 Requirements | Initial creation |
+**Pipeline Status:**
+- ✅ Pipeline 01 Complete (Requirements with eval specs)
+- ⏳ Pipeline 03 Pending (Architecture)
+- ⏳ Pipeline 04 Pending (Design — API contracts, DB schemas)
+- ⏳ Pipeline 05 Pending (PxD — UI/UX specifications)
+- ⏳ Pipeline 06 Pending (Clinical Safety — N/A for this system)
+- ⏳ Pipeline 07 Pending (Normalisation)
+- ⏳ Pipeline 08 Pending (Planning)
+

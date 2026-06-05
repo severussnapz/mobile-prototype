@@ -45,4 +45,28 @@ public class Artefact : Entity, IAggregateRoot
             CreatedAt = timeProvider.GetUtcNow()
         };
     }
+
+    /// <summary>
+    /// Replaces the stored content of this artefact in place — keeping the same identity
+    /// (single row) but bumping the version number. Used for derived artefacts that should
+    /// be regenerated rather than duplicated (e.g. the hazard log export), so re-running
+    /// produces one artefact whose version climbs (v1 → v2 → … → vN).
+    /// </summary>
+    public void ReplaceContent(
+        int version,
+        string s3Key,
+        string contentType,
+        long sizeBytes,
+        string updatedBy,
+        TimeProvider timeProvider)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(s3Key);
+
+        Version = version;
+        S3Key = s3Key;
+        ContentType = contentType;
+        SizeBytes = sizeBytes;
+        CreatedBy = updatedBy;
+        CreatedAt = timeProvider.GetUtcNow();
+    }
 }

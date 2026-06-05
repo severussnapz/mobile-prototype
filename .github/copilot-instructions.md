@@ -229,9 +229,9 @@ Current migrations:
 
 ### Seed Data
 
-`db/seed-local.sql` — Idempotent (DELETE + INSERT). Creates test project with conversations, messages, parking lot items, token usage records, and artefacts. Runs automatically via Docker Compose `seed` service.
+`db/seeds/<project-code>.sql` — Idempotent (DELETE + INSERT) per-project seed files. Each creates a test project with conversations, messages, parking lot items, token usage records, notes, decisions, and artefacts. The Docker Compose `seed` service runs every `db/seeds/*.sql` file on boot, so multiple projects can be seeded side by side.
 
-`db/generate-seed.sh` — Generates `seed-local.sql` from any project in the running database. Usage: `./db/generate-seed.sh <project_id> [--description "override"]`. Lists available projects if no ID given.
+`db/generate-seed.sh` — Generates `db/seeds/<project-code>.sql` from any project in the running database (and extracts its S3 artefacts into `db/seed-artefacts/`). Usage: `./db/generate-seed.sh <project_id> [--description "override"]`. Lists available projects if no ID given.
 
 ---
 
@@ -348,7 +348,7 @@ Artefact content lives in S3; the `artefacts` table stores metadata and the S3 k
 - **Implementation:** `S3ArtefactStorageService` (`Infrastructure/Services/`) — uses `IAmazonS3`; bucket name from `S3:ArtefactBucketName` config
 - **Storage key scheme:** `projects/{projectId}/artefacts/{filePath}/v{version}` (leading `/` stripped from `filePath`)
 - **Local development:** LocalStack container at `http://localhost:4566`; `localstack/init-s3.sh` creates the `genesis-ai-artefacts` bucket on startup; in-container URL is `http://localstack:4566`
-- **Seed data:** `db/seed-local.sql` + the seed service upload artefact content objects to LocalStack so the full read path works locally
+- **Seed data:** `db/seeds/*.sql` + the seed service upload artefact content objects to LocalStack so the full read path works locally
 - **Config keys:**
   - `S3:ArtefactBucketName` — bucket name (e.g. `genesis-ai-artefacts`)
   - `S3:ServiceUrl` — override endpoint (set to LocalStack URL in non-production environments)

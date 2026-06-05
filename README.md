@@ -270,7 +270,7 @@ tests/
 └── Genesis.AI.TestFramework/    # Shared utilities (MockTokenGenerator)
 db/
 ├── migrations/                  # Flyway SQL (V1, V2)
-├── seed-local.sql               # Idempotent local test data (DB rows + S3 objects)
+├── seeds/                       # Per-project seed files (<project-code>.sql); all run on boot
 localstack/
 └── init-s3.sh                   # Creates genesis-ai-artefacts bucket on LocalStack startup
 ```
@@ -366,7 +366,7 @@ All enums use **native PostgreSQL enum types** (never text columns). Registered 
 
 ### Seed Data
 
-seed-local.sql creates a test project with conversations, messages, parking lot items, token usage records, and artefacts. Runs automatically on `docker compose up`.
+Each file in db/seeds/ (named <project-code>.sql) creates a test project with conversations, messages, parking lot items, token usage records, and artefacts. The seed service runs every db/seeds/*.sql file on `docker compose up`, so multiple projects can be seeded side by side. Each file is idempotent (DELETE + INSERT for its own project).
 
 To regenerate from a live project:
 

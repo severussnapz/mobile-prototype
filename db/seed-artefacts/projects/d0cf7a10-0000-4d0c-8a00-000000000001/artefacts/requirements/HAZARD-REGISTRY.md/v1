@@ -1,0 +1,2276 @@
+# HAZARD-REGISTRY.md
+# Documents Management Core — IF678 Hazard Log
+
+**Project:** DOCMAN  
+**Generated:** 2026-05-29  
+**Source:** requirements cleanup script — migrated from V1e Clinical Safety sections  
+
+> Full IF678 hazard cards for all requirements where V1e Clinical Safety has run.
+> Severity, likelihood, and risk scores marked [TBD] — to be completed by CSO (Dan Watts)
+> via CSV export/import workflow.
+> Import/export via V1e agent: 'export CSV' / 'import CSV'.
+
+
+---
+
+## HAZ-DOC-001: REQ-001-unified-inbound-inbox — Provisional Document Accessible Before Filing Complete
+
+**Source requirement:** [REQ-001-unified-inbound-inbox](requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** A document in Provisional status is accessible to users before filing is complete.
+
+**Potential clinical impact:** User opens and acts on a document that has not yet been filed to the patient record. Clinical action, coding, or task creation occurs on the basis of a document whose status is still Provisional. If the document is subsequently corrected, rejected, or re-matched, the clinical action taken may be inconsistent with the final filed version.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** REQ-001 AC: Provisional status visibly labelled on all document rows. D-002: filing alone commits the record - Provisional window is defined and bounded.
+
+---
+
+##### Cause 1: Provisional documents returned in search or queue results without status filtering
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-001.1.1 | HIT Design | Server-side status field always included in queue/search response; Provisional state visibly surfaced to UI; no server-side suppression that could create false "filed" appearance | CLIN-009 | CHECK 22 [BLOCKED - PL-12: technical confirmation required] | - | 🔴 Blocked - PL-12 |
+| HAZ-DOC-001.1.2 | Training | Staff training on Provisional vs Filed status and what it means before acting on document content | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-001.1.3 | Business Process | Practice SOP: check document status before taking clinical action on document content | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Document viewer accessible via direct URL without status gate check
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-001.2.1 | HIT Design | Status gate enforced at document fetch API boundary; Provisional documents accessible for review but status clearly returned in response for UI enforcement | CLIN-009 | CHECK 22 [BLOCKED - PL-12: technical confirmation required] | - | 🔴 Blocked - PL-12 |
+
+##### Cause 3: Status gate client-side only - bypassed
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-001.3.1 | HIT Design | All status-dependent access control enforced at API layer; client rendering of status badge derived from server-returned value only | CLIN-009 | CHECK 22 [BLOCKED - PL-12: technical confirmation required] | - | 🔴 Blocked - PL-12 |
+
+**Additional Comments:** All HIT Design controls blocked pending technical team confirmation of Provisional status gate implementation boundary (Parking Lot item 12). Controls and CHECK 22 test specification cannot be finalised until technical confirmation received. Must be resolved before production release.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Blocked pending PL-12 resolution
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-001 | Cause 1 | HAZ-DOC-001.1.1 | HIT Design | CLIN-009 | CHECK 22 [BLOCKED] | 🔴 Blocked - PL-12 |
+| HAZ-DOC-001 | Cause 2 | HAZ-DOC-001.2.1 | HIT Design | CLIN-009 | CHECK 22 [BLOCKED] | 🔴 Blocked - PL-12 |
+| HAZ-DOC-001 | Cause 3 | HAZ-DOC-001.3.1 | HIT Design | CLIN-009 | CHECK 22 [BLOCKED] | 🔴 Blocked - PL-12 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-001 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-007: Hazard Log Traceability**
+- **Purpose:** Safety-critical code changes reference the relevant HAZ-DOC-ID in commit messages and PR descriptions
+- **Mitigates:** All REQ-001 hazards (HAZ-DOC-001/002/003/004/028/029)
+- **Implementation:** PR descriptions and commit messages include HAZ-DOC references for all safety-critical changes to inbox, completion gate, and access control code
+- **Verification:** Existing CHECK 2 (urgency indicator); code review gate for HAZ-DOC references
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Access control, completion gates, and sort order default to the safest state when configuration or context is missing
+- **Mitigates:** HAZ-DOC-001, HAZ-DOC-002 (Cause 2), HAZ-DOC-003, HAZ-DOC-028 (Causes 1,3), HAZ-DOC-029 (Cause 3)
+- **Implementation:** JWT/role gate deny-by-default; completion gate server-enforced and cannot be bypassed client-side; urgent-first sort default on first load
+- **Verification:** CHECK 22 (BLOCKED - PL-12), CHECK 23, CHECK 24, CHECK 27
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. All hazard descriptions, cause sets, clinical impact wording, and HIT Design controls confirmed during V1e review session (D-025, D-026, D-033, D-034). HAZ-DOC-001 controls blocked pending Parking Lot item 12 resolution.
+
+
+
+---
+
+## HAZ-DOC-002: REQ-001-unified-inbound-inbox — Clinically Urgent Document Not Actioned Promptly
+
+**Source requirement:** [REQ-001-unified-inbound-inbox](requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Clinically urgent document is not actioned promptly due to poor visibility in a high-volume inbox.
+
+**Potential clinical impact:** Urgent clinical result, referral response, or correspondence sits unactioned in the queue. The responsible user does not identify it as requiring immediate action. Delayed or missed clinical response to a time-sensitive document.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 2 (CLIN-007): red arrow urgency indicator per row; sort and filter by urgency. CHECK 3 (CLIN-004): inbox fails closed on error - error state visually distinct from empty inbox.
+
+---
+
+##### Cause 1: Urgency indicator absent or not prominent enough
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-002.1.1 | HIT Design | Urgency indicator present on every urgent document row; visually distinct from non-urgent rows; sourced from server-side urgency flag | CLIN-007 | Existing CHECK 2 | - | 🔴 |
+| HAZ-DOC-002.1.2 | Training | Urgency triage workflow guidance | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-002.1.3 | Business Process | Practice SOP: urgent inbox review cadence | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-002.1.4 | Customer Controls | GP practice must define and enforce response SLA for urgent documents | - | N/A - practice responsibility | CUST-NNN (TBD) | ⚪ Outside scope |
+
+##### Cause 2: Default sort buries urgent documents beneath volume
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-002.2.1 | HIT Design | Default inbox sort order prioritises urgent documents; sort-by-urgency always available; safe default on first load | CLIN-009 | CHECK 23 | - | 🔴 |
+| HAZ-DOC-002.2.2 | Business Process | Practice SOP: users instructed to review urgent items first | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 3: Inbox silent failure renders as empty - urgent documents invisible
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-002.3.1 | HIT Design | Inbox fails closed on error with explicit error state visually distinct from empty inbox | CLIN-004 | Existing CHECK 3 | - | 🔴 |
+
+**Additional Comments:** Primary HIT Design controls for Causes 1 and 3 are covered by existing V1d checks (CHECK 2 and CHECK 3). V1e adds CHECK 23 for default sort safe-default behaviour (Cause 2). Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Controls accepted (D-034)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-002 | Cause 1 | HAZ-DOC-002.1.1 | HIT Design | CLIN-007 | CHECK 2 (existing) | 🔴 |
+| HAZ-DOC-002 | Cause 2 | HAZ-DOC-002.2.1 | HIT Design | CLIN-009 | CHECK 23 | 🔴 |
+| HAZ-DOC-002 | Cause 3 | HAZ-DOC-002.3.1 | HIT Design | CLIN-004 | CHECK 3 (existing) | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-002 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Ensures autosave failures, completion-gate computation errors, and status update failures are surfaced explicitly - never silently swallowed
+- **Mitigates:** HAZ-DOC-004 (Causes 2,4), HAZ-DOC-028 (Causes 2,3), HAZ-DOC-029 (Cause 2), HAZ-DOC-002 (Cause 3)
+- **Implementation:** Document API endpoints return explicit error responses on all failure paths; no HTTP 200 with partial or empty data
+- **Verification:** CHECK 26
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Access control, completion gates, and sort order default to the safest state when configuration or context is missing
+- **Mitigates:** HAZ-DOC-001, HAZ-DOC-002 (Cause 2), HAZ-DOC-003, HAZ-DOC-028 (Causes 1,3), HAZ-DOC-029 (Cause 3)
+- **Implementation:** JWT/role gate deny-by-default; completion gate server-enforced and cannot be bypassed client-side; urgent-first sort default on first load
+- **Verification:** CHECK 22 (BLOCKED - PL-12), CHECK 23, CHECK 24, CHECK 27
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. All hazard descriptions, cause sets, clinical impact wording, and HIT Design controls confirmed during V1e review session (D-025, D-026, D-033, D-034). HAZ-DOC-001 controls blocked pending Parking Lot item 12 resolution.
+
+
+
+---
+
+## HAZ-DOC-003: REQ-001-unified-inbound-inbox — Patient Document Accessed Without Appropriate Role or Patient Relationship
+
+**Source requirement:** [REQ-001-unified-inbound-inbox](requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Patient document is accessed by a user without the appropriate role or patient relationship.
+
+**Potential clinical impact:** Potential for patient harm if a user without clinical responsibility for the patient accesses and acts on a document. Clinically significant information may be misused or misinterpreted. Confidentiality breach may cause direct harm to the patient.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** None identified.
+
+---
+
+##### Cause 1: JWT/scope validation gap at document endpoint
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-003.1.1 | HIT Design | Validate JWT scopes and role at document API boundary; reject HTTP 403 if scope absent | CLIN-009 | CHECK 24 | - | 🔴 |
+| HAZ-DOC-003.1.2 | Training | Staff awareness of role-based access to patient documents | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-003.1.3 | Business Process | Practice SOP on user role assignment and access review | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Role-to-patient relationship check missing on open/view
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-003.2.1 | HIT Design | Enforce patient relationship check at document open/view endpoint; reject if relationship check fails | CLIN-009 | CHECK 24 | - | 🔴 |
+| HAZ-DOC-003.2.2 | Customer Controls | GP practice responsible for maintaining accurate user role assignments and patient list allocations | - | N/A - practice responsibility | CUST-NNN (TBD) | ⚪ Outside scope |
+
+##### Cause 3: Session reuse or stale context after user switch
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-003.3.1 | HIT Design | Deny access on missing or expired context; no fallback to last-known user identity | CLIN-009 | CHECK 24 | - | 🔴 |
+
+**Additional Comments:** All three causes mitigated by server-side JWT/role gate (CHECK 24). Cause 2 patient relationship check boundary subject to technical team confirmation (Parking Lot item 1). ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Controls accepted (D-026)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-003 | Causes 1-3 | HAZ-DOC-003.1.1 / 2.1 / 3.1 | HIT Design | CLIN-009 | CHECK 24 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-003 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Access control, completion gates, and sort order default to the safest state when configuration or context is missing
+- **Mitigates:** HAZ-DOC-001, HAZ-DOC-002 (Cause 2), HAZ-DOC-003, HAZ-DOC-028 (Causes 1,3), HAZ-DOC-029 (Cause 3)
+- **Implementation:** JWT/role gate deny-by-default; completion gate server-enforced and cannot be bypassed client-side; urgent-first sort default on first load
+- **Verification:** CHECK 22 (BLOCKED - PL-12), CHECK 23, CHECK 24, CHECK 27
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. All hazard descriptions, cause sets, clinical impact wording, and HIT Design controls confirmed during V1e review session (D-025, D-026, D-033, D-034). HAZ-DOC-001 controls blocked pending Parking Lot item 12 resolution.
+
+
+
+---
+
+## HAZ-DOC-004: REQ-001-unified-inbound-inbox — Document Processed Twice or Missed
+
+**Source requirement:** [REQ-001-unified-inbound-inbox](requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Document processed twice or missed.
+
+**Potential clinical impact:** Clinically significant document not actioned or actioned twice. Required filing coding or task creation missed. Patient treatment follow-up or referral response delayed or omitted.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** REQ-001 AC: autosaves state; in-progress marker visible in queue; user can return to queue at any point.
+
+---
+
+##### Cause 1: Inbox state lost on interruption
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-004.1.1 | HIT Design | Autosave in-progress marker server-side within transaction; explicit failure notification if save fails | CLIN-005 | CHECK 25 | - | 🔴 |
+| HAZ-DOC-004.1.2 | Training | User guidance on in-progress document behaviour and how to resume | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-004.1.3 | Business Process | Practice SOP: workflow completion check at end of session | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Autosave failure not surfaced to user
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-004.2.1 | HIT Design | Return explicit error (not silent) when autosave fails; surface error to user immediately | CLIN-004 | CHECK 26 | - | 🔴 |
+
+##### Cause 3: In-progress marker not persisted server-side
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-004.3.1 | HIT Design | Server-side in-progress state; client reads from server, not local state only | CLIN-005 | CHECK 25 | - | 🔴 |
+
+##### Cause 4: Resume flow restores stale or incomplete state
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-004.4.1 | HIT Design | Resume flow re-fetches server state; stale local state discarded | CLIN-004 | CHECK 26 | - | 🔴 |
+
+**Additional Comments:** Causes 1 and 3 share CHECK 25 (transactional integrity). Causes 2 and 4 share CHECK 26 (fail-safe error surfacing). Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Controls accepted (D-026)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-004 | Causes 1,3 | HAZ-DOC-004.1.1 / 3.1 | HIT Design | CLIN-005 | CHECK 25 | 🔴 |
+| HAZ-DOC-004 | Causes 2,4 | HAZ-DOC-004.2.1 / 4.1 | HIT Design | CLIN-004 | CHECK 26 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-004 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Ensures autosave failures, completion-gate computation errors, and status update failures are surfaced explicitly - never silently swallowed
+- **Mitigates:** HAZ-DOC-004 (Causes 2,4), HAZ-DOC-028 (Causes 2,3), HAZ-DOC-029 (Cause 2), HAZ-DOC-002 (Cause 3)
+- **Implementation:** Document API endpoints return explicit error responses on all failure paths; no HTTP 200 with partial or empty data
+- **Verification:** CHECK 26
+
+
+**CLIN-005: Clinical Data Transactional Integrity**
+- **Purpose:** Ensures in-progress state and cross-context action outcomes are persisted atomically
+- **Mitigates:** HAZ-DOC-004 (Causes 1,3), HAZ-DOC-029 (Cause 1)
+- **Implementation:** In-progress marker written within transaction; atomic state updates across queue contexts; no partial persistence
+- **Verification:** CHECK 25
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. All hazard descriptions, cause sets, clinical impact wording, and HIT Design controls confirmed during V1e review session (D-025, D-026, D-033, D-034). HAZ-DOC-001 controls blocked pending Parking Lot item 12 resolution.
+
+
+
+---
+
+## HAZ-DOC-028: REQ-001-unified-inbound-inbox — Document Remains Unactioned with Required Steps Incomplete
+
+**Source requirement:** [REQ-001-unified-inbound-inbox](requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Document remains unactioned with required steps incomplete.
+
+**Potential clinical impact:** Clinically significant document sits in queue with incomplete required actions. Filing coding or task creation never completed. Information does not reach the patient record or responsible clinician.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** None identified.
+
+---
+
+##### Cause 1: Completion gate not enforced before advancing
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-028.1.1 | HIT Design | Server-side completion gate enforced before document can advance; client cannot bypass | CLIN-009 | CHECK 27 | - | 🔴 |
+| HAZ-DOC-028.1.2 | Training | User guidance on required steps before a document can be advanced | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-028.1.3 | Business Process | Practice SOP: supervisor review of incomplete queue items | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Required-step status computed incorrectly
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-028.2.1 | HIT Design | Required-step completion computed server-side; fail-closed on computation error | CLIN-004 | CHECK 26 | - | 🔴 |
+
+##### Cause 3: Queue indicator fails to flag incomplete items
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-028.3.1 | HIT Design | Completion status badge sourced from server authoritative state; not from client-computed value | CLIN-004 | CHECK 26 | - | 🔴 |
+
+**Additional Comments:** Cause 1 shares CHECK 27 with HAZ-DOC-029. Causes 2 and 3 share CHECK 26 with HAZ-DOC-004. Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Controls accepted (D-026)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-028 | Cause 1 | HAZ-DOC-028.1.1 | HIT Design | CLIN-009 | CHECK 27 | 🔴 |
+| HAZ-DOC-028 | Causes 2,3 | HAZ-DOC-028.2.1 / 3.1 | HIT Design | CLIN-004 | CHECK 26 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-028 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Ensures autosave failures, completion-gate computation errors, and status update failures are surfaced explicitly - never silently swallowed
+- **Mitigates:** HAZ-DOC-004 (Causes 2,4), HAZ-DOC-028 (Causes 2,3), HAZ-DOC-029 (Cause 2), HAZ-DOC-002 (Cause 3)
+- **Implementation:** Document API endpoints return explicit error responses on all failure paths; no HTTP 200 with partial or empty data
+- **Verification:** CHECK 26
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Access control, completion gates, and sort order default to the safest state when configuration or context is missing
+- **Mitigates:** HAZ-DOC-001, HAZ-DOC-002 (Cause 2), HAZ-DOC-003, HAZ-DOC-028 (Causes 1,3), HAZ-DOC-029 (Cause 3)
+- **Implementation:** JWT/role gate deny-by-default; completion gate server-enforced and cannot be bypassed client-side; urgent-first sort default on first load
+- **Verification:** CHECK 22 (BLOCKED - PL-12), CHECK 23, CHECK 24, CHECK 27
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. All hazard descriptions, cause sets, clinical impact wording, and HIT Design controls confirmed during V1e review session (D-025, D-026, D-033, D-034). HAZ-DOC-001 controls blocked pending Parking Lot item 12 resolution.
+
+
+
+---
+
+## HAZ-DOC-029: REQ-001-unified-inbound-inbox — Action Completion State Ambiguous; Document Advances with Missing Information
+
+**Source requirement:** [REQ-001-unified-inbound-inbox](requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Action completion state is ambiguous across queue contexts; document advances with missing information.
+
+**Potential clinical impact:** Document advances through the workflow with required information missing. Incomplete clinical data filed or tasked. Downstream clinical decision made on basis of incomplete record.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** None identified.
+
+---
+
+##### Cause 1: Secondary action outcome not synchronised across contexts
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-029.1.1 | HIT Design | Atomic state update across contexts; no optimistic completion state | CLIN-005 | CHECK 25 | - | 🔴 |
+| HAZ-DOC-029.1.2 | Training | User guidance on multi-context action behaviour | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: UI status badges stale or inconsistent
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-029.2.1 | HIT Design | Status badges sourced from server; explicit re-fetch after secondary action | CLIN-004 | CHECK 26 | - | 🔴 |
+
+##### Cause 3: Completion logic allows false-positive complete state
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-029.3.1 | HIT Design | Server-side completion validation; completion only on confirmed all-step success | CLIN-009 | CHECK 27 | - | 🔴 |
+| HAZ-DOC-029.3.2 | Business Process | Practice SOP: document completion workflow sign-off process | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+**Additional Comments:** CHECK 25/26/27 cover transactional integrity, fail-safe status, and server-side gate respectively across all three causes. Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Controls accepted (D-026)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-029 | Cause 1 | HAZ-DOC-029.1.1 | HIT Design | CLIN-005 | CHECK 25 | 🔴 |
+| HAZ-DOC-029 | Cause 2 | HAZ-DOC-029.2.1 | HIT Design | CLIN-004 | CHECK 26 | 🔴 |
+| HAZ-DOC-029 | Cause 3 | HAZ-DOC-029.3.1 | HIT Design | CLIN-009 | CHECK 27 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-029 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Ensures autosave failures, completion-gate computation errors, and status update failures are surfaced explicitly - never silently swallowed
+- **Mitigates:** HAZ-DOC-004 (Causes 2,4), HAZ-DOC-028 (Causes 2,3), HAZ-DOC-029 (Cause 2), HAZ-DOC-002 (Cause 3)
+- **Implementation:** Document API endpoints return explicit error responses on all failure paths; no HTTP 200 with partial or empty data
+- **Verification:** CHECK 26
+
+
+**CLIN-005: Clinical Data Transactional Integrity**
+- **Purpose:** Ensures in-progress state and cross-context action outcomes are persisted atomically
+- **Mitigates:** HAZ-DOC-004 (Causes 1,3), HAZ-DOC-029 (Cause 1)
+- **Implementation:** In-progress marker written within transaction; atomic state updates across queue contexts; no partial persistence
+- **Verification:** CHECK 25
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Access control, completion gates, and sort order default to the safest state when configuration or context is missing
+- **Mitigates:** HAZ-DOC-001, HAZ-DOC-002 (Cause 2), HAZ-DOC-003, HAZ-DOC-028 (Causes 1,3), HAZ-DOC-029 (Cause 3)
+- **Implementation:** JWT/role gate deny-by-default; completion gate server-enforced and cannot be bypassed client-side; urgent-first sort default on first load
+- **Verification:** CHECK 22 (BLOCKED - PL-12), CHECK 23, CHECK 24, CHECK 27
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. All hazard descriptions, cause sets, clinical impact wording, and HIT Design controls confirmed during V1e review session (D-025, D-026, D-033, D-034). HAZ-DOC-001 controls blocked pending Parking Lot item 12 resolution.
+
+
+
+---
+
+## HAZ-DOC-005: REQ-002-electronic-inbound-ingestion — Clinical Document Not Received
+
+**Source requirement:** [REQ-002-electronic-inbound-ingestion](requirements/increment-1-inbox-and-triage/REQ-002-electronic-inbound-ingestion.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Clinical document not received by the practice.
+
+**Potential clinical impact:** Clinical document not received by the practice. Clinically significant information from another care setting does not reach the responsible clinician. Patient treatment follow-up or referral response missed or delayed.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** MIT-DOC-004: source availability in operational telemetry and monitoring alerts. No user-facing banner in this release.
+
+---
+
+##### Cause 1: Silent source failure - connector goes down with no notification
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-005.1.1 | HIT Design | Source availability monitoring with operator alert on connector down | CLIN-010 | CHECK 18 | - | 🔴 |
+| HAZ-DOC-005.1.2 | Training | Staff guidance on what to do when source connector alert fires | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-005.1.3 | Business Process | Practice SOP: escalation path when documents expected but not received | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-005.1.4 | Customer Controls | Sending organisation responsible for confirming successful transmission at their end | - | N/A | CUST-NNN (TBD) | ⚪ Outside scope |
+
+##### Cause 2: Source connector outage not detected
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-005.2.1 | HIT Design | Connector health check with explicit alert on threshold breach; not silent | CLIN-009 | CHECK 19 | - | 🔴 |
+
+##### Cause 3: Error mapped to empty inbox state
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-005.3.1 | HIT Design | Source error state returned explicitly to operator; never silently mapped to empty result | CLIN-004 | CHECK 20 | - | 🔴 |
+
+##### Cause 4: Monitoring/alerting threshold gap
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-005.4.1 | HIT Design | Alerting threshold and SLA defined in monitoring config; not unbounded or default-off | CLIN-009 | CHECK 19 | - | 🔴 |
+
+**Additional Comments:** Primary mitigation is operational monitoring (MIT-DOC-004). No user-facing inbox banner in Increment 1 scope (per V1a). Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Controls accepted (D-026)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-005 | Cause 1 | HAZ-DOC-005.1.1 | HIT Design | CLIN-010 | CHECK 18 | 🔴 |
+| HAZ-DOC-005 | Cause 2 | HAZ-DOC-005.2.1 | HIT Design | CLIN-009 | CHECK 19 | 🔴 |
+| HAZ-DOC-005 | Cause 3 | HAZ-DOC-005.3.1 | HIT Design | CLIN-004 | CHECK 20 | 🔴 |
+| HAZ-DOC-005 | Cause 4 | HAZ-DOC-005.4.1 | HIT Design | CLIN-009 | CHECK 19 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-005 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Ensures source errors never silently map to empty inbox; source health check failures surfaced explicitly
+- **Mitigates:** HAZ-DOC-005 (Cause 3), HAZ-DOC-006 (Cause 3), HAZ-DOC-007 (Cause 3)
+- **Implementation:** Source adapter error responses must return explicit failure states; no HTTP 200 with empty document list on error
+- **Verification:** CHECK 20
+
+
+**CLIN-007: Hazard Log Traceability**
+- **Purpose:** Safety-critical ingestion code changes reference HAZ-DOC-IDs
+- **Mitigates:** All REQ-002 hazards
+- **Implementation:** PR descriptions for ingestion pipeline changes include HAZ-DOC-005/006/007 references
+- **Verification:** Existing CHECK 2
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Connector down defaults to explicit alert; alerting thresholds defined and not default-off
+- **Mitigates:** HAZ-DOC-005 (Causes 2, 4), HAZ-DOC-006 (Cause 1)
+- **Implementation:** Alerting threshold configured and enforced; degraded source visible in inbox; no silent no-documents state
+- **Verification:** CHECK 19, CHECK 21
+
+
+**CLIN-010: Third-Party Clinical Risk**
+- **Purpose:** Source connector failure mode documented; clinical data flow through third-party connectors assessed
+- **Mitigates:** HAZ-DOC-005 (Cause 1)
+- **Implementation:** Each source connector has documented failure mode and alerting SLA in monitoring config
+- **Verification:** CHECK 18
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. Hazard descriptions, cause sets, clinical impact, and non-blocked HIT Design controls confirmed during V1e review session (D-025, D-026). HAZ-DOC-006 Cause 2 blocked (PL-2). HAZ-DOC-007 full card parked (PL-3).
+
+---
+
+## HAZ-DOC-006: REQ-002-electronic-inbound-ingestion — Inbox Completeness Incorrectly Assumed
+
+**Source requirement:** [REQ-002-electronic-inbound-ingestion](requirements/increment-1-inbox-and-triage/REQ-002-electronic-inbound-ingestion.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Inbox completeness is incorrectly assumed.
+
+**Potential clinical impact:** User makes clinical decisions based on an incomplete view of inbound documents. Clinically significant information present in the system but attributed to a degraded source not actioned. Practice unaware documents are missing.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** None identified.
+
+---
+
+##### Cause 1: Degraded source status not shown in UI
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-006.1.1 | HIT Design | Degraded source status indicator visible in inbox when source partially available | CLIN-009 | CHECK 21 | - | 🔴 |
+| HAZ-DOC-006.1.2 | Training | Staff guidance on interpreting source degradation indicators | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-006.1.3 | Business Process | Practice SOP: check source status before concluding inbox is complete | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Partial ingestion not labelled as incomplete [PARKED - Parking Lot item 2]
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-006.2.1 | HIT Design | [BLOCKED - Parking Lot item 2: batch completeness tracking at source boundary requires technical confirmation] | [TBD] | [BLOCKED] | - | 🔴 Blocked - PL-2 |
+
+##### Cause 3: Source health checks delayed or failing
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-006.3.1 | HIT Design | Source health check failures surfaced as explicit inbox status; not silent | CLIN-004 | CHECK 20 | - | 🔴 |
+
+**Additional Comments:** Cause 2 BLOCKED pending technical input on batch completeness tracking (Parking Lot item 2). Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Partial - Cause 2 blocked (PL-2)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-006 | Cause 1 | HAZ-DOC-006.1.1 | HIT Design | CLIN-009 | CHECK 21 | 🔴 |
+| HAZ-DOC-006 | Cause 2 | HAZ-DOC-006.2.1 | HIT Design | [BLOCKED] | [BLOCKED] | 🔴 Blocked - PL-2 |
+| HAZ-DOC-006 | Cause 3 | HAZ-DOC-006.3.1 | HIT Design | CLIN-004 | CHECK 20 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-006 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Ensures source errors never silently map to empty inbox; source health check failures surfaced explicitly
+- **Mitigates:** HAZ-DOC-005 (Cause 3), HAZ-DOC-006 (Cause 3), HAZ-DOC-007 (Cause 3)
+- **Implementation:** Source adapter error responses must return explicit failure states; no HTTP 200 with empty document list on error
+- **Verification:** CHECK 20
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Connector down defaults to explicit alert; alerting thresholds defined and not default-off
+- **Mitigates:** HAZ-DOC-005 (Causes 2, 4), HAZ-DOC-006 (Cause 1)
+- **Implementation:** Alerting threshold configured and enforced; degraded source visible in inbox; no silent no-documents state
+- **Verification:** CHECK 19, CHECK 21
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. Hazard descriptions, cause sets, clinical impact, and non-blocked HIT Design controls confirmed during V1e review session (D-025, D-026). HAZ-DOC-006 Cause 2 blocked (PL-2). HAZ-DOC-007 full card parked (PL-3).
+
+---
+
+## HAZ-DOC-007: REQ-002-electronic-inbound-ingestion — Out-of-Order or Duplicate Document Ingestion
+
+**Source requirement:** [REQ-002-electronic-inbound-ingestion](requirements/increment-1-inbox-and-triage/REQ-002-electronic-inbound-ingestion.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Out-of-order or duplicate document ingestion occurs.
+
+**Potential clinical impact:** Duplicate document causes user to action same clinical content twice. Out-of-sequence document causes user to act on superseded information. Clinically significant result instruction or referral missed or actioned incorrectly.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** None identified.
+
+---
+
+##### Cause 1: Idempotency key or dedupe check fails - same document ingested twice
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-007.1.1 | HIT Design | Idempotency key enforced at ingestion boundary; duplicate message rejected | CLIN-005 | CHECK 22 [PARKED - PL-3] | - | 🔴 Parked - PL-3 |
+| HAZ-DOC-007.1.2 | Training | Staff guidance on duplicate document identification and handling | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Replay ordering not preserved after source outage
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-007.2.1 | HIT Design | Ordering enforced on replay after outage recovery; sequence watermark validated | CLIN-005 | CHECK 22 [PARKED - PL-3] | - | 🔴 Parked - PL-3 |
+
+##### Cause 3: Source watermark offset corrupted or reset
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-007.3.1 | HIT Design | Watermark integrity validated on recovery; corrupted offset triggers alert not silent resume | CLIN-004 | CHECK 22 [PARKED - PL-3] | - | 🔴 Parked - PL-3 |
+
+**Additional Comments:** Full card PARKED - Parking Lot item 3. All HIT Design controls and CHECK 22 require technical confirmation of idempotency/deduplication implementation approach before controls can be finalised. ALARP assessment deferred pending card resolution and CSO Phase 6.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** PARKED - Parking Lot item 3
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-007 | Causes 1-3 | HAZ-DOC-007.1.1 / 2.1 / 3.1 | HIT Design | CLIN-005/004 | CHECK 22 [PARKED] | 🔴 Parked - PL-3 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-007 | [TBD] | [TBD] | [TBD - Phase 6 pending] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Ensures source errors never silently map to empty inbox; source health check failures surfaced explicitly
+- **Mitigates:** HAZ-DOC-005 (Cause 3), HAZ-DOC-006 (Cause 3), HAZ-DOC-007 (Cause 3)
+- **Implementation:** Source adapter error responses must return explicit failure states; no HTTP 200 with empty document list on error
+- **Verification:** CHECK 20
+
+
+**CLIN-005: Clinical Data Transactional Integrity**
+- **Purpose:** Ensures idempotency key enforcement and ordering validation on replay
+- **Mitigates:** HAZ-DOC-007 (Causes 1, 2) [PARKED - PL-3]
+- **Implementation:** Ingestion boundary enforces idempotency key; duplicate messages rejected before persistence
+- **Verification:** CHECK 22 [PARKED]
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** Pending formal sign-off
+
+**CSO Comments:** Sign-off to be provided by CSO at a later date. Hazard descriptions, cause sets, clinical impact, and non-blocked HIT Design controls confirmed during V1e review session (D-025, D-026). HAZ-DOC-006 Cause 2 blocked (PL-2). HAZ-DOC-007 full card parked (PL-3).
+
+---
+
+## HAZ-DOC-047: REQ-004-document-viewer-navigation — Multi-Page Clinical Content Missed
+
+**Source requirement:** [REQ-004-document-viewer-navigation](requirements/increment-1-inbox-and-triage/REQ-004-document-viewer-navigation.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+> **Note:** This hazard was registered as HAZ-DOC-011 in V1a through V1d. Canonical ID remapped to HAZ-DOC-047 per D-001 (HAZ-ID collision resolution, 2026-05-28). All prior references to HAZ-DOC-011 in this file refer to HAZ-DOC-047.
+
+**Hazard description:** Multi-page clinical content is missed.
+
+**Potential clinical impact:** User reviews an incomplete portion of a multi-page clinical document — a discharge summary, referral, or test result. Clinical action, coding, or task creation is taken on the basis of partial content. Information relevant to patient care on later pages is not seen.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 1 (CLIN-007): page count "Page N of M" always displayed in viewer. Pre-built viewer component provides explicit pagination controls.
+
+---
+
+##### Cause 1: Page count/progress not visible
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-047.1.1 | HIT Design | API response includes total page count; viewer integration contract requires page count to be surfaced; no viewer state where page count is absent or hidden | CLIN-009 | CHECK 6 | - | 🔴 |
+| HAZ-DOC-047.1.2 | Training | Staff training: read entire document before taking clinical action; do not assume a single-screen view is the full document | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Scroll/pagination control design causes skipped pages
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-047.2.1 | HIT Design | Pre-built viewer navigation integration tested: explicit previous/next page controls function correctly; sequential page access verified for documents with 2, 7, and 20+ pages | CLIN-009 | CHECK 6 | - | 🔴 |
+| HAZ-DOC-047.2.2 | Business Process | Practice SOP: multi-page document review process; page count verification before completing document review | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 3: Viewer state reset hides unread pages
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-047.3.1 | HIT Design | Viewer page position not reset by interaction with other UI elements (filter panel, action menu) during the same document viewing session; page state persists until viewer is closed | CLIN-009 | CHECK 7 | - | 🔴 |
+
+**Additional Comments:** HIT Design controls rely on the pre-built viewer integration contract. CHECK 6 covers page count surfacing and navigation integrity. CHECK 7 covers viewer state persistence during interaction. Controls subject to technical team validation per D-024 (PL-9). Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-047 | C1 | HAZ-DOC-047.1.1 | HIT Design | CLIN-009 | CHECK 6 | 🔴 |
+| HAZ-DOC-047 | C1 | HAZ-DOC-047.1.2 | Training | — | KB-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-047 | C2 | HAZ-DOC-047.2.1 | HIT Design | CLIN-009 | CHECK 6 | 🔴 |
+| HAZ-DOC-047 | C2 | HAZ-DOC-047.2.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-047 | C3 | HAZ-DOC-047.3.1 | HIT Design | CLIN-009 | CHECK 7 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-047 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Enforce safe default viewer state — page count visible, neutral zoom/rotation on open, page position not reset during interaction
+- **Mitigates:** HAZ-DOC-047 via controls HAZ-DOC-047.1.1, HAZ-DOC-047.2.1, HAZ-DOC-047.3.1; HAZ-DOC-012 via HAZ-DOC-012.3.1
+- **Implementation:** Viewer integration contract — API must return total page count; viewer initialised to fit-to-page and 0-degree rotation
+- **Verification:** CHECK 6, CHECK 7, CHECK 8
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring and Phase 6 residual risk assessment.
+
+
+
+---
+
+## HAZ-DOC-012: REQ-004-document-viewer-navigation — Clinical Information Misread Due to Incorrect Document Rendering
+
+**Source requirement:** [REQ-004-document-viewer-navigation](requirements/increment-1-inbox-and-triage/REQ-004-document-viewer-navigation.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Clinical information is misread due to incorrect document rendering.
+
+**Potential clinical impact:** User reads a document that is rendered in an incorrect orientation, with truncated content, or with corrupted formatting. Clinical decision is based on misread or incomplete clinical information.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 1 (CLIN-007): rotation controls available so user can correct document orientation. Document Manager integrates a pre-built viewer component — the rendering pipeline is owned by the component team.
+
+---
+
+##### Cause 1: Viewer transform pipeline bug
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-012.1.1 | HIT Design | Pre-built viewer component version pinned; rendering regression detected by component integration tests before deployment; viewer version upgrade requires re-run of CHECK 8 | CLIN-010 | CHECK 8 | - | 🔴 |
+| HAZ-DOC-012.1.2 | Business Process | Rendering defect escalation process: Document Manager team reports rendering issues to component team within 1 business day of detection | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Unsupported format fallback degrades rendering
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-012.2.1 | HIT Design | Unsupported or degraded format renders explicit warning indicator — not silently degraded to partial display; warning includes format identifier and action option (download original) | CLIN-010 | CHECK 8 | - | 🔴 |
+
+##### Cause 3: Zoom/rotate defaults obscure key content
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-012.3.1 | HIT Design | Viewer opens with neutral defaults: zoom = fit-to-page, rotation = 0 degrees; no stored per-document state that could apply incorrect orientation from a previous session | CLIN-009 | CHECK 8 | - | 🔴 |
+
+**Additional Comments:** Rendering pipeline is owned by the pre-built viewer component team (CLIN-010 applies). Document Manager's clinical safety obligation is to ensure any known rendering degradation is surfaced explicitly rather than silently. CHECK 8 covers rendering accuracy, unsupported format warning, and zoom/rotate safe defaults. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-012 | C1 | HAZ-DOC-012.1.1 | HIT Design | CLIN-010 | CHECK 8 | 🔴 |
+| HAZ-DOC-012 | C1 | HAZ-DOC-012.1.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-012 | C2 | HAZ-DOC-012.2.1 | HIT Design | CLIN-010 | CHECK 8 | 🔴 |
+| HAZ-DOC-012 | C3 | HAZ-DOC-012.3.1 | HIT Design | CLIN-009 | CHECK 8 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-012 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Enforce safe default viewer state — page count visible, neutral zoom/rotation on open, page position not reset during interaction
+- **Mitigates:** HAZ-DOC-047 via controls HAZ-DOC-047.1.1, HAZ-DOC-047.2.1, HAZ-DOC-047.3.1; HAZ-DOC-012 via HAZ-DOC-012.3.1
+- **Implementation:** Viewer integration contract — API must return total page count; viewer initialised to fit-to-page and 0-degree rotation
+- **Verification:** CHECK 6, CHECK 7, CHECK 8
+
+
+**CLIN-010: Third-Party Clinical Risk**
+- **Purpose:** Pre-built viewer component rendering risks managed at Document Manager integration boundary
+- **Mitigates:** HAZ-DOC-012 via controls HAZ-DOC-012.1.1, HAZ-DOC-012.2.1
+- **Implementation:** Version pinning; regression testing on version upgrade; unsupported format explicit warning
+- **Verification:** CHECK 8
+
+**WCLIN-001: Patient Banner State Readiness**
+- **Purpose:** Document viewer must not render document content until patient banner state confirms patient is fully loaded
+- **Mitigates:** Cross-cutting patient context safety for all REQ-004 document renders
+- **Implementation:** React microfrontend subscribes to `subscribeToPatientBannerState`; renders viewer only on `Loaded` state; handles Initiated/Error/Confidential explicitly
+- **Verification:** CHECK 10
+
+**WCLIN-002: Patient Context Presence Check**
+- **Purpose:** Document viewer must not render patient documents if no patient is selected in context
+- **Mitigates:** Cross-cutting patient context safety for all REQ-004 document renders
+- **Implementation:** Check `patientContext.personGuid`; display "No patient selected" if empty; subscribe to `subscribeToPersonSwap` to react on patient clear
+- **Verification:** CHECK 10
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring and Phase 6 residual risk assessment.
+
+
+
+---
+
+## HAZ-DOC-013: REQ-004-document-viewer-navigation — Viewer Silently Fails to Render All Pages
+
+**Source requirement:** [REQ-004-document-viewer-navigation](requirements/increment-1-inbox-and-triage/REQ-004-document-viewer-navigation.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Viewer silently fails to render all pages.
+
+**Potential clinical impact:** User opens a multi-page document and the viewer presents only a subset of pages — because of a partial render failure, pagination metadata mismatch, or timeout — without any indication that content is missing. Clinical action taken on incomplete document content.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 2 (CLIN-010): partial render failure surfaced explicitly per page. CHECK 3 (CLIN-010): full viewer failure surfaced explicitly via Banner with retry. Both controls implemented in current pre-built viewer integration.
+
+---
+
+##### Cause 1: Partial render failure not fail-closed
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-013.1.1 | HIT Design | Failed page renders explicit error (not blank, not stuck spinner); total declared page count remains accurate; user cannot mistake a failed page for the end of the document | CLIN-004 | CHECK 9 | - | 🔴 |
+
+##### Cause 2: Pagination metadata mismatch
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-013.2.1 | HIT Design | API-declared page count matches viewer-rendered page count; mismatch between declared and rendered count surfaces as explicit error rather than silent truncation | CLIN-004 | CHECK 9 | - | 🔴 |
+
+##### Cause 3: Timeout/memory limits truncate document
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-013.3.1 | HIT Design | Render timeout and memory limit errors surface explicit error state — not silent truncation; user cannot see a partial document without knowing it is partial | CLIN-004 | CHECK 9 | - | 🔴 |
+| HAZ-DOC-013.3.2 | Business Process | Viewer timeout SLO defined; performance degradation monitoring alerts operational team before patient-visible failures occur | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+**Additional Comments:** All three causes converge on the same HIT Design requirement: viewer must never silently truncate document content. Explicit error is mandatory in all partial failure scenarios. CHECK 9 consolidates fail-closed verification across all three causes. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-013 | C1 | HAZ-DOC-013.1.1 | HIT Design | CLIN-004 | CHECK 9 | 🔴 |
+| HAZ-DOC-013 | C2 | HAZ-DOC-013.2.1 | HIT Design | CLIN-004 | CHECK 9 | 🔴 |
+| HAZ-DOC-013 | C3 | HAZ-DOC-013.3.1 | HIT Design | CLIN-004 | CHECK 9 | 🔴 |
+| HAZ-DOC-013 | C3 | HAZ-DOC-013.3.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-013 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Viewer partial and full failures must be explicit — never silent truncation
+- **Mitigates:** HAZ-DOC-013 via controls HAZ-DOC-013.1.1, HAZ-DOC-013.2.1, HAZ-DOC-013.3.1
+- **Implementation:** Viewer integration tests; page-level and document-level error states verified
+- **Verification:** CHECK 9
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring and Phase 6 residual risk assessment.
+
+
+
+---
+
+## HAZ-DOC-014: REQ-005-file-format-support — Blank or Unreadable Document Displayed
+
+**Source requirement:** [REQ-005-file-format-support](requirements/increment-1-inbox-and-triage/REQ-005-file-format-support.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Blank or unreadable document displayed.
+
+**Potential clinical impact:** User opens a clinical document and sees a blank page, corrupted render, or no content. User assumes the document has no relevant content and proceeds without reading it. Clinical decision is made without awareness of the document's actual content.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 1 (CLIN-010): explicit conversion failure Banner surfaced by Document Manager layer with download original link.
+
+---
+
+##### Cause 1: Conversion failure
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-014.1.1 | HIT Design | Conversion pipeline returns explicit failure status — not an empty payload; Document Manager maps conversion failure status to Banner error state (existing CHECK 1 control) | CLIN-004 | CHECK 5 | - | 🔴 |
+| HAZ-DOC-014.1.2 | Training | Staff training: if a document displays blank or as a download-only link, use the download option to access content or contact document sender for re-submission | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Conversion error mapped to blank viewer [BLOCKED — PL-6]
+
+> **🔴 BLOCKED — PL-6:** This cause is blocked pending technical confirmation of how the conversion pipeline surfaces errors to the viewer layer. See TECH-005. HIT Design control and CHECK cannot be specified until the error propagation path is confirmed.
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-014.2.1 | HIT Design | [BLOCKED — PL-6: awaiting technical confirmation of conversion error propagation path to viewer] | TBD | TBD | - | 🔴 Blocked |
+
+##### Cause 3: Unsupported embedded object dropped silently
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-014.3.1 | HIT Design | Conversion pipeline treats unsupported embedded objects as conversion warnings — not silent drops; warning surfaced as partial conversion indicator in viewer | CLIN-004 | CHECK 5 | - | 🔴 |
+
+##### Cause 4: Missing explicit conversion-failed state
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-014.4.1 | HIT Design | Document Manager defines and tests an explicit ConversionFailed document state — distinct from Loaded and Loading; viewer component receives and renders this state as an error Banner (not blank) | CLIN-004 | CHECK 5 | - | 🔴 |
+| HAZ-DOC-014.4.2 | Business Process | Conversion failure monitoring: operational alerts on sustained high conversion failure rates; escalation to component team within 1 business day | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+**Additional Comments:** Causes 1, 3, and 4 are mitigated by CHECK 5 (explicit conversion failure state). Cause 2 is BLOCKED pending PL-6 resolution — CHECK 5 test specification will be extended to cover Cause 2 once technical confirmation is received. All HIT Design controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Partially blocked — Cause 2 pending PL-6; other causes accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-014 | C1 | HAZ-DOC-014.1.1 | HIT Design | CLIN-004 | CHECK 5 | 🔴 |
+| HAZ-DOC-014 | C1 | HAZ-DOC-014.1.2 | Training | — | KB-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-014 | C2 | HAZ-DOC-014.2.1 | HIT Design | TBD | TBD (BLOCKED PL-6) | 🔴 Blocked |
+| HAZ-DOC-014 | C3 | HAZ-DOC-014.3.1 | HIT Design | CLIN-004 | CHECK 5 | 🔴 |
+| HAZ-DOC-014 | C4 | HAZ-DOC-014.4.1 | HIT Design | CLIN-004 | CHECK 5 | 🔴 |
+| HAZ-DOC-014 | C4 | HAZ-DOC-014.4.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-014 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Conversion failures must be explicitly surfaced — never silently mapped to blank viewer
+- **Mitigates:** HAZ-DOC-014 via controls HAZ-DOC-014.1.1, HAZ-DOC-014.3.1, HAZ-DOC-014.4.1
+- **Implementation:** Conversion pipeline explicit failure status; Document Manager ConversionFailed state; Banner error displayed
+- **Verification:** CHECK 5
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment; HAZ-DOC-014 Cause 2 pending PL-6 resolution
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring, Phase 6 residual risk assessment, and PL-6 resolution.
+
+
+
+---
+
+## HAZ-DOC-015: REQ-005-file-format-support — Structured CDA Content Omitted or Misrepresented in Rendering
+
+**Source requirement:** [REQ-005-file-format-support](requirements/increment-1-inbox-and-triage/REQ-005-file-format-support.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Structured CDA content is omitted or misrepresented in rendering.
+
+**Potential clinical impact:** User reads a CDA document where coded clinical sections — diagnoses, medications, allergies, or results — are absent or incorrectly presented. Clinical decision is based on incomplete or incorrect structured clinical data.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 2 (SEC): CDA XML XXE prevention in place. CDA stylesheet rendering is part of the pre-built viewer component pipeline.
+
+---
+
+##### Cause 1: XSLT mapping incomplete or outdated
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-015.1.1 | HIT Design | XSLT stylesheet version tracked; changes to CDA document model or clinical sections require stylesheet review and re-validation before deployment | CLIN-010 | CHECK 6 | - | 🔴 |
+| HAZ-DOC-015.1.2 | Business Process | CDA stylesheet clinical review: any XSLT update reviewed by clinical safety representative before deployment to production | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Namespace/version handling defects
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-015.2.1 | HIT Design | CDA rendering integration tests include documents with multiple CDA namespace versions; rendering verified against known-good expected output for each version | CLIN-010 | CHECK 6 | - | 🔴 |
+
+##### Cause 3: Fallback renderer suppresses coded sections
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-015.3.1 | HIT Design | Fallback (non-XSLT) rendering path is not used for CDA documents containing clinical coded sections; if XSLT rendering fails, document is presented as download-only with explicit warning rather than silently stripped via fallback | CLIN-010 | CHECK 6 | - | 🔴 |
+
+**Additional Comments:** CDA rendering pipeline is owned by the pre-built viewer component team (CLIN-010 applies). Document Manager's responsibility is ensuring version-pinning and integration testing cover all supported CDA namespace versions, and that any rendering failure is surfaced explicitly. CHECK 6 consolidates CDA rendering integrity across all three causes. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-015 | C1 | HAZ-DOC-015.1.1 | HIT Design | CLIN-010 | CHECK 6 | 🔴 |
+| HAZ-DOC-015 | C1 | HAZ-DOC-015.1.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-015 | C2 | HAZ-DOC-015.2.1 | HIT Design | CLIN-010 | CHECK 6 | 🔴 |
+| HAZ-DOC-015 | C3 | HAZ-DOC-015.3.1 | HIT Design | CLIN-010 | CHECK 6 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-015 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-010: Third-Party Clinical Risk**
+- **Purpose:** CDA rendering pipeline risks managed at Document Manager integration boundary
+- **Mitigates:** HAZ-DOC-015 via controls HAZ-DOC-015.1.1, HAZ-DOC-015.2.1, HAZ-DOC-015.3.1
+- **Implementation:** XSLT version pinning; CDA namespace version integration tests; fallback path does not silently strip coded sections
+- **Verification:** CHECK 6
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment; HAZ-DOC-014 Cause 2 pending PL-6 resolution
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring, Phase 6 residual risk assessment, and PL-6 resolution.
+
+
+
+---
+
+## HAZ-DOC-016: REQ-005-file-format-support — Original File Lost After Conversion
+
+**Source requirement:** [REQ-005-file-format-support](requirements/increment-1-inbox-and-triage/REQ-005-file-format-support.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Original file lost after conversion.
+
+**Potential clinical impact:** User or downstream system requires access to the original clinical document — for legal, audit, or clinical re-review purposes — and finds only the converted rendition. If the original contained information not preserved in the rendition (e.g. embedded attachments, structured XML), that information is permanently inaccessible.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 3 (CLIN-007): original file preserved alongside rendition — existing V1a mitigation. ADR-007: binary documents stored in S3 with application-layer access control.
+
+---
+
+##### Cause 1: Source retention policy not enforced
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-016.1.1 | HIT Design | S3 object storage enforces immutable retention policy on original document objects; policy applied at bucket level preventing deletion; enforced independently of application code | CLIN-005 | CHECK 7 | - | 🔴 |
+| HAZ-DOC-016.1.2 | Business Process | Data retention policy documented: original clinical documents retained for minimum NHS-mandated period; retention period reviewed annually by IG lead | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Conversion overwrite without immutable original
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-016.2.1 | HIT Design | Conversion pipeline writes rendition to a separate S3 path from the original; original object key is never overwritten by conversion process; separate rendition key maintained | CLIN-005 | CHECK 7 | - | 🔴 |
+
+##### Cause 3: Export path references rendition only
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-016.3.1 | HIT Design | Original file download endpoint returns the original S3 object; not the rendition; API contract distinguishes /original and /rendition endpoints explicitly | CLIN-009 | CHECK 7 | - | 🔴 |
+
+**Additional Comments:** Original file retention is a transactional integrity requirement (CLIN-005) that must be enforced at infrastructure layer independently of application code. CHECK 7 verifies both the separate S3 path and the original download endpoint. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-016 | C1 | HAZ-DOC-016.1.1 | HIT Design | CLIN-005 | CHECK 7 | 🔴 |
+| HAZ-DOC-016 | C1 | HAZ-DOC-016.1.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-016 | C2 | HAZ-DOC-016.2.1 | HIT Design | CLIN-005 | CHECK 7 | 🔴 |
+| HAZ-DOC-016 | C3 | HAZ-DOC-016.3.1 | HIT Design | CLIN-009 | CHECK 7 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-016 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-005: Clinical Data Transactional Integrity**
+- **Purpose:** Original clinical document must be retained immutably — never overwritten by conversion
+- **Mitigates:** HAZ-DOC-016 via controls HAZ-DOC-016.1.1, HAZ-DOC-016.2.1, HAZ-DOC-016.3.1
+- **Implementation:** S3 immutable retention on original objects; separate path for rendition; original download endpoint distinct
+- **Verification:** CHECK 7
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment; HAZ-DOC-014 Cause 2 pending PL-6 resolution
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring, Phase 6 residual risk assessment, and PL-6 resolution.
+
+
+
+---
+
+## HAZ-DOC-019: REQ-007-search-filter-sort-folders — Required Document Incorrectly Assumed Absent
+
+**Source requirement:** [REQ-007-search-filter-sort-folders](requirements/increment-1-inbox-and-triage/REQ-007-search-filter-sort-folders.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Required document is incorrectly assumed absent.
+
+**Potential clinical impact:** User searches for a clinical document and receives no results. User incorrectly concludes the document has not been received. Clinical action is delayed or not taken because the document was assumed missing. Document was present but not visible due to active filters, index lag, or a degraded search mode.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 1 (CLIN-010): empty state and error state are visually distinct; error state is not shown as empty results.
+
+---
+
+##### Cause 1: Search scope/filter state not visible
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-019.1.1 | HIT Design | Active search filters always visible to user — filter chips or summary always rendered in search results header; no filter state hidden from UI; filter panel always accessible | CLIN-009 | CHECK 22 | - | 🔴 |
+| HAZ-DOC-019.1.2 | Training | Staff training: before concluding a document is absent, check and clear all active filters; use the "all documents" view as baseline | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Index lag causes temporary false negatives [BLOCKED — PL-7]
+
+> **🔴 BLOCKED — PL-7:** This cause is blocked pending technical confirmation of the search index latency profile and availability of an index-freshness indicator. See TECH-007. HIT Design control and CHECK test specification cannot be finalised until search service owner confirms indexing latency and freshness signal availability.
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-019.2.1 | HIT Design | [BLOCKED — PL-7: awaiting search index latency profile and freshness indicator availability] | TBD | TBD | - | 🔴 Blocked |
+| HAZ-DOC-019.2.2 | Customer Controls | Practice awareness: recently ingested documents (< indexing latency window) may not appear immediately in search; users should retry after indexing period if searching shortly after ingestion | - | N/A | CUST-001 | ⚪ Outside scope |
+
+##### Cause 3: Error/degraded mode shown as empty result
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-019.3.1 | HIT Design | Search service degraded state surfaces explicit warning indicator in search results area — not an empty result set; degraded state distinguished from "no documents match your search" | CLIN-004 | CHECK 22 | - | 🔴 |
+| HAZ-DOC-019.3.2 | Business Process | Search service availability monitoring: operational alerts on sustained degraded search; user-facing banner shown during confirmed outage | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+**Additional Comments:** Cause 2 is BLOCKED pending PL-7 resolution (TECH-007). Causes 1 and 3 are mitigated by CHECK 22. The active filter visibility control (Cause 1) and degraded mode explicit warning (Cause 3) are the primary HIT Design mitigations available without the index-freshness technical decision. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Partially blocked — Cause 2 pending PL-7; other causes accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-019 | C1 | HAZ-DOC-019.1.1 | HIT Design | CLIN-009 | CHECK 22 | 🔴 |
+| HAZ-DOC-019 | C1 | HAZ-DOC-019.1.2 | Training | — | KB-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-019 | C2 | HAZ-DOC-019.2.1 | HIT Design | TBD | TBD (BLOCKED PL-7) | 🔴 Blocked |
+| HAZ-DOC-019 | C2 | HAZ-DOC-019.2.2 | Customer Controls | — | N/A | CUST-001 |
+| HAZ-DOC-019 | C3 | HAZ-DOC-019.3.1 | HIT Design | CLIN-004 | CHECK 22 | 🔴 |
+| HAZ-DOC-019 | C3 | HAZ-DOC-019.3.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-019 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Search degraded/error state must be surfaced explicitly — never shown as empty results
+- **Mitigates:** HAZ-DOC-019 via control HAZ-DOC-019.3.1
+- **Implementation:** Search service degraded state maps to explicit warning UI; not suppressed as zero-result empty state
+- **Verification:** CHECK 22
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Active search filter state always visible; tag semantics do not imply workflow completion; tag picker language and visual design safe by default
+- **Mitigates:** HAZ-DOC-019 via HAZ-DOC-019.1.1; HAZ-DOC-025 via HAZ-DOC-025.1.1, HAZ-DOC-025.2.1, HAZ-DOC-025.3.1
+- **Implementation:** Filter chips persistent in search header; tag UI language review; tag picker help text
+- **Verification:** CHECK 22, CHECK 23
+
+**WCLIN-001: Patient Banner State Readiness**
+- **Purpose:** Search and tag UI must not render patient-linked document content until patient banner is confirmed loaded
+- **Mitigates:** Cross-cutting patient context safety for all REQ-007 patient-linked document displays
+- **Implementation:** React microfrontend subscribes to `subscribeToPatientBannerState`; renders document list only on `Loaded` state
+- **Verification:** CHECK 24
+
+**WCLIN-002: Patient Context Presence Check**
+- **Purpose:** Document search and tagging must not operate if no patient is selected
+- **Mitigates:** Cross-cutting patient context safety for all REQ-007 patient-linked document displays
+- **Implementation:** Check `patientContext.personGuid`; display "No patient selected" if empty; subscribe to `subscribeToPersonSwap`
+- **Verification:** CHECK 24
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment; HAZ-DOC-019 Cause 2 pending PL-7 resolution
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring, Phase 6 residual risk assessment, and PL-7 resolution.
+
+
+
+---
+
+## HAZ-DOC-025: REQ-007-search-filter-sort-folders — Clinically Significant Document Not Processed as Expected
+
+**Source requirement:** [REQ-007-search-filter-sort-folders](requirements/increment-1-inbox-and-triage/REQ-007-search-filter-sort-folders.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+> **Note:** Per D-019, this hazard description was rewritten to: "Clinically significant result, instruction or referral is not processed as expected." The cause set was reframed in user-friendly terms. Cause 2 existing control is training material (KB articles).
+
+**Hazard description:** Clinically significant result, instruction, or referral is not processed as expected.
+
+**Potential clinical impact:** User applies a tag to a document and believes the document has been actioned. A clinically significant result, referral response, or instruction remains in the queue without the required workflow action being taken. The tag creates a false impression of completion.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 6 (CLIN-007): tagging a document does not change workflow state; tag is not treated as an action.
+
+---
+
+##### Cause 1: Tagging UI semantics imply completion
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-025.1.1 | HIT Design | Tag UI components use language and visual design that do not imply workflow completion; no checkmark, tick, or "done" language on tag application; workflow state (Filed, Actioned) is a separate server-side state | CLIN-009 | CHECK 23 | - | 🔴 |
+| HAZ-DOC-025.1.2 | Training | Staff training: tagging is for classification only; tagging does not action or complete a document; workflow completion requires explicit action through the action menu | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Workflow state not clearly separated from tags
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-025.2.1 | HIT Design | Document row UI renders workflow state (queue position, completion status) and tags in visually distinct areas; tag chips and workflow status badges are not co-located in a way that implies equivalence | CLIN-009 | CHECK 23 | - | 🔴 |
+
+##### Cause 3: No warning that tag is non-clinical workflow marker
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-025.3.1 | HIT Design | Tag picker tooltip or help text states that tags are for classification only and do not affect document workflow; this text is surfaced on first use and accessible at all times via help affordance | CLIN-009 | CHECK 23 | - | 🔴 |
+| HAZ-DOC-025.3.2 | Business Process | Practice onboarding includes tag usage guidance distinguishing classification tags from workflow actions; admin configuration guide includes warning about tag vs action semantics | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+**Additional Comments:** All three causes converge on the requirement that tag application must not visually or semantically imply workflow completion. CHECK 23 covers visual design, language, and contextual help for tag semantics. Controls subject to technical team validation per D-024 (PL-9). Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-025 | C1 | HAZ-DOC-025.1.1 | HIT Design | CLIN-009 | CHECK 23 | 🔴 |
+| HAZ-DOC-025 | C1 | HAZ-DOC-025.1.2 | Training | — | KB-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-025 | C2 | HAZ-DOC-025.2.1 | HIT Design | CLIN-009 | CHECK 23 | 🔴 |
+| HAZ-DOC-025 | C3 | HAZ-DOC-025.3.1 | HIT Design | CLIN-009 | CHECK 23 | 🔴 |
+| HAZ-DOC-025 | C3 | HAZ-DOC-025.3.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-025 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Active search filter state always visible; tag semantics do not imply workflow completion; tag picker language and visual design safe by default
+- **Mitigates:** HAZ-DOC-019 via HAZ-DOC-019.1.1; HAZ-DOC-025 via HAZ-DOC-025.1.1, HAZ-DOC-025.2.1, HAZ-DOC-025.3.1
+- **Implementation:** Filter chips persistent in search header; tag UI language review; tag picker help text
+- **Verification:** CHECK 22, CHECK 23
+
+**WCLIN-001: Patient Banner State Readiness**
+- **Purpose:** Search and tag UI must not render patient-linked document content until patient banner is confirmed loaded
+- **Mitigates:** Cross-cutting patient context safety for all REQ-007 patient-linked document displays
+- **Implementation:** React microfrontend subscribes to `subscribeToPatientBannerState`; renders document list only on `Loaded` state
+- **Verification:** CHECK 24
+
+**WCLIN-002: Patient Context Presence Check**
+- **Purpose:** Document search and tagging must not operate if no patient is selected
+- **Mitigates:** Cross-cutting patient context safety for all REQ-007 patient-linked document displays
+- **Implementation:** Check `patientContext.personGuid`; display "No patient selected" if empty; subscribe to `subscribeToPersonSwap`
+- **Verification:** CHECK 24
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** In review — pending Phase 6 residual risk assessment; HAZ-DOC-019 Cause 2 pending PL-7 resolution
+
+**CSO Comments:** Sign-off deferred per D-031. To be completed after severity/likelihood scoring, Phase 6 residual risk assessment, and PL-7 resolution.
+
+
+
+---
+
+## HAZ-DOC-048: REQ-009-audit-trail — Inappropriate Access Goes Undetected
+
+**Source requirement:** [REQ-009-audit-trail](requirements/increment-1-inbox-and-triage/REQ-009-audit-trail.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Inappropriate access goes undetected.
+
+**Potential clinical impact:** A user accesses a patient document without appropriate clinical or business justification. The access event is not logged. No audit trail exists to identify the access, investigate a data breach, or take corrective action. Inappropriate access to sensitive patient information goes undetected.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 1 (CLIN-002): write-before-return audit pattern — access event written to audit before response returned to client. CHECK 3 (AUTH-004): RBAC-controlled access to audit records.
+
+---
+
+##### Cause 1: Access events not logged at point of view/open
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-048.1.1 | HIT Design | Document view/open endpoint writes audit entry before returning document content (write-before-return pattern); audit entry includes documentGuid, personGuid, userId, timestamp, action type | CLIN-002 | CHECK 18 | - | 🔴 |
+| HAZ-DOC-048.1.2 | Training | Staff training on data protection obligations: accessing patient records without clinical or business justification is a disciplinary matter; audit trail is maintained for all access events | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Audit write failure not retried or escalated [BLOCKED — PL-8]
+
+> **🔴 BLOCKED — PL-8 (CRITICAL):** This cause requires the audit store architecture decision before controls can be specified. If audit write fails on a fire-and-forget pattern, the access event is lost. A guaranteed-delivery pattern (e.g. durable queue, outbox) is required. See TECH-001. No HIT Design control can be specified until audit store architecture is confirmed.
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-048.2.1 | HIT Design | [BLOCKED — PL-8: awaiting audit store architecture and guaranteed-delivery pattern decision] | TBD | TBD | - | 🔴 Blocked |
+
+##### Cause 3: Review/reporting pipeline does not surface anomalies
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-048.3.1 | Business Process | Practice access review: designated information governance lead reviews audit logs quarterly for anomalous access patterns; escalation process defined | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+| HAZ-DOC-048.3.2 | Customer Controls | GP practice is responsible for reviewing audit logs and reporting suspected inappropriate access to their DPO and to NHSE as applicable | - | N/A | CUST-002 | ⚪ Outside scope |
+
+**Additional Comments:** Cause 1 is mitigated by CHECK 18 (write-before-return pattern). Cause 2 is BLOCKED on PL-8 — critical blocker. Cause 3 is a Business Process and Customer Control responsibility. Full mitigation of this hazard depends on PL-8 resolution. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Partially blocked — Cause 2 pending PL-8 resolution; other causes accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-048 | C1 | HAZ-DOC-048.1.1 | HIT Design | CLIN-002 | CHECK 18 | 🔴 |
+| HAZ-DOC-048 | C1 | HAZ-DOC-048.1.2 | Training | — | KB-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-048 | C2 | HAZ-DOC-048.2.1 | HIT Design | TBD | TBD (BLOCKED PL-8) | 🔴 Blocked |
+| HAZ-DOC-048 | C3 | HAZ-DOC-048.3.1 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-048 | C3 | HAZ-DOC-048.3.2 | Customer Controls | — | N/A | CUST-002 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-048 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-002: Patient Data Audit Trail**
+- **Purpose:** All document access events must be logged at point of access; write-before-return enforced
+- **Mitigates:** HAZ-DOC-048 via control HAZ-DOC-048.1.1
+- **Implementation:** Document view/open endpoint writes audit entry before returning content; audit includes documentGuid, personGuid, userId, timestamp, action type
+- **Verification:** CHECK 18
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** BLOCKED — HAZ-DOC-049 cannot be signed off until PL-8 (audit store architecture) is resolved
+
+**CSO Comments:** Sign-off deferred per D-031. REQ-009 coding must not begin until TECH-001 (PL-8) is resolved. HAZ-DOC-050 Cause 3 integrity mechanism to be reviewed at go/no-go gate per D-028.
+
+
+
+---
+
+## HAZ-DOC-049: REQ-009-audit-trail — Audit Trail Incomplete [ALL CAUSES BLOCKED — PL-8 CRITICAL]
+
+**Source requirement:** [REQ-009-audit-trail](requirements/increment-1-inbox-and-triage/REQ-009-audit-trail.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Audit trail incomplete.
+
+**Potential clinical impact:** Document access, filing, or action events are not recorded in the audit trail. Investigation of a clinical incident, data breach, or complaint finds no audit evidence. Inability to establish what happened to a clinical document.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 1 (CLIN-002): write-before-return audit pattern for supported actions. Current implementation is dependent on EMIS Web filing availability.
+
+> **🔴 ALL CAUSES BLOCKED — PL-8 (CRITICAL):** All HIT Design controls for this hazard require the audit store architecture decision (TECH-001). Until the architecture decision is made — specifically whether a guaranteed-delivery pattern is in scope and where the primary audit store sits — no controls can be finalised. This hazard and all its causes remain in BLOCKED state. This is a production release blocker.
+
+---
+
+##### Cause 1: EMIS Web filing failure
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-049.1.1 | HIT Design | [BLOCKED — PL-8: depends on audit store architecture decision (EMIS Web primary vs native EMIS-X vs hybrid)] | TBD | TBD | - | 🔴 Blocked |
+
+##### Cause 2: Dependency on EMIS Web availability without queueing
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-049.2.1 | HIT Design | [BLOCKED — PL-8: guaranteed-delivery queue/retry pattern in scope decision required before control can be specified] | TBD | TBD | - | 🔴 Blocked |
+
+##### Cause 3: No guaranteed-delivery pattern for audit writes
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-049.3.1 | HIT Design | [BLOCKED — PL-8: guaranteed-delivery pattern (SQS, outbox) must be decided by Solution Architect before this control can be specified] | TBD | TBD | - | 🔴 Blocked |
+
+##### Cause 4: Failure path lacks operator alert
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-049.4.1 | HIT Design | [BLOCKED — PL-8: operator alerting design depends on audit store architecture and failure mode definition] | TBD | TBD | - | 🔴 Blocked |
+| HAZ-DOC-049.4.2 | Business Process | Operational runbook: audit write failure escalation process — operator receives alert and initiates recovery procedure | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+**Additional Comments:** ALL HIT Design controls for HAZ-DOC-049 are BLOCKED on PL-8. This is a production release blocker. No coding may begin on the audit component of REQ-009 until TECH-001 is resolved. Business Process control (Cause 4) is deferred to pre-go-live. This hazard must be re-assessed at Phase 6 after PL-8 is resolved.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** BLOCKED — all HIT Design controls pending PL-8 (CRITICAL)
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-049 | C1 | HAZ-DOC-049.1.1 | HIT Design | TBD | TBD (BLOCKED PL-8) | 🔴 Blocked |
+| HAZ-DOC-049 | C2 | HAZ-DOC-049.2.1 | HIT Design | TBD | TBD (BLOCKED PL-8) | 🔴 Blocked |
+| HAZ-DOC-049 | C3 | HAZ-DOC-049.3.1 | HIT Design | TBD | TBD (BLOCKED PL-8) | 🔴 Blocked |
+| HAZ-DOC-049 | C4 | HAZ-DOC-049.4.1 | HIT Design | TBD | TBD (BLOCKED PL-8) | 🔴 Blocked |
+| HAZ-DOC-049 | C4 | HAZ-DOC-049.4.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-049 | [TBD] | [TBD] | [BLOCKED - PL-8] | Dan Watts |
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** BLOCKED — HAZ-DOC-049 cannot be signed off until PL-8 (audit store architecture) is resolved
+
+**CSO Comments:** Sign-off deferred per D-031. REQ-009 coding must not begin until TECH-001 (PL-8) is resolved. HAZ-DOC-050 Cause 3 integrity mechanism to be reviewed at go/no-go gate per D-028.
+
+
+
+---
+
+## HAZ-DOC-050: REQ-009-audit-trail — Audit Entries Tampered With
+
+**Source requirement:** [REQ-009-audit-trail](requirements/increment-1-inbox-and-triage/REQ-009-audit-trail.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Audit entries tampered with to conceal activity.
+
+**Potential clinical impact:** Audit records for document access, filing, or action events are modified or deleted. Investigation of a clinical incident, complaint, or data breach finds incomplete or falsified audit evidence. Inability to establish the true record of events.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 2 (immutable entries): audit entries are immutable — existing V1a mitigation.
+
+---
+
+##### Cause 1: Audit store not append-only or immutable
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-050.1.1 | HIT Design | Audit store schema enforces append-only pattern: no UPDATE or DELETE operations permitted on audit table; database role used by application service has INSERT-only permissions on audit table | CLIN-005 | CHECK 19 | - | 🔴 |
+| HAZ-DOC-050.1.2 | Business Process | DBA access policy: direct database access to audit table restricted to named DBAs; all DBA access logged and reviewed | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Excessive permissions allow edit or delete
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-050.2.1 | HIT Design | RBAC role definitions do not include any permission to edit or delete audit entries; verified at service boundary — no application code path permits audit mutation; enforced at database role level | CLIN-009 | CHECK 20 | - | 🔴 |
+
+##### Cause 3: Integrity verification or signature absent [BLOCKED — D-028]
+
+> **🟡 DEFERRED — D-028:** Hash/sequence integrity check for audit entries is deferred to the Increment 1 go/no-go gate review. The sole integrity control for Increment 1 is append-only RBAC enforcement (Cause 2). A hash or sequence signature mechanism is flagged for go/no-go gate assessment before production release.
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-050.3.1 | HIT Design | [DEFERRED — D-028: hash/sequence integrity check deferred to go/no-go gate. Increment 1 relies on RBAC append-only control (HAZ-DOC-050.2.1) as sole integrity mechanism.] | TBD | TBD (deferred) | - | 🟡 Go/no-go gate |
+
+**Additional Comments:** Causes 1 and 2 are mitigated by CHECK 19 (append-only schema) and CHECK 20 (RBAC no-mutation). Cause 3 integrity verification is deferred per D-028 — flagged for go/no-go gate review. RBAC enforcement is the primary tamper-prevention control for Increment 1. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Cause 3 deferred per D-028; other causes accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-050 | C1 | HAZ-DOC-050.1.1 | HIT Design | CLIN-005 | CHECK 19 | 🔴 |
+| HAZ-DOC-050 | C1 | HAZ-DOC-050.1.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-050 | C2 | HAZ-DOC-050.2.1 | HIT Design | CLIN-009 | CHECK 20 | 🔴 |
+| HAZ-DOC-050 | C3 | HAZ-DOC-050.3.1 | HIT Design | TBD | TBD (deferred D-028) | 🟡 Go/no-go gate |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-050 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-005: Clinical Data Transactional Integrity**
+- **Purpose:** Audit store schema enforces append-only; no update or delete permitted
+- **Mitigates:** HAZ-DOC-050 via control HAZ-DOC-050.1.1
+- **Implementation:** Aurora PostgreSQL audit table with INSERT-only database role for application service
+- **Verification:** CHECK 19
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** RBAC role definitions safe by default — no role includes audit mutation permissions
+- **Mitigates:** HAZ-DOC-050 via control HAZ-DOC-050.2.1
+- **Implementation:** Role definitions reviewed; no application code path permits audit UPDATE or DELETE
+- **Verification:** CHECK 20
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** BLOCKED — HAZ-DOC-049 cannot be signed off until PL-8 (audit store architecture) is resolved
+
+**CSO Comments:** Sign-off deferred per D-031. REQ-009 coding must not begin until TECH-001 (PL-8) is resolved. HAZ-DOC-050 Cause 3 integrity mechanism to be reviewed at go/no-go gate per D-028.
+
+
+
+---
+
+## HAZ-DOC-032: REQ-011-patient-matching — Document Filed Against Wrong Patient
+
+**Source requirement:** [REQ-011-patient-matching](requirements/increment-1-inbox-and-triage/REQ-011-patient-matching.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Document filed against wrong patient.
+
+**Potential clinical impact:** A clinical document is associated with the wrong patient record. Clinical decisions, prescribing, or coding are made using another patient's correspondence or results. Serious clinical harm may result from acting on another patient's clinical information.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 2 (CLIN-007): user confirmation required before filing; no auto-advance without explicit user action. CHECK 4 (CLIN-002): match events audited. CHECK 5 (AUTH-004): patient lookup scoped to practice.
+
+---
+
+##### Cause 1: Manual match selection error
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-032.1.1 | HIT Design | Match confirmation step always presents full patient demographic summary (name, DOB, NHS Number, gender) before filing is permitted; user must explicitly confirm the correct patient | CLIN-009 | CHECK 20 | - | 🔴 |
+| HAZ-DOC-032.1.2 | HIT Design | Filing endpoint enforces server-side confirmation gate: document cannot transition to Filed state without a confirmed patient match; no client-side bypass | CLIN-009 | CHECK 20 | - | 🔴 |
+| HAZ-DOC-032.1.3 | Training | Staff training: patient matching confirmation; verify full demographics before confirming match; do not rely on name alone | - | KB-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: Identity lookup mismatch (NHS Number / PDS / GUID)
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-032.2.1 | HIT Design | Patient identity lookup validates NHS Number (Modulus 11) and EMIS GUID (non-empty UUID) at PatientMatchingService API boundary before any match lookup is performed | CLIN-001 | CHECK 21 | - | 🔴 |
+| HAZ-DOC-032.2.2 | HIT Design | PDS lookup failure treated as unmatched state — not as a match; ambiguous lookup results surface for manual resolution rather than auto-matching | CLIN-009 | CHECK 21 | - | 🔴 |
+
+##### Cause 3: Confirmation checks bypassed
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-032.3.1 | HIT Design | FilingGate enforced server-side: filing API endpoint checks MatchStatus = Manually-matched or Auto-matched before accepting filing request; Unmatched or Unknown state returns HTTP 422 | CLIN-007 | CHECK 20 | - | 🔴 |
+
+**Additional Comments:** Server-side filing gate (Cause 3) and explicit confirmation UI (Cause 1) provide defence-in-depth per DCB0129 §7.2. High-risk hazard — two independent HIT Design controls (CHECK 20 and CHECK 21) required. Controls subject to technical team validation per D-024 (PL-9). Residual risk ALARP subject to CSO Phase 6 assessment.
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-032 | C1 | HAZ-DOC-032.1.1 | HIT Design | CLIN-009 | CHECK 20 | 🔴 |
+| HAZ-DOC-032 | C1 | HAZ-DOC-032.1.2 | HIT Design | CLIN-009 | CHECK 20 | 🔴 |
+| HAZ-DOC-032 | C1 | HAZ-DOC-032.1.3 | Training | — | KB-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-032 | C2 | HAZ-DOC-032.2.1 | HIT Design | CLIN-001 | CHECK 21 | 🔴 |
+| HAZ-DOC-032 | C2 | HAZ-DOC-032.2.2 | HIT Design | CLIN-009 | CHECK 21 | 🔴 |
+| HAZ-DOC-032 | C3 | HAZ-DOC-032.3.1 | HIT Design | CLIN-007 | CHECK 20 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-032 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-001: Patient Identifier Validation**
+- **Purpose:** All NHS Numbers and patient identifiers validated at PatientMatchingService API boundary before any match operation
+- **Mitigates:** HAZ-DOC-032 via HAZ-DOC-032.2.1; HAZ-DOC-034 via HAZ-DOC-034.1.1, HAZ-DOC-034.2.1, HAZ-DOC-034.3.1
+- **Implementation:** Modulus 11 validation at API boundary; Guid.Empty rejection; ODS code format validation
+- **Verification:** CHECK 21, CHECK 23
+
+
+**CLIN-007: Hazard Log Traceability**
+- **Purpose:** Hazard mitigations traced to implementation; server-side filing gate cannot be bypassed
+- **Mitigates:** HAZ-DOC-032 via HAZ-DOC-032.3.1; HAZ-DOC-033 via HAZ-DOC-033.3.1
+- **Implementation:** FilingGate server-side check; discard audit trail; no silent bypass of confirmation
+- **Verification:** CHECK 20, CHECK 22
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Filing confirmation gate server-side; unmatched state explicit; identity lookup ambiguity routes to manual resolution
+- **Mitigates:** HAZ-DOC-032 via HAZ-DOC-032.1.1, HAZ-DOC-032.1.2, HAZ-DOC-032.2.2; HAZ-DOC-033 via HAZ-DOC-033.2.1
+- **Implementation:** FilingGate API boundary check; MatchStatus enum explicit; PDS failure = Unmatched
+- **Verification:** CHECK 20, CHECK 21, CHECK 22
+
+**WCLIN-001: Patient Banner State Readiness**
+- **Purpose:** Match confirmation UI must not render patient content until banner state confirms patient is loaded
+- **Mitigates:** Cross-cutting patient context safety for all REQ-011 patient-linked rendering
+- **Implementation:** React microfrontend subscribes to `subscribeToPatientBannerState`; renders match confirmation content only on `Loaded` state
+- **Verification:** CHECK 24
+
+**WCLIN-002: Patient Context Presence Check**
+- **Purpose:** Patient matching workflow must not operate if no patient is in context
+- **Mitigates:** Cross-cutting patient context safety; also contributes to HAZ-DOC-035 defence-in-depth
+- **Implementation:** Check `patientContext.personGuid`; display "No patient selected" if empty; subscribe to `subscribeToPersonSwap`
+- **Verification:** CHECK 24
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** BLOCKED for HAZ-DOC-035 — CSO sign-off required per D-027 before provisional visibility implementation
+
+**CSO Comments:** Sign-off deferred per D-031. HAZ-DOC-035 must not be implemented without explicit CSO clinical safety approval. HAZ-DOC-032/033/034 sign-off pending Phase 6 residual risk assessment.
+
+
+
+---
+
+## HAZ-DOC-033: REQ-011-patient-matching — Unmatched Document Lost from Workflow
+
+**Source requirement:** [REQ-011-patient-matching](requirements/increment-1-inbox-and-triage/REQ-011-patient-matching.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Unmatched document is lost from workflow.
+
+**Potential clinical impact:** A clinical document that could not be automatically matched to a patient is silently removed from the workflow queue. No user is aware the document was received. The clinical correspondence is never actioned.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 3 (CLIN-010): unmatched queue; no silent discard — existing V1a mitigation.
+
+---
+
+##### Cause 1: Unmatched queue routing failure
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-033.1.1 | HIT Design | Document with no auto-match result is routed to unmatched queue as an atomic operation; routing failure is fail-closed (document not lost; escalated to dead-letter queue with operator alert) | CLIN-004 | CHECK 22 | - | 🔴 |
+| HAZ-DOC-033.1.2 | Business Process | Unmatched queue SLO monitored: queue depth alerts when unmatched documents exceed threshold; escalated to responsible user for resolution | - | PR-NNN (deferred D-017) | - | 🟡 Pre-production |
+
+##### Cause 2: No explicit unresolved-match state
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-033.2.1 | HIT Design | Unmatched document state is an explicit server-side enum value (Unmatched); no document can exist in a limbo state without an explicit status; Unmatched status visible in queue UI | CLIN-009 | CHECK 22 | - | 🔴 |
+
+##### Cause 3: Discard path enabled without user acknowledgement
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-033.3.1 | HIT Design | No automated discard path for unmatched documents; discard action (if available) requires explicit user acknowledgement with confirmation dialog stating document will be permanently removed; discard event is audited | CLIN-007 | CHECK 22 | - | 🔴 |
+
+**Additional Comments:** All three causes addressed by CHECK 22. Unmatched queue must be a persistent, visible state that cannot be silently resolved by the system. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-033 | C1 | HAZ-DOC-033.1.1 | HIT Design | CLIN-004 | CHECK 22 | 🔴 |
+| HAZ-DOC-033 | C1 | HAZ-DOC-033.1.2 | Business Process | — | PR-NNN (deferred D-017) | 🟡 |
+| HAZ-DOC-033 | C2 | HAZ-DOC-033.2.1 | HIT Design | CLIN-009 | CHECK 22 | 🔴 |
+| HAZ-DOC-033 | C3 | HAZ-DOC-033.3.1 | HIT Design | CLIN-007 | CHECK 22 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-033 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-004: Fail-Safe Error Handling**
+- **Purpose:** Unmatched document routing failure is fail-closed; no silent document loss
+- **Mitigates:** HAZ-DOC-033 via control HAZ-DOC-033.1.1
+- **Implementation:** Routing to unmatched queue is atomic; failure escalates to dead-letter queue with operator alert
+- **Verification:** CHECK 22
+
+
+**CLIN-007: Hazard Log Traceability**
+- **Purpose:** Hazard mitigations traced to implementation; server-side filing gate cannot be bypassed
+- **Mitigates:** HAZ-DOC-032 via HAZ-DOC-032.3.1; HAZ-DOC-033 via HAZ-DOC-033.3.1
+- **Implementation:** FilingGate server-side check; discard audit trail; no silent bypass of confirmation
+- **Verification:** CHECK 20, CHECK 22
+
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Filing confirmation gate server-side; unmatched state explicit; identity lookup ambiguity routes to manual resolution
+- **Mitigates:** HAZ-DOC-032 via HAZ-DOC-032.1.1, HAZ-DOC-032.1.2, HAZ-DOC-032.2.2; HAZ-DOC-033 via HAZ-DOC-033.2.1
+- **Implementation:** FilingGate API boundary check; MatchStatus enum explicit; PDS failure = Unmatched
+- **Verification:** CHECK 20, CHECK 21, CHECK 22
+
+**WCLIN-001: Patient Banner State Readiness**
+- **Purpose:** Match confirmation UI must not render patient content until banner state confirms patient is loaded
+- **Mitigates:** Cross-cutting patient context safety for all REQ-011 patient-linked rendering
+- **Implementation:** React microfrontend subscribes to `subscribeToPatientBannerState`; renders match confirmation content only on `Loaded` state
+- **Verification:** CHECK 24
+
+**WCLIN-002: Patient Context Presence Check**
+- **Purpose:** Patient matching workflow must not operate if no patient is in context
+- **Mitigates:** Cross-cutting patient context safety; also contributes to HAZ-DOC-035 defence-in-depth
+- **Implementation:** Check `patientContext.personGuid`; display "No patient selected" if empty; subscribe to `subscribeToPersonSwap`
+- **Verification:** CHECK 24
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** BLOCKED for HAZ-DOC-035 — CSO sign-off required per D-027 before provisional visibility implementation
+
+**CSO Comments:** Sign-off deferred per D-031. HAZ-DOC-035 must not be implemented without explicit CSO clinical safety approval. HAZ-DOC-032/033/034 sign-off pending Phase 6 residual risk assessment.
+
+
+
+---
+
+## HAZ-DOC-034: REQ-011-patient-matching — Invalid NHS Number Used as Matching Signal
+
+**Source requirement:** [REQ-011-patient-matching](requirements/increment-1-inbox-and-triage/REQ-011-patient-matching.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Invalid NHS Number used as matching signal.
+
+**Potential clinical impact:** Document is matched to a patient using an NHS Number that fails Modulus 11 validation. The match may link the document to the wrong patient or create an erroneous patient record association. Clinical decisions may be made using incorrectly matched documents.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** CHECK 1 (CLIN-001): Modulus 11 NHS Number validation — existing V1a mitigation at controller boundary.
+
+---
+
+##### Cause 1: Modulus 11 validation missing or incorrect
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-034.1.1 | HIT Design | PatientMatchingService API boundary validates NHS Number using Modulus 11 algorithm before any patient lookup or match operation; invalid NHS Number returns HTTP 400; no patient data returned | CLIN-001 | CHECK 23 | - | 🔴 |
+
+##### Cause 2: Non-numeric or partial NHS Number accepted
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-034.2.1 | HIT Design | NHS Number validator rejects all non-numeric inputs, inputs shorter or longer than 10 digits, and inputs with whitespace; Guid.Empty for EMIS GUID rejected; ODS code format validation applied | CLIN-001 | CHECK 23 | - | 🔴 |
+
+##### Cause 3: Fallback matching over-trusts invalid identifier
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-034.3.1 | HIT Design | Fallback matching logic (name + DOB when NHS Number absent) does not accept a failed-validation NHS Number as a partial match signal; invalid identifier is treated as no identifier | CLIN-001 | CHECK 23 | - | 🔴 |
+
+**Additional Comments:** All three causes addressed by CHECK 23 (NHS Number validation). CLIN-001 is the critical guardrail for this hazard. Validation must occur at API boundary, not only at UI layer. Controls subject to technical team validation per D-024 (PL-9).
+
+**CSO Approval:** Dan Watts - [DEFERRED - D-031]
+**Status:** Accepted pending Phase 6 risk scoring
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-034 | C1 | HAZ-DOC-034.1.1 | HIT Design | CLIN-001 | CHECK 23 | 🔴 |
+| HAZ-DOC-034 | C2 | HAZ-DOC-034.2.1 | HIT Design | CLIN-001 | CHECK 23 | 🔴 |
+| HAZ-DOC-034 | C3 | HAZ-DOC-034.3.1 | HIT Design | CLIN-001 | CHECK 23 | 🔴 |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-034 | [TBD] | [TBD] | [TBD - CSO Phase 6] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-001: Patient Identifier Validation**
+- **Purpose:** All NHS Numbers and patient identifiers validated at PatientMatchingService API boundary before any match operation
+- **Mitigates:** HAZ-DOC-032 via HAZ-DOC-032.2.1; HAZ-DOC-034 via HAZ-DOC-034.1.1, HAZ-DOC-034.2.1, HAZ-DOC-034.3.1
+- **Implementation:** Modulus 11 validation at API boundary; Guid.Empty rejection; ODS code format validation
+- **Verification:** CHECK 21, CHECK 23
+
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** BLOCKED for HAZ-DOC-035 — CSO sign-off required per D-027 before provisional visibility implementation
+
+**CSO Comments:** Sign-off deferred per D-031. HAZ-DOC-035 must not be implemented without explicit CSO clinical safety approval. HAZ-DOC-032/033/034 sign-off pending Phase 6 residual risk assessment.
+
+
+
+---
+
+## HAZ-DOC-035: REQ-011-patient-matching — Document Visible Before Patient Match Confirmation [ALL CAUSES BLOCKED — PL-10]
+
+**Source requirement:** [REQ-011-patient-matching](requirements/increment-1-inbox-and-triage/REQ-011-patient-matching.md)  
+**DCB0129 §4.1:** Clinical safety  
+**Status:** Active — CSO sign-off pending (D-031)  
+
+
+**Hazard description:** Document is visible before patient match confirmation.
+
+**Potential clinical impact:** A clinical document is rendered visible to users before a confirmed patient match. The document may be associated with the wrong patient or with no patient at all. Users may read, act on, code from, or file a document against an incorrect or unconfirmed patient record.
+
+**Initial risk:** [TBD Severity] x [TBD Likelihood] = **[TBD - CSO to complete]**
+**Residual risk:** [TBD Severity] x [TBD Likelihood] = **[TBD]**
+**Residual risk decision:** [TBD - CSO to complete at Phase 6]
+
+**Existing Controls:** Provisional visibility blocked pending CSO sign-off (existing Parking Lot item from V1a). No implementation of provisional rendering has been made.
+
+> **🔴 ALL CAUSES BLOCKED — PL-10 (HIGH):** Per D-027, HAZ-DOC-035 is BLOCKED. No HIT Design controls may be proposed or implemented without explicit CSO clinical safety sign-off. This hazard must not be implemented in Increment 1 without CSO approval. Provisional visibility is a patient safety risk requiring careful design and CSO sign-off before any implementation proceeds.
+
+---
+
+##### Cause 1: Provisional rendering enabled pre-confirmation
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-035.1.1 | HIT Design | [BLOCKED — PL-10: CSO sign-off required. No control may be specified until clinical safety design is approved by CSO.] | TBD | TBD | - | 🔴 Blocked |
+
+##### Cause 2: Patient context guard not enforced during unresolved match
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-035.2.1 | HIT Design | [BLOCKED — PL-10: patient context guard design requires CSO sign-off. WCLIN-002 applies but implementation cannot proceed until CSO approves overall provisional visibility design.] | TBD | TBD | - | 🔴 Blocked |
+
+##### Cause 3: Workflow timing allows early user access
+
+| Control ID | Category | Description | CLIN Rule | Evidence / Reference | CUST | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-035.3.1 | HIT Design | [BLOCKED — PL-10: workflow timing design requires CSO sign-off before any implementation.] | TBD | TBD | - | 🔴 Blocked |
+
+**Additional Comments:** ALL HIT Design controls BLOCKED per D-027. HAZ-DOC-035 implementation must not begin without explicit CSO clinical safety sign-off. This hazard should be reviewed at the Increment 1 go/no-go gate. If Provisional visibility is not implemented in Increment 1, this hazard does not manifest and can be deferred to a future increment with appropriate clinical safety analysis.
+
+**CSO Approval:** Dan Watts - [BLOCKED - D-027 / D-031]
+**Status:** BLOCKED — CSO sign-off required before implementation
+
+---
+
+
+### Mitigations
+
+| HAZ-DOC-ID | Cause | Control ID | Category | CLIN Rule | CHECK | Go/Launch Gate |
+|---|---|---|---|---|---|---|
+| HAZ-DOC-035 | C1 | HAZ-DOC-035.1.1 | HIT Design | TBD | TBD (BLOCKED PL-10) | 🔴 Blocked |
+| HAZ-DOC-035 | C2 | HAZ-DOC-035.2.1 | HIT Design | TBD | TBD (BLOCKED PL-10) | 🔴 Blocked |
+| HAZ-DOC-035 | C3 | HAZ-DOC-035.3.1 | HIT Design | TBD | TBD (BLOCKED PL-10) | 🔴 Blocked |
+
+### Residual Risk Assessment
+
+| HAZ-DOC-ID | Initial Risk | Residual Risk | ALARP Accepted | CSO |
+|---|---|---|---|---|
+| HAZ-DOC-035 | [TBD] | [TBD] | [BLOCKED - PL-10 / D-027] | Dan Watts |
+
+### Genesis AI Skills Applied
+
+**CLIN-009: Safe Defaults**
+- **Purpose:** Filing confirmation gate server-side; unmatched state explicit; identity lookup ambiguity routes to manual resolution
+- **Mitigates:** HAZ-DOC-032 via HAZ-DOC-032.1.1, HAZ-DOC-032.1.2, HAZ-DOC-032.2.2; HAZ-DOC-033 via HAZ-DOC-033.2.1
+- **Implementation:** FilingGate API boundary check; MatchStatus enum explicit; PDS failure = Unmatched
+- **Verification:** CHECK 20, CHECK 21, CHECK 22
+
+**WCLIN-001: Patient Banner State Readiness**
+- **Purpose:** Match confirmation UI must not render patient content until banner state confirms patient is loaded
+- **Mitigates:** Cross-cutting patient context safety for all REQ-011 patient-linked rendering
+- **Implementation:** React microfrontend subscribes to `subscribeToPatientBannerState`; renders match confirmation content only on `Loaded` state
+- **Verification:** CHECK 24
+
+**WCLIN-002: Patient Context Presence Check**
+- **Purpose:** Patient matching workflow must not operate if no patient is in context
+- **Mitigates:** Cross-cutting patient context safety; also contributes to HAZ-DOC-035 defence-in-depth
+- **Implementation:** Check `patientContext.personGuid`; display "No patient selected" if empty; subscribe to `subscribeToPersonSwap`
+- **Verification:** CHECK 24
+
+---
+
+
+### CSO Sign-Off
+
+
+**Clinical Safety Officer:** Dan Watts
+**Sign-Off Date:** [DEFERRED - D-031]
+**Status:** BLOCKED for HAZ-DOC-035 — CSO sign-off required per D-027 before provisional visibility implementation
+
+**CSO Comments:** Sign-off deferred per D-031. HAZ-DOC-035 must not be implemented without explicit CSO clinical safety approval. HAZ-DOC-032/033/034 sign-off pending Phase 6 residual risk assessment.
+
+
