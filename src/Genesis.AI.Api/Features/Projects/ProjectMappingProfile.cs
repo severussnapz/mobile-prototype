@@ -9,6 +9,9 @@ public class ProjectMappingProfile : Profile
     {
         CreateMap<Project, ProjectResource>()
             .ForMember(
+                destination => destination.PipelineStages,
+                options => options.MapFrom(source => source.PipelineStages.OrderBy(stage => stage.SortOrder)))
+            .ForMember(
                 destination => destination.ComplianceDomain,
                 options => options.MapFrom(source => ConvertToKebabCase(source.ComplianceDomain.ToString())))
             .ForMember(
@@ -18,7 +21,7 @@ public class ProjectMappingProfile : Profile
         CreateMap<PipelineStage, PipelineStageResource>()
             .ForMember(
                 destination => destination.StageType,
-                options => options.MapFrom(source => ConvertToKebabCase(source.StageType.ToString())))
+                options => options.MapFrom(source => ConvertToSnakeCase(source.StageType.ToString())))
             .ForMember(
                 destination => destination.Status,
                 options => options.MapFrom(source => ConvertToKebabCase(source.Status.ToString())));
@@ -28,6 +31,13 @@ public class ProjectMappingProfile : Profile
     {
         return string.Concat(value.Select((character, index) =>
             index > 0 && char.IsUpper(character) ? $"-{character}" : character.ToString()))
+            .ToLowerInvariant();
+    }
+
+    private static string ConvertToSnakeCase(string value)
+    {
+        return string.Concat(value.Select((character, index) =>
+            index > 0 && char.IsUpper(character) ? $"_{character}" : character.ToString()))
             .ToLowerInvariant();
     }
 }

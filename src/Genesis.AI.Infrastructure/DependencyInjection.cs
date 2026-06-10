@@ -1,7 +1,9 @@
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
+using Genesis.AI.Domain.Dpia;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
+using Genesis.AI.Domain.SecurityReviewReport;
 using Genesis.AI.Infrastructure.Repositories;
 using Genesis.AI.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -33,6 +35,10 @@ public static class DependencyInjection
         services.AddSingleton<ISkillContentService, SkillContentService>();
         services.AddSingleton<IHazardRegistryParser, HazardRegistryParser>();
         services.AddSingleton<IHazardLogExcelBuilder, HazardLogExcelBuilder>();
+        services.AddSingleton<IDpiaDocxBuilder, Pr1625DpiaDocxBuilder>();
+        services.AddSingleton<ISecurityReviewReportBuilder, SecurityReviewReportBuilder>();
+        services.AddScoped<INormalisationGateService, NormalisationGateService>();
+        services.AddScoped<IPlanningGateService, PlanningGateService>();
 
         AddS3(services, configuration);
 

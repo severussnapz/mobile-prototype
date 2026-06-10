@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.org/schemas/sdp_evidence_schema.json",
+  "title": "Secure Development Process Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_code", "generated_at", "controls"],
+  "properties": {
+    "project_code": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "ISO-8601 timestamp"
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "control_id",
+          "name",
+          "status",
+          "evidence_type",
+          "evidence_ref",
+          "owner",
+          "last_reviewed"
+        ],
+        "properties": {
+          "control_id": {
+            "type": "string",
+            "pattern": "^SDP-[0-9]{3}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pass", "partial", "fail", "not_applicable"]
+          },
+          "evidence_type": {
+            "type": "string",
+            "enum": ["ci_report", "policy_doc", "platform_setting", "audit_log", "manual_attestation"]
+          },
+          "evidence_ref": {
+            "type": "string",
+            "description": "Path/URL/identifier of evidence artifact"
+          },
+          "owner": {
+            "type": "string",
+            "description": "Role/team owning this control evidence"
+          },
+          "last_reviewed": {
+            "type": "string",
+            "description": "ISO-8601 date or datetime"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "mapped_requirements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

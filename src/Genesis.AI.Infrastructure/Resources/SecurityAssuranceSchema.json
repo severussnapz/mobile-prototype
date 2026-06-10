@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://emis.example/schemas/security_assurance_schema.json",
+  "title": "Security Assurance Data",
+  "type": "object",
+  "required": [
+    "document_version",
+    "project",
+    "threat_model",
+    "attack_vector_coverage",
+    "control_mappings",
+    "checks",
+    "evidence_artifacts",
+    "review_signoff"
+  ],
+  "properties": {
+    "document_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "summary", "architecture_context"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "architecture_context": { "type": "string", "minLength": 1 },
+        "data_sensitivity": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "threat_model": {
+      "type": "object",
+      "required": ["assets", "actors", "entry_points", "abuse_cases"],
+      "properties": {
+        "assets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "actors": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "entry_points": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "abuse_cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "attack_vector_coverage": {
+      "type": "object",
+      "required": [
+        "repo_secrets",
+        "ci_cd_exposure",
+        "supply_chain",
+        "injection",
+        "authn_authz",
+        "crypto",
+        "logging_monitoring"
+      ],
+      "properties": {
+        "repo_secrets": {
+          "type": "object",
+          "required": ["status", "controls", "evidence_refs"],
+          "properties": {
+            "status": { "type": "string", "enum": ["covered", "partial", "not_applicable", "gap"] },
+            "controls": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        },
+        "ci_cd_exposure": {
+          "type": "object",
+          "required": ["status", "controls", "evidence_refs"],
+          "properties": {
+            "status": { "type": "string", "enum": ["covered", "partial", "not_applicable", "gap"] },
+            "controls": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        },
+        "supply_chain": {
+          "type": "object",
+          "required": ["status", "controls", "evidence_refs"],
+          "properties": {
+            "status": { "type": "string", "enum": ["covered", "partial", "not_applicable", "gap"] },
+            "controls": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        },
+        "injection": {
+          "type": "object",
+          "required": ["status", "controls", "evidence_refs"],
+          "properties": {
+            "status": { "type": "string", "enum": ["covered", "partial", "not_applicable", "gap"] },
+            "controls": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        },
+        "authn_authz": {
+          "type": "object",
+          "required": ["status", "controls", "evidence_refs"],
+          "properties": {
+            "status": { "type": "string", "enum": ["covered", "partial", "not_applicable", "gap"] },
+            "controls": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        },
+        "crypto": {
+          "type": "object",
+          "required": ["status", "controls", "evidence_refs"],
+          "properties": {
+            "status": { "type": "string", "enum": ["covered", "partial", "not_applicable", "gap"] },
+            "controls": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        },
+        "logging_monitoring": {
+          "type": "object",
+          "required": ["status", "controls", "evidence_refs"],
+          "properties": {
+            "status": { "type": "string", "enum": ["covered", "partial", "not_applicable", "gap"] },
+            "controls": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "control_mappings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "control_id",
+          "title",
+          "owasp",
+          "asvs",
+          "cwe",
+          "internal_policy_refs",
+          "applicability_rationale",
+          "requirement_ids"
+        ],
+        "properties": {
+          "control_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "owasp": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          },
+          "asvs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "cwe": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "internal_policy_refs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          },
+          "applicability_rationale": { "type": "string", "minLength": 1 },
+          "requirement_ids": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "check_id",
+          "control_id",
+          "test_type",
+          "scenario",
+          "pass_criteria",
+          "evidence_ref"
+        ],
+        "properties": {
+          "check_id": { "type": "string", "minLength": 1 },
+          "control_id": { "type": "string", "minLength": 1 },
+          "test_type": {
+            "type": "string",
+            "enum": ["positive", "negative", "abuse", "evidence"]
+          },
+          "scenario": { "type": "string", "minLength": 1 },
+          "pass_criteria": { "type": "string", "minLength": 1 },
+          "evidence_ref": { "type": "string", "minLength": 1 },
+          "requirement_id": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evidence_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["artifact_id", "type", "location", "description"],
+        "properties": {
+          "artifact_id": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 },
+          "location": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "review_signoff": {
+      "type": "object",
+      "required": ["reviewer", "role", "decision", "reference", "date"],
+      "properties": {
+        "reviewer": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "decision": {
+          "type": "string",
+          "enum": ["approved", "approved_with_conditions", "blocked"]
+        },
+        "reference": { "type": "string", "minLength": 1 },
+        "date": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

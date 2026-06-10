@@ -49,7 +49,7 @@ public class ProjectsApiTests : IDisposable
         Assert.True(doc.RootElement.TryGetProperty("data", out var data));
         Assert.True(data.TryGetProperty("id", out _));
         Assert.True(data.TryGetProperty("pipelineStages", out var stages));
-        Assert.Equal(8, stages.GetArrayLength());
+        Assert.Equal(10, stages.GetArrayLength());
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class ProjectsApiTests : IDisposable
         {
             var stageType = stage.GetProperty("stageType").GetString();
             var status = stage.GetProperty("status").GetString();
-            if (string.Equals(stageType, "requirements-discovery", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(stageType, "requirements_discovery", StringComparison.OrdinalIgnoreCase))
             {
                 Assert.Equal("not-started", status);
             }
@@ -101,7 +101,7 @@ public class ProjectsApiTests : IDisposable
         {
             var stageType = stage.GetProperty("stageType").GetString();
             var status = stage.GetProperty("status").GetString();
-            if (string.Equals(stageType, "requirements-discovery", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(stageType, "requirements_discovery", StringComparison.OrdinalIgnoreCase))
             {
                 Assert.Equal("not-started", status);
             }
@@ -149,7 +149,49 @@ public class ProjectsApiTests : IDisposable
         using var doc = JsonDocument.Parse(body);
         var data = doc.RootElement.GetProperty("data");
         Assert.Equal("GET1", data.GetProperty("code").GetString());
-        Assert.Equal(8, data.GetProperty("pipelineStages").GetArrayLength());
+        Assert.Equal(10, data.GetProperty("pipelineStages").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CreateProject_WithGenericDomain_ReturnsTenOrderedStagesIncludingInformationGovernanceAndSecurity()
+    {
+        var client = _factory.CreateAdminClient();
+        var content = new StringContent(
+            """{"code":"ORD10","name":"Ordering Test","description":"Stage ordering contract","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var response = await client.PostAsync("/api/v1/projects", content);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        using var doc = JsonDocument.Parse(body);
+        var stages = doc.RootElement.GetProperty("data").GetProperty("pipelineStages").EnumerateArray().ToList();
+
+        Assert.Equal(10, stages.Count);
+
+        var expectedStageTypes = new[]
+        {
+            "requirements_discovery",
+            "prototype",
+            "architecture",
+            "design",
+            "pxd",
+            "clinical_safety",
+            "information_governance",
+            "security",
+            "normalisation",
+            "planning"
+        };
+
+        for (var index = 0; index < expectedStageTypes.Length; index++)
+        {
+            var stage = stages[index];
+
+            Assert.Equal(index + 1, stage.GetProperty("sortOrder").GetInt32());
+            Assert.Equal(expectedStageTypes[index], stage.GetProperty("stageType").GetString());
+        }
     }
 
     [Fact]

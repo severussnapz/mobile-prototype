@@ -260,6 +260,16 @@ public class CreateConversationCommandHandlerTests
         pxdStage.Complete("user-1", _timeProvider);
         project.RecalculateStatus(_timeProvider);
 
+        var igStage = project.PipelineStages.First(s => s.StageType == StageType.InformationGovernance);
+        igStage.Start(_timeProvider);
+        igStage.Complete("user-1", _timeProvider);
+        project.RecalculateStatus(_timeProvider);
+
+        var secStage = project.PipelineStages.First(s => s.StageType == StageType.Security);
+        secStage.Start(_timeProvider);
+        secStage.Complete("user-1", _timeProvider);
+        project.RecalculateStatus(_timeProvider);
+
         // Normalisation should be unblocked now (ClinicalSafety is Blocked for Generic domain)
         var normStage = project.PipelineStages.First(s => s.StageType == StageType.Normalisation);
 

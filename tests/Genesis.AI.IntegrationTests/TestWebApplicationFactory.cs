@@ -16,13 +16,16 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
 {
     private readonly MockTokenGenerator _tokenGenerator;
     private readonly string _databaseName;
+    private readonly Mock<IAiService> _aiServiceMock;
 
     public MockTokenGenerator TokenGenerator => _tokenGenerator;
+    public Mock<IAiService> AiServiceMock => _aiServiceMock;
 
     public TestWebApplicationFactory()
     {
         _tokenGenerator = new MockTokenGenerator();
         _databaseName = $"TestDb_{Guid.NewGuid()}";
+        _aiServiceMock = new Mock<IAiService>();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -66,8 +69,7 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
             services.AddHealthChecks();
 
             // Mock IAiService — integration tests don't call AWS Bedrock
-            var mockAiService = new Mock<IAiService>();
-            services.AddSingleton(mockAiService.Object);
+            services.AddSingleton(_aiServiceMock.Object);
 
             // Fake IArtefactStorageService — integration tests don't call S3/LocalStack.
             // Keeps content in memory so save/read round-trips work.

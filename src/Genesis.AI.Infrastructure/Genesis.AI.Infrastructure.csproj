@@ -8,6 +8,8 @@
     <EmbeddedResource Include="Prompts\*.md" />
     <EmbeddedResource Include="Skills\*.md" />
     <EmbeddedResource Include="Resources\*.xlsx" />
+    <EmbeddedResource Include="Resources\*.docx" />
+    <EmbeddedResource Include="Resources\*.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -15,6 +17,7 @@
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" />
     <PackageReference Include="ClosedXML" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>

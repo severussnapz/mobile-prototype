@@ -12,9 +12,10 @@ public class PipelineStagesApiTests(GenesisAiFixture fixture) : GenesisAiBaseTes
     {
         var createBody = new
         {
-            code = $"STG-{Guid.NewGuid():N}"[..10],
+            code = GenerateProjectCode("STG"),
             name = $"Stage Test {DateTime.UtcNow:HHmmss}",
             description = "Created for pipeline stage API tests",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
         var createResponse = await Msvc.Api.CreateProjectAsync(ValidToken, createBody);

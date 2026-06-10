@@ -34,7 +34,14 @@ public class SkipStageCommandHandler : IRequestHandler<SkipStageCommand, SkipSta
             Found: true,
             ValidationError: null,
             StageId: stage.Id,
-            StageType: stage.StageType.ToString(),
+            StageType: ConvertToSnakeCase(stage.StageType.ToString()),
             Status: "complete");
+    }
+
+    private static string ConvertToSnakeCase(string value)
+    {
+        return string.Concat(value.Select((character, index) =>
+            index > 0 && char.IsUpper(character) ? $"_{character}" : character.ToString()))
+            .ToLowerInvariant();
     }
 }

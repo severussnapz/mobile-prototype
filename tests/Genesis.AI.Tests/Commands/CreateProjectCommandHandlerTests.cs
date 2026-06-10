@@ -112,7 +112,7 @@ public class CreateProjectCommandHandlerTests
         await _handler.Handle(command, CancellationToken.None);
 
         Assert.NotNull(capturedProject);
-        Assert.Equal(8, capturedProject.PipelineStages.Count);
+        Assert.Equal(10, capturedProject.PipelineStages.Count);
     }
 
     [Fact]

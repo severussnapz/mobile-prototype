@@ -91,7 +91,7 @@ public class Project : Entity, IAggregateRoot
     /// <summary>
     /// Checks prerequisites and unblocks stages whose dependencies are now satisfied.
     /// Prerequisite chain:
-    ///   RequirementsDiscovery → Prototype → [Architecture, Design, PxD] → ClinicalSafety → Normalisation → Planning
+    ///   RequirementsDiscovery → Prototype → [Architecture, Design, PxD] → ClinicalSafety → InformationGovernance → Security → Normalisation → Planning
     /// ClinicalSafety is also permanently blocked for non-clinical domains.
     /// </summary>
     private void UnblockAvailableStages()
@@ -111,12 +111,18 @@ public class Project : Entity, IAggregateRoot
                        && IsStageComplete(StageType.Design)
                        && IsStageComplete(StageType.Pxd),
 
-                StageType.Normalisation
+                StageType.InformationGovernance
                     => IsStageComplete(StageType.Architecture)
                        && IsStageComplete(StageType.Design)
                        && IsStageComplete(StageType.Pxd)
                        && (IsStageComplete(StageType.ClinicalSafety)
                            || ComplianceDomain != ComplianceDomain.ClinicalUk),
+
+                StageType.Security
+                    => IsStageComplete(StageType.InformationGovernance),
+
+                StageType.Normalisation
+                    => IsStageComplete(StageType.Security),
 
                 StageType.Planning
                     => IsStageComplete(StageType.Normalisation),

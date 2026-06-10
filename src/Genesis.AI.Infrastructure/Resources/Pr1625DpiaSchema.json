@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://emis.example/schemas/pr1625_dpia_schema.json",
+  "title": "PR1625 DPIA Data",
+  "type": "object",
+  "required": [
+    "document_version",
+    "project",
+    "processing",
+    "data_profile",
+    "legal_basis",
+    "risk_assessment",
+    "signoff"
+  ],
+  "properties": {
+    "document_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "title",
+        "request_date",
+        "contact_name",
+        "sponsor",
+        "business_unit",
+        "proposition",
+        "environment",
+        "change_type",
+        "summary",
+        "data_flow"
+      ],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "request_date": { "type": "string", "minLength": 1 },
+        "contact_name": { "type": "string", "minLength": 1 },
+        "sponsor": { "type": "string", "minLength": 1 },
+        "business_unit": { "type": "string", "minLength": 1 },
+        "proposition": { "type": "string", "minLength": 1 },
+        "environment": { "type": "string", "minLength": 1 },
+        "stakeholders": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "change_type": {
+          "type": "string",
+          "enum": ["new_solution", "existing_change", "one_off_process"]
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "data_flow": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "processing": {
+      "type": "object",
+      "required": [
+        "personal_data",
+        "special_category_data",
+        "minors_data",
+        "volume",
+        "frequency",
+        "role",
+        "data_controller",
+        "data_subjects",
+        "recipients"
+      ],
+      "properties": {
+        "personal_data": { "type": "boolean" },
+        "special_category_data": { "type": "boolean" },
+        "minors_data": { "type": "boolean" },
+        "volume": { "type": "string", "minLength": 1 },
+        "frequency": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "data_controller": { "type": "string", "minLength": 1 },
+        "data_subjects": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "recipients": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "third_parties": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "data_profile": {
+      "type": "object",
+      "required": [
+        "classifications",
+        "data_categories",
+        "retention_rule",
+        "deletion_trigger",
+        "sharing_methods",
+        "encryption_at_rest",
+        "encryption_in_transit"
+      ],
+      "properties": {
+        "classifications": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "data_categories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "retention_rule": { "type": "string", "minLength": 1 },
+        "deletion_trigger": { "type": "string", "minLength": 1 },
+        "sharing_methods": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "encryption_at_rest": { "type": "string", "minLength": 1 },
+        "encryption_in_transit": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "legal_basis": {
+      "type": "object",
+      "required": [
+        "article6",
+        "article9",
+        "lawful_purpose",
+        "privacy_notice_reference"
+      ],
+      "properties": {
+        "article6": { "type": "string", "minLength": 1 },
+        "article9": { "type": "string" },
+        "lawful_purpose": { "type": "string", "minLength": 1 },
+        "privacy_notice_reference": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "risk_assessment": {
+      "type": "object",
+      "required": ["risks"],
+      "properties": {
+        "risks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "risk_id",
+              "title",
+              "description",
+              "likelihood",
+              "impact",
+              "controls",
+              "residual_risk",
+              "check_ids"
+            ],
+            "properties": {
+              "risk_id": { "type": "string", "minLength": 1 },
+              "title": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "minLength": 1 },
+              "likelihood": { "type": "string", "minLength": 1 },
+              "impact": { "type": "string", "minLength": 1 },
+              "controls": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 1
+              },
+              "residual_risk": { "type": "string", "minLength": 1 },
+              "check_ids": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "signoff": {
+      "type": "object",
+      "required": [
+        "ig_reviewer",
+        "role",
+        "decision",
+        "reference",
+        "date"
+      ],
+      "properties": {
+        "ig_reviewer": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "decision": {
+          "type": "string",
+          "enum": ["approved", "approved_with_conditions", "blocked"]
+        },
+        "reference": { "type": "string", "minLength": 1 },
+        "date": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "source_mapping": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["control_id", "source_document", "source_section"],
+        "properties": {
+          "control_id": { "type": "string", "minLength": 1 },
+          "source_document": { "type": "string", "minLength": 1 },
+          "source_section": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

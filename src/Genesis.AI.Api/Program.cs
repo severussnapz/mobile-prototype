@@ -25,18 +25,25 @@ builder.Services.AddHealthChecks()
 // Authentication (AUTH-005, AUTH-006)
 var jwtAuthority = builder.Configuration["Authentication:Authority"];
 var jwtAudience = builder.Configuration["Authentication:Audience"];
+var hasValidHttpsAuthority = Uri.TryCreate(jwtAuthority, UriKind.Absolute, out var authorityUri)
+    && authorityUri.Scheme == Uri.UriSchemeHttps;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        if (!string.IsNullOrEmpty(jwtAuthority))
+        if (hasValidHttpsAuthority)
             options.Authority = jwtAuthority;
         if (!string.IsNullOrEmpty(jwtAudience))
             options.Audience = jwtAudience;
 
+        // Local development may run without identity wiring; avoid hard-fail when
+        // compose resolves empty IDENTITY_URL into a non-HTTPS authority like "/v2.0/".
+        if (!hasValidHttpsAuthority && builder.Environment.IsDevelopment())
+            options.RequireHttpsMetadata = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = !string.IsNullOrEmpty(jwtAuthority),
+            ValidateIssuer = hasValidHttpsAuthority,
             ValidateAudience = !string.IsNullOrEmpty(jwtAudience),
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
@@ -78,6 +85,10 @@ builder.Services.AddAuthorization(options =>
     options.AddAuthorisationPolicy(
         AuthorisationPolicies.ClinicalSafetyConverse,
         AuthorisationScopes.ClinicalSafety, AuthorisationScopes.Admin);
+
+    options.AddAuthorisationPolicy(
+        AuthorisationPolicies.AdminOnly,
+        AuthorisationScopes.Admin);
 });
 
 // MediatR

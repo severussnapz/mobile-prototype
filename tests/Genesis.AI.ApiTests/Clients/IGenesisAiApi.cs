@@ -50,6 +50,10 @@ public interface IGenesisAiApi : IApi
     [Get("/api/v1/projects/{projectId}/export")]
     Task<ApiResponse<HttpResponseMessage>> ExportProjectAsync([Authorize] string token, Guid projectId);
 
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/token-usage")]
+    Task<ApiResponse<HttpResponseMessage>> GetProjectTokenUsageAsync([Authorize] string token, Guid projectId);
+
     #endregion
 
     #region Artefacts Endpoints
@@ -62,9 +66,117 @@ public interface IGenesisAiApi : IApi
     [Get("/api/v1/projects/{projectId}/artefacts/{artefactId}")]
     Task<ApiResponse<HttpResponseMessage>> GetArtefactByIdAsync([Authorize] string token, Guid projectId, Guid artefactId);
 
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/artefacts/{artefactId}/download")]
+    Task<ApiResponse<HttpResponseMessage>> DownloadArtefactAsync([Authorize] string token, Guid projectId, Guid artefactId);
+
     [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
     [Post("/api/v1/projects/{projectId}/artefacts")]
     Task<ApiResponse<HttpResponseMessage>> CreateArtefactsAsync([Authorize] string token, Guid projectId, [Body] object body);
+
+    #endregion
+
+    #region Notes Endpoints
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/notes")]
+    Task<ApiResponse<HttpResponseMessage>> GetNotesAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/notes")]
+    Task<ApiResponse<HttpResponseMessage>> CreateNoteAsync([Authorize] string token, Guid projectId, [Body] object body);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Patch("/api/v1/projects/{projectId}/notes/{noteId}")]
+    Task<ApiResponse<HttpResponseMessage>> UpdateNoteAsync([Authorize] string token, Guid projectId, Guid noteId, [Body] object body);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Delete("/api/v1/projects/{projectId}/notes/{noteId}")]
+    Task<ApiResponse<HttpResponseMessage>> DeleteNoteAsync([Authorize] string token, Guid projectId, Guid noteId);
+
+    #endregion
+
+    #region Decisions Endpoints
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/decisions")]
+    Task<ApiResponse<HttpResponseMessage>> GetDecisionsAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/decisions")]
+    Task<ApiResponse<HttpResponseMessage>> CreateDecisionAsync([Authorize] string token, Guid projectId, [Body] object body);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Patch("/api/v1/projects/{projectId}/decisions/{decisionId}")]
+    Task<ApiResponse<HttpResponseMessage>> UpdateDecisionAsync([Authorize] string token, Guid projectId, Guid decisionId, [Body] object body);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Delete("/api/v1/projects/{projectId}/decisions/{decisionId}")]
+    Task<ApiResponse<HttpResponseMessage>> DeleteDecisionAsync([Authorize] string token, Guid projectId, Guid decisionId);
+
+    #endregion
+
+    #region Governance Document Generation Endpoints
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqClin, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/hazard-log")]
+    Task<ApiResponse<HttpResponseMessage>> GenerateHazardLogAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/data-protection-impact-assessment")]
+    Task<ApiResponse<HttpResponseMessage>> GenerateDpiaReportAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/security-review-report")]
+    Task<ApiResponse<HttpResponseMessage>> GenerateSecurityReviewReportAsync([Authorize] string token, Guid projectId);
+
+    #endregion
+
+    #region Normalisation Endpoints
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/normalisation/extract-requirements")]
+    Task<ApiResponse<HttpResponseMessage>> RunNormalisationExtractAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/normalisation/verify-complete")]
+    Task<ApiResponse<HttpResponseMessage>> VerifyNormalisationCompleteAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/normalisation/bypass-planning-gate")]
+    Task<ApiResponse<HttpResponseMessage>> BypassNormalisationPlanningGateAsync([Authorize] string token, Guid projectId, [Body] object body);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/normalisation/artefacts")]
+    Task<ApiResponse<HttpResponseMessage>> GetNormalisationArtefactsAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/normalisation/status")]
+    Task<ApiResponse<HttpResponseMessage>> GetNormalisationStatusAsync([Authorize] string token, Guid projectId);
+
+    #endregion
+
+    #region Planning Endpoints
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/planning/run-preflight")]
+    Task<ApiResponse<HttpResponseMessage>> RunPlanningPreflightAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/planning/approve-em-review")]
+    Task<ApiResponse<HttpResponseMessage>> ApproveEmReviewAsync([Authorize] string token, Guid projectId, [Body] object body);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Post("/api/v1/projects/{projectId}/planning/split-tasks")]
+    Task<ApiResponse<HttpResponseMessage>> SplitPlanningTasksAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/planning/artefacts")]
+    Task<ApiResponse<HttpResponseMessage>> GetPlanningArtefactsAsync([Authorize] string token, Guid projectId);
+
+    [ExcludeFromScopeTest, ProtectedBy(Scope.GenaiReqRead, Scope.GenaiReqWrite, Scope.GenaiReqAdmin)]
+    [Get("/api/v1/projects/{projectId}/planning/status")]
+    Task<ApiResponse<HttpResponseMessage>> GetPlanningStatusAsync([Authorize] string token, Guid projectId);
 
     #endregion
 

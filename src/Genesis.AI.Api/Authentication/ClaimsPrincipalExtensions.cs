@@ -27,6 +27,8 @@ public static class ClaimsPrincipalExtensions
             StageType.Architecture => principal.HasScope(AuthorisationScopes.Architecture),
             StageType.Pxd => principal.HasScope(AuthorisationScopes.ProductDesign),
             StageType.ClinicalSafety => principal.HasScope(AuthorisationScopes.ClinicalSafety),
+            StageType.InformationGovernance => principal.HasScope(AuthorisationScopes.Write),
+            StageType.Security => principal.HasScope(AuthorisationScopes.Write),
             _ => principal.HasScope(AuthorisationScopes.Write)
         };
     }

@@ -60,9 +60,10 @@ public class ProjectsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fixt
     {
         var body = new
         {
-            code = $"TST{Guid.NewGuid():N}"[..10],
+            code = GenerateProjectCode("TST"),
             name = $"API Test Project {DateTime.UtcNow:HHmmss}",
             description = "Created by automated API test",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
 
@@ -75,7 +76,7 @@ public class ProjectsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fixt
         Assert.True(doc.RootElement.TryGetProperty("data", out var dataElement));
         Assert.True(dataElement.TryGetProperty("id", out _));
         Assert.True(dataElement.TryGetProperty("pipelineStages", out var stagesElement));
-        Assert.Equal(8, stagesElement.GetArrayLength());
+        Assert.Equal(10, stagesElement.GetArrayLength());
     }
 
     [Fact]
@@ -86,6 +87,7 @@ public class ProjectsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fixt
             code = "INVALID",
             name = "Invalid Project",
             description = "Testing invalid compliance domain",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "NotADomain"
         };
 
@@ -102,6 +104,7 @@ public class ProjectsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fixt
             code = "NOAUTH",
             name = "No Auth Project",
             description = "Should fail auth",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
 
@@ -130,9 +133,10 @@ public class ProjectsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fixt
         // Arrange — create a project first
         var createBody = new
         {
-            code = $"GP-{Guid.NewGuid():N}"[..10],
+            code = GenerateProjectCode("GP"),
             name = "Get Project Test",
             description = "Testing GET by ID",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
         var createResponse = await Msvc.Api.CreateProjectAsync(ValidToken, createBody);
@@ -161,9 +165,10 @@ public class ProjectsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fixt
         // Arrange — create a project to delete
         var createBody = new
         {
-            code = $"DEL-{Guid.NewGuid():N}"[..10],
+            code = GenerateProjectCode("DEL"),
             name = "Delete Test Project",
             description = "Will be soft-deleted",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
         var createResponse = await Msvc.Api.CreateProjectAsync(ValidToken, createBody);
@@ -196,9 +201,10 @@ public class ProjectsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fixt
         // Arrange — create a project
         var createBody = new
         {
-            code = $"PL-{Guid.NewGuid():N}"[..10],
+            code = GenerateProjectCode("PL"),
             name = "Parking Lot Test",
             description = "Testing parking lot aggregation",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
         var createResponse = await Msvc.Api.CreateProjectAsync(ValidToken, createBody);
