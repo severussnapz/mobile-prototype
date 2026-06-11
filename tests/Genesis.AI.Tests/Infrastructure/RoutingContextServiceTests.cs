@@ -1,4 +1,5 @@
 using Genesis.AI.Domain;
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
@@ -10,10 +11,18 @@ namespace Genesis.AI.Tests.Infrastructure;
 public sealed class RoutingContextServiceTests
 {
     private readonly Mock<IConversationRepository> _repositoryMock = new();
+    private readonly Mock<IArtefactRepository> _artefactRepositoryMock = new();
     private readonly TimeProvider _timeProvider = TimeProvider.System;
 
+    public RoutingContextServiceTests()
+    {
+        _artefactRepositoryMock
+            .Setup(repository => repository.GetByProjectIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+    }
+
     private RoutingContextService CreateSut() =>
-        new(_repositoryMock.Object);
+        new(_repositoryMock.Object, _artefactRepositoryMock.Object);
 
     private Conversation CreateConversation(Guid stageId, int totalPhases = 13, int userMessageCount = 0)
     {
