@@ -14,7 +14,6 @@ namespace Genesis.AI.Domain.Commands.GenerateHazardLog;
 /// </summary>
 public class GenerateHazardLogCommandHandler : IRequestHandler<GenerateHazardLogCommand, GenerateHazardLogResult>
 {
-    // guardrail:skip=AUTH-002:Artefact file path, not an OAuth scope.
     private const string RegistryFilePath = "requirements/HAZARD-REGISTRY.md";
     private const string SpreadsheetContentType =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

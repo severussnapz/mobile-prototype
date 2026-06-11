@@ -35,7 +35,7 @@ public class ProjectTests
     {
         var project = new Project("DOC", "Documents", null, "PORTASK0001045", ComplianceDomain.ClinicalUk, "user-1", _timeProvider);
 
-        Assert.Equal(8, project.PipelineStages.Count);
+        Assert.Equal(10, project.PipelineStages.Count);
     }
 
     [Fact]
@@ -232,6 +232,8 @@ public class ProjectTests
         CompleteStage(project, StageType.Architecture);
         CompleteStage(project, StageType.Design);
         CompleteStage(project, StageType.Pxd);
+        CompleteStage(project, StageType.InformationGovernance);
+        CompleteStage(project, StageType.Security);
 
         project.RecalculateStatus(_timeProvider);
 
@@ -249,6 +251,8 @@ public class ProjectTests
         CompleteStage(project, StageType.Design);
         CompleteStage(project, StageType.Pxd);
         CompleteStage(project, StageType.ClinicalSafety);
+        CompleteStage(project, StageType.InformationGovernance);
+        CompleteStage(project, StageType.Security);
 
         project.RecalculateStatus(_timeProvider);
 
@@ -282,6 +286,8 @@ public class ProjectTests
         CompleteStage(project, StageType.Design);
         CompleteStage(project, StageType.Pxd);
         CompleteStage(project, StageType.ClinicalSafety);
+        CompleteStage(project, StageType.InformationGovernance);
+        CompleteStage(project, StageType.Security);
         CompleteStage(project, StageType.Normalisation);
         CompleteStage(project, StageType.Planning);
 

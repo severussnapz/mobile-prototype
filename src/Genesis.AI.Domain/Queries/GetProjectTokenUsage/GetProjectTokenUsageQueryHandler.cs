@@ -27,7 +27,7 @@ public class GetProjectTokenUsageQueryHandler : IRequestHandler<GetProjectTokenU
             var cost = CalculateCost(stage.InputTokens, stage.OutputTokens, stage.CacheReadInputTokens, stage.CacheWriteInputTokens);
             return new StageTokenUsageWithCost(
                 stage.StageId,
-                stage.StageType.ToString(),
+                ConvertToSnakeCase(stage.StageType.ToString()),
                 stage.InputTokens,
                 stage.OutputTokens,
                 stage.CacheReadInputTokens,
@@ -53,5 +53,12 @@ public class GetProjectTokenUsageQueryHandler : IRequestHandler<GetProjectTokenU
         var cacheReadCost = cacheReadTokens / 1_000_000m * CacheReadPricePerMillion;
         var cacheWriteCost = cacheWriteTokens / 1_000_000m * CacheWritePricePerMillion;
         return Math.Round(inputCost + outputCost + cacheReadCost + cacheWriteCost, 4);
+    }
+
+    private static string ConvertToSnakeCase(string value)
+    {
+        return string.Concat(value.Select((character, index) =>
+            index > 0 && char.IsUpper(character) ? $"_{character}" : character.ToString()))
+            .ToLowerInvariant();
     }
 }

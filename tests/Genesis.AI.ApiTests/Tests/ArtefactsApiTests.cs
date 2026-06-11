@@ -12,9 +12,10 @@ public class ArtefactsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fix
     {
         var body = new
         {
-            code = $"ART-{Guid.NewGuid():N}"[..10],
+            code = GenerateProjectCode("ART"),
             name = $"Artefact Test {DateTime.UtcNow:HHmmss}",
             description = "Created for artefact API tests",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
         var response = await Msvc.Api.CreateProjectAsync(ValidToken, body);
@@ -58,6 +59,28 @@ public class ArtefactsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest(fix
         var response = await Msvc.Api.GetArtefactByIdAsync(ValidToken, projectId, Guid.NewGuid());
 
         AssertNotFound(response);
+    }
+
+    #endregion
+
+    #region GET /api/v1/projects/{projectId}/artefacts/{artefactId}/download
+
+    [Fact]
+    public async Task DownloadArtefact_WithNonExistentId_ReturnsNotFound()
+    {
+        var projectId = await CreateProjectAsync();
+
+        var response = await Msvc.Api.DownloadArtefactAsync(ValidToken, projectId, Guid.NewGuid());
+
+        AssertNotFound(response);
+    }
+
+    [Fact]
+    public async Task DownloadArtefact_WithoutToken_ReturnsUnauthorized()
+    {
+        var response = await Msvc.Api.DownloadArtefactAsync("", Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     #endregion

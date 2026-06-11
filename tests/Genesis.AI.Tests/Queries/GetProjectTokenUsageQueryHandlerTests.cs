@@ -37,7 +37,7 @@ public class GetProjectTokenUsageQueryHandlerTests
         Assert.Single(result.Stages);
         var stage = result.Stages[0];
         Assert.Equal(stageId, stage.StageId);
-        Assert.Equal("RequirementsDiscovery", stage.StageType);
+        Assert.Equal("requirements_discovery", stage.StageType);
         Assert.Equal(5000, stage.InputTokens);
         Assert.Equal(12000, stage.OutputTokens);
         Assert.Equal(2000, stage.CacheReadInputTokens);

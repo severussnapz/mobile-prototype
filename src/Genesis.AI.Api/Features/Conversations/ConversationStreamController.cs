@@ -20,6 +20,11 @@ namespace Genesis.AI.Api.Features.Conversations;
 [Consumes("application/json")]
 public class ConversationStreamController : ControllerBase
 {
+    private const int ToolExecutionRetryCount = 2;
+    private const int Pipeline02CompletionPhaseNumber = 6;
+    private const string PrototypeHtmlArtefactPath = "prototype/index.html";
+    private const string PrototypeNotesArtefactPath = "prototype/PROTOTYPE_NOTES.md";
+
     private readonly IConversationRepository _conversationRepository;
     private readonly IArtefactRepository _artefactRepository;
     private readonly IArtefactStorageService _artefactStorageService;
@@ -255,8 +260,42 @@ public class ConversationStreamController : ControllerBase
                 {
                     await SendToolStartSseEventAsync(toolCall, cancellationToken);
 
-                    var result = await ExecuteToolCallAsync(
-                        toolCall, conversation, savedArtefacts, savedParkingLotItems, projectParkingLotItems, createdBy, projectId, cancellationToken);
+                    string result;
+                    try
+                    {
+                        result = await ExecuteToolCallWithRetryAsync(
+                            toolCall,
+                            conversation,
+                            savedArtefacts,
+                            savedParkingLotItems,
+                            projectParkingLotItems,
+                            createdBy,
+                            projectId,
+                            stageType,
+                            cancellationToken);
+                    }
+                    catch (ToolExecutionFailedException exception)
+                    {
+                        _logger.LogError(
+                            exception,
+                            "Tool failure with fail-closed policy for conversation {ConversationId}: {ToolName}",
+                            conversation.Id,
+                            toolCall.ToolName);
+
+                        var toolErrorEvent = JsonSerializer.Serialize(new
+                        {
+                            error = "Tool execution failed",
+                            reason = exception.Message,
+                            tool = toolCall.ToolName,
+                            retryCount = ToolExecutionRetryCount + 1
+                        });
+
+                        await Response.WriteAsync($"event: error\ndata: {toolErrorEvent}\n\n", cancellationToken);
+                        await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                        await Response.Body.FlushAsync(cancellationToken);
+                        return;
+                    }
+
                     toolResults.Add(new AiToolResult(toolCall.ToolUseId, result));
 
                     await SendToolSseEventAsync(toolCall, conversation, savedArtefacts, savedParkingLotItems, cancellationToken);
@@ -420,6 +459,55 @@ public class ConversationStreamController : ControllerBase
         }
     }
 
+    private async Task<string> ExecuteToolCallWithRetryAsync(
+        AiToolCall toolCall,
+        Conversation conversation,
+        List<Artefact> savedArtefacts,
+        List<ParkingLotItem> savedParkingLotItems,
+        IReadOnlyList<ParkingLotItem> projectParkingLotItems,
+        string createdBy,
+        Guid projectId,
+        StageType? stageType,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
+        {
+            try
+            {
+                return await ExecuteToolCallAsync(
+                    toolCall,
+                    conversation,
+                    savedArtefacts,
+                    savedParkingLotItems,
+                    projectParkingLotItems,
+                    createdBy,
+                    projectId,
+                    stageType,
+                    cancellationToken);
+            }
+            catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Tool {ToolName} attempt {Attempt}/{MaxAttempts} failed. Retrying.",
+                    toolCall.ToolName,
+                    attempt,
+                    ToolExecutionRetryCount + 1);
+            }
+            catch (Exception exception)
+            {
+                throw new ToolExecutionFailedException(
+                    toolCall.ToolName,
+                    $"Tool '{toolCall.ToolName}' failed after {ToolExecutionRetryCount + 1} attempts. Reason: {exception.Message}",
+                    exception);
+            }
+        }
+
+        throw new ToolExecutionFailedException(
+            toolCall.ToolName,
+            $"Tool '{toolCall.ToolName}' failed after {ToolExecutionRetryCount + 1} attempts.");
+    }
+
     private async Task<string> ExecuteToolCallAsync(
         AiToolCall toolCall,
         Conversation conversation,
@@ -428,6 +516,7 @@ public class ConversationStreamController : ControllerBase
         IReadOnlyList<ParkingLotItem> projectParkingLotItems,
         string createdBy,
         Guid projectId,
+        StageType? stageType,
         CancellationToken cancellationToken)
     {
         var root = toolCall.Input.RootElement;
@@ -439,18 +528,32 @@ public class ConversationStreamController : ControllerBase
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var content = root.GetProperty("content").GetString()!;
 
+                if (stageType == StageType.Prototype)
+                {
+                    var validation = ValidatePipeline02SaveContract(filePath, content);
+                    if (!validation.IsValid)
+                    {
+                        _logger.LogWarning(
+                            "Tool save_artefact rejected for pipeline02 contract failure: {Reason}",
+                            validation.Reason);
+                        return $"Error: pipeline02_output_contract_failed: {validation.Reason}";
+                    }
+                }
+
+                var contentType = ResolveArtefactContentType(filePath);
+
                 var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
                     projectId, filePath, cancellationToken);
 
                 var storageKey = await _artefactStorageService.SaveContentAsync(
-                    projectId, filePath, nextVersion, content, "text/markdown", cancellationToken);
+                    projectId, filePath, nextVersion, content, contentType, cancellationToken);
 
                 var artefact = Artefact.CreateS3Artefact(
                     projectId,
                     nextVersion,
                     filePath,
                     storageKey,
-                    "text/markdown",
+                    contentType,
                     System.Text.Encoding.UTF8.GetByteCount(content),
                     createdBy,
                     _timeProvider);
@@ -464,15 +567,27 @@ public class ConversationStreamController : ControllerBase
                 savedArtefacts.Add(artefact);
 
                 _logger.LogInformation(
-                    "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars)",
-                    filePath, nextVersion, content.Length);
-                return $"Saved {filePath} (version {nextVersion}, {content.Length} chars)";
+                    "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
+                    filePath, nextVersion, content.Length, contentType);
+                return $"Saved {filePath} (version {nextVersion}, {content.Length} chars, {contentType})";
             }
 
             case PipelineToolDefinitions.AdvancePhase:
             {
                 var phaseNumber = root.GetProperty("phase_number").GetInt32();
                 var phaseName = root.GetProperty("phase_name").GetString()!;
+
+                if (stageType == StageType.Prototype && phaseNumber >= Pipeline02CompletionPhaseNumber)
+                {
+                    var completionValidation = await ValidatePipeline02CompletionGateAsync(projectId, cancellationToken);
+                    if (!completionValidation.IsValid)
+                    {
+                        _logger.LogWarning(
+                            "Tool advance_phase blocked by pipeline02 completion gate: {Reason}",
+                            completionValidation.Reason);
+                        return $"Error: pipeline02_completion_gate_failed: {completionValidation.Reason}";
+                    }
+                }
 
                 conversation.SetPhase(phaseNumber, phaseName);
 
@@ -640,6 +755,193 @@ public class ConversationStreamController : ControllerBase
         }
     }
 
+    private async Task<ValidationResult> ValidatePipeline02CompletionGateAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var prototypeHtml = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, PrototypeHtmlArtefactPath, cancellationToken);
+        if (prototypeHtml is null)
+        {
+            return ValidationResult.Fail("Missing required artefact: prototype/index.html");
+        }
+
+        var prototypeNotes = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, PrototypeNotesArtefactPath, cancellationToken);
+        if (prototypeNotes is null)
+        {
+            return ValidationResult.Fail("Missing required artefact: prototype/PROTOTYPE_NOTES.md");
+        }
+
+        var htmlContent = await _artefactStorageService.GetContentAsync(prototypeHtml.S3Key, cancellationToken);
+        if (string.IsNullOrWhiteSpace(htmlContent))
+        {
+            return ValidationResult.Fail("prototype/index.html content could not be retrieved");
+        }
+
+        var notesContent = await _artefactStorageService.GetContentAsync(prototypeNotes.S3Key, cancellationToken);
+        if (string.IsNullOrWhiteSpace(notesContent))
+        {
+            return ValidationResult.Fail("prototype/PROTOTYPE_NOTES.md content could not be retrieved");
+        }
+
+        var htmlValidation = ValidatePrototypeHtmlContract(htmlContent);
+        if (!htmlValidation.IsValid)
+        {
+            return htmlValidation;
+        }
+
+        var notesValidation = ValidatePrototypeNotesContract(notesContent);
+        if (!notesValidation.IsValid)
+        {
+            return notesValidation;
+        }
+
+        return ValidationResult.Ok();
+    }
+
+    private static ValidationResult ValidatePipeline02SaveContract(string filePath, string content)
+    {
+        if (filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidatePrototypeHtmlContract(content);
+        }
+
+        if (filePath.Equals(PrototypeNotesArtefactPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidatePrototypeNotesContract(content);
+        }
+
+        return ValidationResult.Ok();
+    }
+
+    private static ValidationResult ValidatePrototypeHtmlContract(string htmlContent)
+    {
+        const string metadataStartTag = "<script id=\"prototype-metadata\" type=\"application/json\">";
+        const string metadataEndTag = "</script>";
+
+        var startIndex = htmlContent.IndexOf(metadataStartTag, StringComparison.OrdinalIgnoreCase);
+        if (startIndex < 0)
+        {
+            return ValidationResult.Fail("prototype/index.html is missing required metadata script tag");
+        }
+
+        var jsonStart = startIndex + metadataStartTag.Length;
+        var endIndex = htmlContent.IndexOf(metadataEndTag, jsonStart, StringComparison.OrdinalIgnoreCase);
+        if (endIndex < 0)
+        {
+            return ValidationResult.Fail("prototype/index.html metadata script is not closed correctly");
+        }
+
+        var metadataJson = htmlContent[jsonStart..endIndex].Trim();
+        if (string.IsNullOrWhiteSpace(metadataJson))
+        {
+            return ValidationResult.Fail("prototype/index.html metadata JSON is empty");
+        }
+
+        try
+        {
+            using var metadataDocument = JsonDocument.Parse(metadataJson);
+            var metadataRoot = metadataDocument.RootElement;
+
+            if (!metadataRoot.TryGetProperty("contractVersion", out var contractVersion)
+                || contractVersion.GetString() != "1.0")
+            {
+                return ValidationResult.Fail("prototype/index.html metadata must include contractVersion='1.0'");
+            }
+
+            if (!metadataRoot.TryGetProperty("stageCode", out var stageCode)
+                || !string.Equals(stageCode.GetString(), "prototype", StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Fail("prototype/index.html metadata must include stageCode='prototype'");
+            }
+
+            if (!metadataRoot.TryGetProperty("prototypeOnly", out var prototypeOnly)
+                || prototypeOnly.ValueKind != JsonValueKind.True)
+            {
+                return ValidationResult.Fail("prototype/index.html metadata must include prototypeOnly=true");
+            }
+
+            if (!metadataRoot.TryGetProperty("generatedAtUtc", out var generatedAtUtc)
+                || generatedAtUtc.ValueKind != JsonValueKind.String
+                || !DateTimeOffset.TryParse(generatedAtUtc.GetString(), out _))
+            {
+                return ValidationResult.Fail("prototype/index.html metadata must include generatedAtUtc as ISO datetime");
+            }
+
+            if (!metadataRoot.TryGetProperty("requirementsCovered", out var requirementsCovered)
+                || requirementsCovered.ValueKind != JsonValueKind.Array
+                || requirementsCovered.GetArrayLength() == 0)
+            {
+                return ValidationResult.Fail("prototype/index.html metadata must include non-empty requirementsCovered array");
+            }
+
+            if (!metadataRoot.TryGetProperty("flows", out var flows)
+                || flows.ValueKind != JsonValueKind.Array
+                || flows.GetArrayLength() == 0)
+            {
+                return ValidationResult.Fail("prototype/index.html metadata must include non-empty flows array");
+            }
+
+            if (!metadataRoot.TryGetProperty("privacySafetyConstraints", out var constraints)
+                || constraints.ValueKind != JsonValueKind.Array
+                || constraints.GetArrayLength() == 0)
+            {
+                return ValidationResult.Fail("prototype/index.html metadata must include non-empty privacySafetyConstraints array");
+            }
+        }
+        catch (JsonException)
+        {
+            return ValidationResult.Fail("prototype/index.html metadata must contain valid JSON");
+        }
+
+        return ValidationResult.Ok();
+    }
+
+    private static ValidationResult ValidatePrototypeNotesContract(string notesContent)
+    {
+        var requiredHeaders = new[]
+        {
+            "# Prototype Validation Notes",
+            "## Summary",
+            "## Requirements Validation",
+            "## Output Contract",
+            "## Open Questions"
+        };
+
+        foreach (var requiredHeader in requiredHeaders)
+        {
+            if (!notesContent.Contains(requiredHeader, StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Fail($"prototype/PROTOTYPE_NOTES.md is missing section '{requiredHeader}'");
+            }
+        }
+
+        var requiredContractLines = new[]
+        {
+            "output_contract_version: 1.0",
+            "stage_code: prototype",
+            "html_artefact_path: prototype/index.html",
+            "completion_decision:"
+        };
+
+        foreach (var requiredContractLine in requiredContractLines)
+        {
+            if (!notesContent.Contains(requiredContractLine, StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Fail($"prototype/PROTOTYPE_NOTES.md is missing contract field '{requiredContractLine}'");
+            }
+        }
+
+        return ValidationResult.Ok();
+    }
+
+    private static string ResolveArtefactContentType(string filePath)
+    {
+        if (filePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+        {
+            return "text/html";
+        }
+
+        return "text/markdown";
+    }
+
     private static string BuildStateContext(Conversation conversation, IReadOnlyList<ParkingLotItem> projectParkingLotItems)
     {
         var sb = new System.Text.StringBuilder();
@@ -703,5 +1005,35 @@ public class ConversationStreamController : ControllerBase
         }
 
         return sb.ToString();
+    }
+
+    private readonly record struct ValidationResult(bool IsValid, string? Reason)
+    {
+        public static ValidationResult Ok()
+        {
+            return new ValidationResult(true, null);
+        }
+
+        public static ValidationResult Fail(string reason)
+        {
+            return new ValidationResult(false, reason);
+        }
+    }
+
+    private sealed class ToolExecutionFailedException : Exception
+    {
+        public string ToolName { get; }
+
+        public ToolExecutionFailedException(string toolName, string message)
+            : base(message)
+        {
+            ToolName = toolName;
+        }
+
+        public ToolExecutionFailedException(string toolName, string message, Exception innerException)
+            : base(message, innerException)
+        {
+            ToolName = toolName;
+        }
     }
 }

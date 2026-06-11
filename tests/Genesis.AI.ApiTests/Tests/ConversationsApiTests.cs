@@ -12,9 +12,10 @@ public class ConversationsApiTests(GenesisAiFixture fixture) : GenesisAiBaseTest
     {
         var createBody = new
         {
-            code = $"CV-{Guid.NewGuid():N}"[..10],
+            code = GenerateProjectCode("CV"),
             name = $"Conversation Test {DateTime.UtcNow:HHmmss}",
             description = "Created for conversation API tests",
+            timeSheetCode = "PORTASK0001045",
             complianceDomain = "Generic"
         };
         var createResponse = await Msvc.Api.CreateProjectAsync(ValidToken, createBody);

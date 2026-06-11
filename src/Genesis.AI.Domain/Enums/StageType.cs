@@ -22,6 +22,12 @@ public enum StageType
     [PgName("clinical_safety")]
     ClinicalSafety,
 
+    [PgName("information_governance")]
+    InformationGovernance,
+
+    [PgName("security")]
+    Security,
+
     [PgName("normalisation")]
     Normalisation,
 

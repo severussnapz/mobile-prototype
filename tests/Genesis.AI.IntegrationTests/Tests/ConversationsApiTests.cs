@@ -1,5 +1,7 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Genesis.AI.Domain.Interfaces;
 
 namespace Genesis.AI.IntegrationTests.Tests;
 
@@ -32,6 +34,85 @@ public class ConversationsApiTests : IDisposable
         var firstStage = data.GetProperty("pipelineStages").EnumerateArray().First();
         var stageId = firstStage.GetProperty("id").GetString()!;
         return (projectId, stageId);
+    }
+
+    private static async Task<(string ProjectId, string RequirementsStageId, string PrototypeStageId)> CreateProjectAndGetPipelineStageIdsAsync(HttpClient client)
+    {
+        var content = new StringContent(
+            """{"code":"P02","name":"Pipeline02 Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var response = await client.PostAsync("/api/v1/projects", content);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var data = doc.RootElement.GetProperty("data");
+
+        var requirementsStageId = string.Empty;
+        var prototypeStageId = string.Empty;
+
+        foreach (var stage in data.GetProperty("pipelineStages").EnumerateArray())
+        {
+            var stageType = stage.GetProperty("stageType").GetString();
+            if (string.Equals(stageType, "requirements_discovery", StringComparison.OrdinalIgnoreCase))
+            {
+                requirementsStageId = stage.GetProperty("id").GetString()!;
+            }
+
+            if (string.Equals(stageType, "prototype", StringComparison.OrdinalIgnoreCase))
+            {
+                prototypeStageId = stage.GetProperty("id").GetString()!;
+            }
+        }
+
+        return (
+            data.GetProperty("id").GetString()!,
+            requirementsStageId,
+            prototypeStageId);
+    }
+
+    private static async Task<string> CreateConversationAsync(HttpClient client, string stageId)
+    {
+        var createConversationContent = new StringContent(
+            $$$"""{"stageId":"{{{stageId}}}"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var createConversationResponse = await client.PostAsync("/api/v1/conversations", createConversationContent);
+        var createConversationBody = await createConversationResponse.Content.ReadAsStringAsync();
+        using var createConversationDoc = JsonDocument.Parse(createConversationBody);
+        return createConversationDoc.RootElement.GetProperty("data").GetProperty("id").GetString()!;
+    }
+
+    private static async Task<(string ProjectId, string PrototypeConversationId)> PreparePrototypeConversationAsync(HttpClient client)
+    {
+        var (projectId, requirementsStageId, prototypeStageId) = await CreateProjectAndGetPipelineStageIdsAsync(client);
+
+        var requirementsConversationId = await CreateConversationAsync(client, requirementsStageId);
+        Assert.NotNull(requirementsConversationId);
+
+        var artefactPayload = new StringContent(
+            """{"artefacts":[{"filePath":"requirements/REQ-001.md","contentType":"text/markdown","content":"# Requirement"}]}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
+        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
+
+        var completeRequirementsResponse = await client.PostAsync($"/api/v1/stages/{requirementsStageId}/complete", content: null);
+        Assert.Equal(HttpStatusCode.OK, completeRequirementsResponse.StatusCode);
+
+        var prototypeConversationId = await CreateConversationAsync(client, prototypeStageId);
+        return (projectId, prototypeConversationId);
+    }
+
+    private static async IAsyncEnumerable<AiStreamEvent> CreateStreamEvents(
+        IReadOnlyList<AiStreamEvent> events,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        foreach (var streamEvent in events)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return streamEvent;
+            await Task.Yield();
+        }
     }
 
     [Fact]
@@ -124,5 +205,138 @@ public class ConversationsApiTests : IDisposable
         var response = await client.PostAsync("/api/v1/conversations", content);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_Pipeline02SaveArtefact_SavesAndRetrievesPrototypeHtml()
+    {
+        var client = _factory.CreateAdminClient();
+        var (projectId, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
+
+        using var savePrototypeToolInput = JsonDocument.Parse(
+            """
+            {
+              "file_path": "prototype/index.html",
+              "content": "<!doctype html><html><head><title>Prototype</title></head><body><h1>Prototype</h1><script id=\"prototype-metadata\" type=\"application/json\">{\"contractVersion\":\"1.0\",\"stageCode\":\"prototype\",\"generatedAtUtc\":\"2026-06-08T10:00:00Z\",\"prototypeOnly\":true,\"requirementsCovered\":[\"REQ-001\"],\"flows\":[\"Primary flow\"],\"privacySafetyConstraints\":[\"No real patient data\"]}</script></body></html>"
+            }
+            """);
+
+        _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(CreateStreamEvents(
+            [
+                new AiToolCall("save_artefact", "tool-use-1", savePrototypeToolInput)
+            ]))
+            .Returns(CreateStreamEvents(
+            [
+                new AiTextChunk("Prototype saved.")
+            ]));
+
+        var streamRequest = new StringContent(
+            """{"content":"build prototype"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{prototypeConversationId}/stream", streamRequest);
+        _ = await streamResponse.Content.ReadAsStringAsync();
+
+        var artefactsResponse = await client.GetAsync($"/api/v1/projects/{projectId}/artefacts");
+        var artefactsBody = await artefactsResponse.Content.ReadAsStringAsync();
+        using var artefactsDocument = JsonDocument.Parse(artefactsBody);
+        var prototypeArtefact = artefactsDocument.RootElement
+            .EnumerateArray()
+            .First(artefact => artefact.GetProperty("filePath").GetString() == "prototype/index.html");
+
+        var artefactId = prototypeArtefact.GetProperty("id").GetString()!;
+        var getArtefactResponse = await client.GetAsync($"/api/v1/projects/{projectId}/artefacts/{artefactId}");
+        var getArtefactBody = await getArtefactResponse.Content.ReadAsStringAsync();
+        using var artefactDocument = JsonDocument.Parse(getArtefactBody);
+        var artefactContent = artefactDocument.RootElement.GetProperty("content").GetString();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, getArtefactResponse.StatusCode);
+        Assert.NotNull(artefactContent);
+        Assert.Contains("prototype-metadata", artefactContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_Pipeline02CompletionGate_MissingRequiredArtefactsDoesNotAdvancePhase()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
+
+        using var advancePhaseToolInput = JsonDocument.Parse(
+            """
+            {
+              "phase_number": 6,
+              "phase_name": "completion"
+            }
+            """);
+
+        _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(CreateStreamEvents(
+            [
+                new AiToolCall("advance_phase", "tool-use-advance", advancePhaseToolInput)
+            ]))
+            .Returns(CreateStreamEvents(
+            [
+                new AiTextChunk("Completion blocked.")
+            ]));
+
+        var streamRequest = new StringContent(
+            """{"content":"complete prototype"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{prototypeConversationId}/stream", streamRequest);
+        _ = await streamResponse.Content.ReadAsStringAsync();
+
+        var progressResponse = await client.GetAsync($"/api/v1/conversations/{prototypeConversationId}/progress");
+        var progressBody = await progressResponse.Content.ReadAsStringAsync();
+        using var progressDocument = JsonDocument.Parse(progressBody);
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, progressResponse.StatusCode);
+        Assert.Equal(0, progressDocument.RootElement.GetProperty("currentPhase").GetInt32());
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_InvalidToolPayload_RetriesAndFailsClosedWithReason()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
+
+        using var invalidSaveToolInput = JsonDocument.Parse("{}");
+
+        _factory.AiServiceMock
+            .Setup(service => service.StreamWithToolsAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(CreateStreamEvents(
+            [
+                new AiToolCall("save_artefact", "tool-use-invalid", invalidSaveToolInput)
+            ]));
+
+        var streamRequest = new StringContent(
+            """{"content":"save invalid"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{prototypeConversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Contains("event: error", streamBody, StringComparison.Ordinal);
+        Assert.Contains("Tool execution failed", streamBody, StringComparison.Ordinal);
+        Assert.Contains("\"retryCount\":3", streamBody, StringComparison.Ordinal);
     }
 }

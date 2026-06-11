@@ -74,12 +74,14 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
     private static void ValidatePrerequisites(PipelineStage targetStage, Project project)
     {
         // Prerequisite chain:
-        //   RequirementsDiscovery → Prototype → [Architecture, Design, PxD] → ClinicalSafety → Normalisation → Planning
+        //   RequirementsDiscovery → Prototype → [Architecture, Design, PxD] → ClinicalSafety → InformationGovernance → Security → Normalisation → Planning
         //
         // - Prototype requires RequirementsDiscovery complete
         // - Architecture/Design/PxD require Prototype complete
         // - ClinicalSafety requires Architecture, Design, AND PxD all complete
-        // - Normalisation requires ClinicalSafety complete (or blocked)
+        // - InformationGovernance requires Architecture, Design, PxD complete, and ClinicalSafety complete (or blocked)
+        // - Security requires InformationGovernance complete
+        // - Normalisation requires Security complete
         // - Planning requires Normalisation complete
 
         switch (targetStage.StageType)
@@ -99,22 +101,40 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
                 break;
 
             case StageType.ClinicalSafety:
-                RequireStageComplete(project, StageType.Architecture, targetStage.StageType);
-                RequireStageComplete(project, StageType.Design, targetStage.StageType);
-                RequireStageComplete(project, StageType.Pxd, targetStage.StageType);
+                RequireClinicalSafetyPrerequisites(project, targetStage.StageType);
+                break;
+
+            case StageType.InformationGovernance:
+                RequireInformationGovernancePrerequisites(project, targetStage.StageType);
+                break;
+
+            case StageType.Security:
+                RequireStageComplete(project, StageType.InformationGovernance, targetStage.StageType);
                 break;
 
             case StageType.Normalisation:
-                RequireStageComplete(project, StageType.Architecture, targetStage.StageType);
-                RequireStageComplete(project, StageType.Design, targetStage.StageType);
-                RequireStageComplete(project, StageType.Pxd, targetStage.StageType);
-                RequireStageCompleteOrBlocked(project, StageType.ClinicalSafety, targetStage.StageType);
+                RequireStageComplete(project, StageType.Security, targetStage.StageType);
                 break;
 
             case StageType.Planning:
                 RequireStageComplete(project, StageType.Normalisation, targetStage.StageType);
                 break;
         }
+    }
+
+    private static void RequireClinicalSafetyPrerequisites(Project project, StageType target)
+    {
+        RequireStageComplete(project, StageType.Architecture, target);
+        RequireStageComplete(project, StageType.Design, target);
+        RequireStageComplete(project, StageType.Pxd, target);
+    }
+
+    private static void RequireInformationGovernancePrerequisites(Project project, StageType target)
+    {
+        RequireStageComplete(project, StageType.Architecture, target);
+        RequireStageComplete(project, StageType.Design, target);
+        RequireStageComplete(project, StageType.Pxd, target);
+        RequireStageCompleteOrBlocked(project, StageType.ClinicalSafety, target);
     }
 
     private static void RequireStageComplete(Project project, StageType prerequisite, StageType target)

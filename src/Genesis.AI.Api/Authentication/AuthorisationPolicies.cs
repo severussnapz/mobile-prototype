@@ -9,4 +9,5 @@ public static class AuthorisationPolicies
     public const string ArchitectureConverse = nameof(ArchitectureConverse);
     public const string ProductDesignConverse = nameof(ProductDesignConverse);
     public const string ClinicalSafetyConverse = nameof(ClinicalSafetyConverse);
+    public const string AdminOnly = nameof(AdminOnly);
 }

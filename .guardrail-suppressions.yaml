@@ -88,6 +88,12 @@ suppressions:
   - id: API-007
     path: "src/Genesis.AI.Api/Features/Conversations/ConversationStateController.cs"
     justification: "AdvancePhase is a state transition — returns 200 OK, not 201 Created"
+  - id: API-007
+    path: "src/Genesis.AI.Api/Features/Normalisation/NormalisationController.cs"
+    justification: "POST actions run the normaliser, verify the gate and bypass the gate — state transitions, not resource creation; return 200 OK"
+  - id: API-007
+    path: "src/Genesis.AI.Api/Features/Planning/PlanningController.cs"
+    justification: "POST actions run preflight, approve EM review and split tasks — state transitions, not resource creation; return 200 OK"
 
   # ENG-005: Analyser pattern-matches 'new ProjectContext(...)' as DbContext
   # instantiation, but ProjectContext is a value object created in a LINQ projection.

@@ -83,6 +83,26 @@ public sealed class EmbeddedPromptService : IPromptService
             "write_to_file",            // 9
             "feedback"                  // 10
         ],
+        [StageType.InformationGovernance] = [
+            "context_loading",          // 0
+            "lawful_basis",             // 1
+            "data_minimisation",        // 2
+            "retention_and_deletion",   // 3
+            "access_controls",          // 4
+            "audit_and_governance",     // 5
+            "write_to_file",            // 6
+            "feedback"                  // 7
+        ],
+        [StageType.Security] = [
+            "context_loading",          // 0
+            "threat_modelling",         // 1
+            "auth_and_access",          // 2
+            "data_protection",          // 3
+            "monitoring_and_alerting",  // 4
+            "hardening_actions",        // 5
+            "write_to_file",            // 6
+            "feedback"                  // 7
+        ],
         [StageType.Normalisation] = [
             "context_loading",          // 0
             "incremental_check",        // 1
@@ -125,8 +145,10 @@ public sealed class EmbeddedPromptService : IPromptService
             StageType.Design => 4,
             StageType.Pxd => 5,
             StageType.ClinicalSafety => 6,
-            StageType.Normalisation => 7,
-            StageType.Planning => 8,
+            StageType.InformationGovernance => 7,
+            StageType.Security => 8,
+            StageType.Normalisation => 9,
+            StageType.Planning => 10,
             _ => 99
         };
     }
@@ -163,8 +185,10 @@ public sealed class EmbeddedPromptService : IPromptService
             [StageType.Design] = "Genesis.AI.Infrastructure.Prompts.Pipeline04Design.md",
             [StageType.Pxd] = "Genesis.AI.Infrastructure.Prompts.Pipeline05Pxd.md",
             [StageType.ClinicalSafety] = "Genesis.AI.Infrastructure.Prompts.Pipeline06ClinicalSafety.md",
-            [StageType.Normalisation] = "Genesis.AI.Infrastructure.Prompts.Pipeline07Normalisation.md",
-            [StageType.Planning] = "Genesis.AI.Infrastructure.Prompts.Pipeline08Planning.md",
+            [StageType.InformationGovernance] = "Genesis.AI.Infrastructure.Prompts.Pipeline07InformationGovernance.md",
+            [StageType.Security] = "Genesis.AI.Infrastructure.Prompts.Pipeline08Security.md",
+            [StageType.Normalisation] = "Genesis.AI.Infrastructure.Prompts.Pipeline09Normalisation.md",
+            [StageType.Planning] = "Genesis.AI.Infrastructure.Prompts.Pipeline10Planning.md",
         };
 
         var result = new Dictionary<StageType, string>();

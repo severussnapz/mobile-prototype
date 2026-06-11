@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using ClosedXML.Excel;
 
 namespace Genesis.AI.IntegrationTests.Tests;
 
@@ -122,6 +123,43 @@ public class HazardLogApiTests : IDisposable
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
         Assert.NotEmpty(bytes);
+    }
+
+    [Fact]
+    public async Task GenerateHazardLog_RegistryExists_ReturnsValidXlsxWorkbook()
+    {
+        var client = _factory.CreateAdminClient();
+        var projectId = await CreateProjectAsync(client);
+        await SeedRegistryArtefactAsync(client, projectId);
+
+        var response = await client.PostAsync(
+            $"/api/v1/projects/{projectId}/hazard-log", content: null);
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        using var stream = new MemoryStream(bytes);
+        using var workbook = new XLWorkbook(stream);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(workbook.Worksheet("Hazard Log"));
+    }
+
+    [Fact]
+    public async Task GenerateHazardLog_RegistryExists_ContractRemainsStable()
+    {
+        var client = _factory.CreateAdminClient();
+        var projectId = await CreateProjectAsync(client);
+        await SeedRegistryArtefactAsync(client, projectId);
+
+        var response = await client.PostAsync(
+            $"/api/v1/projects/{projectId}/hazard-log", content: null);
+
+        var disposition = response.Content.Headers.ContentDisposition;
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(SpreadsheetContentType, response.Content.Headers.ContentType?.MediaType);
+        Assert.NotNull(disposition);
+        Assert.Equal("attachment", disposition!.DispositionType);
+        Assert.EndsWith(".xlsx", disposition.FileNameStar ?? disposition.FileName ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
