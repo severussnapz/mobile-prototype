@@ -34,6 +34,7 @@ public class ConversationStreamController : ControllerBase
     private readonly IPromptService _promptService;
     private readonly ISkillContentService _skillContentService;
     private readonly IFoundationService _foundationService;
+    private readonly IPrototypeAssemblyService _prototypeAssemblyService;
     private readonly TokenOptimisationOptions _tokenOptimisationOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConversationStreamController> _logger;
@@ -46,6 +47,7 @@ public class ConversationStreamController : ControllerBase
         IPromptService promptService,
         ISkillContentService skillContentService,
         IFoundationService foundationService,
+        IPrototypeAssemblyService prototypeAssemblyService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
         TimeProvider timeProvider,
         ILogger<ConversationStreamController> logger)
@@ -57,6 +59,7 @@ public class ConversationStreamController : ControllerBase
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _skillContentService = skillContentService ?? throw new ArgumentNullException(nameof(skillContentService));
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
+        _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
         _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -237,7 +240,7 @@ public class ConversationStreamController : ControllerBase
                 var needsNewlineSeparator = fullResponse.Length > 0 && fullResponse[^1] != '\n';
 
                 await foreach (var streamEvent in _aiService.StreamWithToolsAsync(
-                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.All, cancellationToken))
+                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.GetTools(_tokenOptimisationOptions), cancellationToken))
                 {
                     switch (streamEvent)
                     {
@@ -450,6 +453,7 @@ public class ConversationStreamController : ControllerBase
             PipelineToolDefinitions.GetGuardrailDetails => $"Loading {GetToolInputString(toolCall, "skill_name") ?? "guardrail"} guidelines...",
             PipelineToolDefinitions.SetOrchestrationMode => "Entering cross-check mode...",
             PipelineToolDefinitions.AdvanceRequirement => $"Completing requirement {GetToolInputString(toolCall, "requirement_id") ?? string.Empty}...",
+            PipelineToolDefinitions.EditArtefact => $"Editing {GetToolInputString(toolCall, "file_path") ?? "artefact"}...",
             _ => $"Running {toolCall.ToolName}..."
         };
 
@@ -535,6 +539,23 @@ public class ConversationStreamController : ControllerBase
                         status = "resolved"
                     });
                     await Response.WriteAsync($"event: parking_lot_resolved\ndata: {resolveEvent}\n\n", cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                }
+                break;
+            }
+
+            case PipelineToolDefinitions.EditArtefact:
+            {
+                if (savedArtefacts.Count > 0)
+                {
+                    var lastArtefact = savedArtefacts[^1];
+                    var artefactEvent = JsonSerializer.Serialize(new
+                    {
+                        filePath = lastArtefact.FilePath,
+                        version = lastArtefact.Version,
+                        id = lastArtefact.Id
+                    });
+                    await Response.WriteAsync($"event: artefact\ndata: {artefactEvent}\n\n", cancellationToken);
                     await Response.Body.FlushAsync(cancellationToken);
                 }
                 break;
@@ -648,6 +669,13 @@ public class ConversationStreamController : ControllerBase
                     projectId, filePath, nextVersion, cancellationToken);
 
                 savedArtefacts.Add(artefact);
+
+                // Trigger prototype assembly if fragment path and flag enabled
+                if (_tokenOptimisationOptions.PrototypeFragmentsEnabled &&
+                    filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
+                }
 
                 _logger.LogInformation(
                     "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
@@ -907,6 +935,96 @@ public class ConversationStreamController : ControllerBase
                 return $"Orchestration mode set to cross_check. Forward sweep is complete. Beginning cross-requirement consistency check.";
             }
 
+            case PipelineToolDefinitions.EditArtefact:
+            {
+                if (!_tokenOptimisationOptions.EditArtefactEnabled)
+                    return "Error: edit_artefact is not enabled on this server.";
+
+                var filePath = root.GetProperty("file_path").GetString()!;
+                var oldStr = root.GetProperty("old_str").GetString()!;
+                var newStr = root.GetProperty("new_str").GetString()!;
+
+                if (string.IsNullOrEmpty(oldStr))
+                    return "Error: edit_artefact_invalid_anchor: old_str must not be empty.";
+
+                // Load latest version
+                var existingArtefact = await _artefactRepository.GetByProjectAndFilePathAsync(
+                    projectId, filePath, cancellationToken);
+
+                if (existingArtefact is null)
+                    return $"Error: FILE_NOT_FOUND: No artefact found at path '{filePath}'. Use list_artefacts to see available files.";
+
+                var existingContent = await _artefactStorageService.GetContentAsync(
+                    existingArtefact.S3Key, cancellationToken);
+
+                if (existingContent is null)
+                    return $"Error: FILE_NOT_FOUND: Artefact content could not be retrieved for '{filePath}'.";
+
+                // Count occurrences - exact match, no normalisation
+                var occurrences = CountOccurrences(existingContent, oldStr);
+
+                if (occurrences == 0)
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact: ANCHOR_NOT_FOUND for {FilePath} (old_str length {Length})",
+                        filePath, oldStr.Length);
+                    return $"Error: ANCHOR_NOT_FOUND: The anchor string was not found in '{filePath}'. " +
+                           "Use get_artefact to re-read the current content and retry with a corrected anchor.";
+                }
+
+                if (occurrences > 1)
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact: ANCHOR_AMBIGUOUS for {FilePath} ({Count} occurrences, old_str length {Length})",
+                        filePath, occurrences, oldStr.Length);
+                    return $"Error: ANCHOR_AMBIGUOUS: The anchor string appears {occurrences} times in '{filePath}'. " +
+                           "Use a longer, more unique anchor string.";
+                }
+
+                // Apply edit
+                var updatedContent = existingContent.Replace(oldStr, newStr, StringComparison.Ordinal);
+                var bytesChanged = Math.Abs(
+                    System.Text.Encoding.UTF8.GetByteCount(updatedContent) -
+                    System.Text.Encoding.UTF8.GetByteCount(existingContent));
+
+                var contentType = existingArtefact.ContentType;
+                var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+                    projectId, filePath, cancellationToken);
+
+                var storageKey = await _artefactStorageService.SaveContentAsync(
+                    projectId, filePath, nextVersion, updatedContent, contentType, cancellationToken);
+
+                var editedArtefact = Artefact.CreateS3Artefact(
+                    projectId,
+                    nextVersion,
+                    filePath,
+                    storageKey,
+                    contentType,
+                    System.Text.Encoding.UTF8.GetByteCount(updatedContent),
+                    createdBy,
+                    _timeProvider);
+
+                await _artefactRepository.AddAsync(editedArtefact, cancellationToken);
+                await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+                await _artefactRepository.DeletePreviousVersionsAsync(
+                    projectId, filePath, nextVersion, cancellationToken);
+
+                savedArtefacts.Add(editedArtefact);
+
+                _logger.LogInformation(
+                    "Tool edit_artefact: edited {FilePath} v{Version} ({BytesChanged} bytes changed, total {Total} bytes, {ContentType})",
+                    filePath, nextVersion, bytesChanged, System.Text.Encoding.UTF8.GetByteCount(updatedContent), contentType);
+
+                // Trigger prototype assembly if fragment path and flag enabled
+                if (_tokenOptimisationOptions.PrototypeFragmentsEnabled &&
+                    filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
+                }
+
+                return $"Edited {filePath} (version {nextVersion}, {bytesChanged} bytes changed, total {System.Text.Encoding.UTF8.GetByteCount(updatedContent)} bytes)";
+            }
+
             default:
                 _logger.LogWarning("Unknown tool call: {ToolName}", toolCall.ToolName);
                 return "Unknown tool";
@@ -1098,6 +1216,21 @@ public class ConversationStreamController : ControllerBase
         }
 
         return "text/markdown";
+    }
+
+    internal static int CountOccurrences(string source, string target)
+    {
+        if (string.IsNullOrEmpty(target))
+            return 0;
+
+        var count = 0;
+        var index = 0;
+        while ((index = source.IndexOf(target, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += target.Length;
+        }
+        return count;
     }
 
     private static string BuildStateContext(Conversation conversation, IReadOnlyList<ParkingLotItem> projectParkingLotItems)

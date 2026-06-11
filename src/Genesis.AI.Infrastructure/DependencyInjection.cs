@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<INormalisationGateService, NormalisationGateService>();
         services.AddScoped<IPlanningGateService, PlanningGateService>();
         services.AddScoped<IFoundationService, FoundationService>();
+        services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
 
         services.Configure<TokenOptimisationOptions>(
             configuration.GetSection(TokenOptimisationOptions.SectionName));

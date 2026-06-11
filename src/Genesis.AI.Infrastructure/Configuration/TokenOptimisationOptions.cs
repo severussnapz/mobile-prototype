@@ -43,4 +43,17 @@ public sealed class TokenOptimisationOptions
     /// Useful for stages with high output volume (e.g. P08 Security writing many files).
     /// </summary>
     public Dictionary<string, int> StageToolTurnLimits { get; set; } = new();
+
+    /// <summary>
+    /// When enabled, the edit_artefact tool is registered and advertised to the AI.
+    /// Allows surgical anchor-based edits to existing artefacts instead of full regeneration.
+    /// Rollout: P02 pilot first, then extend to P03-P08 after telemetry is green.
+    /// </summary>
+    public bool EditArtefactEnabled { get; set; }
+
+    /// <summary>
+    /// When enabled, P02 uses fragment-based generation under prototype/fragments/.
+    /// The platform assembles prototype/index.html deterministically after each fragment save.
+    /// </summary>
+    public bool PrototypeFragmentsEnabled { get; set; }
 }

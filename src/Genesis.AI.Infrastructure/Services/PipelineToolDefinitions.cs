@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Genesis.AI.Domain.Interfaces;
+using Genesis.AI.Infrastructure.Configuration;
 
 namespace Genesis.AI.Infrastructure.Services;
 
@@ -24,6 +25,23 @@ public static class PipelineToolDefinitions
     public const string GetArtefact = "get_artefact";
     public const string SetOrchestrationMode = "set_orchestration_mode";
     public const string AdvanceRequirement = "advance_requirement";
+    public const string EditArtefact = "edit_artefact";
+
+    /// <summary>
+    /// Returns the tool list conditioned on <paramref name="options"/>.
+    /// Includes <c>edit_artefact</c> when <see cref="TokenOptimisationOptions.EditArtefactEnabled"/> is true.
+    /// </summary>
+    public static IReadOnlyList<AiToolDefinition> GetTools(TokenOptimisationOptions options)
+    {
+        if (!options.EditArtefactEnabled)
+            return All;
+
+        var tools = new List<AiToolDefinition>(All)
+        {
+            BuildEditArtefactTool()
+        };
+        return tools.AsReadOnly();
+    }
 
     private static IReadOnlyList<AiToolDefinition> BuildTools()
     {
@@ -242,5 +260,35 @@ public static class PipelineToolDefinitions
                 }
                 """))
         ];
+    }
+
+    private static AiToolDefinition BuildEditArtefactTool()
+    {
+        return new AiToolDefinition(
+            Name: EditArtefact,
+            Description: "Make a surgical edit to an existing artefact by replacing an exact anchor string with new content. " +
+                         "Use this for changes affecting less than ~30% of a file — far cheaper than regenerating the whole file. " +
+                         "IMPORTANT: Before calling this, always fetch the file fresh with get_artefact — your cached content may be stale. " +
+                         "On ANCHOR_NOT_FOUND or ANCHOR_AMBIGUOUS errors, re-read the file and retry (maximum 2 retries).",
+            InputSchema: JsonDocument.Parse("""
+            {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The relative file path of the artefact to edit."
+                    },
+                    "old_str": {
+                        "type": "string",
+                        "description": "The exact string to find and replace. Must appear exactly once in the file."
+                    },
+                    "new_str": {
+                        "type": "string",
+                        "description": "The replacement string. Empty string to delete the anchor."
+                    }
+                },
+                "required": ["file_path", "old_str", "new_str"]
+            }
+            """));
     }
 }

@@ -124,6 +124,7 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 - `Conversation.AddMessage()` / `.AdvancePhase()` / `.SetPhase()` / `.UpdateProgress()` / `.Complete()` / `.Pause()` / `.Resume()`
 - `ParkingLotItem.Resolve()` / `.Defer()` / `.UpdatePriority()` / `.UpdateContent()`
 - Stage reopening increments `Iteration` and resets status to InProgress
+- Always fix forward dont fake passing tests by supressing always find a solution
 
 ---
 

@@ -175,6 +175,7 @@ Before any gap-fill:
 
 You have six tools available:
 - `save_artefact`
+- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files during the normalisation sweep (less than ~30% of the file). Always `get_artefact` immediately before calling this. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, re-read and retry (max 2 retries). Never use on normalised output files (cross_cutting_concerns.md, NORMALISATION_SUMMARY.md).
 - `advance_phase`
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`

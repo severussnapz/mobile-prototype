@@ -205,6 +205,7 @@ The API manages all session state automatically. You do NOT write to files or ma
 You have six tools available:
 
 - `save_artefact`
+- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always `get_artefact` immediately before calling this. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, re-read and retry (max 2 retries). Never use on IG-specific outputs (DPIA.md, information_asset_register.md, data_flows.md).
 - `advance_phase`
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`
