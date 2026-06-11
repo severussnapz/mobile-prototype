@@ -145,6 +145,99 @@ public class PhaseSkillMapTests
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // GetSkillsForPhase — P03 Architecture contains EMIS API design skills every phase
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("emis-x-api-microservice-design")]
+    [InlineData("emis-x-api-observability")]
+    [InlineData("emis-x-api-postgres")]
+    public void GetSkillsForPhase_ArchitectureStage_ContainsArchitectureSkills(string expectedSkill)
+    {
+        // Act
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.Architecture, phase: 5);
+
+        // Assert
+        Assert.Contains(expectedSkill, result);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // GetSkillsForPhase — P04 Design contains EMIS API standards skills every phase
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("emis-x-api-standards")]
+    [InlineData("emis-x-api-auth")]
+    [InlineData("emis-x-api-csharp-standards")]
+    [InlineData("emis-x-api-domain-driven-design")]
+    [InlineData("emis-x-api-data-access")]
+    public void GetSkillsForPhase_DesignStage_ContainsDesignSkills(string expectedSkill)
+    {
+        // Act
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.Design, phase: 3);
+
+        // Assert
+        Assert.Contains(expectedSkill, result);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // GetSkillsForPhase — P05 PxD contains EMIS webapp design system skills every phase
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("emis-x-webapp-design-system")]
+    [InlineData("emis-x-webapp-coding-standards")]
+    [InlineData("emis-x-webapp-accessibility")]
+    [InlineData("emis-x-webapp-clinical-safety")]
+    public void GetSkillsForPhase_PxdStage_ContainsPxdSkills(string expectedSkill)
+    {
+        // Act
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.Pxd, phase: 2);
+
+        // Assert
+        Assert.Contains(expectedSkill, result);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // GetSkillsForPhase — P06 Clinical Safety includes clinical safety guardrail
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetSkillsForPhase_ClinicalSafetyStage_ContainsClinicalSafetyGuardrailSkill()
+    {
+        // Act
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.ClinicalSafety, phase: 2);
+
+        // Assert
+        Assert.Contains("emis-x-api-clinical-safety", result);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // GetSkillsForPhase — P08 Security includes security guardrail skill
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetSkillsForPhase_SecurityStage_ContainsSecurityGuardrailSkill()
+    {
+        // Act
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.Security, phase: 2);
+
+        // Assert
+        Assert.Contains("emis-x-api-security", result);
+    }
+
+    [Fact]
+    public void GetSkillsForPhase_InformationGovernanceStage_DoesNotContainSecurityGuardrailSkill()
+    {
+        // Arrange — P07 IG should not receive the security skill
+        // Act
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.InformationGovernance, phase: 2);
+
+        // Assert
+        Assert.DoesNotContain("emis-x-api-security", result);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
 

@@ -32,14 +32,40 @@ public static class PhaseSkillMap
 
     /// <summary>
     /// Additional skills applied on every phase of specific stages.
+    /// P03 Architecture: EMIS microservice design and observability guardrails.
+    /// P04 Design: EMIS API standards, auth, C# patterns, DDD, and data access guardrails.
+    /// P05 PxD: EMIS webapp design system and accessibility guardrails.
     /// P06, P07, P08 require human-in-the-loop and pre-fill confidence protocols.
+    /// P08 Security additionally injects the EMIS security guardrail skill.
     /// </summary>
     private static readonly Dictionary<StageType, string[]> StageSkills = new()
     {
+        [StageType.Architecture] =
+        [
+            "emis-x-api-microservice-design",
+            "emis-x-api-observability",
+            "emis-x-api-postgres",
+        ],
+        [StageType.Design] =
+        [
+            "emis-x-api-standards",
+            "emis-x-api-auth",
+            "emis-x-api-csharp-standards",
+            "emis-x-api-domain-driven-design",
+            "emis-x-api-data-access",
+        ],
+        [StageType.Pxd] =
+        [
+            "emis-x-webapp-design-system",
+            "emis-x-webapp-coding-standards",
+            "emis-x-webapp-accessibility",
+            "emis-x-webapp-clinical-safety",
+        ],
         [StageType.ClinicalSafety] =
         [
             "human-in-the-loop-protocol",
             "pre-fill-confidence-markers",
+            "emis-x-api-clinical-safety",
         ],
         [StageType.InformationGovernance] =
         [
@@ -50,13 +76,13 @@ public static class PhaseSkillMap
         [
             "human-in-the-loop-protocol",
             "pre-fill-confidence-markers",
+            "emis-x-api-security",
         ],
     };
 
     /// <summary>
     /// Additional skills applied only at specific phase numbers within a stage.
     /// Phase 0 is always the orientation/routing phase.
-    /// Stage-specific run-mode routing skills for P04–P10 will be added in later commits.
     /// </summary>
     private static readonly Dictionary<StageType, Dictionary<int, string[]>> PhaseOverrides = new()
     {
