@@ -56,4 +56,13 @@ public sealed class TokenOptimisationOptions
     /// The platform assembles prototype/index.html deterministically after each fragment save.
     /// </summary>
     public bool PrototypeFragmentsEnabled { get; set; }
+
+    /// <summary>
+    /// When enabled, phase-aware skill content is appended to the stable (cached) part of
+    /// the Bedrock system prompt, immediately before the cache breakpoint.
+    /// Only active when <see cref="FoundationPrefixEnabled"/> is also true — requires the
+    /// split-prompt path to insert skills before the cache point.
+    /// Defaults to <c>false</c> until skill content has been validated against all stages.
+    /// </summary>
+    public bool ActiveSkillInjectionEnabled { get; set; }
 }

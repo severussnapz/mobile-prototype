@@ -33,6 +33,7 @@ public class ConversationStreamController : ControllerBase
     private readonly IAiService _aiService;
     private readonly IPromptService _promptService;
     private readonly ISkillContentService _skillContentService;
+    private readonly IActiveSkillsService _activeSkillsService;
     private readonly IFoundationService _foundationService;
     private readonly IPrototypeAssemblyService _prototypeAssemblyService;
     private readonly TokenOptimisationOptions _tokenOptimisationOptions;
@@ -46,6 +47,7 @@ public class ConversationStreamController : ControllerBase
         IAiService aiService,
         IPromptService promptService,
         ISkillContentService skillContentService,
+        IActiveSkillsService activeSkillsService,
         IFoundationService foundationService,
         IPrototypeAssemblyService prototypeAssemblyService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
@@ -58,6 +60,7 @@ public class ConversationStreamController : ControllerBase
         _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _skillContentService = skillContentService ?? throw new ArgumentNullException(nameof(skillContentService));
+        _activeSkillsService = activeSkillsService ?? throw new ArgumentNullException(nameof(activeSkillsService));
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
         _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
         _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
@@ -179,6 +182,17 @@ public class ConversationStreamController : ControllerBase
             var stablePart = string.IsNullOrEmpty(foundationContent)
                 ? basePrompt
                 : $"{basePrompt}\n\n---\n\n{foundationContent}";
+
+            if (_tokenOptimisationOptions.ActiveSkillInjectionEnabled)
+            {
+                var activeSkillContent = await _activeSkillsService.BuildActiveSkillsAsync(
+                    stageType.Value, conversation.CurrentPhase, cancellationToken);
+
+                if (!string.IsNullOrEmpty(activeSkillContent))
+                {
+                    stablePart += $"\n\n---\n\n## ACTIVE SKILLS (phase {conversation.CurrentPhase})\n\n{activeSkillContent}";
+                }
+            }
 
             var mutablePart = $"## PROJECT CONTEXT (from project creation)\n\n{projectContextSection}\n\n---\n\n## CURRENT SESSION STATE (managed by API)\n\n{stateContext}";
 
