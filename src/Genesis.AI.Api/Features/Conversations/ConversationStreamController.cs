@@ -221,7 +221,11 @@ public class ConversationStreamController : ControllerBase
 
         try
         {
-            const int maxToolTurns = 40; // Safety limit to prevent infinite tool loops (needs headroom for Phase 11 saving 15+ files one-at-a-time)
+            const int defaultMaxToolTurns = 40; // Safety limit to prevent infinite tool loops (needs headroom for Phase 11 saving 15+ files one-at-a-time)
+            var maxToolTurns = stageType.HasValue &&
+                _tokenOptimisationOptions.StageToolTurnLimits.TryGetValue(stageType.Value.ToString(), out var stageLimit)
+                ? stageLimit
+                : defaultMaxToolTurns;
             var turnsRemaining = maxToolTurns;
 
             while (turnsRemaining > 0)

@@ -35,4 +35,12 @@ public sealed class TokenOptimisationOptions
     /// signal — never inferred from requirement counts or turn counts.
     /// </summary>
     public bool NonWindowedCrossCheckEnabled { get; set; }
+
+    /// <summary>
+    /// Optional per-stage overrides for the tool-turn hard limit.
+    /// Keys are <see cref="StageType"/> string values (e.g. <c>"ClinicalSafety"</c>).
+    /// When a key is present, its value replaces the default 40-turn limit for that stage.
+    /// Useful for stages with high output volume (e.g. P08 Security writing many files).
+    /// </summary>
+    public Dictionary<string, int> StageToolTurnLimits { get; set; } = new();
 }
