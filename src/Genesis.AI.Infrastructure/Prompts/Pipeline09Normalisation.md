@@ -75,14 +75,14 @@ stage_map_consistency_check:
 ### 1.1 Stage-First Execution (Mandatory)
 - Always enforce this exact flow:
   1. Run Extract Requirements stage action (C# process action)
-  2. Optional V2 gap-fill chat
-  3. Verify V2 Complete gate
+  2. Optional gap-fill chat
+  3. Verify Pipeline 09 Complete gate
 - Never skip step 1 and never claim stage completion before step 3 passes.
 - Do not require Python runtime execution in this stage.
 
 ### 1.2 No Cross-Cutting Writes from Gap-Fill
-- V2 gap-fill may update per-requirement output JSON only.
-- V2 gap-fill MUST NOT write:
+- Gap-fill may update per-requirement output JSON only.
+- Gap-fill MUST NOT write:
   - `output/cross_cutting/traceability.json`
   - `output/cross_cutting/dependency_graph.json`
   - `output/cross_cutting/last_extracted.json`
@@ -104,7 +104,7 @@ stage_map_consistency_check:
 ### 1.5 Completion Gate Policy
 Pipeline 09 cannot complete until all are true:
 - Normaliser run status is `completed`
-- V2 completeness gate passes
+- Pipeline 09 completeness gate passes
 - Required source artefacts exist:
   - `output/SECURITY_ASSURANCE_DATA.json`
   - `output/SDP_EVIDENCE.json`
@@ -145,7 +145,7 @@ If conflict exists with CorePolicy, fail closed and request clarification.
 
 **Pipeline Position:** 01 Requirements -> 02 Prototype -> 03 Architecture -> 04 Design -> 05 PxD -> 06 Clinical Safety -> 07 Information Governance -> 08 Security -> **09 Normalisation** -> 10 Planning
 
-**Purpose:** Complete V2 normalisation by combining deterministic extraction and LLM-only enrichment while preserving deterministic ownership boundaries.
+**Purpose:** Complete Pipeline 09 normalisation by combining deterministic extraction and LLM-only enrichment while preserving deterministic ownership boundaries.
 
 **In Scope:**
 - LLM-only field completion from gaps manifest
@@ -166,7 +166,7 @@ Before any gap-fill:
 1. Confirm `manifest.md` exists.
 2. Confirm at least one `requirements/REQ-*.md` exists.
 3. Confirm Extract Requirements stage action has run.
-4. If `output/SECURITY_ASSURANCE_DATA.json` or `output/SDP_EVIDENCE.json` are missing, continue with a warning and record dependency gaps for Verify V2 Complete.
+4. If `output/SECURITY_ASSURANCE_DATA.json` or `output/SDP_EVIDENCE.json` are missing, continue with a warning and record dependency gaps for the Pipeline 09 completeness gate.
 5. If 1 or 2 are missing: STOP and list exact missing artefacts.
 
 ---
@@ -205,7 +205,7 @@ For each requirement:
 - Enrich Security/IG/Auth checks with target components, test scenarios, pass criteria.
 
 ### Phase 2 - Gate Verification
-- Run Verify V2 Complete gate checks.
+- Run Pipeline 09 completeness gate checks.
 - If gate fails: list errors deterministically and stop completion.
 - If gate passes: prepare handoff summary.
 

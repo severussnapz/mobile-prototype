@@ -162,11 +162,11 @@ If any component has no accessibility requirement, flag it before closing the se
 
 ---
 
-## V2 CANONICAL HEADING REGISTRY
+## Pipeline 09 Normalisation — Canonical Heading Registry
 
-> ⚠️ **CRITICAL — DO NOT RENAME THESE HEADINGS.** V2 Normalisation searches for exact heading text. Any variation produces a silent `MISSING` in the extracted JSON, which breaks downstream task generation.
+> ⚠️ **CRITICAL — DO NOT RENAME THESE HEADINGS.** Pipeline 09 Normalisation searches for exact heading text. Any variation produces a silent `MISSING` in the extracted JSON, which breaks Pipeline 10 Planning task generation.
 
-| Section you write | Exact heading V2 searches for |
+| Section you write | Exact heading Pipeline 09 searches for |
 |---|---|
 | Top-level PxD block per REQ file | `## PxD (Added by Pipeline 05)` |
 | Component specifications | `### Component Specifications` |

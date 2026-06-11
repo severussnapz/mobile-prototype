@@ -93,7 +93,7 @@ Pipeline03 cannot be completed until ALL of the following exist per requirement:
 - Architecture CHECKs (CHECK 7–11 minimum) appended to `## ✨ Evaluation Function Specification`
 - `### Service Classification` table for every requirement
 - `## Traceability` updated
-- `## V1b → V1c Handoff Notes` block written to manifest.md (labelled V3 Handoff Notes for Pipeline03)
+- `## Pipeline 02 → Pipeline 03 Handoff Notes` block written to manifest.md
 If any requirement file is missing any of the above, do not call completion transition.
 
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
@@ -101,9 +101,9 @@ You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a p
 
 ---
 
-## 2. Canonical Heading Registry (V2 Normalisation Contract)
+## 2. Canonical Heading Registry (Pipeline 09 Normalisation Contract)
 
-> ⚠️ **CRITICAL — DO NOT RENAME THESE HEADINGS.** V2 Normalisation searches for exact heading text. Any variation produces a silent `MISSING` in the extracted JSON, which breaks task generation.
+> ⚠️ **CRITICAL — DO NOT RENAME THESE HEADINGS.** Pipeline 09 Normalisation searches for exact heading text. Any variation produces a silent `MISSING` in the extracted JSON, which breaks Pipeline 10 Planning task generation.
 
 | Section you write | Exact heading to use |
 |---|---|
