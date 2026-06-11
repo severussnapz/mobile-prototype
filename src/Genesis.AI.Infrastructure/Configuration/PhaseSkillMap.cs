@@ -153,6 +153,17 @@ public static class PhaseSkillMap
             [12] = ["completeness-gate-p06", "output-write-protocol", "no-placeholder-enforcement"],
             [13] = ["cso-review-final", "iteration-report"],
         },
+        [StageType.InformationGovernance] = new()
+        {
+            [0] = ["context-loading-p07", "dpia-reference-check", "ig003-gate-p07", "haz-id-carry-forward"],
+            [1] = ["lawful-basis-method"],
+            [2] = ["data-classification-prefill", "data-minimisation-rules"],
+            [3] = ["retention-deletion-prefill"],
+            [4] = ["ig-control-mapping", "ig-check-authoring"],
+            [5] = ["privacy-by-design-checklist", "confirmation-write-p07"],
+            [6] = ["reviewer-pass-p07"],
+            [7] = ["handoff-iteration-report-p07", "iteration-report"],
+        },
     };
 
     /// <summary>
