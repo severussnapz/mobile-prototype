@@ -7,6 +7,25 @@ This guide explains how to safely make changes to agents, stage prompts, scripts
 
 ---
 
+## Canonical Stage Naming Map
+
+This table is authoritative. V-labels are used in policy and agent files. P-labels are used in stage prompt filenames and UI display. When referencing a stage, always use the P-label in prompt filenames and the V-label in policy routing.
+
+| V-label | P-label |
+|---|---|
+| V1a Requirements | P01 Requirements Discovery |
+| V1a Prototype | P02 Prototype |
+| V1b | P03 Architecture |
+| V1c | P04 Design |
+| V1d | P05 PxD |
+| V1e Clinical Safety | P06 Clinical Safety |
+| V1e Information Governance | P07 Information Governance |
+| V1e Security | P08 Security |
+| V2 | P09 Normalisation |
+| V1f | P10 Planning |
+
+---
+
 ## 1. End-to-End Pipeline Relationship Model
 
 The pipeline is additive. Each stage appends structure and evidence; no stage overwrites prior stage intent.

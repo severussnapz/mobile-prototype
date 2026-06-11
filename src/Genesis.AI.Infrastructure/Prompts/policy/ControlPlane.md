@@ -4,6 +4,25 @@ This document is the deterministic routing contract for the EMIS stage pipeline.
 It does not replace stage agents. It decides whether a stage is runnable and what
 must run next.
 
+## Canonical Stage Naming Map
+
+This table is authoritative. V-labels are used in policy and agent files. P-labels are used in stage prompt filenames and UI display. When referencing a stage, always use the P-label in prompt filenames and the V-label in policy routing.
+
+| V-label | P-label |
+|---|---|
+| V1a Requirements | P01 Requirements Discovery |
+| V1a Prototype | P02 Prototype |
+| V1b | P03 Architecture |
+| V1c | P04 Design |
+| V1d | P05 PxD |
+| V1e Clinical Safety | P06 Clinical Safety |
+| V1e Information Governance | P07 Information Governance |
+| V1e Security | P08 Security |
+| V2 | P09 Normalisation |
+| V1f | P10 Planning |
+
+---
+
 ## Purpose
 
 - Keep V1a -> V1g stage flow deterministic.
