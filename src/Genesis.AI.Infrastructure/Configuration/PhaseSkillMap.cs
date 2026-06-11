@@ -164,6 +164,17 @@ public static class PhaseSkillMap
             [6] = ["reviewer-pass-p07"],
             [7] = ["handoff-iteration-report-p07", "iteration-report"],
         },
+        [StageType.Security] = new()
+        {
+            [0] = ["context-loading-p08", "owasp-asvs-stack-baseline"],
+            [1] = ["threat-framing-method"],
+            [2] = ["control-strategy-method"],
+            [3] = ["owasp-mapping-prefill"],
+            [4] = ["asvs-cwe-enrichment-prefill"],
+            [5] = ["attack-vector-checklist"],
+            [6] = ["security-check-authoring", "confirmation-write-p08"],
+            [7] = ["reviewer-pass-p08", "handoff-iteration-report-p08", "iteration-report"],
+        },
     };
 
     /// <summary>
