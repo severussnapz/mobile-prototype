@@ -1,38 +1,40 @@
 ---
 name: requirements-v2-contract
-description: 'Use this skill when producing output that the V2 Normalisation agent will consume — defines the canonical heading registry (exact strings V2 searches for), the additive update model, DRAFT marker protocol, and the 6 JSON output schemas V2 produces.'
+description: 'Use this skill when producing output that P09 Normalisation will consume — defines the canonical heading registry (exact strings P09 searches for), the additive update model, DRAFT marker protocol, and the 6 JSON output schemas P09 produces.'
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   applyTo:
     - requirements
 ---
 
-# Requirements V2 Contract
+# Requirements P09 Contract
 
-This skill defines the interface contract between pipeline agents (V1a–V1e) and the V2 Normalisation agent. V2 performs exact string matching on headings — any variation breaks extraction.
+This skill defines the interface contract between pipeline stages (P03–P08) and P09 Normalisation.
+P09 performs exact string matching on headings — any variation produces a silent `MISSING` in the extracted JSON.
 
 ---
 
 ## Canonical Heading Registry
 
-These are the **exact** headings V2 searches for. Same capitalisation, same punctuation, same spacing. Any deviation produces a silent `MISSING` in the extracted JSON.
+These are the **exact** headings P09 searches for. Same capitalisation, same punctuation, same spacing.
+Any deviation produces a silent `MISSING` in the extracted JSON.
 
-### V1b Architecture headings
+### P03 Architecture headings
 
-| Section you write | Exact heading V2 searches for |
+| Section you write | Exact heading P09 searches for |
 |---|---|
-| Top-level architecture block | `## Architecture (Added by V1b)` |
+| Top-level architecture block | `## Architecture (Added by Pipeline 03)` |
 | BDAT subsection | `### BDAT Analysis` |
 | ADR list | `### Architecture Decision Records` |
 | Failure modes | `### Failure Modes & Resilience` |
 | Integration points | `### Integration Points` |
 | Traceability updates | `## Traceability` |
 
-### V1c Design headings
+### P04 Design headings
 
-| Section you write | Exact heading V2 searches for |
+| Section you write | Exact heading P09 searches for |
 |---|---|
-| Top-level design block | `## Design (Added by V1c)` |
+| Top-level design block | `## Design (Added by Pipeline 04)` |
 | API contract | `### API Contract (OpenAPI 3.0)` |
 | Database schema | `### Database Schema` |
 | Component interfaces | `### Component Interfaces` |
@@ -40,44 +42,68 @@ These are the **exact** headings V2 searches for. Same capitalisation, same punc
 | Cross-requirement orchestration | `### Cross-Requirement Orchestration` |
 | Traceability updates | `## Traceability` |
 
-### V1d PxD headings
+### P05 PxD headings
 
-| Section you write | Exact heading V2 searches for |
+| Section you write | Exact heading P09 searches for |
 |---|---|
-| Top-level PxD block | `## PxD (Added by V1d)` |
+| Top-level PxD block | `## PxD (Added by Pipeline 05)` |
 | Component specifications | `### Component Specifications` |
 | User flows | `### User Flow` |
 | Wireframes | `### Wireframes` |
 | Accessibility requirements | `### Accessibility Requirements` |
 | Traceability updates | `## Traceability` |
 
-### V1e Clinical Safety headings
+### P06 Clinical Safety headings
 
-| Section you write | Exact heading V2 searches for |
+| Section you write | Exact heading P09 searches for |
 |---|---|
-| Top-level clinical safety block | `## Clinical Safety (Added by V1e)` |
+| Top-level clinical safety block | `## Clinical Safety (Added by Pipeline 06)` |
 | Genesis AI skills applied | `### Genesis AI Skills Applied` |
 | Hazard log entries | `### Hazard Log Entries` |
 | Mitigations | `### Mitigations` |
 | Residual risk | `### Residual Risk Assessment` |
 | Traceability updates | `## Traceability` |
 
+### P07 Information Governance headings
+
+| Section you write | Exact heading P09 searches for |
+|---|---|
+| Top-level IG block | `## Information Governance (Added by Pipeline 07)` |
+| Lawful basis | `### Lawful Basis` |
+| Data classification | `### Data Classification` |
+| Retention and deletion | `### Retention and Deletion` |
+| IG controls | `### Information Governance Controls` |
+| Traceability updates | `## Traceability` |
+
+### P08 Security headings
+
+| Section you write | Exact heading P09 searches for |
+|---|---|
+| Top-level security block | `## Security (Added by Pipeline 08)` |
+| Threat model | `### Threat Model` |
+| Controls | `### Security Controls` |
+| OWASP mapping | `### OWASP Mapping` |
+| CHECKs | `### Security CHECKs` |
+| Traceability updates | `## Traceability` |
+
 ---
 
 ## Additive Update Model
 
-Each V1 agent **adds** sections to existing requirement files. They do NOT replace or restructure content written by prior agents.
+Each pipeline stage **adds** sections to existing requirement files. They do NOT replace or restructure content written by prior stages.
 
 ```
-V1a creates:    REQ-001.md (user story, acceptance criteria, 4 dimensions, eval specs)
-V1b appends:    ## Architecture (Added by V1b)
-V1c appends:    ## Design (Added by V1c)
-V1d appends:    ## PxD (Added by V1d)
-V1e appends:    ## Clinical Safety (Added by V1e)
+P01 creates:    REQ-001.md (user story, acceptance criteria, 4 dimensions, eval specs)
+P03 appends:    ## Architecture (Added by Pipeline 03)
+P04 appends:    ## Design (Added by Pipeline 04)
+P05 appends:    ## PxD (Added by Pipeline 05)
+P06 appends:    ## Clinical Safety (Added by Pipeline 06)
+P07 appends:    ## Information Governance (Added by Pipeline 07)
+P08 appends:    ## Security (Added by Pipeline 08)
 ```
 
 Rules:
-- Never modify content from a prior agent
+- Never modify content from a prior stage
 - Always use the exact heading from the registry above
 - Append at the end of the file, before the `## Change Log` section
 - Update the `## Traceability` table (append rows, don't replace)
@@ -90,7 +116,7 @@ When writing content that has not yet been validated by the user or CSO:
 
 ```markdown
 <!-- DRAFT — pending final validation -->
-## Architecture (Added by V1b)
+## Architecture (Added by Pipeline 03)
 ...content...
 ```
 
@@ -102,34 +128,35 @@ Remove the DRAFT marker only when:
 
 ## MISSING and VALIDATION_ERROR Handling
 
-When V2 cannot find expected content:
+When P09 cannot find expected content:
 
 - Missing heading → `"MISSING"` in the JSON field
 - Malformed content → `"VALIDATION_ERROR: {reason}"` in the field
-- Both are logged to `_session/parking_lot.md`
+- Both are logged to `feedback/P09_REVIEW_LIST.md`
 
-**Resolution:** Before V2 hands off to V1f, ALL `MISSING` and `VALIDATION_ERROR` values must be resolved. If they cannot be resolved from source, V2 halts and reports the gaps.
+**Resolution:** Before P09 hands off to P10, ALL `MISSING` and `VALIDATION_ERROR` values must be resolved.
+If they cannot be resolved from source, P09 halts and reports the gaps.
 
 ---
 
-## V2 Output Files (6 JSON)
+## P09 Output Files (6 JSON)
 
-V2 produces these files in `output/`:
+P09 produces these files in `output/`:
 
-| File | Source Agent | Content |
+| File | Source Stage | Content |
 |------|-------------|---------|
-| `API_Contracts.json` | V1c Design | OpenAPI 3.0 specs per requirement |
-| `Database_Schemas.json` | V1c Design | DDL, tables, indexes, constraints |
-| `Component_Interfaces.json` | V1c Design | C# interfaces, methods, DI registration |
-| `UI_Component_Specs.json` | V1d PxD | React components, props, state, accessibility |
-| `CS_Guardrails.json` | V1e Clinical Safety | Guardrail rules linked to code components |
-| `Traceability_Map.json` | All V1 agents | REQ → HAZ → MIT → Guardrail → CHECK mapping |
+| `API_Contracts.json` | P04 Design | OpenAPI 3.0 specs per requirement |
+| `Database_Schemas.json` | P04 Design | DDL, tables, indexes, constraints |
+| `Component_Interfaces.json` | P04 Design | C# interfaces, methods, DI registration |
+| `UI_Component_Specs.json` | P05 PxD | React components, props, state, accessibility |
+| `CS_Guardrails.json` | P06 Clinical Safety | Guardrail rules linked to code components |
+| `Traceability_Map.json` | All stages P03–P08 | REQ → HAZ → MIT → Guardrail → CHECK mapping |
 
 ---
 
-## V2 Transformation Rules
+## P09 Transformation Rules
 
 1. **Exact extraction** — no interpretation, no inference, no generated examples
-2. **Guardrails embedded** — V3 coding agent cannot skip them
+2. **Guardrails embedded** — P10 Planning and coding agents cannot skip them
 3. **Traceability preserved** — every JSON entry links back to source requirement
 4. **Validation before output** — required fields present, types correct, cross-refs resolved
