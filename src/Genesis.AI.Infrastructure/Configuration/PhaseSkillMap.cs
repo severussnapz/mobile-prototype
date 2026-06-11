@@ -137,6 +137,22 @@ public static class PhaseSkillMap
             [12] = ["output-write-protocol", "no-placeholder-enforcement"],
             [13] = ["iteration-report", "feedback-collection-p05"],
         },
+        [StageType.ClinicalSafety] = new()
+        {
+            [0] = ["clin-wclin-registry-loader", "ig003-gate-p06", "haz-id-watermark-protocol", "cso-introduction", "review-list-p06", "decision-log-p06"],
+            [1] = ["hazard-identification-method", "haz-id-assignment-rules", "plain-language-rule"],
+            [2] = ["hazard-severity-scale"],
+            [3] = ["hazard-likelihood-scale"],
+            [4] = ["risk-matrix-emis"],
+            [5] = ["control-elicitation-method"],
+            [6] = ["residual-risk-assessment"],
+            [7] = ["if678-hazard-card-template"],
+            [9] = ["genesis-ai-skill-mapping"],
+            [10] = ["dcb0129-compliance-check"],
+            [11] = ["cso-signoff-protocol"],
+            [12] = ["completeness-gate-p06", "output-write-protocol", "no-placeholder-enforcement"],
+            [13] = ["cso-review-final", "iteration-report"],
+        },
     };
 
     /// <summary>
