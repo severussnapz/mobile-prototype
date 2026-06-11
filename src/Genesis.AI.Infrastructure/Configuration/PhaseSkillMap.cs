@@ -120,6 +120,23 @@ public static class PhaseSkillMap
             [12] = ["output-write-protocol", "no-placeholder-enforcement"],
             [13] = ["iteration-report", "feedback-collection-p04"],
         },
+        [StageType.Pxd] = new()
+        {
+            [0] = ["context-loading-p05", "emis-ui-kit-baseline"],
+            [1] = ["user-flow-mapping"],
+            [2] = ["wireframe-design"],
+            [3] = ["component-specifications"],
+            [4] = ["interaction-patterns"],
+            [5] = ["accessibility-requirements"],
+            [6] = ["responsive-design"],
+            [7] = ["visual-design"],
+            [8] = ["micro-interactions"],
+            [9] = ["error-states"],
+            [10] = ["empty-states"],
+            [11] = ["design-system-integration"],
+            [12] = ["output-write-protocol", "no-placeholder-enforcement"],
+            [13] = ["iteration-report", "feedback-collection-p05"],
+        },
     };
 
     /// <summary>
