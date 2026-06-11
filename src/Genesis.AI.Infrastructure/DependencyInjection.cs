@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddSingleton<IAiService, BedrockAiService>();
         services.AddSingleton<IPromptService, EmbeddedPromptService>();
         services.AddSingleton<ISkillContentService, SkillContentService>();
+        services.AddSingleton<IActiveSkillsService, ActiveSkillsService>();
         services.AddSingleton<IHazardRegistryParser, HazardRegistryParser>();
         services.AddSingleton<IHazardLogExcelBuilder, HazardLogExcelBuilder>();
         services.AddSingleton<IDpiaDocxBuilder, Pr1625DpiaDocxBuilder>();
