@@ -103,6 +103,23 @@ public static class PhaseSkillMap
             [12] = ["gap-fill-verification", "emis-x-stack-reference"],
             [13] = ["iteration-report", "feedback-collection-p03"],
         },
+        [StageType.Design] = new()
+        {
+            [0] = ["context-loading-p04", "service-scope-verification"],
+            [1] = ["api-contract-design", "cross-requirement-chain"],
+            [2] = ["database-schema-design"],
+            [3] = ["component-interface-design"],
+            [4] = ["state-machine-design"],
+            [5] = ["data-validation-rules"],
+            [6] = ["error-handling-strategy"],
+            [7] = ["integration-contract-design"],
+            [8] = ["data-migration-strategy"],
+            [9] = ["testing-strategy"],
+            [10] = ["performance-optimisation"],
+            [11] = ["api-documentation"],
+            [12] = ["output-write-protocol", "no-placeholder-enforcement"],
+            [13] = ["iteration-report", "feedback-collection-p04"],
+        },
     };
 
     /// <summary>
