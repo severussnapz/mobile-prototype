@@ -88,7 +88,20 @@ public static class PhaseSkillMap
     {
         [StageType.Architecture] = new()
         {
-            [0] = ["run-mode-routing-p03"],
+            [0] = ["run-mode-routing-p03", "context-loading-p03", "review-list-p03"],
+            [1] = ["technology-stack-p03", "adr-register-protocol", "mandatory-adr-index-strategy", "mandatory-adr-idempotency"],
+            [2] = ["bdat-analysis-method", "ig003-gate-p03", "service-classification-rules", "immediate-write-protocol"],
+            [3] = ["platform-boundaries-method"],
+            [4] = ["failure-modes-method"],
+            [5] = ["emis-landscape-integration"],
+            [6] = ["aws-well-architected"],
+            [7] = ["emis-principles-validation"],
+            [8] = ["operations-monitoring"],
+            [9] = ["performance-cost"],
+            [10] = ["security-framing-p03"],
+            [11] = ["mermaid-diagrams"],
+            [12] = ["gap-fill-verification", "emis-x-stack-reference"],
+            [13] = ["iteration-report", "feedback-collection-p03"],
         },
     };
 
