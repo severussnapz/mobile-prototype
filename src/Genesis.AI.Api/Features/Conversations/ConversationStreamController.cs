@@ -445,6 +445,7 @@ public class ConversationStreamController : ControllerBase
             PipelineToolDefinitions.ResolveParkingLotItem => "Resolving parking lot item...",
             PipelineToolDefinitions.GetGuardrailDetails => $"Loading {GetToolInputString(toolCall, "skill_name") ?? "guardrail"} guidelines...",
             PipelineToolDefinitions.SetOrchestrationMode => "Entering cross-check mode...",
+            PipelineToolDefinitions.AdvanceRequirement => $"Completing requirement {GetToolInputString(toolCall, "requirement_id") ?? string.Empty}...",
             _ => $"Running {toolCall.ToolName}..."
         };
 
@@ -825,6 +826,50 @@ public class ConversationStreamController : ControllerBase
                     "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars)",
                     filePath, artefact.Version, artefactContent.Length);
                 return $"## {filePath} (v{artefact.Version})\n\n{artefactContent}";
+            }
+
+            case PipelineToolDefinitions.AdvanceRequirement:
+            {
+                var requirementIdInput = root.TryGetProperty("requirement_id", out var reqProp)
+                    ? reqProp.GetString()
+                    : null;
+                var summary = root.TryGetProperty("summary", out var summaryProp)
+                    ? summaryProp.GetString()
+                    : null;
+
+                // Contract 1 gate: at least one requirements/REQ-*.md must exist for this project,
+                // either saved via tool in this session or persisted in a prior session.
+                var hasRequirementArtefact =
+                    savedArtefacts.Any(artefact =>
+                        artefact.FilePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase)
+                        && artefact.FilePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                    || await _artefactRepository.HasRequirementArtefactAsync(projectId, cancellationToken);
+
+                if (!hasRequirementArtefact)
+                {
+                    _logger.LogWarning(
+                        "Tool advance_requirement blocked by completion gate for conversation {ConversationId}, requirement {RequirementId}: no requirement artefact saved in this session",
+                        conversation.Id, requirementIdInput ?? "(unknown)");
+                    return "Error: requirement_completion_gate_failed: You must save the requirement artefact (requirements/REQ-xxx.md) before signalling completion. Save the artefact first, then call advance_requirement.";
+                }
+
+                conversation.Complete();
+                await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation(
+                    "Tool advance_requirement: requirement {RequirementId} completed for conversation {ConversationId}. Summary: {Summary}",
+                    requirementIdInput ?? "(none)", conversation.Id, summary ?? "(none)");
+
+                // Emit SSE here (inside the gate-passed path) so it only fires on success
+                var requirementCompletedEvent = JsonSerializer.Serialize(new
+                {
+                    requirementId = conversation.RequirementId,
+                    conversationId = conversation.Id
+                });
+                await Response.WriteAsync($"event: requirement_complete\ndata: {requirementCompletedEvent}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
+
+                return $"Requirement {requirementIdInput ?? conversation.RequirementId ?? "(unknown)"} marked complete.";
             }
 
             case PipelineToolDefinitions.SetOrchestrationMode:

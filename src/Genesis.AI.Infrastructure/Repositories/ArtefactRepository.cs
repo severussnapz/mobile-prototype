@@ -98,4 +98,14 @@ public class ArtefactRepository : IArtefactRepository
             .Where(artefact => artefact.ProjectId == projectId)
             .MaxAsync(artefact => (DateTimeOffset?)artefact.CreatedAt, cancellationToken);
     }
+
+    public async Task<bool> HasRequirementArtefactAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        return await _context.Artefacts
+            .AnyAsync(
+                artefact => artefact.ProjectId == projectId
+                    && artefact.FilePath.StartsWith("requirements/REQ-")
+                    && artefact.FilePath.EndsWith(".md"),
+                cancellationToken);
+    }
 }

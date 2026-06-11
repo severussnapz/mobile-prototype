@@ -23,6 +23,7 @@ public static class PipelineToolDefinitions
     public const string ListArtefacts = "list_artefacts";
     public const string GetArtefact = "get_artefact";
     public const string SetOrchestrationMode = "set_orchestration_mode";
+    public const string AdvanceRequirement = "advance_requirement";
 
     private static IReadOnlyList<AiToolDefinition> BuildTools()
     {
@@ -212,6 +213,32 @@ public static class PipelineToolDefinitions
                         }
                     },
                     "required": ["mode", "justification"]
+                }
+                """))
+        ,
+
+            new AiToolDefinition(
+                Name: AdvanceRequirement,
+                Description: "Signal that you have fully completed the current requirement conversation. " +
+                             "Call this ONLY after you have saved the requirement artefact (requirements/REQ-xxx.md) " +
+                             "for this requirement in the current session. " +
+                             "The API will reject this call if no requirement artefact has been persisted yet — " +
+                             "save the artefact first, then call this tool. " +
+                             "Do not call this tool to advance between interview phases — use advance_phase for that.",
+                InputSchema: JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "requirement_id": {
+                            "type": "string",
+                            "description": "The requirement identifier being completed (e.g. 'REQ-001'). Must match the requirement assigned to this conversation."
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Brief one-line summary of what was captured for this requirement."
+                        }
+                    },
+                    "required": ["requirement_id"]
                 }
                 """))
         ];

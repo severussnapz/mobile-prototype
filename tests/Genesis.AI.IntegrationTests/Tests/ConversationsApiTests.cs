@@ -418,4 +418,97 @@ public class ConversationsApiTests : IDisposable
         Assert.Contains("event: tool_limit_hit", streamBody, StringComparison.Ordinal);
         Assert.Contains("\"turnsUsed\":40", streamBody, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenAdvanceRequirementCalledWithoutRequirementArtefact_BlocksCompletionWithGateError()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, stageId) = await CreateProjectAndGetFirstStageAsync(client);
+
+        // No requirement artefact seeded — gate must block
+        var conversationPayload = new StringContent(
+            $$$"""{"stageId":"{{{stageId}}}","requirementId":"REQ-001"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var createConversationResponse = await client.PostAsync("/api/v1/conversations", conversationPayload);
+        var createConversationBody = await createConversationResponse.Content.ReadAsStringAsync();
+        using var createConversationDoc = JsonDocument.Parse(createConversationBody);
+        var conversationId = createConversationDoc.RootElement.GetProperty("data").GetProperty("id").GetString()!;
+
+        using var advanceRequirementInput = JsonDocument.Parse("""{"requirement_id":"REQ-001","summary":"Done"}""");
+
+        _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            // Turn 1: AI attempts to advance without saving — gate error returned as tool result
+            .Returns(CreateStreamEvents(
+            [
+                new AiToolCall("advance_requirement", "tool-use-advance", advanceRequirementInput)
+            ]))
+            // Turn 2: AI acknowledges and stops
+            .Returns(CreateStreamEvents([new AiTextChunk("I need to save the artefact first.")]));
+
+        var streamRequest = new StringContent(
+            """{"content":"mark this requirement done"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        // Gate blocked — requirement_complete event must not be emitted
+        Assert.DoesNotContain("event: requirement_complete", streamBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenAdvanceRequirementCalledWithExistingRequirementArtefact_EmitsRequirementCompleteEvent()
+    {
+        var client = _factory.CreateAdminClient();
+        var (projectId, stageId) = await CreateProjectAndGetFirstStageAsync(client);
+
+        // Pre-seed requirement artefact via REST endpoint (simulates artefact saved in a prior session)
+        var artefactPayload = new StringContent(
+            $$$"""{"artefacts":[{"filePath":"requirements/REQ-001_patient_search.md","contentType":"text/markdown","content":"# REQ-001\n\nCapture patient search requirement."}]}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
+        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
+
+        var conversationPayload = new StringContent(
+            $$$"""{"stageId":"{{{stageId}}}","requirementId":"REQ-001"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var createConversationResponse = await client.PostAsync("/api/v1/conversations", conversationPayload);
+        var createConversationBody = await createConversationResponse.Content.ReadAsStringAsync();
+        using var createConversationDoc = JsonDocument.Parse(createConversationBody);
+        var conversationId = createConversationDoc.RootElement.GetProperty("data").GetProperty("id").GetString()!;
+
+        using var advanceRequirementInput = JsonDocument.Parse("""{"requirement_id":"REQ-001","summary":"Patient search captured"}""");
+
+        _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(CreateStreamEvents(
+            [
+                new AiToolCall("advance_requirement", "tool-use-advance", advanceRequirementInput)
+            ]))
+            .Returns(CreateStreamEvents([new AiTextChunk("Requirement REQ-001 complete.")]));
+
+        var streamRequest = new StringContent(
+            """{"content":"mark this requirement done"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Contains("event: requirement_complete", streamBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("requirement_completion_gate_failed", streamBody, StringComparison.Ordinal);
+    }
 }
