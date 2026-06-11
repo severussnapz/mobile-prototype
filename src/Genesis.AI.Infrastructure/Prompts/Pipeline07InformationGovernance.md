@@ -124,6 +124,23 @@ If conflict exists with CorePolicy, fail closed and request clarification.
 
 ---
 
+## 4. Artefact Read Efficiency
+
+**PROJECT FOUNDATION files are already loaded in full in this system context.**
+If a section headed `## PROJECT FOUNDATION` is present in this prompt, the files listed there are pre-loaded.
+Do NOT call `get_artefact` for any file listed under PROJECT FOUNDATION — the content is already available.
+Use `get_artefact` only for files NOT listed in PROJECT FOUNDATION or for live tracking artefacts
+(e.g. `feedback/P07_REVIEW_LIST.md`, `feedback/VALUE_CHAIN.md`, `manifest.md` watermark fields).
+
+When per-requirement windowing is active, this conversation may start fresh without prior summary
+history. If you do not have the content of a file you need and it is not in PROJECT FOUNDATION,
+use `get_artefact` to load it — do not assume earlier turn summaries are present.
+
+Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
+Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
+
+---
+
 ## ⛔ PRE-START CHECK
 
 Before reasoning about any requirement:
@@ -259,6 +276,12 @@ Storage and naming rules:
 - Review and iteration records: `feedback/*.md`
 - Artifact paths are persisted through the API storage layer; use deterministic names exactly as specified.
 - Underlying persistence is object storage managed by the API (S3/blob equivalent); do not use direct bucket/container paths in prompt outputs.
+
+---
+
+## ✨ WRITE PROTOCOL — MANDATORY (Per Requirement)
+
+> 📝 **WRITE NOW — MANDATORY:** For each requirement, write to the REQ file **one at a time**. After each write: log `"✅ REQ{N} IG section written ({M}/{TOTAL} complete). Moving to REQ{N+1}."` then discard from working context before processing the next requirement. Do NOT batch multiple requirements in memory before writing.
 
 ---
 
