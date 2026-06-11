@@ -116,6 +116,8 @@ use `get_artefact` to load it — do not assume earlier turn summaries are prese
 Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
 Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
 
+**`edit_artefact` — surgical edits to REQ files:** For changes affecting less than ~30% of a `requirements/REQ-*.md` file, use `edit_artefact` instead of rewriting the whole file. Always call `get_artefact` immediately before `edit_artefact` — do not rely on your memory of the file from earlier turns. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, re-read the fragment and retry (maximum 2 retries). Never use `edit_artefact` on structural artefacts (manifest.md, SUMMARY.md, VALUE_CHAIN.md, iteration reports).
+
 ---
 
 **Pipeline Position:** 01 Requirements → 02 Prototype → 03 Architecture → 04 Design → **05 PxD** → 06 Clinical Safety → 07 Information Governance → 08 Security → 09 Normalisation → 10 Planning
