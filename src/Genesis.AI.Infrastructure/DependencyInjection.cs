@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddSingleton<IPromptService, EmbeddedPromptService>();
         services.AddSingleton<ISkillContentService, SkillContentService>();
         services.AddSingleton<IActiveSkillsService, ActiveSkillsService>();
+        services.AddScoped<IRoutingContextService, RoutingContextService>();
         services.AddSingleton<IHazardRegistryParser, HazardRegistryParser>();
         services.AddSingleton<IHazardLogExcelBuilder, HazardLogExcelBuilder>();
         services.AddSingleton<IDpiaDocxBuilder, Pr1625DpiaDocxBuilder>();
