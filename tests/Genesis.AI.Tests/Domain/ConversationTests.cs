@@ -177,4 +177,36 @@ public class ConversationTests
         Assert.Equal(ConversationStatus.Active, conversation.Status);
         Assert.NotNull(conversation.ResumedAt);
     }
+
+    [Fact]
+    public void EnterCrossCheckMode_WhenCalled_SetsOrchestrationModeToCrossCheck()
+    {
+        var conversation = new Conversation(Guid.NewGuid(), 5, _timeProvider);
+
+        conversation.EnterCrossCheckMode();
+
+        Assert.Equal(OrchestrationMode.CrossCheck, conversation.OrchestrationMode);
+    }
+
+    [Fact]
+    public void OrchestrationMode_WhenNewConversation_IsForwardSweep()
+    {
+        var conversation = new Conversation(Guid.NewGuid(), 5, _timeProvider);
+
+        Assert.Equal(OrchestrationMode.ForwardSweep, conversation.OrchestrationMode);
+    }
+
+    [Fact]
+    public void OrchestrationMode_WhenNoExplicitModeTransition_RemainsForwardSweep()
+    {
+        var conversation = new Conversation(Guid.NewGuid(), 5, _timeProvider);
+
+        // Simulate normal forward-sweep operations: add messages, advance phases
+        conversation.AddMessage(MessageRole.User, "Hello", null, _timeProvider);
+        conversation.AddMessage(MessageRole.Assistant, "Response", 100, _timeProvider);
+        conversation.AdvancePhase("context_gathering");
+
+        // Without explicit EnterCrossCheckMode(), must remain ForwardSweep
+        Assert.Equal(OrchestrationMode.ForwardSweep, conversation.OrchestrationMode);
+    }
 }
