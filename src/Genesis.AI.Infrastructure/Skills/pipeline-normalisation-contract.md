@@ -1,5 +1,5 @@
 ---
-name: requirements-v2-contract
+name: pipeline-normalisation-contract
 description: 'Use this skill when producing output that P09 Normalisation will consume — defines the canonical heading registry (exact strings P09 searches for), the additive update model, DRAFT marker protocol, and the 6 JSON output schemas P09 produces.'
 metadata:
   version: 2.0.0

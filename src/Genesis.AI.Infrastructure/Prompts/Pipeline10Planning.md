@@ -228,7 +228,7 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 
 | Skill | Domain |
 |-------|--------|
-| `requirements-v2-contract` | Defines canonical heading registry, output schemas, and JSON structures |
+| `pipeline-normalisation-contract` | Defines canonical heading registry, output schemas, and JSON structures |
 
 ---
 

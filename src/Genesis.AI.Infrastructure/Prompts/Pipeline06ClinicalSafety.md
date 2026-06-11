@@ -188,7 +188,7 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 
 | Skill | Domain |
 |-------|--------|
-| `requirements-v2-contract` | Exact Pipeline 07 headings — use verbatim or Pipeline 07 extraction breaks |
+| `pipeline-normalisation-contract` | Exact Pipeline 07 headings — use verbatim or Pipeline 07 extraction breaks |
 | `requirements-four-dimensions` | IG-003 hard gate, clinical safety dimension questions |
 | `emis-x-api-clinical-safety` | CLIN-001 to CLIN-010 API-layer clinical safety rules |
 | `emis-x-webapp-clinical-safety` | Frontend clinical safety rules (WCLIN) for patient context |

@@ -201,7 +201,7 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 
 | Skill | Domain |
 |-------|--------|
-| `requirements-v2-contract` | Exact Pipeline 07 headings — use verbatim or Pipeline 07 extraction breaks |
+| `pipeline-normalisation-contract` | Exact Pipeline 07 headings — use verbatim or Pipeline 07 extraction breaks |
 | `requirements-evaluation-specs` | CHECK template format, standard frontend CHECKs A–E |
 | `emis-x-webapp-design-system` | DS-001 to DS-005, EMIS-X component mandates |
 | `emis-x-webapp-accessibility` | A11Y rules, WCAG compliance |

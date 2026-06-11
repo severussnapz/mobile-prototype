@@ -201,7 +201,7 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 
 | Skill | Domain |
 |-------|--------|
-| `requirements-v2-contract` | Exact Pipeline 07 headings — use verbatim or Pipeline 07 extraction breaks |
+| `pipeline-normalisation-contract` | Exact Pipeline 07 headings — use verbatim or Pipeline 07 extraction breaks |
 | `requirements-evaluation-specs` | CHECK template format |
 | `emis-x-api-standards` | API-001 to API-016, JSON:API format |
 | `emis-x-api-data-access` | DATA-001 to DATA-005, repository pattern |
