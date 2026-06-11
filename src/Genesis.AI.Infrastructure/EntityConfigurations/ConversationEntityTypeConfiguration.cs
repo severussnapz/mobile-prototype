@@ -59,6 +59,15 @@ public class ConversationEntityTypeConfiguration : IEntityTypeConfiguration<Conv
         builder.Property(conversation => conversation.ResumedAt)
             .HasColumnName("resumed_at");
 
+        builder.Property(conversation => conversation.RequirementId)
+            .HasColumnName("requirement_id")
+            .HasMaxLength(50);
+
+        builder.Property(conversation => conversation.OrchestrationMode)
+            .HasColumnName("orchestration_mode")
+            .IsRequired()
+            .HasDefaultValueSql("'forward_sweep'::orchestration_mode");
+
         builder.HasMany(conversation => conversation.Messages)
             .WithOne()
             .HasForeignKey(message => message.ConversationId)

@@ -22,6 +22,7 @@ public static class PipelineToolDefinitions
     public const string GetGuardrailDetails = "get_guardrail_details";
     public const string ListArtefacts = "list_artefacts";
     public const string GetArtefact = "get_artefact";
+    public const string SetOrchestrationMode = "set_orchestration_mode";
 
     private static IReadOnlyList<AiToolDefinition> BuildTools()
     {
@@ -186,6 +187,31 @@ public static class PipelineToolDefinitions
                         }
                     },
                     "required": ["skill_name"]
+                }
+                """)),
+
+            new AiToolDefinition(
+                Name: SetOrchestrationMode,
+                Description: "Explicitly switch the orchestration mode for this conversation. " +
+                             "Use ONLY to enter 'cross_check' mode after completing the forward sweep in P6/P7/P8. " +
+                             "DO NOT call this during the forward sweep — cross_check mode must never be inferred from " +
+                             "turn counts, requirement counts, or queue state. Only one cross-check conversation " +
+                             "should exist per stage run.",
+                InputSchema: JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "mode": {
+                            "type": "string",
+                            "enum": ["cross_check"],
+                            "description": "The orchestration mode to enter. Only 'cross_check' is a valid transition target."
+                        },
+                        "justification": {
+                            "type": "string",
+                            "description": "Explanation of why the cross-check mode is being entered now (e.g. 'Forward sweep complete for all N requirements. Entering cross-check to verify HAZ-ID monotonicity.')."
+                        }
+                    },
+                    "required": ["mode", "justification"]
                 }
                 """))
         ];

@@ -223,7 +223,7 @@ public class ConversationsApiTests : IDisposable
 
         _factory.AiServiceMock
             .SetupSequence(service => service.StreamWithToolsAsync(
-                It.IsAny<string>(),
+                It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()))
@@ -279,7 +279,7 @@ public class ConversationsApiTests : IDisposable
 
         _factory.AiServiceMock
             .SetupSequence(service => service.StreamWithToolsAsync(
-                It.IsAny<string>(),
+                It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()))
@@ -318,7 +318,7 @@ public class ConversationsApiTests : IDisposable
 
         _factory.AiServiceMock
             .Setup(service => service.StreamWithToolsAsync(
-                It.IsAny<string>(),
+                It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()))

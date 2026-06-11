@@ -35,7 +35,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
     }
 
     public async Task<AiResponse> GenerateResponseAsync(
-        string systemPrompt,
+        AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         CancellationToken cancellationToken)
     {
@@ -57,7 +57,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
     }
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
-        string systemPrompt,
+        AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -79,7 +79,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
     }
 
     public async IAsyncEnumerable<AiStreamEvent> StreamWithToolsAsync(
-        string systemPrompt,
+        AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         IReadOnlyList<AiToolDefinition> tools,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -228,16 +228,12 @@ public sealed class BedrockAiService : IAiService, IDisposable
         }
     }
 
-    private ConverseRequest BuildConverseRequest(string systemPrompt, IReadOnlyList<AiMessage> messages)
+    private ConverseRequest BuildConverseRequest(AiSystemPrompt systemPrompt, IReadOnlyList<AiMessage> messages)
     {
         return new ConverseRequest
         {
             ModelId = _modelId,
-            System =
-            [
-                new SystemContentBlock { Text = systemPrompt },
-                new SystemContentBlock { CachePoint = new CachePointBlock { Type = CachePointType.Default } }
-            ],
+            System = BuildSystemBlocks(systemPrompt),
             Messages = messages.Select(msg => new Amazon.BedrockRuntime.Model.Message
             {
                 Role = msg.Role == MessageRole.User ? ConversationRole.User : ConversationRole.Assistant,
@@ -252,16 +248,12 @@ public sealed class BedrockAiService : IAiService, IDisposable
         };
     }
 
-    private ConverseStreamRequest BuildConverseStreamRequest(string systemPrompt, IReadOnlyList<AiMessage> messages)
+    private ConverseStreamRequest BuildConverseStreamRequest(AiSystemPrompt systemPrompt, IReadOnlyList<AiMessage> messages)
     {
         return new ConverseStreamRequest
         {
             ModelId = _modelId,
-            System =
-            [
-                new SystemContentBlock { Text = systemPrompt },
-                new SystemContentBlock { CachePoint = new CachePointBlock { Type = CachePointType.Default } }
-            ],
+            System = BuildSystemBlocks(systemPrompt),
             Messages = messages.Select(BuildMessage).ToList(),
             InferenceConfig = new InferenceConfiguration
             {
@@ -270,6 +262,37 @@ public sealed class BedrockAiService : IAiService, IDisposable
             },
             AdditionalModelRequestFields = BuildThinkingConfig()
         };
+    }
+
+    /// <summary>
+    /// Builds Bedrock system content blocks from an <see cref="AiSystemPrompt"/>.
+    /// When a mutable part is present the layout is:
+    ///   [Text(stablePart)] [CachePoint] [Text(mutablePart)]
+    /// This means Bedrock caches the stable foundation and processes only the
+    /// mutable part (session state, artefact manifest) on each turn — approximately
+    /// 10× cheaper for the cached portion.
+    /// When no mutable part exists the layout is the original single-block design:
+    ///   [Text(stablePart)] [CachePoint]
+    /// </summary>
+    private static List<SystemContentBlock> BuildSystemBlocks(AiSystemPrompt systemPrompt)
+    {
+        if (string.IsNullOrEmpty(systemPrompt.MutablePart))
+        {
+            // Legacy / flag-off path: single prompt block followed by cache point
+            return
+            [
+                new SystemContentBlock { Text = systemPrompt.StablePart },
+                new SystemContentBlock { CachePoint = new CachePointBlock { Type = CachePointType.Default } }
+            ];
+        }
+
+        // Foundation-split path: stable foundation cached, mutable state always fresh
+        return
+        [
+            new SystemContentBlock { Text = systemPrompt.StablePart },
+            new SystemContentBlock { CachePoint = new CachePointBlock { Type = CachePointType.Default } },
+            new SystemContentBlock { Text = systemPrompt.MutablePart }
+        ];
     }
 
     private Document BuildThinkingConfig()

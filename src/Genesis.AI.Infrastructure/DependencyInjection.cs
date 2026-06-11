@@ -4,6 +4,7 @@ using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.SecurityReviewReport;
+using Genesis.AI.Infrastructure.Configuration;
 using Genesis.AI.Infrastructure.Repositories;
 using Genesis.AI.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,10 @@ public static class DependencyInjection
         services.AddSingleton<ISecurityReviewReportBuilder, SecurityReviewReportBuilder>();
         services.AddScoped<INormalisationGateService, NormalisationGateService>();
         services.AddScoped<IPlanningGateService, PlanningGateService>();
+        services.AddScoped<IFoundationService, FoundationService>();
+
+        services.Configure<TokenOptimisationOptions>(
+            configuration.GetSection(TokenOptimisationOptions.SectionName));
 
         AddS3(services, configuration);
 
@@ -67,6 +72,7 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<ParkingLotPriority>("parking_lot_priority");
                 npgsqlOptions.MapEnum<ParkingLotStatus>("parking_lot_status");
                 npgsqlOptions.MapEnum<MessageRole>("message_role");
+                npgsqlOptions.MapEnum<OrchestrationMode>("orchestration_mode");
             }));
     }
 
@@ -80,6 +86,7 @@ public static class DependencyInjection
         dataSourceBuilder.MapEnum<ParkingLotPriority>("parking_lot_priority");
         dataSourceBuilder.MapEnum<ParkingLotStatus>("parking_lot_status");
         dataSourceBuilder.MapEnum<MessageRole>("message_role");
+        dataSourceBuilder.MapEnum<OrchestrationMode>("orchestration_mode");
     }
 
     private static void AddS3(IServiceCollection services, IConfiguration configuration)

@@ -54,7 +54,7 @@ public class ConversationsController : ControllerBase
 
         try
         {
-            var command = new CreateConversationCommand(request.StageId);
+            var command = new CreateConversationCommand(request.StageId, request.RequirementId);
             var conversationId = await _mediator.Send(command, cancellationToken);
 
             var conversation = await _mediator.Send(
@@ -111,6 +111,30 @@ public class ConversationsController : ControllerBase
     {
         var conversations = await _mediator.Send(
             new GetConversationsByStageQuery(stageId), cancellationToken);
+
+        var resources = _mapper.Map<IReadOnlyList<ConversationResource>>(conversations);
+        var projectContext = await _conversationRepository.GetProjectContextByStageIdAsync(stageId, cancellationToken);
+        var projectId = projectContext?.ProjectId ?? Guid.Empty;
+        foreach (var resource in resources)
+        {
+            resource.ProjectId = projectId;
+        }
+
+        return Ok(new ApiResponse<IReadOnlyList<ConversationResource>> { Data = resources });
+    }
+
+    /// <summary>
+    /// Gets all requirement-windowed conversations for a stage (one per requirement_id).
+    /// Returns only conversations that have a requirement_id set, ordered by requirement_id.
+    /// Used by the frontend stepper to render per-requirement progress.
+    /// </summary>
+    [HttpGet("by-stage/{stageId:guid}/requirements")]
+    [Authorize(Policy = AuthorisationPolicies.ConversationRead)]
+    [ProducesResponseType(typeof(IReadOnlyList<ConversationResource>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetConversationsByStageRequirements(Guid stageId, CancellationToken cancellationToken)
+    {
+        var conversations = await _conversationRepository.GetByStageIdWithRequirementIdsAsync(
+            stageId, cancellationToken);
 
         var resources = _mapper.Map<IReadOnlyList<ConversationResource>>(conversations);
         var projectContext = await _conversationRepository.GetProjectContextByStageIdAsync(stageId, cancellationToken);

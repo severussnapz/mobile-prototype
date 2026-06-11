@@ -68,3 +68,5 @@ Thumbs.db
 .github/agents/EMIS-X_API_ENGINEER.agent.md
 .github/agents/EMIS-X_API_REVIEWER.agent.md
 .opencode/
+
+.plan/

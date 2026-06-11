@@ -13,6 +13,8 @@ public interface IConversationRepository
     Task<Conversation?> GetByIdWithMessagesAsync(Guid id, CancellationToken cancellationToken);
     Task<Conversation?> GetByIdWithParkingLotAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<Conversation>> GetByStageIdAsync(Guid stageId, CancellationToken cancellationToken);
+    Task<Conversation?> GetByStageAndRequirementIdAsync(Guid stageId, string requirementId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Conversation>> GetByStageIdWithRequirementIdsAsync(Guid stageId, CancellationToken cancellationToken);
     Task<StageType?> GetStageTypeByStageIdAsync(Guid stageId, CancellationToken cancellationToken);
     Task<StageType?> GetStageTypeByConversationIdAsync(Guid conversationId, CancellationToken cancellationToken);
     Task<ProjectContext?> GetProjectContextByStageIdAsync(Guid stageId, CancellationToken cancellationToken);

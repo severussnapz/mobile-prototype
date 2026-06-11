@@ -14,6 +14,23 @@ public class Conversation : Entity, IAggregateRoot
     public int QuestionsAsked { get; private set; }
     public int? EstimatedTotalQuestions { get; private set; }
     public int RequirementsCaptured { get; private set; }
+
+    /// <summary>
+    /// The requirement identifier this conversation is scoped to (e.g. "REQ-001").
+    /// Null for non-windowed conversations and stages outside P3-P8.
+    /// When per-requirement windowing is active, one conversation is created per
+    /// requirement so each has an independent, bounded message window.
+    /// </summary>
+    public string? RequirementId { get; private set; }
+
+    /// <summary>
+    /// The orchestration mode for this conversation.
+    /// <see cref="OrchestrationMode.ForwardSweep"/> is the default.
+    /// <see cref="OrchestrationMode.CrossCheck"/> is entered explicitly for P6/P7/P8
+    /// cross-check conversations via the <c>set_orchestration_mode</c> tool.
+    /// </summary>
+    public OrchestrationMode OrchestrationMode { get; private set; } = OrchestrationMode.ForwardSweep;
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? ResumedAt { get; private set; }
 
@@ -28,7 +45,7 @@ public class Conversation : Entity, IAggregateRoot
 
     private Conversation() { } // Required for EF Core
 
-    public Conversation(Guid stageId, int totalPhases, TimeProvider timeProvider)
+    public Conversation(Guid stageId, int totalPhases, TimeProvider timeProvider, string? requirementId = null)
     {
         Id = Guid.NewGuid();
         StageId = stageId;
@@ -37,6 +54,7 @@ public class Conversation : Entity, IAggregateRoot
         CurrentPhase = 0;
         TotalPhases = totalPhases;
         QuestionsAsked = 0;
+        RequirementId = requirementId;
         CreatedAt = timeProvider.GetUtcNow();
     }
 
@@ -94,6 +112,18 @@ public class Conversation : Entity, IAggregateRoot
         var record = new TokenUsageRecord(Id, inputTokens, outputTokens, cacheReadInputTokens, cacheWriteInputTokens, timeProvider);
         _tokenUsageRecords.Add(record);
         return record;
+    }
+
+    /// <summary>
+    /// Transitions this conversation to the explicit cross-check orchestration mode.
+    /// Valid only for P6/P7/P8 stages after the forward sweep is complete.
+    /// The mode switch must be requested via the <c>set_orchestration_mode</c> tool —
+    /// it is never inferred from turn counts, requirement counts, or queue state.
+    /// Forward sweep conversations must never call this.
+    /// </summary>
+    public void EnterCrossCheckMode()
+    {
+        OrchestrationMode = OrchestrationMode.CrossCheck;
     }
 
     public void Resume(TimeProvider timeProvider)

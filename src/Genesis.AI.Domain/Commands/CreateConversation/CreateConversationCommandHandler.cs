@@ -49,7 +49,7 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
         var stageType = targetStage.StageType;
         var totalPhases = _promptService.GetTotalPhases(stageType);
 
-        var conversation = new Conversation(request.StageId, totalPhases, _timeProvider);
+        var conversation = new Conversation(request.StageId, totalPhases, _timeProvider, request.RequirementId);
 
         await _conversationRepository.AddAsync(conversation, cancellationToken);
         await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

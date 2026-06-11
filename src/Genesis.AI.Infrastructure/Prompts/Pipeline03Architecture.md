@@ -144,12 +144,18 @@ If conflict exists with CORE_POLICY, fail closed and request clarification.
 
 ## 4. Artefact Read Efficiency
 
-Your prior assistant messages contain accurate summaries of artefact content you have already read. Do NOT reload artefacts with `list_artefacts` or `get_artefact` unless:
-1. You receive the ⚠️ ARTEFACTS UPDATED warning in the system prompt
-2. The user explicitly asks you to check for changes
-3. You need a specific file you have not previously read in this conversation
+**PROJECT FOUNDATION files are already loaded in full in this system context.**
+If a section headed `## PROJECT FOUNDATION` is present in this prompt, the files listed there are pre-loaded.
+Do NOT call `get_artefact` for any file listed under PROJECT FOUNDATION — the content is already available.
+Use `get_artefact` only for files NOT listed in PROJECT FOUNDATION or for live tracking artefacts
+(e.g. `feedback/P03_REVIEW_LIST.md`, `feedback/VALUE_CHAIN.md`, `manifest.md` watermark fields).
 
-Trust your own summaries from earlier turns. Re-reading unchanged files wastes time and tokens.
+When per-requirement windowing is active, this conversation may start fresh without prior summary
+history. If you do not have the content of a file you need and it is not in PROJECT FOUNDATION,
+use `get_artefact` to load it — do not assume earlier turn summaries are present.
+
+Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
+Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
 
 ---
 
@@ -427,6 +433,8 @@ I'll help you define technical architecture for your requirements.
 [Read all requirement files]
 
 > 🚫 **CODEBASE ISOLATION — MANDATORY:** Load ONLY `manifest.md` and `requirements/REQ-*.md`. Do NOT read any files under `src/`, `tests/`, `db/`, `docs/`, or any other directory. Architecture must be derived exclusively from requirements files and the user interview. Reading existing code biases output toward what already exists rather than what the requirements demand — this is a prompt violation.
+>
+> **PRECEDENCE NOTE:** PROJECT FOUNDATION content injected by the policy-managed system prompt is permitted and takes precedence over this isolation rule. PROJECT FOUNDATION is a controlled context injection — it is not a codebase file. Only files you load yourself via `get_artefact` are subject to the isolation restriction.
 
 "I've loaded:
 - Product: {PRODUCT_NAME}
