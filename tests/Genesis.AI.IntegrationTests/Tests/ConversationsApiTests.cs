@@ -339,4 +339,83 @@ public class ConversationsApiTests : IDisposable
         Assert.Contains("Tool execution failed", streamBody, StringComparison.Ordinal);
         Assert.Contains("\"retryCount\":3", streamBody, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenToolLoopReaches35Turns_EmitsNearLimitEvent()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
+
+        // Simulate 36 turns of tool calls (turn 36 triggers the warning at turnsRemaining == 5 after decrement from 6 to 5)
+        // The loop decrements AFTER processing, so the warning fires when turnsRemaining becomes 5 (i.e. turn 36 of 40)
+        using var listArtefactsInput = JsonDocument.Parse("{}");
+
+        var sequence = _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()));
+
+        // 35 turns of tool calls (brings turnsRemaining to 5, triggering the warning)
+        for (var turn = 0; turn < 35; turn++)
+        {
+            sequence = sequence.Returns(CreateStreamEvents(
+            [
+                new AiToolCall("list_artefacts", $"tool-use-{turn}", listArtefactsInput)
+            ]));
+        }
+
+        // Turn 36+ returns text to break the loop
+        sequence.Returns(CreateStreamEvents([new AiTextChunk("Done.")]));
+
+        var streamRequest = new StringContent(
+            """{"content":"list artefacts many times"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{prototypeConversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Contains("event: near_limit", streamBody, StringComparison.Ordinal);
+        Assert.Contains("\"turnsRemaining\":5", streamBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("event: tool_limit_hit", streamBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenToolLoopExhaustsAllTurns_EmitsToolLimitHitEvent()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
+
+        using var listArtefactsInput = JsonDocument.Parse("{}");
+
+        var sequence = _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()));
+
+        // 40 turns of tool calls — exhausts the loop completely
+        for (var turn = 0; turn < 40; turn++)
+        {
+            sequence = sequence.Returns(CreateStreamEvents(
+            [
+                new AiToolCall("list_artefacts", $"tool-use-{turn}", listArtefactsInput)
+            ]));
+        }
+
+        var streamRequest = new StringContent(
+            """{"content":"loop forever"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{prototypeConversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Contains("event: near_limit", streamBody, StringComparison.Ordinal);
+        Assert.Contains("event: tool_limit_hit", streamBody, StringComparison.Ordinal);
+        Assert.Contains("\"turnsUsed\":40", streamBody, StringComparison.Ordinal);
+    }
 }

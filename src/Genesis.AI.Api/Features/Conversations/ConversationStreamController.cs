@@ -358,6 +358,41 @@ public class ConversationStreamController : ControllerBase
                     ToolResults: toolResults));
 
                 turnsRemaining--;
+
+                // Near-limit telemetry: warn when only 5 turns remain so the user can safely checkpoint
+                if (turnsRemaining == 5)
+                {
+                    _logger.LogWarning(
+                        "Tool loop near limit for conversation {ConversationId}, stage {StageType}, requirement {RequirementId}: {TurnsUsed}/{MaxTurns} turns used",
+                        conversation.Id, stageType, conversation.RequirementId ?? "(none)", maxToolTurns - turnsRemaining, maxToolTurns);
+
+                    var nearLimitEventData = JsonSerializer.Serialize(new
+                    {
+                        turnsUsed = maxToolTurns - turnsRemaining,
+                        turnsRemaining,
+                        conversationId = conversation.Id,
+                        requirementId = conversation.RequirementId
+                    });
+                    await Response.WriteAsync($"event: near_limit\ndata: {nearLimitEventData}\n\n", cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                }
+            }
+
+            // Hard-limit telemetry: loop exited without the AI finishing — response was cut off
+            if (turnsRemaining == 0)
+            {
+                _logger.LogError(
+                    "Tool loop hard limit hit for conversation {ConversationId}, stage {StageType}, requirement {RequirementId}: all {MaxTurns} turns exhausted — response was cut off",
+                    conversation.Id, stageType, conversation.RequirementId ?? "(none)", maxToolTurns);
+
+                var limitHitEventData = JsonSerializer.Serialize(new
+                {
+                    turnsUsed = maxToolTurns,
+                    conversationId = conversation.Id,
+                    requirementId = conversation.RequirementId
+                });
+                await Response.WriteAsync($"event: tool_limit_hit\ndata: {limitHitEventData}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
             }
 
             // Store the full AI text response (skip if AI only produced tool calls with no text)
