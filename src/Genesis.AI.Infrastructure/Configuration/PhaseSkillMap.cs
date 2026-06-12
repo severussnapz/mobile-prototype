@@ -11,9 +11,9 @@ namespace Genesis.AI.Infrastructure.Configuration;
 ///   2. Stage skills                   — additional skills applied on every phase of a specific stage.
 ///   3. Phase overrides                — additional skills applied only at a specific phase number.
 ///
-/// Supported stages: Architecture (P03) through Planning (P10).
-/// RequirementsDiscovery (P01) and Prototype (P02) are explicitly excluded —
-/// those stages do not use the active skill injection path.
+/// Supported stages: Prototype (P02) through Planning (P10).
+/// RequirementsDiscovery (P01) is explicitly excluded — it is a pure interview
+/// stage with no guardrail-constrained outputs.
 /// </summary>
 public static class PhaseSkillMap
 {
@@ -32,6 +32,7 @@ public static class PhaseSkillMap
 
     /// <summary>
     /// Additional skills applied on every phase of specific stages.
+    /// P02 Prototype: EMIS webapp design system and accessibility guardrails for HTML prototype output.
     /// P03 Architecture: EMIS microservice design and observability guardrails.
     /// P04 Design: EMIS API standards, auth, C# patterns, DDD, and data access guardrails.
     /// P05 PxD: EMIS webapp design system and accessibility guardrails.
@@ -40,6 +41,13 @@ public static class PhaseSkillMap
     /// </summary>
     private static readonly Dictionary<StageType, string[]> StageSkills = new()
     {
+        [StageType.Prototype] =
+        [
+            "emis-x-webapp-design-system",
+            "emis-x-webapp-accessibility",
+            "design-system-integration",
+            "emis-ui-kit-baseline",
+        ],
         [StageType.Architecture] =
         [
             "emis-x-api-microservice-design",
@@ -191,7 +199,7 @@ public static class PhaseSkillMap
     /// </returns>
     public static IReadOnlyList<string> GetSkillsForPhase(StageType stageType, int phase)
     {
-        if (stageType is StageType.RequirementsDiscovery or StageType.Prototype)
+        if (stageType is StageType.RequirementsDiscovery)
         {
             return [];
         }
@@ -210,6 +218,15 @@ public static class PhaseSkillMap
         }
 
         return skills.AsReadOnly();
+    }
+
+    /// <summary>
+    /// Returns true if the stage has stage-level skills defined, meaning skills are
+    /// pre-injected into the system prompt and <c>get_guardrail_details</c> is redundant.
+    /// </summary>
+    public static bool HasStageSkills(StageType stageType)
+    {
+        return StageSkills.ContainsKey(stageType);
     }
 
     /// <summary>
