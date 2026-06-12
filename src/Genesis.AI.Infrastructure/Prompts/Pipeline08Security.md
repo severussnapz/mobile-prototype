@@ -224,7 +224,8 @@ The API manages all session state automatically. You do NOT write to files or ma
 You have six tools available:
 
 - `save_artefact`
-- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always `get_artefact` immediately before calling this. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, re-read and retry (max 2 retries). Never use on security outputs (SECURITY_ASSURANCE_DATA.json, SDP_EVIDENCE.json, threat_model.md).
+- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 retries). Never use on security outputs (SECURITY_ASSURANCE_DATA.json, SDP_EVIDENCE.json, threat_model.md).
+- `search_in_artefact` — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact` to get the exact verbatim anchor.
 - `advance_phase`
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`
