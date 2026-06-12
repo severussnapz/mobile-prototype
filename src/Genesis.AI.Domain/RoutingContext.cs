@@ -19,4 +19,32 @@ public sealed record RoutingContext(
     bool SecurityFramingPresent = false,
     bool DpiaReferenceExisting = false,
     bool NhsRetentionApplicable = false,
-    bool LawfulBasisConfirmed = false);
+    bool LawfulBasisConfirmed = false)
+{
+    public static RoutingContext Create(
+        StageType stageType,
+        int currentPhase,
+        bool isFirstMessage,
+        bool swaggerPresent,
+        bool prototypePresent,
+        bool hazardRegistryExisting,
+        int hazIdWatermark,
+        bool securityFramingPresent,
+        bool dpiaReferenceExisting,
+        bool nhsRetentionApplicable,
+        bool lawfulBasisConfirmed)
+    {
+        return new RoutingContext(
+            StageType: stageType,
+            CurrentPhase: currentPhase,
+            IsFirstMessage: isFirstMessage,
+            SwaggerPresent: swaggerPresent,
+            PrototypePresent: prototypePresent,
+            HazardRegistryExisting: hazardRegistryExisting,
+            HazIdWatermark: hazIdWatermark,
+            SecurityFramingPresent: securityFramingPresent,
+            DpiaReferenceExisting: dpiaReferenceExisting,
+            NhsRetentionApplicable: nhsRetentionApplicable,
+            LawfulBasisConfirmed: lawfulBasisConfirmed);
+    }
+}

@@ -79,7 +79,7 @@ public sealed class RoutingContextServiceTests
     [InlineData(StageType.Architecture)]
     [InlineData(StageType.Design)]
     [InlineData(StageType.ClinicalSafety)]
-    public async Task BuildRoutingContextAsync_ReturnsCorrectStageType(StageType stageType)
+    public async Task BuildRoutingContextAsync_ValidStageType_ReturnsCorrectStageType(StageType stageType)
     {
         // Arrange
         var conversationId = Guid.NewGuid();
@@ -104,7 +104,7 @@ public sealed class RoutingContextServiceTests
     [InlineData(0)]
     [InlineData(3)]
     [InlineData(12)]
-    public async Task BuildRoutingContextAsync_ReturnsCurrentPhaseFromConversation(int expectedPhase)
+    public async Task BuildRoutingContextAsync_ConversationHasCurrentPhase_ReturnsCurrentPhaseFromConversation(int expectedPhase)
     {
         // Arrange
         var conversationId = Guid.NewGuid();

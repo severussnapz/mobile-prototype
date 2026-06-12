@@ -57,87 +57,24 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
     public async Task AssemblePrototypeAsync(Guid projectId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("PrototypeAssembly: starting assembly for project {ProjectId}", projectId);
-
-        // 1. Load all artefacts for the project
         var allArtefacts = await _artefactRepository.GetByProjectIdAsync(projectId, cancellationToken);
 
-        // 2. Load shell — fail closed if missing
-        var shellArtefact = allArtefacts.FirstOrDefault(artefact =>
-            artefact.FilePath.Equals(ShellPath, StringComparison.OrdinalIgnoreCase));
-
-        if (shellArtefact is null)
-        {
-            _logger.LogWarning("PrototypeAssembly: SHELL_MISSING — {ShellPath} not found, skipping assembly", ShellPath);
-            return;
-        }
-
-        var shell = await _artefactStorageService.GetContentAsync(shellArtefact.S3Key, cancellationToken);
+        var shell = await TryLoadShellAsync(allArtefacts, cancellationToken);
         if (shell is null)
         {
-            _logger.LogWarning("PrototypeAssembly: shell content could not be retrieved, skipping assembly");
             return;
         }
 
-        // 3. Get screen fragments sorted by NN prefix
-        var screenFragments = allArtefacts
-            .Where(artefact => artefact.FilePath.StartsWith(FragmentPrefix, StringComparison.OrdinalIgnoreCase)
-                && System.IO.Path.GetFileName(artefact.FilePath).StartsWith("screen-", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(artefact => ExtractScreenNumber(artefact.FilePath))
-            .ToList();
-
-        // 4. Load optional fragments — only fail closed on styles/app/data when screens exist
-        var stylesArtefact = allArtefacts.FirstOrDefault(artefact =>
-            artefact.FilePath.Equals(StylesPath, StringComparison.OrdinalIgnoreCase));
-        var appArtefact = allArtefacts.FirstOrDefault(artefact =>
-            artefact.FilePath.Equals(AppPath, StringComparison.OrdinalIgnoreCase));
-        var dataArtefact = allArtefacts.FirstOrDefault(artefact =>
-            artefact.FilePath.Equals(DataPath, StringComparison.OrdinalIgnoreCase));
-
-        if (screenFragments.Count > 0 && (stylesArtefact is null || appArtefact is null || dataArtefact is null))
+        var screenFragments = GetScreenFragments(allArtefacts);
+        var supportingFragments = await TryLoadSupportingFragmentsAsync(allArtefacts, screenFragments.Count, cancellationToken);
+        if (supportingFragments is null)
         {
-            _logger.LogWarning(
-                "PrototypeAssembly: screen fragments exist but required fragments missing " +
-                "(styles={StylesMissing}, app={AppMissing}, data={DataMissing}), skipping assembly",
-                stylesArtefact is null, appArtefact is null, dataArtefact is null);
             return;
         }
 
-        var styles = stylesArtefact is not null
-            ? await _artefactStorageService.GetContentAsync(stylesArtefact.S3Key, cancellationToken) ?? string.Empty
-            : string.Empty;
-        var appJs = appArtefact is not null
-            ? await _artefactStorageService.GetContentAsync(appArtefact.S3Key, cancellationToken) ?? string.Empty
-            : string.Empty;
-        var dataJs = dataArtefact is not null
-            ? await _artefactStorageService.GetContentAsync(dataArtefact.S3Key, cancellationToken) ?? string.Empty
-            : string.Empty;
+        var (screensHtml, navHtml) = await BuildScreensAndNavAsync(screenFragments, cancellationToken);
+        var assembled = BuildAssembledDocument(shell, supportingFragments.Value, screensHtml, navHtml);
 
-        // 5. Build screens HTML and nav
-        var screensBuilder = new System.Text.StringBuilder();
-        var navBuilder = new System.Text.StringBuilder();
-
-        foreach (var screenArtefact in screenFragments)
-        {
-            var screenContent = await _artefactStorageService.GetContentAsync(
-                screenArtefact.S3Key, cancellationToken);
-            if (screenContent is not null)
-                screensBuilder.Append(screenContent);
-
-            var navLabel = BuildNavLabel(screenArtefact.FilePath);
-            var screenId = BuildScreenId(screenArtefact.FilePath);
-            navBuilder.AppendLine(System.Globalization.CultureInfo.InvariantCulture,
-                $"<li><a href=\"#{screenId}\" onclick=\"showScreen('{screenId}')\">{navLabel}</a></li>");
-        }
-
-        // 6. Replace markers
-        var assembled = shell
-            .Replace(MarkerStyles, $"<style>\n{styles}\n</style>", StringComparison.Ordinal)
-            .Replace(MarkerNav, navBuilder.ToString(), StringComparison.Ordinal)
-            .Replace(MarkerScreens, screensBuilder.ToString(), StringComparison.Ordinal)
-            .Replace(MarkerData, $"<script>\n{dataJs}\n</script>", StringComparison.Ordinal)
-            .Replace(MarkerApp, $"<script>\n{appJs}\n</script>", StringComparison.Ordinal);
-
-        // 7. Validate assembled output — fail closed
         var validationError = ValidateAssembledOutput(assembled);
         if (validationError is not null)
         {
@@ -147,32 +84,113 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
             return;
         }
 
-        // 8. Persist as new version of prototype/index.html
-        var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
-            projectId, OutputPath, cancellationToken);
+        await PersistAssembledPrototypeAsync(projectId, assembled, screenFragments.Count, cancellationToken);
+    }
 
-        var storageKey = await _artefactStorageService.SaveContentAsync(
-            projectId, OutputPath, nextVersion, assembled, "text/html", cancellationToken);
+    private async Task<string?> TryLoadShellAsync(IReadOnlyList<Artefact> allArtefacts, CancellationToken cancellationToken)
+    {
+        var shellArtefact = allArtefacts.FirstOrDefault(artefact =>
+            artefact.FilePath.Equals(ShellPath, StringComparison.OrdinalIgnoreCase));
 
-        var outputArtefact = Artefact.CreateS3Artefact(
-            projectId,
-            nextVersion,
-            OutputPath,
-            storageKey,
-            "text/html",
-            System.Text.Encoding.UTF8.GetByteCount(assembled),
-            "system-assembly",
-            _timeProvider);
+        if (shellArtefact is null)
+        {
+            _logger.LogWarning("PrototypeAssembly: SHELL_MISSING — {ShellPath} not found, skipping assembly", ShellPath);
+            return null;
+        }
 
-        await _artefactRepository.AddAsync(outputArtefact, cancellationToken);
-        await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
-        await _artefactRepository.DeletePreviousVersionsAsync(
-            projectId, OutputPath, nextVersion, cancellationToken);
+        var shellContent = await _artefactStorageService.GetContentAsync(shellArtefact.S3Key, cancellationToken);
+        if (shellContent is null)
+        {
+            _logger.LogWarning("PrototypeAssembly: shell content could not be retrieved, skipping assembly");
+            return null;
+        }
 
-        _logger.LogInformation(
-            "PrototypeAssembly: assembled {OutputPath} v{Version} ({Screens} screens, {Bytes} bytes)",
-            OutputPath, nextVersion, screenFragments.Count,
-            System.Text.Encoding.UTF8.GetByteCount(assembled));
+        return shellContent;
+    }
+
+    private static List<Artefact> GetScreenFragments(IReadOnlyList<Artefact> allArtefacts)
+    {
+        return allArtefacts
+            .Where(artefact => artefact.FilePath.StartsWith(FragmentPrefix, StringComparison.OrdinalIgnoreCase)
+                && System.IO.Path.GetFileName(artefact.FilePath).StartsWith("screen-", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(artefact => ExtractScreenNumber(artefact.FilePath))
+            .ToList();
+    }
+
+    private async Task<(string Styles, string AppJs, string DataJs)?> TryLoadSupportingFragmentsAsync(
+        IReadOnlyList<Artefact> allArtefacts,
+        int screenCount,
+        CancellationToken cancellationToken)
+    {
+        var stylesArtefact = allArtefacts.FirstOrDefault(artefact =>
+            artefact.FilePath.Equals(StylesPath, StringComparison.OrdinalIgnoreCase));
+        var appArtefact = allArtefacts.FirstOrDefault(artefact =>
+            artefact.FilePath.Equals(AppPath, StringComparison.OrdinalIgnoreCase));
+        var dataArtefact = allArtefacts.FirstOrDefault(artefact =>
+            artefact.FilePath.Equals(DataPath, StringComparison.OrdinalIgnoreCase));
+
+        if (screenCount > 0 && (stylesArtefact is null || appArtefact is null || dataArtefact is null))
+        {
+            _logger.LogWarning(
+                "PrototypeAssembly: screen fragments exist but required fragments missing " +
+                "(styles={StylesMissing}, app={AppMissing}, data={DataMissing}), skipping assembly",
+                stylesArtefact is null, appArtefact is null, dataArtefact is null);
+            return null;
+        }
+
+        var styles = await LoadOptionalFragmentContentAsync(stylesArtefact, cancellationToken);
+        var appJs = await LoadOptionalFragmentContentAsync(appArtefact, cancellationToken);
+        var dataJs = await LoadOptionalFragmentContentAsync(dataArtefact, cancellationToken);
+
+        return (styles, appJs, dataJs);
+    }
+
+    private async Task<string> LoadOptionalFragmentContentAsync(Artefact? artefact, CancellationToken cancellationToken)
+    {
+        if (artefact is null)
+        {
+            return string.Empty;
+        }
+
+        return await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken) ?? string.Empty;
+    }
+
+    private async Task<(string ScreensHtml, string NavHtml)> BuildScreensAndNavAsync(
+        IReadOnlyList<Artefact> screenFragments,
+        CancellationToken cancellationToken)
+    {
+        var screensBuilder = new System.Text.StringBuilder();
+        var navBuilder = new System.Text.StringBuilder();
+
+        foreach (var screenArtefact in screenFragments)
+        {
+            var screenContent = await _artefactStorageService.GetContentAsync(screenArtefact.S3Key, cancellationToken);
+            if (screenContent is not null)
+            {
+                screensBuilder.Append(screenContent);
+            }
+
+            var navLabel = BuildNavLabel(screenArtefact.FilePath);
+            var screenId = BuildScreenId(screenArtefact.FilePath);
+            navBuilder.AppendLine(System.Globalization.CultureInfo.InvariantCulture,
+                $"<li><a href=\"#{screenId}\" onclick=\"showScreen('{screenId}')\">{navLabel}</a></li>");
+        }
+
+        return (screensBuilder.ToString(), navBuilder.ToString());
+    }
+
+    private static string BuildAssembledDocument(
+        string shell,
+        (string Styles, string AppJs, string DataJs) fragments,
+        string screensHtml,
+        string navHtml)
+    {
+        return shell
+            .Replace(MarkerStyles, $"<style>\n{fragments.Styles}\n</style>", StringComparison.Ordinal)
+            .Replace(MarkerNav, navHtml, StringComparison.Ordinal)
+            .Replace(MarkerScreens, screensHtml, StringComparison.Ordinal)
+            .Replace(MarkerData, $"<script>\n{fragments.DataJs}\n</script>", StringComparison.Ordinal)
+            .Replace(MarkerApp, $"<script>\n{fragments.AppJs}\n</script>", StringComparison.Ordinal);
     }
 
     private static string? ValidateAssembledOutput(string html)
@@ -225,5 +243,38 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
     private static string BuildScreenId(string filePath)
     {
         return System.IO.Path.GetFileNameWithoutExtension(filePath);
+    }
+
+    private async Task PersistAssembledPrototypeAsync(
+        Guid projectId,
+        string assembled,
+        int screenCount,
+        CancellationToken cancellationToken)
+    {
+        var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+            projectId, OutputPath, cancellationToken);
+
+        var storageKey = await _artefactStorageService.SaveContentAsync(
+            projectId, OutputPath, nextVersion, assembled, "text/html", cancellationToken);
+
+        var outputArtefact = Artefact.CreateS3Artefact(
+            projectId,
+            nextVersion,
+            OutputPath,
+            storageKey,
+            "text/html",
+            System.Text.Encoding.UTF8.GetByteCount(assembled),
+            "system-assembly",
+            _timeProvider);
+
+        await _artefactRepository.AddAsync(outputArtefact, cancellationToken);
+        await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        await _artefactRepository.DeletePreviousVersionsAsync(
+            projectId, OutputPath, nextVersion, cancellationToken);
+
+        _logger.LogInformation(
+            "PrototypeAssembly: assembled {OutputPath} v{Version} ({Screens} screens, {Bytes} bytes)",
+            OutputPath, nextVersion, screenCount,
+            System.Text.Encoding.UTF8.GetByteCount(assembled));
     }
 }

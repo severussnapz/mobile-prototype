@@ -59,7 +59,7 @@ public sealed class ActiveSkillsServiceTests
     }
 
     [Fact]
-    public async Task BuildActiveSkillsAsync_SkillsJoinedWithSeparator()
+    public async Task BuildActiveSkillsAsync_MultipleSkillsResolved_JoinsSkillsWithSeparator()
     {
         // Arrange
         _skillContentServiceMock

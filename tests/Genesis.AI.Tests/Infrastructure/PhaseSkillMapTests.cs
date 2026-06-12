@@ -13,7 +13,7 @@ public class PhaseSkillMapTests
     // ──────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void AllReferencedSkills_EveryNameResolvesToEmbeddedResource()
+    public void AllReferencedSkills_ReferencedByPhaseMap_ResolvesToEmbeddedResource()
     {
         // Arrange
         var referencedSkills = PhaseSkillMap.AllReferencedSkills();

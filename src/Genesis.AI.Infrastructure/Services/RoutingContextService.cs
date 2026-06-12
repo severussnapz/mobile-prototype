@@ -44,34 +44,48 @@ public sealed class RoutingContextService : IRoutingContextService
         var projectContext = await _conversationRepository.GetProjectContextByStageIdAsync(conversation.StageId, cancellationToken);
         var projectId = projectContext?.ProjectId ?? Guid.Empty;
 
-        var artefacts = projectId != Guid.Empty
-            ? await _artefactRepository.GetByProjectIdAsync(projectId, cancellationToken)
-            : [];
+        var artefacts = await LoadProjectArtefactsAsync(projectId, cancellationToken);
 
         var isFirstMessage = conversation.QuestionsAsked <= 1;
 
-        return new RoutingContext(
-            StageType: stageType,
-            CurrentPhase: conversation.CurrentPhase,
-            IsFirstMessage: isFirstMessage,
-            SwaggerPresent: HasArtefactWithPrefix(artefacts, "swagger/"),
-            PrototypePresent: HasArtefactWithPath(artefacts, "prototype/index.html"),
-            HazardRegistryExisting: HasArtefactWithPrefix(artefacts, "clinical-safety/"),
-            HazIdWatermark: GetHazIdWatermark(artefacts),
-            SecurityFramingPresent: HasArtefactContentMarker(artefacts, "security-framing"),
-            DpiaReferenceExisting: HasArtefactWithPrefix(artefacts, "ig/dpia"),
-            NhsRetentionApplicable: HasNhsSpecialCategoryData(artefacts),
-            LawfulBasisConfirmed: HasArtefactWithPrefix(artefacts, "ig/lawful-basis"));
+        return RoutingContext.Create(
+            stageType: stageType,
+            currentPhase: conversation.CurrentPhase,
+            isFirstMessage: isFirstMessage,
+            swaggerPresent: HasArtefactWithPrefix(artefacts, "swagger/"),
+            prototypePresent: HasArtefactWithPath(artefacts, "prototype/index.html"),
+            hazardRegistryExisting: HasArtefactWithPrefix(artefacts, "clinical-safety/"),
+            hazIdWatermark: GetHazIdWatermark(artefacts),
+            securityFramingPresent: HasArtefactContentMarker(artefacts, "security-framing"),
+            dpiaReferenceExisting: HasArtefactWithPrefix(artefacts, "ig/dpia"),
+            nhsRetentionApplicable: HasNhsSpecialCategoryData(artefacts),
+            lawfulBasisConfirmed: HasArtefactWithPrefix(artefacts, "ig/lawful-basis"));
     }
 
-    private static bool HasArtefactWithPrefix(IReadOnlyList<Artefact> artefacts, string prefix) =>
-        artefacts.Any(artefact => artefact.FilePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    private async Task<IReadOnlyList<Artefact>> LoadProjectArtefactsAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        if (projectId == Guid.Empty)
+        {
+            return [];
+        }
 
-    private static bool HasArtefactWithPath(IReadOnlyList<Artefact> artefacts, string path) =>
-        artefacts.Any(artefact => string.Equals(artefact.FilePath, path, StringComparison.OrdinalIgnoreCase));
+        return await _artefactRepository.GetByProjectIdAsync(projectId, cancellationToken);
+    }
 
-    private static bool HasArtefactContentMarker(IReadOnlyList<Artefact> artefacts, string marker) =>
-        artefacts.Any(artefact => artefact.FilePath.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    private static bool HasArtefactWithPrefix(IReadOnlyList<Artefact> artefacts, string prefix)
+    {
+        return artefacts.Any(artefact => artefact.FilePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasArtefactWithPath(IReadOnlyList<Artefact> artefacts, string path)
+    {
+        return artefacts.Any(artefact => string.Equals(artefact.FilePath, path, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasArtefactContentMarker(IReadOnlyList<Artefact> artefacts, string marker)
+    {
+        return artefacts.Any(artefact => artefact.FilePath.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static int GetHazIdWatermark(IReadOnlyList<Artefact> artefacts)
     {
@@ -89,8 +103,10 @@ public sealed class RoutingContextService : IRoutingContextService
         return watermarkArtefact.Version;
     }
 
-    private static bool HasNhsSpecialCategoryData(IReadOnlyList<Artefact> artefacts) =>
-        artefacts.Any(artefact =>
+    private static bool HasNhsSpecialCategoryData(IReadOnlyList<Artefact> artefacts)
+    {
+        return artefacts.Any(artefact =>
             artefact.FilePath.Contains("clinical", StringComparison.OrdinalIgnoreCase) ||
             artefact.FilePath.Contains("clinical-safety", StringComparison.OrdinalIgnoreCase));
+    }
 }
