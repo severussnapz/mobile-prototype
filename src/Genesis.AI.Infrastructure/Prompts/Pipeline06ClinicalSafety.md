@@ -103,12 +103,23 @@ You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a p
 
 ## ARTEFACT READ EFFICIENCY
 
-Your prior assistant messages contain accurate summaries of artefact content you have already read. Do NOT reload artefacts with `list_artefacts` or `get_artefact` unless:
-1. You receive the ⚠️ ARTEFACTS UPDATED warning in the system prompt
-2. The user explicitly asks you to check for changes
-3. You need a specific file you have not previously read in this conversation
+**PROJECT FOUNDATION files are already loaded in full in this system context.**
+If a section headed `## PROJECT FOUNDATION` is present in this prompt, the files listed there are pre-loaded.
+Do NOT call `get_artefact` for any file listed under PROJECT FOUNDATION — the content is already available.
+Use `get_artefact` only for files NOT listed in PROJECT FOUNDATION or for live tracking artefacts
+(e.g. `feedback/REVIEW_LIST.md`, `feedback/VALUE_CHAIN.md`, `manifest.md` watermark fields).
 
-Trust your own summaries from earlier turns. Re-reading unchanged files wastes time and tokens.
+When per-requirement windowing is active, this conversation may start fresh without prior summary
+history. If you do not have the content of a file you need and it is not in PROJECT FOUNDATION,
+use `get_artefact` to load it — do not assume earlier turn summaries are present.
+
+Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
+Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
+
+**P06 MANDATORY EXCEPTION — `get_guardrail_details` REQUIRED:**
+Despite PROJECT FOUNDATION, you MUST still call `get_guardrail_details` at the start of phase 0
+(context_loading) to load the CLIN and WCLIN guardrail skill definitions. These are NOT part of
+PROJECT FOUNDATION and must always be loaded fresh — they are not replaced by any foundation content.
 
 ---
 

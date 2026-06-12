@@ -52,6 +52,32 @@ public class ConversationRepository : IConversationRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Conversation?> GetByStageAndRequirementIdAsync(
+        Guid stageId,
+        string requirementId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Conversations
+            .Include(conversation => conversation.Messages)
+            .Include(conversation => conversation.TokenUsageRecords)
+            .Where(conversation => conversation.StageId == stageId
+                && conversation.RequirementId == requirementId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Conversation>> GetByStageIdWithRequirementIdsAsync(
+        Guid stageId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Conversations
+            .AsNoTracking()
+            .Where(conversation => conversation.StageId == stageId
+                && conversation.RequirementId != null)
+            .OrderBy(conversation => conversation.RequirementId)
+            .ThenByDescending(conversation => conversation.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<StageType?> GetStageTypeByStageIdAsync(Guid stageId, CancellationToken cancellationToken)
     {
         return await _context.PipelineStages

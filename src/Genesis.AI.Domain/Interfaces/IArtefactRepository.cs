@@ -41,4 +41,10 @@ public interface IArtefactRepository
     /// Used for staleness detection.
     /// </summary>
     Task<DateTimeOffset?> GetLatestArtefactTimestampAsync(Guid projectId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns true if the project already has at least one saved requirements artefact
+    /// (any file matching requirements/REQ-*.md). Used by the advance_requirement completion gate.
+    /// </summary>
+    Task<bool> HasRequirementArtefactAsync(Guid projectId, CancellationToken cancellationToken);
 }

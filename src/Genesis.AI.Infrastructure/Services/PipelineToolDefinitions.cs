@@ -22,6 +22,8 @@ public static class PipelineToolDefinitions
     public const string GetGuardrailDetails = "get_guardrail_details";
     public const string ListArtefacts = "list_artefacts";
     public const string GetArtefact = "get_artefact";
+    public const string SetOrchestrationMode = "set_orchestration_mode";
+    public const string AdvanceRequirement = "advance_requirement";
 
     private static IReadOnlyList<AiToolDefinition> BuildTools()
     {
@@ -186,6 +188,57 @@ public static class PipelineToolDefinitions
                         }
                     },
                     "required": ["skill_name"]
+                }
+                """)),
+
+            new AiToolDefinition(
+                Name: SetOrchestrationMode,
+                Description: "Explicitly switch the orchestration mode for this conversation. " +
+                             "Use ONLY to enter 'cross_check' mode after completing the forward sweep in P6/P7/P8. " +
+                             "DO NOT call this during the forward sweep — cross_check mode must never be inferred from " +
+                             "turn counts, requirement counts, or queue state. Only one cross-check conversation " +
+                             "should exist per stage run.",
+                InputSchema: JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "mode": {
+                            "type": "string",
+                            "enum": ["cross_check"],
+                            "description": "The orchestration mode to enter. Only 'cross_check' is a valid transition target."
+                        },
+                        "justification": {
+                            "type": "string",
+                            "description": "Explanation of why the cross-check mode is being entered now (e.g. 'Forward sweep complete for all N requirements. Entering cross-check to verify HAZ-ID monotonicity.')."
+                        }
+                    },
+                    "required": ["mode", "justification"]
+                }
+                """))
+        ,
+
+            new AiToolDefinition(
+                Name: AdvanceRequirement,
+                Description: "Signal that you have fully completed the current requirement conversation. " +
+                             "Call this ONLY after you have saved the requirement artefact (requirements/REQ-xxx.md) " +
+                             "for this requirement in the current session. " +
+                             "The API will reject this call if no requirement artefact has been persisted yet — " +
+                             "save the artefact first, then call this tool. " +
+                             "Do not call this tool to advance between interview phases — use advance_phase for that.",
+                InputSchema: JsonDocument.Parse("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "requirement_id": {
+                            "type": "string",
+                            "description": "The requirement identifier being completed (e.g. 'REQ-001'). Must match the requirement assigned to this conversation."
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Brief one-line summary of what was captured for this requirement."
+                        }
+                    },
+                    "required": ["requirement_id"]
                 }
                 """))
         ];

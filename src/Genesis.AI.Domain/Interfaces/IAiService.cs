@@ -11,7 +11,7 @@ public interface IAiService
     /// Sends a conversation to the AI and returns the full response.
     /// </summary>
     Task<AiResponse> GenerateResponseAsync(
-        string systemPrompt,
+        AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         CancellationToken cancellationToken);
 
@@ -19,15 +19,17 @@ public interface IAiService
     /// Sends a conversation to the AI and streams the response token by token.
     /// </summary>
     IAsyncEnumerable<string> StreamResponseAsync(
-        string systemPrompt,
+        AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         CancellationToken cancellationToken);
 
     /// <summary>
     /// Streams the AI response with tool use support. Yields text chunks and completed tool calls.
+    /// The system prompt is split into a stable foundation part (placed before the Bedrock cache
+    /// point) and a mutable part (placed after, not cached).
     /// </summary>
     IAsyncEnumerable<AiStreamEvent> StreamWithToolsAsync(
-        string systemPrompt,
+        AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         IReadOnlyList<AiToolDefinition> tools,
         CancellationToken cancellationToken);

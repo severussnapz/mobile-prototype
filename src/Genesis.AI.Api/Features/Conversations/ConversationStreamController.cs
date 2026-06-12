@@ -6,10 +6,12 @@ using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
+using Genesis.AI.Infrastructure.Configuration;
 using Genesis.AI.Infrastructure.Services;
 using Genesis.AI.Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Genesis.AI.Api.Features.Conversations;
 
@@ -31,6 +33,8 @@ public class ConversationStreamController : ControllerBase
     private readonly IAiService _aiService;
     private readonly IPromptService _promptService;
     private readonly ISkillContentService _skillContentService;
+    private readonly IFoundationService _foundationService;
+    private readonly TokenOptimisationOptions _tokenOptimisationOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConversationStreamController> _logger;
 
@@ -41,6 +45,8 @@ public class ConversationStreamController : ControllerBase
         IAiService aiService,
         IPromptService promptService,
         ISkillContentService skillContentService,
+        IFoundationService foundationService,
+        IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
         TimeProvider timeProvider,
         ILogger<ConversationStreamController> logger)
     {
@@ -50,6 +56,8 @@ public class ConversationStreamController : ControllerBase
         _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _skillContentService = skillContentService ?? throw new ArgumentNullException(nameof(skillContentService));
+        _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
+        _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -158,14 +166,48 @@ public class ConversationStreamController : ControllerBase
             }
         }
 
-        var systemPrompt = $"{basePrompt}\n\n---\n\n## PROJECT CONTEXT (from project creation)\n\n{projectContextSection}\n\n---\n\n## CURRENT SESSION STATE (managed by API)\n\n{stateContext}";
-
-        if (!string.IsNullOrEmpty(artefactManifestSection))
+        // Build split AiSystemPrompt: stable part (cached) + mutable part (fresh each turn)
+        AiSystemPrompt aiSystemPrompt;
+        if (_tokenOptimisationOptions.FoundationPrefixEnabled && stageType.HasValue)
         {
-            systemPrompt += $"\n\n---\n\n## PROJECT ARTEFACTS (use get_artefact tool to read content)\n\n{artefactManifestSection}";
-        }
+            var foundationContent = await _foundationService.BuildFoundationContentAsync(
+                projectId, stageType.Value, cancellationToken);
 
-        systemPrompt += stalenessNotice;
+            var stablePart = string.IsNullOrEmpty(foundationContent)
+                ? basePrompt
+                : $"{basePrompt}\n\n---\n\n{foundationContent}";
+
+            var mutablePart = $"## PROJECT CONTEXT (from project creation)\n\n{projectContextSection}\n\n---\n\n## CURRENT SESSION STATE (managed by API)\n\n{stateContext}";
+
+            if (!string.IsNullOrEmpty(artefactManifestSection))
+            {
+                mutablePart += $"\n\n---\n\n## PROJECT ARTEFACTS (live manifest — use get_artefact for unlisted files)\n\n{artefactManifestSection}";
+            }
+
+            mutablePart += stalenessNotice;
+
+            aiSystemPrompt = new AiSystemPrompt(StablePart: stablePart, MutablePart: mutablePart);
+
+            _logger.LogInformation(
+                "Foundation prefix active for stage {StageType}: stable part {StableChars} chars, mutable part {MutableChars} chars",
+                stageType.Value,
+                stablePart.Length,
+                mutablePart.Length);
+        }
+        else
+        {
+            // Foundation prefix disabled — legacy single-prompt path
+            var systemPrompt = $"{basePrompt}\n\n---\n\n## PROJECT CONTEXT (from project creation)\n\n{projectContextSection}\n\n---\n\n## CURRENT SESSION STATE (managed by API)\n\n{stateContext}";
+
+            if (!string.IsNullOrEmpty(artefactManifestSection))
+            {
+                systemPrompt += $"\n\n---\n\n## PROJECT ARTEFACTS (use get_artefact tool to read content)\n\n{artefactManifestSection}";
+            }
+
+            systemPrompt += stalenessNotice;
+
+            aiSystemPrompt = AiSystemPrompt.FromFullPrompt(systemPrompt);
+        }
 
         var fullResponse = new System.Text.StringBuilder();
         var savedArtefacts = new List<Artefact>();
@@ -179,7 +221,11 @@ public class ConversationStreamController : ControllerBase
 
         try
         {
-            const int maxToolTurns = 40; // Safety limit to prevent infinite tool loops (needs headroom for Phase 11 saving 15+ files one-at-a-time)
+            const int defaultMaxToolTurns = 40; // Safety limit to prevent infinite tool loops (needs headroom for Phase 11 saving 15+ files one-at-a-time)
+            var maxToolTurns = stageType.HasValue &&
+                _tokenOptimisationOptions.StageToolTurnLimits.TryGetValue(stageType.Value.ToString(), out var stageLimit)
+                ? stageLimit
+                : defaultMaxToolTurns;
             var turnsRemaining = maxToolTurns;
 
             while (turnsRemaining > 0)
@@ -191,7 +237,7 @@ public class ConversationStreamController : ControllerBase
                 var needsNewlineSeparator = fullResponse.Length > 0 && fullResponse[^1] != '\n';
 
                 await foreach (var streamEvent in _aiService.StreamWithToolsAsync(
-                    systemPrompt, aiMessages, PipelineToolDefinitions.All, cancellationToken))
+                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.All, cancellationToken))
                 {
                     switch (streamEvent)
                     {
@@ -316,6 +362,41 @@ public class ConversationStreamController : ControllerBase
                     ToolResults: toolResults));
 
                 turnsRemaining--;
+
+                // Near-limit telemetry: warn when only 5 turns remain so the user can safely checkpoint
+                if (turnsRemaining == 5)
+                {
+                    _logger.LogWarning(
+                        "Tool loop near limit for conversation {ConversationId}, stage {StageType}, requirement {RequirementId}: {TurnsUsed}/{MaxTurns} turns used",
+                        conversation.Id, stageType, conversation.RequirementId ?? "(none)", maxToolTurns - turnsRemaining, maxToolTurns);
+
+                    var nearLimitEventData = JsonSerializer.Serialize(new
+                    {
+                        turnsUsed = maxToolTurns - turnsRemaining,
+                        turnsRemaining,
+                        conversationId = conversation.Id,
+                        requirementId = conversation.RequirementId
+                    });
+                    await Response.WriteAsync($"event: near_limit\ndata: {nearLimitEventData}\n\n", cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                }
+            }
+
+            // Hard-limit telemetry: loop exited without the AI finishing — response was cut off
+            if (turnsRemaining == 0)
+            {
+                _logger.LogError(
+                    "Tool loop hard limit hit for conversation {ConversationId}, stage {StageType}, requirement {RequirementId}: all {MaxTurns} turns exhausted — response was cut off",
+                    conversation.Id, stageType, conversation.RequirementId ?? "(none)", maxToolTurns);
+
+                var limitHitEventData = JsonSerializer.Serialize(new
+                {
+                    turnsUsed = maxToolTurns,
+                    conversationId = conversation.Id,
+                    requirementId = conversation.RequirementId
+                });
+                await Response.WriteAsync($"event: tool_limit_hit\ndata: {limitHitEventData}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
             }
 
             // Store the full AI text response (skip if AI only produced tool calls with no text)
@@ -367,6 +448,8 @@ public class ConversationStreamController : ControllerBase
             PipelineToolDefinitions.AddParkingLotItem => "Adding parking lot item...",
             PipelineToolDefinitions.ResolveParkingLotItem => "Resolving parking lot item...",
             PipelineToolDefinitions.GetGuardrailDetails => $"Loading {GetToolInputString(toolCall, "skill_name") ?? "guardrail"} guidelines...",
+            PipelineToolDefinitions.SetOrchestrationMode => "Entering cross-check mode...",
+            PipelineToolDefinitions.AdvanceRequirement => $"Completing requirement {GetToolInputString(toolCall, "requirement_id") ?? string.Empty}...",
             _ => $"Running {toolCall.ToolName}..."
         };
 
@@ -747,6 +830,81 @@ public class ConversationStreamController : ControllerBase
                     "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars)",
                     filePath, artefact.Version, artefactContent.Length);
                 return $"## {filePath} (v{artefact.Version})\n\n{artefactContent}";
+            }
+
+            case PipelineToolDefinitions.AdvanceRequirement:
+            {
+                var requirementIdInput = root.TryGetProperty("requirement_id", out var reqProp)
+                    ? reqProp.GetString()
+                    : null;
+                var summary = root.TryGetProperty("summary", out var summaryProp)
+                    ? summaryProp.GetString()
+                    : null;
+
+                // Contract 1 gate: at least one requirements/REQ-*.md must exist for this project,
+                // either saved via tool in this session or persisted in a prior session.
+                var hasRequirementArtefact =
+                    savedArtefacts.Any(artefact =>
+                        artefact.FilePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase)
+                        && artefact.FilePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                    || await _artefactRepository.HasRequirementArtefactAsync(projectId, cancellationToken);
+
+                if (!hasRequirementArtefact)
+                {
+                    _logger.LogWarning(
+                        "Tool advance_requirement blocked by completion gate for conversation {ConversationId}, requirement {RequirementId}: no requirement artefact saved in this session",
+                        conversation.Id, requirementIdInput ?? "(unknown)");
+                    return "Error: requirement_completion_gate_failed: You must save the requirement artefact (requirements/REQ-xxx.md) before signalling completion. Save the artefact first, then call advance_requirement.";
+                }
+
+                conversation.Complete();
+                await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation(
+                    "Tool advance_requirement: requirement {RequirementId} completed for conversation {ConversationId}. Summary: {Summary}",
+                    requirementIdInput ?? "(none)", conversation.Id, summary ?? "(none)");
+
+                // Emit SSE here (inside the gate-passed path) so it only fires on success
+                var requirementCompletedEvent = JsonSerializer.Serialize(new
+                {
+                    requirementId = conversation.RequirementId,
+                    conversationId = conversation.Id
+                });
+                await Response.WriteAsync($"event: requirement_complete\ndata: {requirementCompletedEvent}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
+
+                return $"Requirement {requirementIdInput ?? conversation.RequirementId ?? "(unknown)"} marked complete.";
+            }
+
+            case PipelineToolDefinitions.SetOrchestrationMode:
+            {
+                var modeValue = root.GetProperty("mode").GetString()!;
+                var justification = root.TryGetProperty("justification", out var jProp) ? jProp.GetString() : null;
+
+                // Only cross_check is a valid transition target
+                if (!string.Equals(modeValue, "cross_check", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning("Tool set_orchestration_mode: invalid mode requested: {Mode}", modeValue);
+                    return $"Invalid mode '{modeValue}'. Only 'cross_check' is a valid transition target via this tool.";
+                }
+
+                // Guard: only valid for P6/P7/P8 (ClinicalSafety, InformationGovernance, Security)
+                if (stageType is not (StageType.ClinicalSafety or StageType.InformationGovernance or StageType.Security))
+                {
+                    _logger.LogWarning(
+                        "Tool set_orchestration_mode: cross_check requested on invalid stage {StageType}",
+                        stageType);
+                    return $"Cross-check mode is only valid for P6 (clinical_safety), P7 (information_governance), and P8 (security). Current stage: {stageType}.";
+                }
+
+                conversation.EnterCrossCheckMode();
+                await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation(
+                    "Orchestration mode set to cross_check for conversation {ConversationId}, stage {StageType}. Justification: {Justification}",
+                    conversation.Id, stageType, justification ?? "(none provided)");
+
+                return $"Orchestration mode set to cross_check. Forward sweep is complete. Beginning cross-requirement consistency check.";
             }
 
             default:

@@ -38,6 +38,7 @@ public sealed class GenesisAiDbContext(
             modelBuilder.HasPostgresEnum<ParkingLotPriority>("parking_lot_priority");
             modelBuilder.HasPostgresEnum<ParkingLotStatus>("parking_lot_status");
             modelBuilder.HasPostgresEnum<MessageRole>("message_role");
+            modelBuilder.HasPostgresEnum<OrchestrationMode>("orchestration_mode");
         }
 
         modelBuilder.ApplyConfiguration(new ProjectEntityTypeConfiguration());

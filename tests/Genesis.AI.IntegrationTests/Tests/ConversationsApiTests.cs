@@ -103,6 +103,16 @@ public class ConversationsApiTests : IDisposable
         return (projectId, prototypeConversationId);
     }
 
+    private static async Task SeedRequirementArtefactAsync(HttpClient client, string projectId, string filePath, string content)
+    {
+        var artefactPayload = new StringContent(
+            $$$"""{"artefacts":[{"filePath":"{{{filePath}}}","contentType":"text/markdown","content":"{{{content}}}"}]}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
+        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
+    }
+
     private static async IAsyncEnumerable<AiStreamEvent> CreateStreamEvents(
         IReadOnlyList<AiStreamEvent> events,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -223,7 +233,7 @@ public class ConversationsApiTests : IDisposable
 
         _factory.AiServiceMock
             .SetupSequence(service => service.StreamWithToolsAsync(
-                It.IsAny<string>(),
+                It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()))
@@ -279,7 +289,7 @@ public class ConversationsApiTests : IDisposable
 
         _factory.AiServiceMock
             .SetupSequence(service => service.StreamWithToolsAsync(
-                It.IsAny<string>(),
+                It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()))
@@ -318,7 +328,7 @@ public class ConversationsApiTests : IDisposable
 
         _factory.AiServiceMock
             .Setup(service => service.StreamWithToolsAsync(
-                It.IsAny<string>(),
+                It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()))
@@ -338,5 +348,176 @@ public class ConversationsApiTests : IDisposable
         Assert.Contains("event: error", streamBody, StringComparison.Ordinal);
         Assert.Contains("Tool execution failed", streamBody, StringComparison.Ordinal);
         Assert.Contains("\"retryCount\":3", streamBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenToolLoopReaches35Turns_EmitsNearLimitEvent()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
+
+        // Simulate 36 turns of tool calls (turn 36 triggers the warning at turnsRemaining == 5 after decrement from 6 to 5)
+        // The loop decrements AFTER processing, so the warning fires when turnsRemaining becomes 5 (i.e. turn 36 of 40)
+        using var listArtefactsInput = JsonDocument.Parse("{}");
+
+        var sequence = _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()));
+
+        // 35 turns of tool calls (brings turnsRemaining to 5, triggering the warning)
+        for (var turn = 0; turn < 35; turn++)
+        {
+            sequence = sequence.Returns(CreateStreamEvents(
+            [
+                new AiToolCall("list_artefacts", $"tool-use-{turn}", listArtefactsInput)
+            ]));
+        }
+
+        // Turn 36+ returns text to break the loop
+        sequence.Returns(CreateStreamEvents([new AiTextChunk("Done.")]));
+
+        var streamRequest = new StringContent(
+            """{"content":"list artefacts many times"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{prototypeConversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Contains("event: near_limit", streamBody, StringComparison.Ordinal);
+        Assert.Contains("\"turnsRemaining\":5", streamBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("event: tool_limit_hit", streamBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenToolLoopExhaustsAllTurns_EmitsToolLimitHitEvent()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
+
+        using var listArtefactsInput = JsonDocument.Parse("{}");
+
+        var sequence = _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()));
+
+        // 40 turns of tool calls — exhausts the loop completely
+        for (var turn = 0; turn < 40; turn++)
+        {
+            sequence = sequence.Returns(CreateStreamEvents(
+            [
+                new AiToolCall("list_artefacts", $"tool-use-{turn}", listArtefactsInput)
+            ]));
+        }
+
+        var streamRequest = new StringContent(
+            """{"content":"loop forever"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{prototypeConversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Contains("event: near_limit", streamBody, StringComparison.Ordinal);
+        Assert.Contains("event: tool_limit_hit", streamBody, StringComparison.Ordinal);
+        Assert.Contains("\"turnsUsed\":40", streamBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenAdvanceRequirementCalledWithoutRequirementArtefact_BlocksCompletionWithGateError()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, stageId) = await CreateProjectAndGetFirstStageAsync(client);
+
+        // No requirement artefact seeded — gate must block
+        var conversationPayload = new StringContent(
+            $$$"""{"stageId":"{{{stageId}}}","requirementId":"REQ-001"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var createConversationResponse = await client.PostAsync("/api/v1/conversations", conversationPayload);
+        var createConversationBody = await createConversationResponse.Content.ReadAsStringAsync();
+        using var createConversationDoc = JsonDocument.Parse(createConversationBody);
+        var conversationId = createConversationDoc.RootElement.GetProperty("data").GetProperty("id").GetString()!;
+
+        using var advanceRequirementInput = JsonDocument.Parse("""{"requirement_id":"REQ-001","summary":"Done"}""");
+
+        _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            // Turn 1: AI attempts to advance without saving — gate error returned as tool result
+            .Returns(CreateStreamEvents(
+            [
+                new AiToolCall("advance_requirement", "tool-use-advance", advanceRequirementInput)
+            ]))
+            // Turn 2: AI acknowledges and stops
+            .Returns(CreateStreamEvents([new AiTextChunk("I need to save the artefact first.")]));
+
+        var streamRequest = new StringContent(
+            """{"content":"mark this requirement done"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        // Gate blocked — requirement_complete event must not be emitted
+        Assert.DoesNotContain("event: requirement_complete", streamBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAiResponse_WhenAdvanceRequirementCalledWithExistingRequirementArtefact_EmitsRequirementCompleteEvent()
+    {
+        var client = _factory.CreateAdminClient();
+        var (projectId, stageId) = await CreateProjectAndGetFirstStageAsync(client);
+
+        // Pre-seed requirement artefact via REST endpoint (simulates artefact saved in a prior session)
+        await SeedRequirementArtefactAsync(
+            client,
+            projectId,
+            "requirements/REQ-001_patient_search.md",
+            "# REQ-001\n\nCapture patient search requirement.");
+
+        var conversationPayload = new StringContent(
+            $$$"""{"stageId":"{{{stageId}}}","requirementId":"REQ-001"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var createConversationResponse = await client.PostAsync("/api/v1/conversations", conversationPayload);
+        var createConversationBody = await createConversationResponse.Content.ReadAsStringAsync();
+        using var createConversationDoc = JsonDocument.Parse(createConversationBody);
+        var conversationId = createConversationDoc.RootElement.GetProperty("data").GetProperty("id").GetString()!;
+
+        using var advanceRequirementInput = JsonDocument.Parse("""{"requirement_id":"REQ-001","summary":"Patient search captured"}""");
+
+        _factory.AiServiceMock
+            .SetupSequence(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(CreateStreamEvents(
+            [
+                new AiToolCall("advance_requirement", "tool-use-advance", advanceRequirementInput)
+            ]))
+            .Returns(CreateStreamEvents([new AiTextChunk("Requirement REQ-001 complete.")]));
+
+        var streamRequest = new StringContent(
+            """{"content":"mark this requirement done"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
+        var streamBody = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.Contains("event: requirement_complete", streamBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("requirement_completion_gate_failed", streamBody, StringComparison.Ordinal);
     }
 }

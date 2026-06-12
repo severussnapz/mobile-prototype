@@ -13,6 +13,13 @@ public sealed class ConversationResource
     [JsonPropertyName("projectId")]
     public Guid ProjectId { get; set; }
 
+    [JsonPropertyName("requirementId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RequirementId { get; init; }
+
+    [JsonPropertyName("orchestrationMode")]
+    public string OrchestrationMode { get; init; } = "forward_sweep";
+
     [JsonPropertyName("status")]
     public string Status { get; init; } = null!;
 

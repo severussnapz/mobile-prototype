@@ -12,6 +12,9 @@ public class ConversationMappingProfile : Profile
                 dest => dest.Status,
                 opts => opts.MapFrom(src => src.Status.ToString().ToLowerInvariant()))
             .ForMember(
+                dest => dest.OrchestrationMode,
+                opts => opts.MapFrom(src => ToSnakeCase(src.OrchestrationMode.ToString())))
+            .ForMember(
                 dest => dest.Messages,
                 opts => opts.MapFrom(src => src.Messages.Count > 0 ? src.Messages.OrderBy(message => message.CreatedAt).ToList() : null))
             .ForMember(
@@ -35,5 +38,10 @@ public class ConversationMappingProfile : Profile
         CreateMap<MessageImage, MessageImageResource>();
 
         CreateMap<MessageDocument, MessageDocumentResource>();
+    }
+
+    private static string ToSnakeCase(string value)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(value, "(?<=[a-z])([A-Z])", "_$1").ToLowerInvariant();
     }
 }
