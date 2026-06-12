@@ -9,9 +9,7 @@ internal static class ArtefactToolBuilder
     {
         return new AiToolDefinition(
             Name: PipelineToolDefinitions.SaveArtefact,
-            Description: "Save a file artefact (e.g. manifest.md, requirements/REQ-001.md) to the project's artefact store. " +
-                         "Call this whenever you produce a complete file output. If the same file_path is saved again, it creates a new version. " +
-                         "Write your full response text first, then call this tool — you will not get another turn.",
+            Description: """Save a file artefact (e.g. manifest.md, requirements/REQ-001.md) to the project's artefact store. Call this whenever you produce a complete file output. If the same file_path is saved again, it creates a new version. Write your full response text first, then call this tool — you will not get another turn.""",
             InputSchema: JsonDocument.Parse("""
             {
                 "type": "object",

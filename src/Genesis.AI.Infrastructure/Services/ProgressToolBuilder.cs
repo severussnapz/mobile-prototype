@@ -9,10 +9,7 @@ internal static class ProgressToolBuilder
     {
         return new AiToolDefinition(
             Name: PipelineToolDefinitions.UpdateProgress,
-            // guardrail:skip=SEC-002:JSON schema literal, not SQL
-            Description: "Update session progress metrics. Call this after each question-answer exchange. " +
-                         "Do NOT output progress numbers in your chat text — use this tool instead. " +
-                         "You can call this alongside other tools (e.g. add_parking_lot_item) in the same turn.",
+            Description: """Update session progress metrics. Call this after each question-answer exchange. Do NOT output progress numbers in your chat text — use this tool instead. You can call this alongside other tools (e.g. add_parking_lot_item) in the same turn.""",
             InputSchema: JsonDocument.Parse("""
             {
                 "type": "object",
@@ -39,11 +36,7 @@ internal static class ProgressToolBuilder
     {
         return new AiToolDefinition(
             Name: PipelineToolDefinitions.SetOrchestrationMode,
-            Description: "Explicitly switch the orchestration mode for this conversation. " +
-                         "Use ONLY to enter 'cross_check' mode after completing the forward sweep in P6/P7/P8. " +
-                         "DO NOT call this during the forward sweep — cross_check mode must never be inferred from " +
-                         "turn counts, requirement counts, or queue state. Only one cross-check conversation " +
-                         "should exist per stage run.",
+            Description: """Explicitly switch the orchestration mode for this conversation. Use ONLY to enter 'cross_check' mode after completing the forward sweep in P6/P7/P8. DO NOT call this during the forward sweep — cross_check mode must never be inferred from turn counts, requirement counts, or queue state. Only one cross-check conversation should exist per stage run.""",
             InputSchema: JsonDocument.Parse("""
             {
                 "type": "object",
