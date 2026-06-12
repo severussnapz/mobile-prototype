@@ -40,6 +40,8 @@ public class ConversationMappingProfile : Profile
         CreateMap<MessageDocument, MessageDocumentResource>();
     }
 
-    private static string ToSnakeCase(string value) =>
-        System.Text.RegularExpressions.Regex.Replace(value, "(?<=[a-z])([A-Z])", "_$1").ToLowerInvariant();
+    private static string ToSnakeCase(string value)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(value, "(?<=[a-z])([A-Z])", "_$1").ToLowerInvariant();
+    }
 }

@@ -90,7 +90,7 @@ public class StageFoundationMapTests
     }
 
     [Fact]
-    public void IsFoundationArtefact_PathMatchIsCaseInsensitive()
+    public void IsFoundationArtefact_PathDiffersInCase_ReturnsTrue()
     {
         var result = StageFoundationMap.IsFoundationArtefact(
             StageType.Architecture, "REQUIREMENTS/REQ-001.MD");
@@ -99,7 +99,7 @@ public class StageFoundationMapTests
     }
 
     [Fact]
-    public void IsFoundationArtefact_ManifestMdIsNeverAFoundationArtefact()
+    public void IsFoundationArtefact_ManifestMd_ReturnsFalse()
     {
         // manifest.md is Category C (live tracking) — must never be included in foundation
         foreach (var stage in Enum.GetValues<StageType>())

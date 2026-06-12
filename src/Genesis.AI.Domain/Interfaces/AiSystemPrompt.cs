@@ -19,6 +19,8 @@ public record AiSystemPrompt(string StablePart, string MutablePart)
     /// is treated as the stable part and the mutable part is empty.
     /// Used when the foundation-prefix feature flag is disabled.
     /// </summary>
-    public static AiSystemPrompt FromFullPrompt(string fullPrompt) =>
-        new(StablePart: fullPrompt, MutablePart: string.Empty);
+    public static AiSystemPrompt FromFullPrompt(string fullPrompt)
+    {
+        return new AiSystemPrompt(StablePart: fullPrompt, MutablePart: string.Empty);
+    }
 }

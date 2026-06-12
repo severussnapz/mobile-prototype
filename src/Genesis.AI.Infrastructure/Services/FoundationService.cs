@@ -1,4 +1,5 @@
 using System.Text;
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -70,13 +71,34 @@ public sealed class FoundationService : IFoundationService
             projectId, stageType, foundationArtefacts.Count);
 
         var builder = new StringBuilder();
+        AppendFoundationHeader(builder);
+
+        var (loadedCount, totalChars) = await AppendFoundationArtefactsAsync(
+            builder, foundationArtefacts, cancellationToken);
+
+        _logger.LogInformation(
+            "Foundation content built for project {ProjectId}, stage {StageType}: " +
+            "{LoadedCount}/{ArtefactCount} artefact(s), {TotalChars} total chars",
+            projectId, stageType, loadedCount, foundationArtefacts.Count, totalChars);
+
+        return builder.ToString();
+    }
+
+    private static void AppendFoundationHeader(StringBuilder builder)
+    {
         builder.AppendLine("## PROJECT FOUNDATION");
         builder.AppendLine();
         builder.AppendLine("The following upstream artefacts are loaded in full in this system context.");
         builder.AppendLine("**Do not call `get_artefact` for any file listed here** — the content is already available below.");
         builder.AppendLine("Use `get_artefact` only for files not listed in PROJECT FOUNDATION or for live tracking artefacts.");
         builder.AppendLine();
+    }
 
+    private async Task<(int LoadedCount, int TotalChars)> AppendFoundationArtefactsAsync(
+        StringBuilder builder,
+        IReadOnlyList<Artefact> foundationArtefacts,
+        CancellationToken cancellationToken)
+    {
         var totalChars = 0;
         var loadedCount = 0;
 
@@ -111,11 +133,6 @@ public sealed class FoundationService : IFoundationService
             loadedCount++;
         }
 
-        _logger.LogInformation(
-            "Foundation content built for project {ProjectId}, stage {StageType}: " +
-            "{LoadedCount}/{ArtefactCount} artefact(s), {TotalChars} total chars",
-            projectId, stageType, loadedCount, foundationArtefacts.Count, totalChars);
-
-        return builder.ToString();
+        return (loadedCount, totalChars);
     }
 }

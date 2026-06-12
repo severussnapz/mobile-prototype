@@ -103,6 +103,16 @@ public class ConversationsApiTests : IDisposable
         return (projectId, prototypeConversationId);
     }
 
+    private static async Task SeedRequirementArtefactAsync(HttpClient client, string projectId, string filePath, string content)
+    {
+        var artefactPayload = new StringContent(
+            $$$"""{"artefacts":[{"filePath":"{{{filePath}}}","contentType":"text/markdown","content":"{{{content}}}"}]}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
+        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
+    }
+
     private static async IAsyncEnumerable<AiStreamEvent> CreateStreamEvents(
         IReadOnlyList<AiStreamEvent> events,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -470,12 +480,11 @@ public class ConversationsApiTests : IDisposable
         var (projectId, stageId) = await CreateProjectAndGetFirstStageAsync(client);
 
         // Pre-seed requirement artefact via REST endpoint (simulates artefact saved in a prior session)
-        var artefactPayload = new StringContent(
-            $$$"""{"artefacts":[{"filePath":"requirements/REQ-001_patient_search.md","contentType":"text/markdown","content":"# REQ-001\n\nCapture patient search requirement."}]}""",
-            System.Text.Encoding.UTF8,
-            "application/json");
-        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
-        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
+        await SeedRequirementArtefactAsync(
+            client,
+            projectId,
+            "requirements/REQ-001_patient_search.md",
+            "# REQ-001\n\nCapture patient search requirement.");
 
         var conversationPayload = new StringContent(
             $$$"""{"stageId":"{{{stageId}}}","requirementId":"REQ-001"}""",
