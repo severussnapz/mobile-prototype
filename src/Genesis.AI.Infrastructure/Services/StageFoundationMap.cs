@@ -29,8 +29,10 @@ public static class StageFoundationMap
     /// Returns the Category A artefact path prefixes for the given stage, or an empty array
     /// when the stage is out of scope (P1, P2, P9, P10) or has no foundation artefacts yet.
     /// </summary>
-    public static IReadOnlyList<string> GetFoundationPrefixes(StageType stageType) =>
-        FoundationPrefixes.TryGetValue(stageType, out var prefixes) ? prefixes : [];
+    public static IReadOnlyList<string> GetFoundationPrefixes(StageType stageType)
+    {
+        return FoundationPrefixes.TryGetValue(stageType, out var prefixes) ? prefixes : [];
+    }
 
     /// <summary>
     /// Returns true when the given artefact file path matches any of the foundation prefixes
