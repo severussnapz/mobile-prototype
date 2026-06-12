@@ -9,6 +9,7 @@ internal static class ProgressToolBuilder
     {
         return new AiToolDefinition(
             Name: PipelineToolDefinitions.UpdateProgress,
+            // guardrail:skip=SEC-002:JSON schema literal, not SQL
             Description: "Update session progress metrics. Call this after each question-answer exchange. " +
                          "Do NOT output progress numbers in your chat text — use this tool instead. " +
                          "You can call this alongside other tools (e.g. add_parking_lot_item) in the same turn.",
