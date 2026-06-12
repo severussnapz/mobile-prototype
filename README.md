@@ -1,12 +1,12 @@
 # Genesis AI Requirements API
 
-Backend REST API for the **Genesis AI Requirements Platform** — an orchestration system that guides product teams through a structured 8-stage requirements pipeline using AI-driven interviews, artefact generation, and stage progression management.
+Backend REST API for the **Genesis AI Requirements Platform** — an orchestration system that guides product teams through a structured 10-stage requirements pipeline using AI-driven interviews, artefact generation, and stage progression management.
 
 ---
 
 ## What It Does
 
-The platform orchestrates an end-to-end requirements lifecycle where each stage is powered by an AI interviewer (Claude Sonnet 4 via AWS Bedrock) that asks structured questions, captures requirements as artefacts, and manages cross-cutting concerns in a parking lot.
+The platform orchestrates an end-to-end requirements lifecycle where each stage is powered by an AI interviewer (Claude Sonnet 4.6 via AWS Bedrock) that asks structured questions, captures requirements as artefacts, and manages cross-cutting concerns in a parking lot.
 
 ### Pipeline Stages
 
@@ -17,9 +17,11 @@ The platform orchestrates an end-to-end requirements lifecycle where each stage 
 | 3 | Architecture | Technical architecture decisions (ADRs, BDAT, failure modes) |
 | 4 | Design | Implementation design (OpenAPI contracts, DDL schemas, interfaces) |
 | 5 | PxD | Product & UX design (user flows, wireframes, accessibility) |
-| 6 | Clinical Safety | DCB0129/0160 compliance (hazard log, guardrail mapping) |
-| 7 | Normalisation | Transform human-readable requirements into machine-readable JSON |
-| 8 | Planning | Generate dependency-ordered task files for coding agents |
+| 6 | Clinical Safety | DCB0129/0160 compliance (hazard log, guardrail mapping) — clinical domains only |
+| 7 | Information Governance | DPIA, data flows, lawful basis, records of processing |
+| 8 | Security | Threat modelling, security review workbook, control mapping |
+| 9 | Normalisation | Transform human-readable requirements into machine-readable JSON |
+| 10 | Planning | Generate dependency-ordered task files for coding agents |
 
 ---
 
@@ -109,6 +111,8 @@ Stages can be revisited in any order. When a user returns to a stage after other
 | `list_artefacts` | Discover what files exist | Read-only (returns file list) |
 | `get_artefact` | Read a specific file's content | Read-only (returns content) |
 | `get_guardrail_details` | Load a skill/guardrail document | Read-only (returns skill content) |
+| `advance_requirement` | Move to the next requirement window (per-requirement processing) | Completes the current requirement conversation and opens the next |
+| `set_orchestration_mode` | Switch between `forward_sweep` and `cross_check` modes (P6–P8) | Updates the conversation's orchestration mode |
 
 ---
 
@@ -116,7 +120,7 @@ Stages can be revisited in any order. When a user returns to a stage after other
 
 ```
 Project (aggregate root)
-├── PipelineStage × 8 (auto-created)
+├── PipelineStage × 10 (auto-created)
 │   └── Conversations (one or more per stage)
 │       ├── Messages (user + assistant turns)
 │       └── ParkingLotItems (stored per-conversation)
@@ -269,7 +273,7 @@ tests/
 ├── Genesis.AI.ApiTests/         # E2E tests (Refit, hits running API)
 └── Genesis.AI.TestFramework/    # Shared utilities (MockTokenGenerator)
 db/
-├── migrations/                  # Flyway SQL (V1, V2)
+├── migrations/                  # Flyway SQL (V1–V9)
 ├── seeds/                       # Per-project seed files (<project-code>.sql); all run on boot
 localstack/
 └── init-s3.sh                   # Creates genesis-ai-artefacts bucket on LocalStack startup
@@ -298,7 +302,7 @@ JWT Bearer with scope-based policies. Every controller action requires `[Authori
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/v1/projects` | Create project (auto-creates 8 stages) |
+| POST | `/api/v1/projects` | Create project (auto-creates 10 stages) |
 | GET | `/api/v1/projects` | List projects (optional `?status=` filter) |
 | GET | `/api/v1/projects/{id}` | Get project with stages |
 | DELETE | `/api/v1/projects/{id}` | Soft-delete |
@@ -353,8 +357,15 @@ Flyway format: `V{version}__description.sql` in `db/migrations/`.
 
 - `V1__initial_schema.sql` — Initial schema (tables, enums, indexes)
 - `V2__artefact_content_to_s3.sql` — Drops `content` column from `artefacts` table; adds `s3_key`, `content_type`, `size_bytes`
+- `V3__project_code_unique_excludes_deleted.sql` — Partial unique index so soft-deleted project codes can be reused
+- `V4__add_notes_and_decisions.sql` — Adds notes and decisions tables
+- `V5__add_project_time_sheet_code.sql` — Adds timesheet code to projects
+- `V6__add_ig_security_pipeline_stages.sql` — Adds Information Governance and Security stage types
+- `V7__backfill_ig_security_pipeline_stages.sql` — Backfills the new stages onto existing projects
+- `V8__add_requirement_id_to_conversation.sql` — Adds `requirement_id` column + index (per-requirement windowing)
+- `V9__add_orchestration_mode_to_conversation.sql` — Adds `orchestration_mode` enum type + column (forward sweep / cross-check)
 
-To add a new migration: create the next versioned file (e.g. `V3__description.sql`) and rebuild.
+To add a new migration: create the next versioned file (e.g. `V10__description.sql`) and rebuild.
 
 ### Enum Handling
 
@@ -413,9 +424,12 @@ dotnet test tests/Genesis.AI.ApiTests/
 10. **Up to 40 tool turns** — Generous limit for output-heavy phases (e.g., saving 15+ requirement files)
 11. **Prompt caching** — Cache checkpoint after system prompt; 90% cost reduction on repeated context in tool loops
 12. **Per-turn token tracking** — Every Bedrock response records input, output, cache read, and cache write tokens with cost estimation
+13. **Foundation prompt prefix** — Stable upstream artefacts (Category A) are loaded in full and placed *before* the Bedrock cache point so they are cached across turns (~10× cheaper cached tokens). Mapped per stage by `StageFoundationMap` and assembled by `FoundationService`. Toggled via `TokenOptimisation:FoundationPrefixEnabled`
+14. **Per-requirement windowing** — Conversations can be scoped to a single requirement (`requirement_id`), giving each a bounded message window. The AI moves between requirements with the `advance_requirement` tool. Toggled via `TokenOptimisation:RequirementWindowingEnabled`
+15. **Explicit orchestration modes** — `forward_sweep` (default, windowed) and `cross_check` (non-windowed holistic pass for P6–P8). The mode is switched explicitly via `set_orchestration_mode`, never inferred. Toggled via `TokenOptimisation:NonWindowedCrossCheckEnabled`
 
 ---
 
 ## Guardrail Compliance
 
-Platform: `emis-x-api` (ref v2.0.0). Suppressions documented in .guardrail-suppressions.yaml.
+Platform: `emis-x-api` (ref v2.0.1). Suppressions documented in .guardrail-suppressions.yaml.
