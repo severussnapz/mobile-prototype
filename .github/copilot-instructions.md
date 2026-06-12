@@ -30,7 +30,7 @@ rtk proxy <cmd>       # Run raw (no filtering) but track usage
 
 ## Project Overview
 
-Backend REST API for the Genesis AI Requirements Platform. Orchestrates an 8-stage requirements pipeline through AI-driven conversations, artefact generation, and stage management.
+Backend REST API for the Genesis AI Requirements Platform. Orchestrates a 10-stage requirements pipeline through AI-driven conversations, artefact generation, and stage management.
 
 **Tech Stack:** .NET 10.0, ASP.NET Core, Entity Framework Core, PostgreSQL 17, MediatR (CQRS), AutoMapper, FluentValidation, AWS Bedrock (Claude Sonnet 4.6), AWSSDK.S3 (LocalStack locally), Docker, Flyway migrations.
 
@@ -77,7 +77,7 @@ src/
 └── Genesis.AI.Infrastructure/   # Data access + external services
     ├── EntityConfigurations/    # EF Core fluent API config
     ├── Repositories/            # IProjectRepository, IConversationRepository, IArtefactRepository
-    ├── Services/                # BedrockAiService, EmbeddedPromptService, SkillContentService, PipelineToolDefinitions, S3ArtefactStorageService
+    ├── Services/                # BedrockAiService, EmbeddedPromptService, SkillContentService, PipelineToolDefinitions, S3ArtefactStorageService, FoundationService, StageFoundationMap
     ├── Skills/                  # Embedded skill content (.md files) injected into AI context
     └── Prompts/                 # Stage-specific system prompts (embedded resources)
 ```
@@ -101,8 +101,8 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 ### Domain Model
 
 **Aggregate Roots:**
-- `Project` — Contains `PipelineStage` collection. Auto-initialises 8 stages on creation. Supports soft-delete.
-- `Conversation` — Contains `Message` and `ParkingLotItem` collections. Tracks phase progress, questions asked, requirements captured.
+- `Project` — Contains `PipelineStage` collection. Auto-initialises 10 stages on creation. Supports soft-delete.
+- `Conversation` — Contains `Message` and `ParkingLotItem` collections. Tracks phase progress, questions asked, requirements captured. Optionally scoped to a single requirement via `RequirementId` (per-requirement windowing) and carries an `OrchestrationMode` (forward sweep / cross-check).
 - `Artefact` — Metadata stored in DB; content stored in S3 (LocalStack locally). Properties: `S3Key`, `ContentType`, `SizeBytes`. Use `CreateS3Artefact` factory. Versioned per file path per project.
 
 **Child Entities (not aggregate roots):**
@@ -118,7 +118,7 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 - `ParkingLotItemResponse` includes `ConversationId` so the frontend can call conversation-level mutation endpoints (resolve/defer/delete) from the project-level view.
 
 **Key Behaviours:**
-- `Project` constructor auto-creates 8 pipeline stages with correct sort order; only RequirementsDiscovery starts as NotStarted, all others start Blocked
+- `Project` constructor auto-creates 10 pipeline stages with correct sort order; only RequirementsDiscovery starts as NotStarted, all others start Blocked
 - `Project.RecalculateStatus()` calls `UnblockAvailableStages()` which checks prerequisites and transitions Blocked → NotStarted when dependencies are satisfied
 - `PipelineStage.Start()` / `.Complete()` / `.Skip()` / `.Block()` / `.Reopen()` — state transitions with iteration tracking
 - `Conversation.AddMessage()` / `.AdvancePhase()` / `.SetPhase()` / `.UpdateProgress()` / `.Complete()` / `.Pause()` / `.Resume()`
@@ -152,6 +152,7 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 | `ArchitectureConverse` | arch, admin |
 | `ProductDesignConverse` | pxd, admin |
 | `ClinicalSafetyConverse` | clin, admin |
+| `AdminOnly` | admin |
 
 Every controller action MUST have `[Authorize(Policy = "...")]` or `[AllowAnonymous]` (AUTH-004 guardrail).
 
@@ -190,12 +191,13 @@ Default values use `HasDefaultValueSql("'value'::enum_type")`, never `HasDefault
 |---------|----------------|--------|
 | `ComplianceDomain` | `compliance_domain` | clinical_uk, generic, finance |
 | `ProjectStatus` | `project_status` | discovery, in_progress, complete, archived |
-| `StageType` | `stage_type` | requirements_discovery, prototype, architecture, design, pxd, clinical_safety, normalisation, planning |
+| `StageType` | `stage_type` | requirements_discovery, prototype, architecture, design, pxd, clinical_safety, information_governance, security, normalisation, planning |
 | `PipelineStageStatus` | `pipeline_stage_status` | not_started, in_progress, complete, blocked |
 | `ConversationStatus` | `conversation_status` | active, completed, paused |
 | `ParkingLotPriority` | `parking_lot_priority` | critical, high, medium |
 | `ParkingLotStatus` | `parking_lot_status` | open, resolved, deferred |
 | `MessageRole` | `message_role` | user, assistant, system |
+| `OrchestrationMode` | `orchestration_mode` | forward_sweep, cross_check |
 
 ### Code Structure Rules
 
@@ -219,6 +221,13 @@ Location: `db/migrations/` (Flyway format: `V{version}__description.sql`)
 Current migrations:
 - `V1__initial_schema.sql` — Initial schema (tables, enums, indexes)
 - `V2__artefact_content_to_s3.sql` — Drops `content` column; adds `s3_key`, `content_type`, `size_bytes`
+- `V3__project_code_unique_excludes_deleted.sql` — Partial unique index so soft-deleted project codes can be reused
+- `V4__add_notes_and_decisions.sql` — Adds notes and decisions tables
+- `V5__add_project_time_sheet_code.sql` — Adds timesheet code to projects
+- `V6__add_ig_security_pipeline_stages.sql` — Adds `information_governance` and `security` stage types
+- `V7__backfill_ig_security_pipeline_stages.sql` — Backfills the new stages onto existing projects
+- `V8__add_requirement_id_to_conversation.sql` — Adds `requirement_id` column + index (per-requirement windowing)
+- `V9__add_orchestration_mode_to_conversation.sql` — Adds `orchestration_mode` enum type + column (forward sweep / cross-check)
 
 ### Adding Migrations
 
@@ -294,7 +303,7 @@ dotnet test tests/Genesis.AI.ApiTests/
 
 | Method | Path | Policy | Purpose |
 |--------|------|--------|---------|
-| POST | `/projects` | ProjectWrite | Create project (auto-creates 8 stages) |
+| POST | `/projects` | ProjectWrite | Create project (auto-creates 10 stages) |
 | GET | `/projects` | ProjectRead | List projects (optional `?status=` filter) |
 | GET | `/projects/{id}` | ProjectRead | Get project with stages |
 | DELETE | `/projects/{id}` | ProjectWrite | Soft-delete |
@@ -362,6 +371,11 @@ Artefact content lives in S3; the `artefacts` table stores metadata and the S3 k
 - **Provider:** AWS Bedrock → Claude Sonnet 4.6 (via `AWSSDK.BedrockRuntime`)
 - **Service:** `BedrockAiService` implements `IAiService` — handles multi-turn tool loop with `IAsyncEnumerable<AiStreamEvent>`
 - **Prompt caching:** Cache checkpoint placed after the system prompt block to avoid re-processing the large system prompt on every tool loop turn (90% cost reduction on cached tokens)
+- **Split system prompt:** `AiSystemPrompt` (record with `StablePart` / `MutablePart`, factory `FromFullPrompt`) splits the prompt around the Bedrock cache point. The stable part holds the base stage prompt + Category A foundation artefacts; the mutable part holds session state, the artefact manifest and staleness notices
+- **Foundation prefix:** `FoundationService` (implements `IFoundationService`) builds the stable "Category A" foundation content \u2014 upstream artefacts loaded in full and placed *before* the cache point so they are cached across turns (~10\u00d7 cheaper cached tokens). `StageFoundationMap` maps each P3\u2013P8 stage to its foundation path prefixes and exposes `IsFoundationArtefact`
+- **Per-requirement windowing:** Conversations can be scoped to a single `RequirementId`, giving each a bounded message window; the AI moves between requirements via the `advance_requirement` tool (gated by a completion check)
+- **Orchestration modes:** `OrchestrationMode` is either `forward_sweep` (default, windowed) or `cross_check` (non-windowed holistic pass for P6\u2013P8). Switched explicitly via the `set_orchestration_mode` tool \u2014 never inferred
+- **Feature toggles:** the `TokenOptimisation` config section gates these behaviours \u2014 `FoundationPrefixEnabled`, `RequirementWindowingEnabled`, `NonWindowedCrossCheckEnabled`
 - **Prompts:** `EmbeddedPromptService` — system prompts per stage type stored as embedded `.md` resources in `Infrastructure/Prompts/`
   - `Pipeline01RequirementsDiscovery.md` — Structured requirements interview (13 phases)
   - `Pipeline02Prototype.md` — Generates single-file HTML prototypes for requirements validation
@@ -369,10 +383,12 @@ Artefact content lives in S3; the `artefacts` table stores metadata and the S3 k
   - `Pipeline04Design.md` — API contracts, database schema, component interfaces
   - `Pipeline05Pxd.md` — Product experience design review
   - `Pipeline06ClinicalSafety.md` — DCB0129 hazard analysis
-  - `Pipeline07Normalisation.md` — Cross-cutting extraction and normalisation
-  - `Pipeline08Planning.md` — Task generation and dependency ordering
+  - `Pipeline07InformationGovernance.md` — DPIA, data flows, lawful basis, records of processing
+  - `Pipeline08Security.md` — Threat modelling, security review workbook, control mapping
+  - `Pipeline09Normalisation.md` — Cross-cutting extraction and normalisation
+  - `Pipeline10Planning.md` — Task generation and dependency ordering
 - **Skills:** `SkillContentService` — loads guardrail/steer skill content from `Infrastructure/Skills/` for injection into AI context
-- **Tool definitions:** `PipelineToolDefinitions` — defines AI tools (save_artefact, advance_phase, update_progress, add_parking_lot_item, resolve_parking_lot_item, list_artefacts, get_artefact, get_guardrail_details)
+- **Tool definitions:** `PipelineToolDefinitions` — defines AI tools (save_artefact, advance_phase, update_progress, add_parking_lot_item, resolve_parking_lot_item, list_artefacts, get_artefact, get_guardrail_details, advance_requirement, set_orchestration_mode)
 - **Streaming:** SSE via `text/event-stream` content type from `ConversationStreamController`
 - **Tool loop:** Up to 40 tool turns per message (generous limit for output-heavy phases saving 15+ files)
 
@@ -420,6 +436,8 @@ When a user returns to a stage after other stages have modified artefacts:
 | `list_artefacts` | Discover what files exist | Read-only |
 | `get_artefact` | Read a specific file's content | Read-only |
 | `get_guardrail_details` | Load a skill/guardrail document | Read-only |
+| `advance_requirement` | Move to the next requirement window | Completes the current requirement conversation and opens the next |
+| `set_orchestration_mode` | Switch between `forward_sweep` and `cross_check` (P6–P8) | Updates the conversation's orchestration mode |
 
 ### SSE Streaming Events
 
@@ -434,6 +452,9 @@ The `/api/v1/conversations/{id}/stream` endpoint sends real-time events:
 | `event: parking_lot_item` | `add_parking_lot_item` tool | `{id, content, priority, status, sourcePhase}` |
 | `event: parking_lot_resolved` | `resolve_parking_lot_item` tool | `{id, status}` |
 | `event: usage` | End of each AI turn | `{inputTokens, outputTokens, totalTokens, cacheReadInputTokens, cacheWriteInputTokens, cumulativeInputTokens, cumulativeOutputTokens}` |
+| `event: near_limit` | Tool loop approaching the per-message tool-turn limit | `{toolTurns, maxToolTurns}` — early-warning telemetry |
+| `event: tool_limit_hit` | Tool loop reached the per-message tool-turn limit | `{toolTurns, maxToolTurns}` — the turn was truncated |
+| `event: requirement_complete` | `advance_requirement` tool | `{requirementId}` — current requirement window finished |
 | `event: error` | AI stream error | `{error, reason}` — AI generation failure |
 | `data: [DONE]` | Stream complete | End-of-stream marker |
 
@@ -457,7 +478,7 @@ Suppressions are documented in `.guardrail-suppressions.yaml` with justification
 3. **Register enums at all three levels** — driver, UseNpgsql options, HasPostgresEnum
 4. **Soft-delete only** — Projects set `IsDeleted = true`, never physically deleted
 5. **Stage reopening** — Completed stages can be re-entered; increments iteration counter
-6. **Stage prerequisites** — Prototype requires RequirementsDiscovery complete; Architecture/Design/Pxd require Prototype complete; ClinicalSafety requires Architecture, Design, AND Pxd all complete (permanently blocked for non-clinical domains); Normalisation requires Arch+Design+Pxd complete and ClinicalSafety complete or permanently blocked; Planning requires Normalisation complete
+6. **Stage prerequisites** — Prototype requires RequirementsDiscovery complete; Architecture/Design/Pxd require Prototype complete; ClinicalSafety requires Architecture, Design, AND Pxd all complete (permanently blocked for non-clinical domains); InformationGovernance requires Arch+Design+Pxd complete and ClinicalSafety complete or non-clinical; Security requires InformationGovernance complete; Normalisation requires Security complete; Planning requires Normalisation complete
 7. **Conventional commits** — `feat:`, `fix:`, `refactor:`, etc.
 8. **Every action needs auth** — `[Authorize(Policy = "...")]` on all controller actions (AUTH-004)
 9. **Descriptive lambda parameters** — no single-letter params like `a`, `c`, `x` (ENG-011)
