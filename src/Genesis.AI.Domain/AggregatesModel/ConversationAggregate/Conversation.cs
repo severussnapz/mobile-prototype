@@ -31,6 +31,13 @@ public class Conversation : Entity, IAggregateRoot
     /// </summary>
     public OrchestrationMode OrchestrationMode { get; private set; } = OrchestrationMode.ForwardSweep;
 
+    /// <summary>
+    /// When this conversation is a continuation of a previous one (e.g. after hitting the
+    /// tool-use limit), this references the ID of the conversation it continues from.
+    /// Used by the stream controller to inject a handover context block into the system prompt.
+    /// </summary>
+    public Guid? ContinuedFromConversationId { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? ResumedAt { get; private set; }
 
@@ -45,7 +52,7 @@ public class Conversation : Entity, IAggregateRoot
 
     private Conversation() { } // Required for EF Core
 
-    public Conversation(Guid stageId, int totalPhases, TimeProvider timeProvider, string? requirementId = null)
+    public Conversation(Guid stageId, int totalPhases, TimeProvider timeProvider, string? requirementId = null, Guid? continuedFromConversationId = null)
     {
         Id = Guid.NewGuid();
         StageId = stageId;
@@ -55,6 +62,7 @@ public class Conversation : Entity, IAggregateRoot
         TotalPhases = totalPhases;
         QuestionsAsked = 0;
         RequirementId = requirementId;
+        ContinuedFromConversationId = continuedFromConversationId;
         CreatedAt = timeProvider.GetUtcNow();
     }
 

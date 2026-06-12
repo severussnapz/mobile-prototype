@@ -15,4 +15,12 @@ public sealed class CreateConversationRequest
     /// </summary>
     [JsonPropertyName("requirementId")]
     public string? RequirementId { get; init; }
+
+    /// <summary>
+    /// When set, the new conversation is a continuation of this conversation (e.g. after
+    /// hitting the tool-use limit). The stream controller will inject a handover block into
+    /// the system prompt so the AI knows where the previous conversation left off.
+    /// </summary>
+    [JsonPropertyName("continuedFromConversationId")]
+    public Guid? ContinuedFromConversationId { get; init; }
 }

@@ -68,6 +68,9 @@ public class ConversationEntityTypeConfiguration : IEntityTypeConfiguration<Conv
             .IsRequired()
             .HasDefaultValueSql("'forward_sweep'::orchestration_mode");
 
+        builder.Property(conversation => conversation.ContinuedFromConversationId)
+            .HasColumnName("continued_from_conversation_id");
+
         builder.HasMany(conversation => conversation.Messages)
             .WithOne()
             .HasForeignKey(message => message.ConversationId)

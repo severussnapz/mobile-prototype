@@ -54,7 +54,7 @@ public class ConversationsController : ControllerBase
 
         try
         {
-            var command = new CreateConversationCommand(request.StageId, request.RequirementId);
+            var command = new CreateConversationCommand(request.StageId, request.RequirementId, request.ContinuedFromConversationId);
             var conversationId = await _mediator.Send(command, cancellationToken);
 
             var conversation = await _mediator.Send(
