@@ -280,7 +280,7 @@ Each phase has a dedicated skill file injected by the platform.
 
 ## ✨ WRITE PROTOCOL — MANDATORY
 
-> 📝 For each requirement, write `## PxD (Added by Pipeline 05)` immediately after completing Phases 1–11 — before moving to the next requirement.
+> 📝 **WRITE NOW — MANDATORY:** For each requirement, write to the REQ file **one at a time**. Write `## PxD (Added by Pipeline 05)` immediately after completing Phases 1–11 for that requirement — before moving to the next. After each write: log `"✅ REQ{N} PxD section written ({M}/{TOTAL} complete). Moving to REQ{N+1}."` then discard that requirement's PxD details from working context before processing the next requirement. Do NOT batch multiple requirements in memory before writing.
 
 ---
 

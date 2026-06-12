@@ -434,9 +434,7 @@ Each phase has a dedicated skill file injected into this session by the platform
 
 ## ✨ WRITE PROTOCOL — MANDATORY
 
-> 📝 **Write immediately.** As soon as the user confirms "Correct" for each requirement's Phase 2 BDAT, write the `## Architecture (Added by Pipeline 03)` section to that requirement's file **before** proceeding to the next requirement. Do NOT accumulate writes.
-
-After each write: log `"✅ REQ{N} Architecture section written ({M}/{TOTAL} complete). Moving to REQ{N+1}."`
+> 📝 **WRITE NOW — MANDATORY:** For each requirement, write to the REQ file **one at a time**. As soon as the user confirms "Correct" for each requirement's Phase 2 BDAT, write the `## Architecture (Added by Pipeline 03)` section to that requirement's file **before** proceeding to the next requirement. After each write: log `"✅ REQ{N} Architecture section written ({M}/{TOTAL} complete). Moving to REQ{N+1}."` then discard that requirement's architecture details from working context before processing the next requirement. Do NOT accumulate writes or batch multiple requirements in memory before writing.
 
 ---
 

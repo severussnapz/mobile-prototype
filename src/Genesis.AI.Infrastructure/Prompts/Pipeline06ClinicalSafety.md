@@ -274,7 +274,7 @@ Each phase has a dedicated skill file injected by the platform.
 
 ## ✨ WRITE PROTOCOL — MANDATORY
 
-> 📝 For each requirement, write `## Clinical Safety (Added by Pipeline 06)` only after the P06 Completeness Gate passes and CSO has signed off.
+> 📝 **WRITE NOW — MANDATORY:** For each requirement, write to the REQ file **one at a time**. Write `## Clinical Safety (Added by Pipeline 06)` only after the P06 Completeness Gate passes and CSO has signed off for that requirement. After each write: log `"✅ REQ{N} Clinical Safety section written ({M}/{TOTAL} complete). Moving to REQ{N+1}."` then discard that requirement's hazard and control details from working context before processing the next requirement. Do NOT batch multiple requirements in memory before writing.
 
 ---
 
