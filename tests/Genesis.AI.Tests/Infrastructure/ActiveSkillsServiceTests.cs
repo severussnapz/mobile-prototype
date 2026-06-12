@@ -17,7 +17,6 @@ public sealed class ActiveSkillsServiceTests
 
     [Theory]
     [InlineData(StageType.RequirementsDiscovery)]
-    [InlineData(StageType.Prototype)]
     public async Task BuildActiveSkillsAsync_ExcludedStage_ReturnsEmptyString(StageType stageType)
     {
         // Arrange

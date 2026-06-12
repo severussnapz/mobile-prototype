@@ -35,7 +35,6 @@ public class PhaseSkillMapTests
 
     [Theory]
     [InlineData(StageType.RequirementsDiscovery)]
-    [InlineData(StageType.Prototype)]
     public void GetSkillsForPhase_ExcludedStage_ReturnsEmpty(StageType stageType)
     {
         // Act
@@ -43,6 +42,17 @@ public class PhaseSkillMapTests
 
         // Assert
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public void GetSkillsForPhase_Prototype_ReturnsDesignSystemSkills()
+    {
+        // Act
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.Prototype, phase: 0);
+
+        // Assert
+        Assert.Contains("emis-x-webapp-design-system", result);
+        Assert.Contains("emis-x-webapp-accessibility", result);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

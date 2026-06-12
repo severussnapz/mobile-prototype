@@ -105,8 +105,15 @@ public class ConversationsApiTests : IDisposable
 
     private static async Task SeedRequirementArtefactAsync(HttpClient client, string projectId, string filePath, string content)
     {
+        var payload = new
+        {
+            artefacts = new[]
+            {
+                new { filePath, contentType = "text/markdown", content }
+            }
+        };
         var artefactPayload = new StringContent(
-            $$$"""{"artefacts":[{"filePath":"{{{filePath}}}","contentType":"text/markdown","content":"{{{content}}}"}]}""",
+            System.Text.Json.JsonSerializer.Serialize(payload),
             System.Text.Encoding.UTF8,
             "application/json");
         var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
@@ -351,13 +358,12 @@ public class ConversationsApiTests : IDisposable
     }
 
     [Fact]
-    public async Task StreamAiResponse_WhenToolLoopReaches35Turns_EmitsNearLimitEvent()
+    public async Task StreamAiResponse_WhenToolLoopReaches55Turns_EmitsNearLimitEvent()
     {
         var client = _factory.CreateAdminClient();
         var (_, prototypeConversationId) = await PreparePrototypeConversationAsync(client);
 
-        // Simulate 36 turns of tool calls (turn 36 triggers the warning at turnsRemaining == 5 after decrement from 6 to 5)
-        // The loop decrements AFTER processing, so the warning fires when turnsRemaining becomes 5 (i.e. turn 36 of 40)
+        // The loop limit is 60 turns. near_limit fires when turnsRemaining drops to 5 (i.e. after turn 55 of 60).
         using var listArtefactsInput = JsonDocument.Parse("{}");
 
         var sequence = _factory.AiServiceMock
@@ -367,8 +373,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()));
 
-        // 35 turns of tool calls (brings turnsRemaining to 5, triggering the warning)
-        for (var turn = 0; turn < 35; turn++)
+        // 55 turns of tool calls (brings turnsRemaining to 5, triggering the near_limit warning)
+        for (var turn = 0; turn < 55; turn++)
         {
             sequence = sequence.Returns(CreateStreamEvents(
             [
@@ -376,7 +382,7 @@ public class ConversationsApiTests : IDisposable
             ]));
         }
 
-        // Turn 36+ returns text to break the loop
+        // Turn 56+ returns text to break the loop
         sequence.Returns(CreateStreamEvents([new AiTextChunk("Done.")]));
 
         var streamRequest = new StringContent(
@@ -407,8 +413,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
                 It.IsAny<CancellationToken>()));
 
-        // 40 turns of tool calls — exhausts the loop completely
-        for (var turn = 0; turn < 40; turn++)
+        // 60 turns of tool calls — exhausts the loop completely (default max is 60)
+        for (var turn = 0; turn < 60; turn++)
         {
             sequence = sequence.Returns(CreateStreamEvents(
             [
@@ -426,7 +432,7 @@ public class ConversationsApiTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
         Assert.Contains("event: near_limit", streamBody, StringComparison.Ordinal);
         Assert.Contains("event: tool_limit_hit", streamBody, StringComparison.Ordinal);
-        Assert.Contains("\"turnsUsed\":40", streamBody, StringComparison.Ordinal);
+        Assert.Contains("\"turnsUsed\":60", streamBody, StringComparison.Ordinal);
     }
 
     [Fact]
