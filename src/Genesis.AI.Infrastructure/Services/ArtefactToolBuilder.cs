@@ -9,7 +9,7 @@ internal static class ArtefactToolBuilder
     {
         return new AiToolDefinition(
             Name: PipelineToolDefinitions.SaveArtefact,
-            Description: """Save a file artefact (e.g. manifest.md, requirements/REQ-001.md) to the project's artefact store. Call this whenever you produce a complete file output. If the same file_path is saved again, it creates a new version. Write your full response text first, then call this tool — you will not get another turn.""",
+            Description: """Save a file artefact (e.g. manifest.md, requirements/REQ-001.md) to the project's artefact store. Call this whenever you produce a complete file output. If the same file_path is saved again, it creates a new version. Write your full response text first, then call this tool — you will not get another turn. ⚠️ For large files (>10KB), prefer using edit_artefact for surgical changes instead — it will succeed where save_artefact runs out of tokens. Only use save_artefact for new files or complete regeneration of small files.""",
             InputSchema: JsonDocument.Parse("""
             {
                 "type": "object",
@@ -59,7 +59,6 @@ internal static class ArtefactToolBuilder
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        // guardrail:skip=SEC-002:JSON schema literal, not SQL
                         "description": "The exact file path of the artefact to retrieve (as shown by list_artefacts)."
                     }
                 },
@@ -74,8 +73,8 @@ internal static class ArtefactToolBuilder
             Name: PipelineToolDefinitions.EditArtefact,
             Description: "Make a surgical edit to an existing artefact by replacing an exact anchor string with new content. " +
                          "Use this for changes affecting less than ~30% of a file — far cheaper than regenerating the whole file. " +
-                         "IMPORTANT: Before calling this, always fetch the file fresh with get_artefact — your cached content may be stale. " +
-                         "On ANCHOR_NOT_FOUND or ANCHOR_AMBIGUOUS errors, re-read the file and retry (maximum 2 retries).",
+                         "IMPORTANT: Before calling this, use search_in_artefact to find the exact text to anchor against — do NOT guess or reconstruct from memory. " +
+                         "On ANCHOR_NOT_FOUND or ANCHOR_AMBIGUOUS errors, search_in_artefact again and retry (maximum 2 retries).",
             InputSchema: JsonDocument.Parse("""
             {
                 "type": "object",
@@ -86,7 +85,7 @@ internal static class ArtefactToolBuilder
                     },
                     "old_str": {
                         "type": "string",
-                        "description": "The exact string to find and replace. Must appear exactly once in the file."
+                        "description": "The exact verbatim string to find and replace. Must appear exactly once in the file. Copy it character-for-character from search_in_artefact results."
                     },
                     "new_str": {
                         "type": "string",
@@ -94,6 +93,32 @@ internal static class ArtefactToolBuilder
                     }
                 },
                 "required": ["file_path", "old_str", "new_str"]
+            }
+            """));
+    }
+
+    internal static AiToolDefinition BuildSearchInArtefactTool()
+    {
+        return new AiToolDefinition(
+            Name: PipelineToolDefinitions.SearchInArtefact,
+            Description: "Search for lines in an artefact file that contain a given query string. " +
+                         "Returns up to 5 matching regions with ±5 lines of surrounding context each. " +
+                         "Use this BEFORE edit_artefact to find the exact verbatim anchor string to pass as old_str — " +
+                         "copy the anchor directly from the search results, never from memory.",
+            InputSchema: JsonDocument.Parse("""
+            {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The relative file path of the artefact to search."
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "A keyword or short phrase to search for (case-insensitive). Use a distinctive word from the content you want to change, e.g. 'nav', 'background', 'header'."
+                    }
+                },
+                "required": ["file_path", "query"]
             }
             """));
     }

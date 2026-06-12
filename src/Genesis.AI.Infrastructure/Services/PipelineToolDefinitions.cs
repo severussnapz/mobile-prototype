@@ -26,20 +26,32 @@ public static class PipelineToolDefinitions
     public const string SetOrchestrationMode = "set_orchestration_mode";
     public const string AdvanceRequirement = "advance_requirement";
     public const string EditArtefact = "edit_artefact";
+    public const string SearchInArtefact = "search_in_artefact";
 
     /// <summary>
-    /// Returns the tool list conditioned on <paramref name="options"/>.
+    /// Returns the tool list conditioned on <paramref name="options"/> and <paramref name="stageType"/>.
     /// Includes <c>edit_artefact</c> when <see cref="TokenOptimisationOptions.EditArtefactEnabled"/> is true.
+    /// Excludes <c>get_guardrail_details</c> when the stage already has skills injected via active skill injection
+    /// — Claude has everything it needs in the system prompt and should not burn tool turns fetching skills.
     /// </summary>
-    public static IReadOnlyList<AiToolDefinition> GetTools(TokenOptimisationOptions options)
+    public static IReadOnlyList<AiToolDefinition> GetTools(TokenOptimisationOptions options, Domain.Enums.StageType? stageType = null)
     {
-        if (!options.EditArtefactEnabled)
-            return All;
+        var base_ = new List<AiToolDefinition>(All);
 
-        var tools = new List<AiToolDefinition>(All)
+        // Remove get_guardrail_details for stages where active skills are pre-injected.
+        // Stages that have entries in PhaseSkillMap.StageSkills have their guardrails in the
+        // cached system prompt already — offering the fetch tool wastes tool turns.
+        if (options.ActiveSkillInjectionEnabled && stageType.HasValue
+            && Configuration.PhaseSkillMap.HasStageSkills(stageType.Value))
         {
-            PipelineToolDefinitionFactory.BuildEditArtefactTool()
-        };
-        return tools.AsReadOnly();
+            base_.RemoveAll(tool => tool.Name == GetGuardrailDetails);
+        }
+
+        if (!options.EditArtefactEnabled)
+            return base_.AsReadOnly();
+
+        base_.Add(PipelineToolDefinitionFactory.BuildEditArtefactTool());
+        base_.Add(PipelineToolDefinitionFactory.BuildSearchInArtefactTool());
+        return base_.AsReadOnly();
     }
 }

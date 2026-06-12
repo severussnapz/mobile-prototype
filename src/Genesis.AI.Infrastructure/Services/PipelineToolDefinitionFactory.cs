@@ -26,4 +26,9 @@ internal static class PipelineToolDefinitionFactory
     {
         return ArtefactToolBuilder.BuildEditArtefactTool();
     }
+
+    internal static AiToolDefinition BuildSearchInArtefactTool()
+    {
+        return ArtefactToolBuilder.BuildSearchInArtefactTool();
+    }
 }
