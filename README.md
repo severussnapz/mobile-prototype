@@ -207,6 +207,9 @@ Parking lot items are **stored** on individual conversations (FK relationship) b
 # Start all services (postgres → flyway → seed → api)
 docker compose up -d --build
 
+# Rebuild or restart only the API without re-running seed
+docker compose up -d --build --no-deps api
+
 # Verify
 curl http://localhost:5000/health
 # → {"status":"Healthy"}
@@ -230,8 +233,8 @@ Services start in dependency order: postgres (healthy) → flyway → seed → a
 ### Useful Commands
 
 ```bash
-# Rebuild API after code changes
-docker compose up -d --build api
+# Rebuild API after code changes without re-running seed
+docker compose up -d --build --no-deps api
 
 # View API logs
 docker compose logs -f api
