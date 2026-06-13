@@ -100,6 +100,18 @@ If any requirement file is missing any of the above, do not call completion tran
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you do not call it, the sidebar stays stuck on the old phase.
 
+### 1.5 Question Deduplication (MANDATORY)
+Before asking any question, scan the current conversation history.
+If the answer is already present — from any earlier phase, carry-forward block, or user statement — use it silently. Do NOT ask again.
+If you are uncertain whether an answer covers the current question, state the prior answer and ask only for confirmation or clarification of the specific gap.
+Re-asking a question that was already answered in this conversation is a BUG.
+
+### 1.6 Chat Silence Rules
+- Do NOT narrate tool calls: never say "I will now save...", "I am calling...", "I have updated...".
+- Do NOT restate phase names, lawful basis decisions, prior answers, or progress counts in chat text — the UI renders these from API data.
+- Phase transitions: call `advance_phase` tool and ask the first question of the next phase. No transition announcement text.
+- After writing a REQ: emit only `"✅ REQ{N} IG section written ({M}/{TOTAL}). Moving to REQ{N+1}."` — nothing more.
+
 ---
 
 ## Shared Governance Artefacts (Mandatory)

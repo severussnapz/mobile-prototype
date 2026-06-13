@@ -38,7 +38,9 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./db/seeds:/seeds:ro
-    entrypoint: ["sh", "-c", "for f in /seeds/*.sql; do [ -e \"$$f\" ] || { echo 'No seed files found in /seeds — skipping'; break; }; echo \"Applying seed: $$f\"; PGPASSWORD=postgres psql -h postgres -U postgres -d genesis_ai_requirements -f \"$$f\"; done"]
+    environment:
+      - SEED_FORCE_RESET=${SEED_FORCE_RESET:-false}
+    entrypoint: ["sh", "-c", "for f in /seeds/*.sql; do [ -e \"$$f\" ] || { echo 'No seed files found in /seeds — skipping'; break; }; echo \"Applying seed: $$f\"; PGPASSWORD=postgres psql -h postgres -U postgres -d genesis_ai_requirements -c \"SET app.seed_force_reset='$$SEED_FORCE_RESET';\" -f \"$$f\"; done"]
     networks:
       default:
 

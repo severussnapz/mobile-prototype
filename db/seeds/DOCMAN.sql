@@ -3,6 +3,29 @@
 -- This is NOT a Flyway migration — it is a manual local-only script.
 -- The seed service runs every db/seeds/*.sql file; each file deletes and
 -- re-inserts its own project, so re-running is idempotent.
+
+-- Guard: skip entirely if this project has live messages beyond the seed
+-- baseline (2026-05-29). Prevents accidental data loss on docker restart.
+-- To force a reset: SEED_FORCE_RESET=true docker compose up -d --build
+DO $$
+DECLARE live_count INTEGER;
+BEGIN
+    IF current_setting('app.seed_force_reset', true) = 'true' THEN
+        RAISE NOTICE 'DOCMAN seed: force reset enabled — proceeding with delete.';
+    ELSE
+        SELECT COUNT(*) INTO live_count
+        FROM message m
+        JOIN conversation c ON m.conversation_id = c.conversation_id
+        JOIN pipeline_stage ps ON c.stage_id = ps.pipeline_stage_id
+        WHERE ps.project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'
+          AND m.created_at > '2026-05-29 10:00:00+00';
+        IF live_count > 0 THEN
+            RAISE NOTICE 'DOCMAN seed skipped — % live messages detected beyond seed baseline.', live_count;
+            RETURN;
+        END IF;
+    END IF;
+END $$;
+
 -- Clean up any existing seed data for this project
 DELETE FROM token_usage WHERE conversation_id IN (SELECT conversation_id FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'));
 DELETE FROM parking_lot_item WHERE conversation_id IN (SELECT conversation_id FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'));
