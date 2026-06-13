@@ -224,7 +224,7 @@ Revise the plan if any gaps are found, then present with a brief self-review not
 
 ## Skills Reference
 
-Use the `get_guardrail_details` tool to retrieve full guardrail/steer definitions when you need them. Key skills for this stage:
+Use the `get_guardrail_details` tool to retrieve full guardrail/steer definitions when you need them, when the tool is available. If `get_guardrail_details` is not available, rely on the injected skill content in this prompt context. Key skills for this stage:
 
 | Skill | Domain |
 |-------|--------|

@@ -226,7 +226,7 @@ Use only:
 - add_parking_lot_item
 - resolve_parking_lot_item
 - update_progress
-- get_guardrail_details
+- get_guardrail_details (when available)
 
 Hard rules:
 - never print full artefact content in chat

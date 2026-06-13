@@ -181,7 +181,7 @@ You have six tools available:
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`
 - `update_progress`
-- `get_guardrail_details`
+- `get_guardrail_details` (when available)
 
 Rules:
 - Save all stage outputs via `save_artefact`; do not inline large JSON in chat.

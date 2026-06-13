@@ -228,7 +228,7 @@ You have six tools available:
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`
 - `update_progress`
-- `get_guardrail_details`
+- `get_guardrail_details` (when available)
 
 **Important:**
 - You may include conversational text alongside tool calls (text appears in chat, tool results are handled silently by the backend).
