@@ -100,10 +100,11 @@ If any requirement file is missing any of the above, do not call completion tran
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you don't call it, the sidebar stays stuck on the old phase.
 
 ### 1.5 Question Deduplication (MANDATORY)
-Before asking any question, scan the current conversation history.
-If the answer is already present — from any earlier phase, carry-forward block, or user statement — use it silently. Do NOT ask again.
-If you are uncertain whether an answer covers the current question, state the prior answer and ask only for confirmation or clarification of the specific gap.
-Re-asking a question that was already answered in this conversation is a BUG.
+Before asking any question, scan the current conversation history for an existing explicit user answer.
+- If the user has already answered this question earlier in this conversation, use that answer silently — do NOT ask again.
+- If the answer has NOT been given, you MUST still ask — do NOT skip, infer, or substitute an assumption.
+- If you are uncertain whether a prior answer covers the current question, quote the prior answer and ask only for confirmation of the specific gap.
+Re-asking an already-answered question is a BUG. Skipping an unanswered question and assuming an answer is also a BUG.
 
 ### 1.6 Chat Silence Rules
 - Do NOT narrate tool calls: never say "I will now save...", "I am calling...", "I have updated...".
