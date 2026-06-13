@@ -24,6 +24,8 @@
 
 - [ ] **No pagination on artefact endpoints** — Suppressed API-011. No hard limit enforced; may need pagination if artefact counts grow significantly.
 
+- [ ] **Keep artefact content in S3 for now** — Maintain the current model where Postgres stores artefact metadata/pointers and S3 stores full content. Revisit only if we find a concrete need for inline DB content; avoid moving large artefact bodies into relational tables without a strong operational reason.
+
 - [ ] **`docker compose up` without `--build` runs stale code** — Developer footgun. Consider adding a `Makefile` or documenting that `--build` is always needed after code changes.
 
 - [ ] **Stage skip doesn't validate artefacts** — `SkipStageCommandHandler` doesn't check whether skipping a stage breaks downstream dependencies. Currently safe because skip sets status to Complete, but semantically questionable.
