@@ -9,5 +9,6 @@ public sealed class ParkingLotItemResponse
     public string Status { get; init; } = null!;
     public int SourcePhase { get; init; }
     public DateTimeOffset? ResolvedAt { get; init; }
+    public string? ClosureDecision { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
 }

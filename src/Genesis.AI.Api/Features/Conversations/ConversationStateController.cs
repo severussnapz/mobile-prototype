@@ -3,6 +3,7 @@ using Genesis.AI.Domain.Commands.AddParkingLotItem;
 using Genesis.AI.Domain.Commands.DeferParkingLotItem;
 using Genesis.AI.Domain.Commands.DeleteParkingLotItem;
 using Genesis.AI.Domain.Commands.AdvancePhase;
+using Genesis.AI.Domain.Commands.ReopenParkingLotItem;
 using Genesis.AI.Domain.Commands.ResolveParkingLotItem;
 using Genesis.AI.Domain.Commands.SetPhase;
 using Genesis.AI.Domain.Queries.GetConversationProgress;
@@ -109,6 +110,7 @@ public class ConversationStateController : ControllerBase
             Status = item.Status.ToString().ToLowerInvariant(),
             SourcePhase = item.SourcePhase,
             ResolvedAt = item.ResolvedAt,
+            ClosureDecision = item.ClosureDecision,
             CreatedAt = item.CreatedAt
         });
 
@@ -141,6 +143,7 @@ public class ConversationStateController : ControllerBase
             Status = item.Status.ToString().ToLowerInvariant(),
             SourcePhase = item.SourcePhase,
             ResolvedAt = item.ResolvedAt,
+            ClosureDecision = item.ClosureDecision,
             CreatedAt = item.CreatedAt
         });
     }
@@ -152,9 +155,17 @@ public class ConversationStateController : ControllerBase
     public async Task<IActionResult> ResolveParkingLotItem(
         Guid conversationId,
         Guid itemId,
+        [FromBody] UpdateParkingLotItemStatusRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new ResolveParkingLotItemCommand(conversationId, itemId), cancellationToken);
+        if (request is null || string.IsNullOrWhiteSpace(request.Decision))
+        {
+            return BadRequest(ApiErrorResponse.Create("400", "Decision is required when resolving a parking lot item."));
+        }
+
+        var result = await _mediator.Send(
+            new ResolveParkingLotItemCommand(conversationId, itemId, request.Decision.Trim()),
+            cancellationToken);
         if (!result.Found) return NotFound();
 
         var item = result.Item!;
@@ -167,6 +178,7 @@ public class ConversationStateController : ControllerBase
             Status = item.Status.ToString().ToLowerInvariant(),
             SourcePhase = item.SourcePhase,
             ResolvedAt = item.ResolvedAt,
+            ClosureDecision = item.ClosureDecision,
             CreatedAt = item.CreatedAt
         });
     }
@@ -178,9 +190,17 @@ public class ConversationStateController : ControllerBase
     public async Task<IActionResult> DeferParkingLotItem(
         Guid conversationId,
         Guid itemId,
+        [FromBody] UpdateParkingLotItemStatusRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new DeferParkingLotItemCommand(conversationId, itemId), cancellationToken);
+        if (request is null || string.IsNullOrWhiteSpace(request.Decision))
+        {
+            return BadRequest(ApiErrorResponse.Create("400", "Decision is required when deferring a parking lot item."));
+        }
+
+        var result = await _mediator.Send(
+            new DeferParkingLotItemCommand(conversationId, itemId, request.Decision.Trim()),
+            cancellationToken);
         if (!result.Found) return NotFound();
 
         var item = result.Item!;
@@ -193,6 +213,34 @@ public class ConversationStateController : ControllerBase
             Status = item.Status.ToString().ToLowerInvariant(),
             SourcePhase = item.SourcePhase,
             ResolvedAt = item.ResolvedAt,
+            ClosureDecision = item.ClosureDecision,
+            CreatedAt = item.CreatedAt
+        });
+    }
+
+    /// <summary>
+    /// Reopen a resolved or deferred parking lot item.
+    /// </summary>
+    [HttpPost("parking-lot/{itemId:guid}/reopen")]
+    public async Task<IActionResult> ReopenParkingLotItem(
+        Guid conversationId,
+        Guid itemId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new ReopenParkingLotItemCommand(conversationId, itemId), cancellationToken);
+        if (!result.Found) return NotFound();
+
+        var item = result.Item!;
+        return Ok(new ParkingLotItemResponse
+        {
+            Id = item.Id,
+            ConversationId = conversationId,
+            Content = item.Content,
+            Priority = item.Priority.ToString().ToLowerInvariant(),
+            Status = item.Status.ToString().ToLowerInvariant(),
+            SourcePhase = item.SourcePhase,
+            ResolvedAt = item.ResolvedAt,
+            ClosureDecision = item.ClosureDecision,
             CreatedAt = item.CreatedAt
         });
     }

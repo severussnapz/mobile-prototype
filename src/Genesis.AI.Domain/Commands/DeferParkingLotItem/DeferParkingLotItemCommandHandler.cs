@@ -6,10 +6,14 @@ namespace Genesis.AI.Domain.Commands.DeferParkingLotItem;
 public class DeferParkingLotItemCommandHandler : IRequestHandler<DeferParkingLotItemCommand, DeferParkingLotItemResult>
 {
     private readonly IConversationRepository _conversationRepository;
+    private readonly TimeProvider _timeProvider;
 
-    public DeferParkingLotItemCommandHandler(IConversationRepository conversationRepository)
+    public DeferParkingLotItemCommandHandler(
+        IConversationRepository conversationRepository,
+        TimeProvider timeProvider)
     {
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     public async Task<DeferParkingLotItemResult> Handle(DeferParkingLotItemCommand request, CancellationToken cancellationToken)
@@ -22,7 +26,7 @@ public class DeferParkingLotItemCommandHandler : IRequestHandler<DeferParkingLot
         if (item is null)
             return new DeferParkingLotItemResult(Found: false);
 
-        item.Defer();
+        item.Defer(_timeProvider, request.ClosureDecision);
         await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
 
         return new DeferParkingLotItemResult(Found: true, Item: item);

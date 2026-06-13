@@ -533,6 +533,7 @@ Finalisation gate:
 - no implementation design generation in this stage
 - park unresolved items with add_parking_lot_item
 - resolve parked items only when fully addressed
+- for Dimension 2 (Information Governance), confirm controller/processor allocation early: care provider organisation is Data Controller and solution supplier is Data Processor unless explicit legal evidence states a joint-controller model
 
 ---
 
@@ -616,6 +617,7 @@ Do not close Pipeline 01 unless all are true:
 - strict_citation_and_confidence_rules_passed_at_finalisation
 - non_impacted_REQ_mutation_guard_passed
 - compatibility_sunset_policy_evaluated_and_compliant
+- Dimension 2 records explicit controller/processor allocation, with legal evidence required for any joint-controller declaration
 
 If any item fails:
 - stop

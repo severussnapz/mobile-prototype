@@ -170,6 +170,7 @@ public class ProjectsController : ControllerBase
             Status = item.Status.ToString().ToLowerInvariant(),
             SourcePhase = item.SourcePhase,
             ResolvedAt = item.ResolvedAt,
+            ClosureDecision = item.ClosureDecision,
             CreatedAt = item.CreatedAt
         });
 
