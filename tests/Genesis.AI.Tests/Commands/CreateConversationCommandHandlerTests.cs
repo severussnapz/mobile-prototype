@@ -151,6 +151,109 @@ public class CreateConversationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_BlockedStageContinuationRequest_Succeeds()
+    {
+        var project = CreateProjectWithStages();
+        var igStage = project.PipelineStages.First(stage => stage.StageType == StageType.InformationGovernance);
+        var priorConversation = new Conversation(igStage.Id, 5, _timeProvider);
+
+        _projectRepositoryMock
+            .Setup(repository => repository.GetByStageIdAsync(igStage.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
+
+        _conversationRepositoryMock
+            .Setup(repository => repository.GetByIdAsync(priorConversation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(priorConversation);
+
+        var command = new CreateConversationCommand(igStage.Id, null, priorConversation.Id);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.NotEqual(Guid.Empty, result);
+        _conversationRepositoryMock.Verify(
+            repository => repository.AddAsync(
+                It.Is<Conversation>(conversation =>
+                    conversation.ContinuedFromConversationId == priorConversation.Id &&
+                    conversation.StageId == igStage.Id),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ContinuationWithMismatchedStage_ThrowsInvalidOperationException()
+    {
+        var project = CreateProjectWithStages();
+        var requestedStage = project.PipelineStages.First(stage => stage.StageType == StageType.InformationGovernance);
+        var differentStage = project.PipelineStages.First(stage => stage.StageType == StageType.Prototype);
+        var priorConversation = new Conversation(differentStage.Id, 5, _timeProvider);
+
+        _projectRepositoryMock
+            .Setup(repository => repository.GetByStageIdAsync(requestedStage.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
+
+        _conversationRepositoryMock
+            .Setup(repository => repository.GetByIdAsync(priorConversation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(priorConversation);
+
+        var command = new CreateConversationCommand(requestedStage.Id, null, priorConversation.Id);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _handler.Handle(command, CancellationToken.None));
+
+        Assert.Contains("stage does not match", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Handle_ContinuationWithoutRequirementId_InheritsPriorRequirementId()
+    {
+        var project = CreateProjectWithStages();
+        var requestedStage = project.PipelineStages.First(stage => stage.StageType == StageType.InformationGovernance);
+        var priorConversation = new Conversation(requestedStage.Id, 5, _timeProvider, "REQ-007");
+
+        _projectRepositoryMock
+            .Setup(repository => repository.GetByStageIdAsync(requestedStage.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
+
+        _conversationRepositoryMock
+            .Setup(repository => repository.GetByIdAsync(priorConversation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(priorConversation);
+
+        var command = new CreateConversationCommand(requestedStage.Id, null, priorConversation.Id);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.NotEqual(Guid.Empty, result);
+        _conversationRepositoryMock.Verify(
+            repository => repository.AddAsync(
+                It.Is<Conversation>(conversation => conversation.RequirementId == "REQ-007"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ContinuationWithMismatchedRequirement_ThrowsInvalidOperationException()
+    {
+        var project = CreateProjectWithStages();
+        var requestedStage = project.PipelineStages.First(stage => stage.StageType == StageType.InformationGovernance);
+        var priorConversation = new Conversation(requestedStage.Id, 5, _timeProvider, "REQ-007");
+
+        _projectRepositoryMock
+            .Setup(repository => repository.GetByStageIdAsync(requestedStage.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
+
+        _conversationRepositoryMock
+            .Setup(repository => repository.GetByIdAsync(priorConversation.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(priorConversation);
+
+        var command = new CreateConversationCommand(requestedStage.Id, "REQ-123", priorConversation.Id);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _handler.Handle(command, CancellationToken.None));
+
+        Assert.Contains("requirement does not match", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Handle_ArchitectureBlockedWithPrototypeIncomplete_ThrowsInvalidOperationException()
     {
         var project = CreateProjectWithStages();

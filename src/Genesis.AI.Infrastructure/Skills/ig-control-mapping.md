@@ -18,6 +18,7 @@
 | IG-CTRL-007 | Organisational | Staff training — annual GDPR/Caldicott training |
 | IG-CTRL-008 | Technical | Breach detection — monitoring and alerting |
 | IG-CTRL-009 | Technical | Data subject rights — export and deletion tooling |
+| IG-CTRL-010 | Organisational | Controllership allocation — controller/processor roles are explicit and evidenced |
 
 ### Control Mapping Template
 
@@ -29,4 +30,5 @@
 | Store patient record | IG-CTRL-001, -002, -003, -004 | Designed in P04 |
 | Share data with {party} | IG-CTRL-006 | DSA required — parking lot item added |
 | Process NHS number | IG-CTRL-001, -003, -005 | Pseudonymise where possible |
+| Assign controller/processor roles | IG-CTRL-010 | Controller = provider organisation, processor = supplier (unless legal evidence states otherwise) |
 ```

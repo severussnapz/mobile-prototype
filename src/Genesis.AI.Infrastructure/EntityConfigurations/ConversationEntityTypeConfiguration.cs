@@ -71,6 +71,14 @@ public class ConversationEntityTypeConfiguration : IEntityTypeConfiguration<Conv
         builder.Property(conversation => conversation.ContinuedFromConversationId)
             .HasColumnName("continued_from_conversation_id");
 
+        builder.HasIndex(conversation => conversation.ContinuedFromConversationId)
+            .HasDatabaseName("idx_conversation_continued_from_conversation_id");
+
+        builder.HasOne<Conversation>()
+            .WithMany()
+            .HasForeignKey(conversation => conversation.ContinuedFromConversationId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasMany(conversation => conversation.Messages)
             .WithOne()
             .HasForeignKey(message => message.ConversationId)

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Genesis.AI.Api.Authentication;
 using Genesis.AI.Api.Http;
 using Genesis.AI.Core.Extensions;
@@ -28,6 +29,9 @@ public class ConversationStreamController : ControllerBase
     private const int Pipeline02CompletionPhaseNumber = 6;
     private const string PrototypeHtmlArtefactPath = "prototype/index.html";
     private const string PrototypeNotesArtefactPath = "prototype/PROTOTYPE_NOTES.md";
+    private static readonly Regex InjectedSectionHeadingRegex = new(
+        @"^## (?<heading>.+ \(Added by [^)]+\))$",
+        RegexOptions.Multiline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private readonly IConversationRepository _conversationRepository;
     private readonly IArtefactRepository _artefactRepository;
@@ -103,6 +107,11 @@ public class ConversationStreamController : ControllerBase
             return;
         }
 
+        // Capture the pre-send message count so continuation handover can detect
+        // a newly created continuation conversation even after the first user
+        // message is persisted below.
+        var messageCountBeforeSend = conversation.Messages.Count;
+
         // Add the user message (skip on retry — message already persisted from the original attempt)
         if (!request.Retry)
         {
@@ -176,9 +185,9 @@ public class ConversationStreamController : ControllerBase
         // Build handover block if this conversation continues from a previous one that hit the tool limit.
         // Injected into the mutable system prompt so the AI knows where the previous session left off.
         var handoverBlock = string.Empty;
-        if (conversation.ContinuedFromConversationId.HasValue && conversation.Messages.Count == 0)
+        if (conversation.ContinuedFromConversationId.HasValue && messageCountBeforeSend == 0)
         {
-            var priorConversation = await _conversationRepository.GetByIdAsync(
+            var priorConversation = await _conversationRepository.GetByIdWithMessagesAsync(
                 conversation.ContinuedFromConversationId.Value, cancellationToken);
 
             if (priorConversation is not null)
@@ -232,6 +241,28 @@ public class ConversationStreamController : ControllerBase
                 sb.AppendLine("**IMPORTANT:** Resume naturally from where the previous session stopped. " +
                               "Do NOT re-introduce yourself or re-explain your purpose. " +
                               "Acknowledge the continuation briefly and continue the work.");
+
+                var checkpointFilePath = BuildContinuationCheckpointFilePath(priorConversation.Id);
+                var checkpointArtefact = await _artefactRepository.GetByProjectAndFilePathAsync(
+                    projectId,
+                    checkpointFilePath,
+                    cancellationToken);
+
+                if (checkpointArtefact is not null)
+                {
+                    var checkpointContent = await _artefactStorageService.GetContentAsync(
+                        checkpointArtefact.S3Key,
+                        cancellationToken);
+
+                    if (!string.IsNullOrWhiteSpace(checkpointContent))
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine("**Persisted checkpoint summary (source of truth for done/next):**");
+                        sb.AppendLine("```");
+                        sb.AppendLine(checkpointContent);
+                        sb.AppendLine("```");
+                    }
+                }
 
                 handoverBlock = $"\n\n---\n\n{sb}";
             }
@@ -664,6 +695,26 @@ public class ConversationStreamController : ControllerBase
             // Hard-limit telemetry: loop exited without the AI finishing — response was cut off
             if (turnsRemaining == 0)
             {
+                try
+                {
+                    await SaveContinuationCheckpointAsync(
+                        conversation,
+                        projectId,
+                        request.Content,
+                        fullResponse.ToString(),
+                        savedArtefacts,
+                        savedParkingLotItems,
+                        createdBy,
+                        cancellationToken);
+                }
+                catch (Exception checkpointException)
+                {
+                    _logger.LogWarning(
+                        checkpointException,
+                        "Failed to persist continuation checkpoint for conversation {ConversationId}",
+                        conversation.Id);
+                }
+
                 _logger.LogError(
                     "Tool loop hard limit hit for conversation {ConversationId}, stage {StageType}, requirement {RequirementId}: all {MaxTurns} turns exhausted — response was cut off",
                     conversation.Id, stageType, conversation.RequirementId ?? "(none)", maxToolTurns);
@@ -684,6 +735,20 @@ public class ConversationStreamController : ControllerBase
             {
                 conversation.AddMessage(MessageRole.Assistant, finalResponse, null, _timeProvider);
                 await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "AI stream completed with no assistant text for conversation {ConversationId}",
+                    conversation.Id);
+
+                var emptyResponseEvent = JsonSerializer.Serialize(new
+                {
+                    error = "No response returned from AI",
+                    reason = "empty_assistant_output"
+                });
+                await Response.WriteAsync($"event: error\ndata: {emptyResponseEvent}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
             }
 
             // Send completion event
@@ -913,6 +978,17 @@ public class ConversationStreamController : ControllerBase
             {
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var content = root.GetProperty("content").GetString()!;
+
+                var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
+                if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
+                    duplicateInjectedHeading is not null)
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected for duplicate injected section heading: {FilePath} / {Heading}",
+                        filePath, duplicateInjectedHeading);
+                    return $"Error: DUPLICATE_SECTION_HEADING: '{duplicateInjectedHeading}' appears more than once in '{filePath}'. " +
+                           "Do not append the same stage-added section twice. Keep one canonical section and remove or replace duplicates before saving.";
+                }
 
                 if (stageType == StageType.Prototype &&
                     filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
@@ -1400,6 +1476,17 @@ public class ConversationStreamController : ControllerBase
                 // Apply edit — replace on the normalised content so the substitution site is correct
                 var normalisedNewStr = ToNfc(newStr);
                 var updatedContent = normalisedContent.Replace(normalisedOldStr, normalisedNewStr, StringComparison.Ordinal);
+                var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(updatedContent);
+                if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
+                    duplicateInjectedHeading is not null)
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact rejected for duplicate injected section heading: {FilePath} / {Heading}",
+                        filePath, duplicateInjectedHeading);
+                    return $"Error: DUPLICATE_SECTION_HEADING: '{duplicateInjectedHeading}' appears more than once in '{filePath}' after the edit. " +
+                           "Do not append the same stage-added section twice. Read the file, keep one canonical section, and remove duplicates instead of adding another copy.";
+                }
+
                 var bytesChanged = Math.Abs(
                     System.Text.Encoding.UTF8.GetByteCount(updatedContent) -
                     System.Text.Encoding.UTF8.GetByteCount(normalisedContent));
@@ -1761,6 +1848,30 @@ public class ConversationStreamController : ControllerBase
         return count;
     }
 
+    internal static string? FindDuplicateInjectedSectionHeading(string content)
+    {
+        var headingCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (Match match in InjectedSectionHeadingRegex.Matches(content))
+        {
+            var heading = match.Groups["heading"].Value;
+            if (!headingCounts.TryAdd(heading, 1))
+            {
+                headingCounts[heading]++;
+            }
+        }
+
+        foreach (var headingCount in headingCounts)
+        {
+            if (headingCount.Value > 1)
+            {
+                return headingCount.Key;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Returns up to 5 regions from <paramref name="fileContent"/> that contain <paramref name="query"/>,
     /// each with ±5 lines of context. Result is a compact excerpt for Claude to pick a verbatim anchor
@@ -1931,6 +2042,136 @@ public class ConversationStreamController : ControllerBase
         sb.AppendLine("**IMPORTANT:** You do NOT manage the parking lot or phase tracking. The API handles that. Focus on asking questions, analyzing answers, and generating content. Do NOT include progress bars or parking lot summaries in your responses — the UI displays those from API data.");
 
         return sb.ToString();
+    }
+
+    private static string BuildContinuationCheckpointFilePath(Guid conversationId)
+    {
+        return $"checkpoints/conversation-{conversationId}.md";
+    }
+
+    private async Task SaveContinuationCheckpointAsync(
+        Conversation conversation,
+        Guid projectId,
+        string latestUserMessage,
+        string latestAssistantOutput,
+        IReadOnlyList<Artefact> savedArtefacts,
+        IReadOnlyList<ParkingLotItem> savedParkingLotItems,
+        string createdBy,
+        CancellationToken cancellationToken)
+    {
+        var filePath = BuildContinuationCheckpointFilePath(conversation.Id);
+        var content = BuildContinuationCheckpointContent(
+            conversation,
+            latestUserMessage,
+            latestAssistantOutput,
+            savedArtefacts,
+            savedParkingLotItems);
+        var contentType = "text/markdown";
+
+        var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+            projectId,
+            filePath,
+            cancellationToken);
+
+        var storageKey = await _artefactStorageService.SaveContentAsync(
+            projectId,
+            filePath,
+            nextVersion,
+            content,
+            contentType,
+            cancellationToken);
+
+        var artefact = Artefact.CreateS3Artefact(
+            projectId,
+            nextVersion,
+            filePath,
+            storageKey,
+            contentType,
+            Encoding.UTF8.GetByteCount(content),
+            createdBy,
+            _timeProvider);
+
+        await _artefactRepository.AddAsync(artefact, cancellationToken);
+        await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        await _artefactRepository.DeletePreviousVersionsAsync(projectId, filePath, nextVersion, cancellationToken);
+    }
+
+    private static string BuildContinuationCheckpointContent(
+        Conversation conversation,
+        string latestUserMessage,
+        string latestAssistantOutput,
+        IReadOnlyList<Artefact> savedArtefacts,
+        IReadOnlyList<ParkingLotItem> savedParkingLotItems)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("# Conversation Checkpoint");
+        sb.AppendLine();
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Conversation ID: {conversation.Id}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Phase: {conversation.CurrentPhase} ({conversation.PhaseName})");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Questions asked: {conversation.QuestionsAsked}");
+        if (!string.IsNullOrWhiteSpace(conversation.RequirementId))
+        {
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Requirement window: {conversation.RequirementId}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("## What Was Just Completed");
+        if (savedArtefacts.Count == 0)
+        {
+            sb.AppendLine("- No artefacts were saved in this interrupted turn.");
+        }
+        else
+        {
+            foreach (var artefact in savedArtefacts)
+            {
+                sb.AppendLine(CultureInfo.InvariantCulture, $"- Saved {artefact.FilePath} v{artefact.Version}");
+            }
+        }
+
+        if (savedParkingLotItems.Count > 0)
+        {
+            sb.AppendLine("- Parking lot updates in this interrupted turn:");
+            foreach (var item in savedParkingLotItems)
+            {
+                sb.AppendLine(CultureInfo.InvariantCulture, $"  - [{item.Status}] {item.Content}");
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("## Last User Instruction");
+        sb.AppendLine("```");
+        sb.AppendLine(TrimForCheckpoint(latestUserMessage, 2000));
+        sb.AppendLine("```");
+
+        if (!string.IsNullOrWhiteSpace(latestAssistantOutput))
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Last Assistant Output (partial if interrupted)");
+            sb.AppendLine("```");
+            sb.AppendLine(TrimForCheckpoint(latestAssistantOutput, 3000));
+            sb.AppendLine("```");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("## Where To Continue");
+        sb.AppendLine("- Continue from the current phase and requirement window.");
+        sb.AppendLine("- Do not repeat completed writes listed above.");
+        sb.AppendLine("- Start with the next unresolved requirement or unanswered question.");
+
+        return sb.ToString();
+    }
+
+    private static string TrimForCheckpoint(string value, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "(empty)";
+        }
+
+        return value.Length <= maxChars
+            ? value
+            : value[..maxChars] + "...";
     }
 
     private static string BuildProjectContext(ProjectContext? project)

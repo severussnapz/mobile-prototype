@@ -113,6 +113,14 @@ Re-asking an already-answered question is a BUG. Skipping an unanswered question
 - Phase transitions: call `advance_phase` tool and ask the first question of the next phase. No transition announcement text.
 - After writing a REQ: emit only `"✅ REQ{N} IG section written ({M}/{TOTAL}). Moving to REQ{N+1}."` — nothing more.
 
+### 1.7 Data Controllership Policy (MANDATORY)
+- For delivery models in primary care and similar healthcare provider settings, default to:
+  - Data Controller: the care provider organisation (for example GP practice, PCN, provider trust, or clinician organisation acting via employer governance).
+  - Data Processor: the solution supplier handling data on documented instructions.
+- Never assign this pipeline delivery solution as Data Controller by default.
+- Joint controller status is allowed only where the user provides explicit legal/DPO-approved evidence.
+- If controller/processor allocation is missing, ambiguous, or conflicts with the above default and no evidence is provided: fail closed, set IG status to `UNVERIFIED`, and raise a blocker.
+
 ---
 
 ## Shared Governance Artefacts (Mandatory)
@@ -160,7 +168,8 @@ Before reasoning about any requirement:
 1. Confirm every in-scope REQ contains `## PxD (Added by Pipeline 05)` and, where applicable, `## Clinical Safety (Added by Pipeline 06)`.
 2. Confirm upstream carry-forward blocks exist in `feedback/VALUE_CHAIN.md`.
 3. Confirm required policy documents are available: PR1625, IP3003, IF3004, IF15937.
-4. If any required input is missing: STOP. State what is missing. Do not proceed.
+4. Confirm baseline controllership assumption is set: care provider organisation is Data Controller and solution supplier is Data Processor, unless explicit legal evidence says otherwise.
+5. If any required input is missing: STOP. State what is missing. Do not proceed.
 
 ## CARRY-FORWARD CONTRACT
 
@@ -249,6 +258,7 @@ You have six tools available:
 - The user never sees your tool calls. They only see your conversational text.
 - Call `advance_phase` at every phase transition.
 - Call `update_progress` after every question.
+- Before writing an IG section to a `requirements/REQ-*.md` file, search for the exact heading `Information Governance (Added by Pipeline 07)`. If it already exists, do NOT append another IG section. Instead update the existing IG section in place or skip the file if it is already complete.
 
 ---
 
@@ -309,6 +319,9 @@ Append or replace with this section:
 ### Lawful Basis
 - Article 6 basis: ...
 - Article 9(2) basis (if special category): ...
+- Data Controller: ...
+- Data Processor: ...
+- Joint controller arrangement: No | Yes (evidence reference required)
 - IG status: VERIFIED | UNVERIFIED
 - Evidence: DPIA ID / DPO sign-off reference / policy link
 
@@ -376,6 +389,7 @@ Minimum per IG control:
 6. Named IG reviewer is mandatory for completion.
 7. Reviewer pass is mandatory; producer-only output is FAIL.
 8. `output/PR1625_DPIA_DATA.json` must be produced and schema-valid.
+9. Controller/processor allocation must be explicit per requirement. If this solution is marked as controller without legal evidence, fail closed and block completion.
 
 ---
 

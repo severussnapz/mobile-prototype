@@ -32,16 +32,56 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
             ?? throw new InvalidOperationException($"No project found for stage '{request.StageId}'.");
 
         var targetStage = project.PipelineStages.First(stage => stage.Id == request.StageId);
+        var effectiveRequirementId = string.IsNullOrWhiteSpace(request.RequirementId)
+            ? null
+            : request.RequirementId;
+
+        var isContinuationRequest = request.ContinuedFromConversationId.HasValue;
+        if (isContinuationRequest)
+        {
+            var priorConversation = await _conversationRepository.GetByIdAsync(
+                request.ContinuedFromConversationId!.Value,
+                cancellationToken);
+
+            if (priorConversation is null)
+            {
+                throw new InvalidOperationException(
+                    $"Continuation source conversation '{request.ContinuedFromConversationId.Value}' was not found.");
+            }
+
+            if (priorConversation.StageId != request.StageId)
+            {
+                throw new InvalidOperationException(
+                    "Continuation source conversation stage does not match requested stage.");
+            }
+
+            if (effectiveRequirementId is null)
+            {
+                effectiveRequirementId = priorConversation.RequirementId;
+            }
+            else if (!string.Equals(
+                         effectiveRequirementId,
+                         priorConversation.RequirementId,
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Continuation source conversation requirement does not match requested requirement.");
+            }
+        }
 
         // Cannot start a Blocked stage
-        if (targetStage.Status == PipelineStageStatus.Blocked)
+        if (!isContinuationRequest && targetStage.Status == PipelineStageStatus.Blocked)
             throw new InvalidOperationException($"Stage '{targetStage.StageType}' is blocked and cannot be started.");
 
         // Validate prerequisite stages are complete
-        ValidatePrerequisites(targetStage, project);
+        if (!isContinuationRequest)
+        {
+            ValidatePrerequisites(targetStage, project);
+        }
 
         // Mark stage as InProgress if currently NotStarted or Complete (re-entering)
-        if (targetStage.Status is PipelineStageStatus.NotStarted or PipelineStageStatus.Complete)
+        if (!isContinuationRequest &&
+            targetStage.Status is PipelineStageStatus.NotStarted or PipelineStageStatus.Complete)
         {
             await ActivateStageAsync(project, targetStage, cancellationToken);
         }
@@ -49,7 +89,12 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
         var stageType = targetStage.StageType;
         var totalPhases = _promptService.GetTotalPhases(stageType);
 
-        var conversation = new Conversation(request.StageId, totalPhases, _timeProvider, request.RequirementId, request.ContinuedFromConversationId);
+        var conversation = new Conversation(
+            request.StageId,
+            totalPhases,
+            _timeProvider,
+            effectiveRequirementId,
+            request.ContinuedFromConversationId);
 
         await _conversationRepository.AddAsync(conversation, cancellationToken);
         await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

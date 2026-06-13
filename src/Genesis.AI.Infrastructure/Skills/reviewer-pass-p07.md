@@ -9,6 +9,7 @@
 
 For each written IG section:
 - [ ] Lawful basis is specified and matches UK GDPR Article 6/9
+- [ ] Data Controller and Data Processor are explicitly stated and correctly assigned (provider organisation as controller, solution supplier as processor unless legal evidence says otherwise)
 - [ ] Data classification is correct (no under-classification of special category data)
 - [ ] Data minimisation — no unnecessary fields remain
 - [ ] Retention periods match NHS RMCOP or have DPO exception documented
@@ -20,6 +21,7 @@ For each written IG section:
 ### Common Mistakes
 
 - Recommending consent as the lawful basis for NHS clinical systems — use Public task (Art 6(1)(e))
+- Marking the solution supplier as Data Controller by default without legal basis
 - Setting retention to "6 months" for clinical records — must be 8 years minimum
 - Missing DSA for third-party data processor (cloud provider, analytics tool)
 - Not classifying NHS Number as special category data

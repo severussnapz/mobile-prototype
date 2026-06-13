@@ -9,6 +9,38 @@ namespace Genesis.AI.Tests.Infrastructure;
 public class ConversationStreamControllerEditArtefactTests
 {
     [Fact]
+    public void FindDuplicateInjectedSectionHeading_WhenInjectedHeadingRepeated_ReturnsHeading()
+    {
+        const string source = """
+## Information Governance (Added by Pipeline 07)
+Section A
+
+## Information Governance (Added by Pipeline 07)
+Section B
+""";
+
+        var duplicateHeading = ConversationStreamController.FindDuplicateInjectedSectionHeading(source);
+
+        Assert.Equal("Information Governance (Added by Pipeline 07)", duplicateHeading);
+    }
+
+    [Fact]
+    public void FindDuplicateInjectedSectionHeading_WhenInjectedHeadingUnique_ReturnsNull()
+    {
+        const string source = """
+## Clinical Safety (Added by V1e)
+Clinical content
+
+## Information Governance (Added by Pipeline 07)
+IG content
+""";
+
+        var duplicateHeading = ConversationStreamController.FindDuplicateInjectedSectionHeading(source);
+
+        Assert.Null(duplicateHeading);
+    }
+
+    [Fact]
     public void EditArtefact_ExactSingleMatch_PersistsNewVersionWithCorrectContent()
     {
         const string source = "Hello world, this is a test.";
