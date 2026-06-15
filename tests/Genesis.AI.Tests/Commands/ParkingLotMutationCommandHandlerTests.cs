@@ -31,7 +31,7 @@ public class ResolveParkingLotItemCommandHandlerTests
     [Fact]
     public async Task Handle_ConversationNotFound_ReturnsNotFound()
     {
-        var command = new ResolveParkingLotItemCommand(Guid.NewGuid(), Guid.NewGuid());
+        var command = new ResolveParkingLotItemCommand(Guid.NewGuid(), Guid.NewGuid(), "Done by manual review");
         _conversationRepositoryMock
             .Setup(repository => repository.GetByIdWithParkingLotAsync(command.ConversationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Conversation?)null);
@@ -49,7 +49,7 @@ public class ResolveParkingLotItemCommandHandlerTests
             .Setup(repository => repository.GetByIdWithParkingLotAsync(conversation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(conversation);
 
-        var command = new ResolveParkingLotItemCommand(conversation.Id, Guid.NewGuid());
+        var command = new ResolveParkingLotItemCommand(conversation.Id, Guid.NewGuid(), "Nothing to resolve");
 
         var result = await _handler.Handle(command, CancellationToken.None);
 
@@ -65,13 +65,14 @@ public class ResolveParkingLotItemCommandHandlerTests
             .Setup(repository => repository.GetByIdWithParkingLotAsync(conversation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(conversation);
 
-        var command = new ResolveParkingLotItemCommand(conversation.Id, item.Id);
+        var command = new ResolveParkingLotItemCommand(conversation.Id, item.Id, "Reviewed and implemented");
 
         var result = await _handler.Handle(command, CancellationToken.None);
 
         Assert.True(result.Found);
         Assert.NotNull(result.Item);
         Assert.Equal(ParkingLotStatus.Resolved, result.Item.Status);
+        Assert.Equal("Reviewed and implemented", result.Item.ClosureDecision);
         _unitOfWorkMock.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 }
@@ -92,13 +93,13 @@ public class DeferParkingLotItemCommandHandlerTests
         _conversationRepositoryMock.Setup(repository => repository.UnitOfWork).Returns(_unitOfWorkMock.Object);
         _unitOfWorkMock.Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-        _handler = new DeferParkingLotItemCommandHandler(_conversationRepositoryMock.Object);
+        _handler = new DeferParkingLotItemCommandHandler(_conversationRepositoryMock.Object, _timeProvider);
     }
 
     [Fact]
     public async Task Handle_ConversationNotFound_ReturnsNotFound()
     {
-        var command = new DeferParkingLotItemCommand(Guid.NewGuid(), Guid.NewGuid());
+        var command = new DeferParkingLotItemCommand(Guid.NewGuid(), Guid.NewGuid(), "Waiting for dependency");
         _conversationRepositoryMock
             .Setup(repository => repository.GetByIdWithParkingLotAsync(command.ConversationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Conversation?)null);
@@ -116,7 +117,7 @@ public class DeferParkingLotItemCommandHandlerTests
             .Setup(repository => repository.GetByIdWithParkingLotAsync(conversation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(conversation);
 
-        var command = new DeferParkingLotItemCommand(conversation.Id, Guid.NewGuid());
+        var command = new DeferParkingLotItemCommand(conversation.Id, Guid.NewGuid(), "Deferred due to priority");
 
         var result = await _handler.Handle(command, CancellationToken.None);
 
@@ -132,13 +133,14 @@ public class DeferParkingLotItemCommandHandlerTests
             .Setup(repository => repository.GetByIdWithParkingLotAsync(conversation.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(conversation);
 
-        var command = new DeferParkingLotItemCommand(conversation.Id, item.Id);
+        var command = new DeferParkingLotItemCommand(conversation.Id, item.Id, "Deferred pending SME confirmation");
 
         var result = await _handler.Handle(command, CancellationToken.None);
 
         Assert.True(result.Found);
         Assert.NotNull(result.Item);
         Assert.Equal(ParkingLotStatus.Deferred, result.Item.Status);
+        Assert.Equal("Deferred pending SME confirmation", result.Item.ClosureDecision);
         _unitOfWorkMock.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 }

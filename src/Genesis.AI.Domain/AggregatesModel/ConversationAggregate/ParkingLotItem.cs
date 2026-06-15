@@ -11,6 +11,7 @@ public class ParkingLotItem : Entity
     public ParkingLotStatus Status { get; private set; }
     public int SourcePhase { get; private set; }
     public DateTimeOffset? ResolvedAt { get; private set; }
+    public string? ClosureDecision { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
     private ParkingLotItem() { } // Required for EF Core
@@ -31,15 +32,25 @@ public class ParkingLotItem : Entity
         CreatedAt = timeProvider.GetUtcNow();
     }
 
-    public void Resolve(TimeProvider timeProvider)
+    public void Resolve(TimeProvider timeProvider, string? closureDecision = null)
     {
         Status = ParkingLotStatus.Resolved;
         ResolvedAt = timeProvider.GetUtcNow();
+        ClosureDecision = closureDecision;
     }
 
-    public void Defer()
+    public void Defer(TimeProvider timeProvider, string? closureDecision = null)
     {
         Status = ParkingLotStatus.Deferred;
+        ResolvedAt = timeProvider.GetUtcNow();
+        ClosureDecision = closureDecision;
+    }
+
+    public void Reopen()
+    {
+        Status = ParkingLotStatus.Open;
+        ResolvedAt = null;
+        ClosureDecision = null;
     }
 
     public void UpdatePriority(ParkingLotPriority priority)

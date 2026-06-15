@@ -3,6 +3,37 @@
 -- This is NOT a Flyway migration — it is a manual local-only script.
 -- The seed service runs every db/seeds/*.sql file; each file deletes and
 -- re-inserts its own project, so re-running is idempotent.
+-- Guard: skip if this project has live activity beyond the seed baseline.
+-- To force a reset: SEED_FORCE_RESET=true docker compose up -d --build
+SELECT
+  CASE
+    WHEN current_setting('app.seed_force_reset', true) = 'true' THEN false
+    WHEN COUNT(*) > 0 THEN true
+    ELSE false
+  END AS seed_should_quit,
+  COUNT(*) AS live_count
+FROM (
+    SELECT 1
+    FROM message m
+    JOIN conversation c ON m.conversation_id = c.conversation_id
+    JOIN pipeline_stage ps ON c.stage_id = ps.pipeline_stage_id
+    WHERE ps.project_id = '03735ad1-8759-414e-a93f-ce8cc7bfc1fc'
+      AND m.created_at > '2026-06-05 12:00:00+00'
+
+    UNION ALL
+
+    SELECT 1
+    FROM artefact a
+    WHERE a.project_id = '03735ad1-8759-414e-a93f-ce8cc7bfc1fc'
+      AND a.created_at > '2026-06-05 12:00:00+00'
+) AS live_activity
+\gset
+
+\if :seed_should_quit
+\echo 'QABOT-001 seed skipped —' :live_count 'live records detected beyond seed baseline.'
+\quit
+\endif
+
 -- Clean up any existing seed data for this project
 DELETE FROM token_usage WHERE conversation_id IN (SELECT conversation_id FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = '03735ad1-8759-414e-a93f-ce8cc7bfc1fc'));
 DELETE FROM parking_lot_item WHERE conversation_id IN (SELECT conversation_id FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = '03735ad1-8759-414e-a93f-ce8cc7bfc1fc'));

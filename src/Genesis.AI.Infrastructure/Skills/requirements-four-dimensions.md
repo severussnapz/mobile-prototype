@@ -77,6 +77,9 @@ Load skill `emis-x-api-clinical-safety` for full CLIN-001 to CLIN-010 rule defin
 - "What is the lawful basis for processing?" (GDPR Article 6)
 - "Is this special category data?" (GDPR Article 9)
 - "What is the retention period?"
+- "Who is the Data Controller and who is the Data Processor for this flow?"
+  - Default expectation for healthcare provider deployments: provider organisation (for example GP practice/PCN/provider trust) is controller; solution supplier is processor.
+  - Any joint-controller claim requires explicit legal/DPO evidence.
 
 ### IG-003 Hard Gate
 
@@ -113,6 +116,11 @@ Load skill `emis-x-api-information-governance` (if available) for full IG rule d
 ### GDPR Articles
 - **Article 6:** {Lawful basis}
 - **Article 9:** {Special category basis — if applicable}
+
+### Controllership Allocation
+- **Data Controller:** {care provider organisation}
+- **Data Processor:** {solution supplier(s)}
+- **Joint Controller:** {No by default; if Yes include legal evidence reference}
 
 ### Data Handling Requirements
 - **Data Categories:** {personal details, health data, contact info}

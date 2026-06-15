@@ -1,14 +1,17 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Genesis.AI.Api.Authentication;
 using Genesis.AI.Api.Http;
+using Genesis.AI.Core.Extensions;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Configuration;
 using Genesis.AI.Infrastructure.Services;
-using Genesis.AI.Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -26,6 +29,9 @@ public class ConversationStreamController : ControllerBase
     private const int Pipeline02CompletionPhaseNumber = 6;
     private const string PrototypeHtmlArtefactPath = "prototype/index.html";
     private const string PrototypeNotesArtefactPath = "prototype/PROTOTYPE_NOTES.md";
+    private static readonly Regex InjectedSectionHeadingRegex = new(
+        @"^## (?<heading>.+ \(Added by [^)]+\))$",
+        RegexOptions.Multiline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private readonly IConversationRepository _conversationRepository;
     private readonly IArtefactRepository _artefactRepository;
@@ -33,7 +39,9 @@ public class ConversationStreamController : ControllerBase
     private readonly IAiService _aiService;
     private readonly IPromptService _promptService;
     private readonly ISkillContentService _skillContentService;
+    private readonly IActiveSkillsService _activeSkillsService;
     private readonly IFoundationService _foundationService;
+    private readonly IPrototypeAssemblyService _prototypeAssemblyService;
     private readonly TokenOptimisationOptions _tokenOptimisationOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConversationStreamController> _logger;
@@ -45,7 +53,9 @@ public class ConversationStreamController : ControllerBase
         IAiService aiService,
         IPromptService promptService,
         ISkillContentService skillContentService,
+        IActiveSkillsService activeSkillsService,
         IFoundationService foundationService,
+        IPrototypeAssemblyService prototypeAssemblyService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
         TimeProvider timeProvider,
         ILogger<ConversationStreamController> logger)
@@ -56,7 +66,9 @@ public class ConversationStreamController : ControllerBase
         _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _skillContentService = skillContentService ?? throw new ArgumentNullException(nameof(skillContentService));
+        _activeSkillsService = activeSkillsService ?? throw new ArgumentNullException(nameof(activeSkillsService));
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
+        _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
         _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -95,6 +107,11 @@ public class ConversationStreamController : ControllerBase
             return;
         }
 
+        // Capture the pre-send message count so continuation handover can detect
+        // a newly created continuation conversation even after the first user
+        // message is persisted below.
+        var messageCountBeforeSend = conversation.Messages.Count;
+
         // Add the user message (skip on retry — message already persisted from the original attempt)
         if (!request.Retry)
         {
@@ -116,9 +133,20 @@ public class ConversationStreamController : ControllerBase
             await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        // Build message history for AI
-        var messages = conversation.Messages
+        // Build message history for AI — the system prompt already injects full session state
+        // (phase, parking lot, artefact manifest) so the LLM does not need the full conversation
+        // to re-orient. We only send the last 4 messages (2 exchanges) for immediate conversational
+        // context. Sending more causes linear input-token growth with no correctness benefit.
+        const int maxHistoryMessages = 4;
+        var orderedMessages = conversation.Messages
             .OrderBy(message => message.CreatedAt)
+            .ToList();
+
+        var windowedMessages = orderedMessages.Count <= maxHistoryMessages
+            ? orderedMessages
+            : orderedMessages.Skip(orderedMessages.Count - maxHistoryMessages).ToList();
+
+        var messages = windowedMessages
             .Select(message => new AiMessage(
                 message.Role,
                 message.Content,
@@ -152,6 +180,93 @@ public class ConversationStreamController : ControllerBase
         // Build lightweight artefact manifest (file paths + versions only — LLM uses tools to read content)
         var artefactManifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
         var artefactManifestSection = BuildArtefactManifest(artefactManifest);
+        var prototypeIntentDirective = BuildPrototypeIntentRoutingDirective(stageType, request.Content, artefactManifest);
+
+        // Build handover block if this conversation continues from a previous one that hit the tool limit.
+        // Injected into the mutable system prompt so the AI knows where the previous session left off.
+        var handoverBlock = string.Empty;
+        if (conversation.ContinuedFromConversationId.HasValue && messageCountBeforeSend == 0)
+        {
+            var priorConversation = await _conversationRepository.GetByIdWithMessagesAsync(
+                conversation.ContinuedFromConversationId.Value, cancellationToken);
+
+            if (priorConversation is not null)
+            {
+                var priorOrderedMessages = priorConversation.Messages
+                    .OrderBy(message => message.CreatedAt)
+                    .ToList();
+
+                var lastUserMessage = priorOrderedMessages
+                    .LastOrDefault(message => message.Role == MessageRole.User);
+
+                var lastAssistantMessage = priorOrderedMessages
+                    .LastOrDefault(message => message.Role == MessageRole.Assistant);
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("## CONTINUATION CONTEXT (previous conversation hit the tool-use limit)");
+                sb.AppendLine();
+                sb.AppendLine(CultureInfo.InvariantCulture, $"This is a continuation of conversation `{priorConversation.Id}`.");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"The previous session was at phase {priorConversation.CurrentPhase} ({priorConversation.PhaseName}).");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"Questions asked in prior session: {priorConversation.QuestionsAsked}.");
+
+                if (lastUserMessage is not null)
+                {
+                    // Include the last user instruction — this is the task that was in progress when the limit hit
+                    var userContent = lastUserMessage.Content.Length > 500
+                        ? lastUserMessage.Content[..500] + "..."
+                        : lastUserMessage.Content;
+
+                    sb.AppendLine();
+                    sb.AppendLine("**Last user instruction from previous session (the task that was interrupted):**");
+                    sb.AppendLine("```");
+                    sb.AppendLine(userContent);
+                    sb.AppendLine("```");
+                }
+
+                if (lastAssistantMessage is not null)
+                {
+                    // Truncate to last 2000 chars to keep context bounded
+                    var content = lastAssistantMessage.Content.Length > 2000
+                        ? "..." + lastAssistantMessage.Content[^2000..]
+                        : lastAssistantMessage.Content;
+
+                    sb.AppendLine();
+                    sb.AppendLine("**Last assistant message from previous session:**");
+                    sb.AppendLine("```");
+                    sb.AppendLine(content);
+                    sb.AppendLine("```");
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("**IMPORTANT:** Resume naturally from where the previous session stopped. " +
+                              "Do NOT re-introduce yourself or re-explain your purpose. " +
+                              "Acknowledge the continuation briefly and continue the work.");
+
+                var checkpointFilePath = BuildContinuationCheckpointFilePath(priorConversation.Id);
+                var checkpointArtefact = await _artefactRepository.GetByProjectAndFilePathAsync(
+                    projectId,
+                    checkpointFilePath,
+                    cancellationToken);
+
+                if (checkpointArtefact is not null)
+                {
+                    var checkpointContent = await _artefactStorageService.GetContentAsync(
+                        checkpointArtefact.S3Key,
+                        cancellationToken);
+
+                    if (!string.IsNullOrWhiteSpace(checkpointContent))
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine("**Persisted checkpoint summary (source of truth for done/next):**");
+                        sb.AppendLine("```");
+                        sb.AppendLine(checkpointContent);
+                        sb.AppendLine("```");
+                    }
+                }
+
+                handoverBlock = $"\n\n---\n\n{sb}";
+            }
+        }
 
         // Detect staleness: were artefacts modified since the last message in this conversation?
         var stalenessNotice = string.Empty;
@@ -177,6 +292,17 @@ public class ConversationStreamController : ControllerBase
                 ? basePrompt
                 : $"{basePrompt}\n\n---\n\n{foundationContent}";
 
+            if (_tokenOptimisationOptions.ActiveSkillInjectionEnabled)
+            {
+                var activeSkillContent = await _activeSkillsService.BuildActiveSkillsAsync(
+                    stageType.Value, conversation.CurrentPhase, cancellationToken);
+
+                if (!string.IsNullOrEmpty(activeSkillContent))
+                {
+                    stablePart += $"\n\n---\n\n## ACTIVE SKILLS (phase {conversation.CurrentPhase})\n\n{activeSkillContent}";
+                }
+            }
+
             var mutablePart = $"## PROJECT CONTEXT (from project creation)\n\n{projectContextSection}\n\n---\n\n## CURRENT SESSION STATE (managed by API)\n\n{stateContext}";
 
             if (!string.IsNullOrEmpty(artefactManifestSection))
@@ -184,7 +310,13 @@ public class ConversationStreamController : ControllerBase
                 mutablePart += $"\n\n---\n\n## PROJECT ARTEFACTS (live manifest — use get_artefact for unlisted files)\n\n{artefactManifestSection}";
             }
 
+            if (!string.IsNullOrEmpty(prototypeIntentDirective))
+            {
+                mutablePart += $"\n\n---\n\n## REQUEST INTENT ROUTING (API-ENFORCED)\n\n{prototypeIntentDirective}";
+            }
+
             mutablePart += stalenessNotice;
+            mutablePart += handoverBlock;
 
             aiSystemPrompt = new AiSystemPrompt(StablePart: stablePart, MutablePart: mutablePart);
 
@@ -204,7 +336,13 @@ public class ConversationStreamController : ControllerBase
                 systemPrompt += $"\n\n---\n\n## PROJECT ARTEFACTS (use get_artefact tool to read content)\n\n{artefactManifestSection}";
             }
 
+            if (!string.IsNullOrEmpty(prototypeIntentDirective))
+            {
+                systemPrompt += $"\n\n---\n\n## REQUEST INTENT ROUTING (API-ENFORCED)\n\n{prototypeIntentDirective}";
+            }
+
             systemPrompt += stalenessNotice;
+            systemPrompt += handoverBlock;
 
             aiSystemPrompt = AiSystemPrompt.FromFullPrompt(systemPrompt);
         }
@@ -221,12 +359,30 @@ public class ConversationStreamController : ControllerBase
 
         try
         {
-            const int defaultMaxToolTurns = 40; // Safety limit to prevent infinite tool loops (needs headroom for Phase 11 saving 15+ files one-at-a-time)
+            const int defaultMaxToolTurns = 60; // Safety limit to prevent infinite tool loops (needs headroom for multi-file tasks and bulk guardrail application)
+            const int maxAnchorNotFoundRetriesPerRequest = 4; // Prevent long-running edit loops on bad anchors
             var maxToolTurns = stageType.HasValue &&
                 _tokenOptimisationOptions.StageToolTurnLimits.TryGetValue(stageType.Value.ToString(), out var stageLimit)
                 ? stageLimit
                 : defaultMaxToolTurns;
             var turnsRemaining = maxToolTurns;
+            var anchorNotFoundRetries = 0;
+            // Track which files have been read via get_artefact this request.
+            // edit_artefact is blocked until the target file has been read, ensuring Claude
+            // always anchors against the real file content rather than memory.
+            var filesReadThisRequest = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Read budget: cap get_artefact calls on non-prototype files per request.
+            // Prevents the LLM reading all 13 REQ files before writing anything.
+            // The artefact manifest in the system prompt already lists every file —
+            // the LLM should read selectively, not exhaustively.
+            const int maxReadBudget = 5;
+            var readBudgetUsed = 0;
+
+            // Prototype stage: cap total fragment saves per request to prevent the LLM
+            // cycling through all fragments repeatedly after the initial build.
+            // 15 saves allows a full build (8 fragments) plus one full refinement pass (7 more).
+            const int maxPrototypeFragmentSaves = 15;
 
             while (turnsRemaining > 0)
             {
@@ -237,7 +393,7 @@ public class ConversationStreamController : ControllerBase
                 var needsNewlineSeparator = fullResponse.Length > 0 && fullResponse[^1] != '\n';
 
                 await foreach (var streamEvent in _aiService.StreamWithToolsAsync(
-                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.All, cancellationToken))
+                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType), cancellationToken))
                 {
                     switch (streamEvent)
                     {
@@ -302,8 +458,49 @@ public class ConversationStreamController : ControllerBase
                 // Execute all tool calls and collect results
                 var toolResults = new List<AiToolResult>();
 
+                // Detect same-turn get_artefact + edit_artefact on the same file.
+                // Claude cannot anchor against a file it just requested in the same turn —
+                // the result won't be in its context until the next turn.
+                // Block the edit now; Claude will retry after seeing the file content.
+                var filesReadThisTurn = toolCallsThisTurn
+                    .Where(tc => tc.ToolName == PipelineToolDefinitions.GetArtefact)
+                    .Select(tc =>
+                    {
+                        try { return tc.Input.RootElement.GetProperty("file_path").GetString(); }
+                        catch { return null; }
+                    })
+                    .Where(path => path is not null)
+                    .Select(path => path!)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var toolCall in toolCallsThisTurn)
                 {
+                    // Enforce read budget inline — block get_artefact on non-prototype files
+                    // once the budget is exhausted. This prevents the LLM reading all REQ files
+                    // before writing anything, regardless of what the prompt directive says.
+                    if (toolCall.ToolName == PipelineToolDefinitions.GetArtefact)
+                    {
+                        var requestedPath = toolCall.Input.RootElement.TryGetProperty("file_path", out var fpProp)
+                            ? fpProp.GetString() ?? string.Empty
+                            : string.Empty;
+                        var isPrototypePath = requestedPath.StartsWith("prototype/", StringComparison.OrdinalIgnoreCase);
+                        if (!isPrototypePath)
+                        {
+                            if (readBudgetUsed >= maxReadBudget)
+                            {
+                                _logger.LogWarning(
+                                    "Tool get_artefact blocked: read budget exhausted ({Budget}) — forcing write mode. File: {FilePath}",
+                                    maxReadBudget, requestedPath);
+                                toolResults.Add(new AiToolResult(toolCall.ToolUseId,
+                                    $"READ BUDGET EXHAUSTED: You have already read {maxReadBudget} files. " +
+                                    "Stop reading and call save_artefact now to produce output."));
+                                await SendToolSseEventAsync(toolCall, conversation, savedArtefacts, savedParkingLotItems, cancellationToken);
+                                continue;
+                            }
+                            readBudgetUsed++;
+                        }
+                    }
+
                     await SendToolStartSseEventAsync(toolCall, cancellationToken);
 
                     string result;
@@ -318,6 +515,8 @@ public class ConversationStreamController : ControllerBase
                             createdBy,
                             projectId,
                             stageType,
+                            filesReadThisRequest,
+                            filesReadThisTurn,
                             cancellationToken);
                     }
                     catch (ToolExecutionFailedException exception)
@@ -342,26 +541,137 @@ public class ConversationStreamController : ControllerBase
                         return;
                     }
 
+                    if (toolCall.ToolName == PipelineToolDefinitions.EditArtefact &&
+                        result.StartsWith("Error: ANCHOR_NOT_FOUND", StringComparison.Ordinal))
+                    {
+                        anchorNotFoundRetries++;
+
+                        if (anchorNotFoundRetries >= maxAnchorNotFoundRetriesPerRequest)
+                        {
+                            _logger.LogWarning(
+                                "Terminating stream after repeated ANCHOR_NOT_FOUND errors for conversation {ConversationId} ({Count} attempts)",
+                                conversation.Id,
+                                anchorNotFoundRetries);
+
+                            var anchorErrorEvent = JsonSerializer.Serialize(new
+                            {
+                                error = "Repeated anchor failures while editing artefact.",
+                                reason = "edit_anchor_retry_limit"
+                            });
+                            await Response.WriteAsync($"event: error\ndata: {anchorErrorEvent}\n\n", cancellationToken);
+                            await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                            return;
+                        }
+                    }
+                    else if (toolCall.ToolName == PipelineToolDefinitions.EditArtefact)
+                    {
+                        // Reset on successful edit or non-anchor edit errors.
+                        anchorNotFoundRetries = 0;
+                    }
+
                     toolResults.Add(new AiToolResult(toolCall.ToolUseId, result));
 
                     await SendToolSseEventAsync(toolCall, conversation, savedArtefacts, savedParkingLotItems, cancellationToken);
                 }
 
                 // Build proper structured continuation messages for the Bedrock API.
-                // Assistant message: text (if any) + tool_use blocks
+                // Assistant message: text (if any) + tool_use blocks.
+                // Strip large inputs (old_str/new_str from edit_artefact, content from search inputs)
+                // from tool calls stored in history — the LLM already acted on them; keeping the
+                // verbatim file content in every assistant message re-sends thousands of chars per turn.
                 var assistantText = turnText.ToString();
+                var compactedToolCalls = toolCallsThisTurn.Select(toolCall =>
+                {
+                    if (toolCall.ToolName != PipelineToolDefinitions.EditArtefact)
+                        return toolCall;
+
+                    // Strip old_str and new_str — keep only file_path so history is legible
+                    try
+                    {
+                        var inputRoot = toolCall.Input.RootElement;
+                        var filePath = inputRoot.TryGetProperty("file_path", out var fp) ? fp.GetString() ?? "" : "";
+                        var oldLen = inputRoot.TryGetProperty("old_str", out var oldProp) ? oldProp.GetString()?.Length ?? 0 : 0;
+                        var newLen = inputRoot.TryGetProperty("new_str", out var newProp) ? newProp.GetString()?.Length ?? 0 : 0;
+                        var strippedJson = $"{{\"file_path\":\"{filePath}\",\"old_str\":\"[{oldLen} chars — stripped from history]\",\"new_str\":\"[{newLen} chars — stripped from history]\"}}";
+                        var strippedDoc = System.Text.Json.JsonDocument.Parse(strippedJson);
+                        return new AiToolCall(toolCall.ToolName, toolCall.ToolUseId, strippedDoc);
+                    }
+                    catch
+                    {
+                        return toolCall;
+                    }
+                }).ToList();
+
                 aiMessages.Add(new AiMessage(
                     MessageRole.Assistant,
                     assistantText,
-                    ToolCalls: toolCallsThisTurn));
+                    ToolCalls: compactedToolCalls));
 
                 // User message: tool_result blocks
+                // Truncate large tool results (get_artefact / get_guardrail_details) to a brief summary
+                // Compact all tool results in history — see compaction logic below.
+                var compactedToolResults = toolResults.Select(toolResult =>
+                {
+                    var matchingCall = toolCallsThisTurn
+                        .FirstOrDefault(tc => tc.ToolUseId == toolResult.ToolUseId);
+
+                        // Compact ALL tool results in history unconditionally.
+                    // The LLM sees full content on the turn it is returned — that is sufficient.
+                    // Keeping results in history (even small ones like search_in_artefact at ~200 chars)
+                    // causes unbounded growth: 50+ searches × 200 chars = 10k chars re-sent every turn.
+                    // If the LLM needs to re-read something, it calls the tool again.
+                    // Only exception: ANCHOR_NOT_FOUND contains real file context needed for retries.
+                    if (!toolResult.Content.StartsWith("Error: ANCHOR_NOT_FOUND", StringComparison.Ordinal))
+                    {
+                        var toolName = matchingCall?.ToolName ?? "tool";
+                        return new AiToolResult(
+                            toolResult.ToolUseId,
+                            $"[Result returned {toolResult.Content.Length:N0} chars — content was provided to you in this turn only and is not repeated here to save context. Use {toolName} again if you need to re-read it.]");
+                    }
+
+                    return toolResult;
+                }).ToList();
+
                 aiMessages.Add(new AiMessage(
                     MessageRole.User,
                     string.Empty,
-                    ToolResults: toolResults));
+                    ToolResults: compactedToolResults));
+
+                // Trim in-memory tool-loop history to prevent unbounded growth within a single request.
+                // DB messages are already capped to 4. Keep only the last 4 tool-loop pairs (8 messages)
+                // within the current request — tool results are already compacted so the LLM has context.
+                const int maxToolLoopPairsInMemory = 4;
+                var dbMessageCount = messages.Count;
+                var toolLoopMessages = aiMessages.Count - dbMessageCount;
+                var maxToolLoopMessages = maxToolLoopPairsInMemory * 2;
+                if (toolLoopMessages > maxToolLoopMessages)
+                {
+                    var excess = toolLoopMessages - maxToolLoopMessages;
+                    // Remove pairs from the start of the tool loop history (oldest first).
+                    // Always remove in pairs (assistant + user) to maintain alternating message structure.
+                    var toRemove = excess % 2 == 0 ? excess : excess + 1;
+                    aiMessages.RemoveRange(dbMessageCount, toRemove);
+                }
 
                 turnsRemaining--;
+
+                // Prototype stage: exit early once the fragment save budget is exhausted.
+                // Prevents the LLM cycling through all fragments repeatedly after the initial build.
+                // 15 saves = full build (8 fragments) + one full refinement pass (7 more).
+                // Count is derived from savedArtefacts (accumulated this request) filtered to fragment paths.
+                if (stageType == StageType.Prototype)
+                {
+                    var fragmentsSaved = savedArtefacts.Count(
+                        artefact => artefact.FilePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase));
+                    if (fragmentsSaved >= maxPrototypeFragmentSaves)
+                    {
+                        _logger.LogInformation(
+                            "Prototype fragment save budget exhausted ({Count}/{Max}) — exiting tool loop early to prevent refinement loop",
+                            fragmentsSaved, maxPrototypeFragmentSaves);
+                        break;
+                    }
+                }
 
                 // Near-limit telemetry: warn when only 5 turns remain so the user can safely checkpoint
                 if (turnsRemaining == 5)
@@ -385,6 +695,26 @@ public class ConversationStreamController : ControllerBase
             // Hard-limit telemetry: loop exited without the AI finishing — response was cut off
             if (turnsRemaining == 0)
             {
+                try
+                {
+                    await SaveContinuationCheckpointAsync(
+                        conversation,
+                        projectId,
+                        request.Content,
+                        fullResponse.ToString(),
+                        savedArtefacts,
+                        savedParkingLotItems,
+                        createdBy,
+                        cancellationToken);
+                }
+                catch (Exception checkpointException)
+                {
+                    _logger.LogWarning(
+                        checkpointException,
+                        "Failed to persist continuation checkpoint for conversation {ConversationId}",
+                        conversation.Id);
+                }
+
                 _logger.LogError(
                     "Tool loop hard limit hit for conversation {ConversationId}, stage {StageType}, requirement {RequirementId}: all {MaxTurns} turns exhausted — response was cut off",
                     conversation.Id, stageType, conversation.RequirementId ?? "(none)", maxToolTurns);
@@ -405,6 +735,20 @@ public class ConversationStreamController : ControllerBase
             {
                 conversation.AddMessage(MessageRole.Assistant, finalResponse, null, _timeProvider);
                 await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "AI stream completed with no assistant text for conversation {ConversationId}",
+                    conversation.Id);
+
+                var emptyResponseEvent = JsonSerializer.Serialize(new
+                {
+                    error = "No response returned from AI",
+                    reason = "empty_assistant_output"
+                });
+                await Response.WriteAsync($"event: error\ndata: {emptyResponseEvent}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
             }
 
             // Send completion event
@@ -450,6 +794,7 @@ public class ConversationStreamController : ControllerBase
             PipelineToolDefinitions.GetGuardrailDetails => $"Loading {GetToolInputString(toolCall, "skill_name") ?? "guardrail"} guidelines...",
             PipelineToolDefinitions.SetOrchestrationMode => "Entering cross-check mode...",
             PipelineToolDefinitions.AdvanceRequirement => $"Completing requirement {GetToolInputString(toolCall, "requirement_id") ?? string.Empty}...",
+            PipelineToolDefinitions.EditArtefact => $"Editing {GetToolInputString(toolCall, "file_path") ?? "artefact"}...",
             _ => $"Running {toolCall.ToolName}..."
         };
 
@@ -539,6 +884,23 @@ public class ConversationStreamController : ControllerBase
                 }
                 break;
             }
+
+            case PipelineToolDefinitions.EditArtefact:
+            {
+                if (savedArtefacts.Count > 0)
+                {
+                    var lastArtefact = savedArtefacts[^1];
+                    var artefactEvent = JsonSerializer.Serialize(new
+                    {
+                        filePath = lastArtefact.FilePath,
+                        version = lastArtefact.Version,
+                        id = lastArtefact.Id
+                    });
+                    await Response.WriteAsync($"event: artefact\ndata: {artefactEvent}\n\n", cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                }
+                break;
+            }
         }
     }
 
@@ -551,6 +913,8 @@ public class ConversationStreamController : ControllerBase
         string createdBy,
         Guid projectId,
         StageType? stageType,
+        HashSet<string> filesReadThisRequest,
+        HashSet<string> filesReadThisTurn,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -566,6 +930,8 @@ public class ConversationStreamController : ControllerBase
                     createdBy,
                     projectId,
                     stageType,
+                    filesReadThisRequest,
+                    filesReadThisTurn,
                     cancellationToken);
             }
             catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
@@ -600,6 +966,8 @@ public class ConversationStreamController : ControllerBase
         string createdBy,
         Guid projectId,
         StageType? stageType,
+        HashSet<string> filesReadThisRequest,
+        HashSet<string> filesReadThisTurn,
         CancellationToken cancellationToken)
     {
         var root = toolCall.Input.RootElement;
@@ -610,6 +978,47 @@ public class ConversationStreamController : ControllerBase
             {
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var content = root.GetProperty("content").GetString()!;
+
+                var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
+                if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
+                    duplicateInjectedHeading is not null)
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected for duplicate injected section heading: {FilePath} / {Heading}",
+                        filePath, duplicateInjectedHeading);
+                    return $"Error: DUPLICATE_SECTION_HEADING: '{duplicateInjectedHeading}' appears more than once in '{filePath}'. " +
+                           "Do not append the same stage-added section twice. Keep one canonical section and remove or replace duplicates before saving.";
+                }
+
+                if (stageType == StageType.Prototype &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    var existingPrototype = await _artefactRepository.GetByProjectAndFilePathAsync(
+                        projectId, filePath, cancellationToken);
+
+                    if (existingPrototype is not null)
+                    {
+                        // Allow full regeneration when the existing prototype is too large to edit via edit_artefact.
+                        // edit_artefact requires exact old_str matches which is not feasible on files >100KB.
+                        var existingSizeBytes = existingPrototype.SizeBytes ?? 0;
+                        var contentIsLargeForEditing = existingSizeBytes > 50_000 || content.Length > 50_000;
+
+                        if (!contentIsLargeForEditing)
+                        {
+                            _logger.LogWarning(
+                                "Tool save_artefact rejected for existing prototype HTML regeneration: {FilePath}",
+                                filePath);
+                            return "Error: PROTOTYPE_REGENERATION_BLOCKED: 'prototype/index.html' already exists. " +
+                                   "For iterative changes, you must use edit_artefact with exact anchor strings. " +
+                                   "Only the initial prototype creation may use save_artefact for prototype/index.html.";
+                        }
+
+                        _logger.LogInformation(
+                            "Tool save_artefact: allowing full regeneration of prototype/index.html " +
+                            "(existing size: {ExistingBytes} bytes — too large for targeted edit_artefact)",
+                            existingSizeBytes);
+                    }
+                }
 
                 if (stageType == StageType.Prototype)
                 {
@@ -648,6 +1057,13 @@ public class ConversationStreamController : ControllerBase
                     projectId, filePath, nextVersion, cancellationToken);
 
                 savedArtefacts.Add(artefact);
+
+                // Trigger prototype assembly if fragment path and flag enabled
+                if (_tokenOptimisationOptions.PrototypeFragmentsEnabled &&
+                    filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
+                }
 
                 _logger.LogInformation(
                     "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
@@ -811,6 +1227,18 @@ public class ConversationStreamController : ControllerBase
             case PipelineToolDefinitions.GetArtefact:
             {
                 var filePath = root.GetProperty("file_path").GetString()!;
+
+                // Block direct reads of the assembled prototype — it is the output, not a fragment to edit.
+                // The LLM should only read/edit fragment files (prototype/fragments/*).
+                if (stageType == StageType.Prototype &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning("Tool get_artefact: blocked read of assembled prototype/index.html — redirect to fragments");
+                    return "Error: prototype/index.html is the assembled output and cannot be read directly. " +
+                           "To edit the prototype, read and modify the fragment files under prototype/fragments/ instead. " +
+                           "Use list_artefacts to see all fragments.";
+                }
+
                 var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, filePath, cancellationToken);
 
                 if (artefact is null)
@@ -826,9 +1254,41 @@ public class ConversationStreamController : ControllerBase
                     return $"Artefact '{filePath}' content could not be retrieved.";
                 }
 
+                // For large files, return a structural outline instead of raw content.
+                // This orients the LLM in one call (CSS selectors, HTML section headers)
+                // rather than forcing 20+ individual search_in_artefact probes.
+                const int largeFileThreshold = 50_000;
+                const int regenerateThreshold = 50_000;
+                if (artefactContent.Length > largeFileThreshold)
+                {
+                    _logger.LogWarning(
+                        "Tool get_artefact: large file {FilePath} ({Length} chars) — returning structural outline",
+                        filePath, artefactContent.Length);
+
+                    if (artefactContent.Length > regenerateThreshold && filePath.StartsWith("prototype/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // File is too large for targeted edit_artefact — exact old_str matching is not feasible.
+                        // Instruct the LLM to do a full regeneration via save_artefact (which is permitted for large files).
+                        filesReadThisRequest.Add(filePath);
+                        return $"## {filePath} (v{artefact.Version}) — TOO LARGE TO EDIT\n\n" +
+                               $"File is {artefactContent.Length:N0} chars — too large for targeted edit_artefact (requires exact anchor strings).\n\n" +
+                               $"**Action required**: Use save_artefact to produce a complete replacement. " +
+                               $"Full regeneration is explicitly permitted for prototype/index.html files above 100KB. " +
+                               $"Do NOT attempt further search_in_artefact calls — regenerate the full file directly.";
+                    }
+
+                    var outline = BuildFileOutline(artefactContent, filePath);
+                    filesReadThisRequest.Add(filePath);
+                    return $"## {filePath} (v{artefact.Version}) — STRUCTURAL OUTLINE\n\n" +
+                           $"File is {artefactContent.Length:N0} chars (too large to return in full). " +
+                           $"Use search_in_artefact to retrieve specific sections, or edit_artefact directly using selectors from this outline.\n\n" +
+                           outline;
+                }
+
                 _logger.LogInformation(
                     "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars)",
                     filePath, artefact.Version, artefactContent.Length);
+                filesReadThisRequest.Add(filePath);
                 return $"## {filePath} (v{artefact.Version})\n\n{artefactContent}";
             }
 
@@ -865,11 +1325,11 @@ public class ConversationStreamController : ControllerBase
                     requirementIdInput ?? "(none)", conversation.Id, summary ?? "(none)");
 
                 // Emit SSE here (inside the gate-passed path) so it only fires on success
-                var requirementCompletedEvent = JsonSerializer.Serialize(new
+                var requirementCompletedEvent = new System.Text.Json.Nodes.JsonObject
                 {
-                    requirementId = conversation.RequirementId,
-                    conversationId = conversation.Id
-                });
+                    ["requirementId"] = conversation.RequirementId,
+                    ["conversationId"] = conversation.Id.ToString()
+                }.ToJsonString();
                 await Response.WriteAsync($"event: requirement_complete\ndata: {requirementCompletedEvent}\n\n", cancellationToken);
                 await Response.Body.FlushAsync(cancellationToken);
 
@@ -905,6 +1365,168 @@ public class ConversationStreamController : ControllerBase
                     conversation.Id, stageType, justification ?? "(none provided)");
 
                 return $"Orchestration mode set to cross_check. Forward sweep is complete. Beginning cross-requirement consistency check.";
+            }
+
+            case PipelineToolDefinitions.SearchInArtefact:
+            {
+                var filePath = root.GetProperty("file_path").GetString()!;
+                var query = root.GetProperty("query").GetString()!;
+
+                var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, filePath, cancellationToken);
+                if (artefact is null)
+                    return $"Artefact '{filePath}' not found. Use list_artefacts to see available files.";
+
+                var content = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
+                if (content is null)
+                    return $"Artefact '{filePath}' content could not be retrieved.";
+
+                var normalisedContent = ToNfc(content);
+                var searchResult = BuildSearchResult(normalisedContent, query, filePath, artefact.Version);
+
+                _logger.LogInformation(
+                    "Tool search_in_artefact: searched {FilePath} v{Version} for '{Query}' ({Length} chars file)",
+                    filePath, artefact.Version, query, content.Length);
+
+                // Unblock edit_artefact for this file — the result contains real verbatim snippets
+                filesReadThisRequest.Add(filePath);
+
+                return searchResult;
+            }
+
+            case PipelineToolDefinitions.EditArtefact:
+            {
+                if (!_tokenOptimisationOptions.EditArtefactEnabled)
+                    return "Error: edit_artefact is not enabled on this server.";
+
+                var filePath = root.GetProperty("file_path").GetString()!;
+                var oldStr = root.GetProperty("old_str").GetString()!;
+                var newStr = root.GetProperty("new_str").GetString()!;
+
+                if (string.IsNullOrEmpty(oldStr))
+                    return "Error: edit_artefact_invalid_anchor: old_str must not be empty.";
+
+                // Require get_artefact to be called first this request so Claude anchors against
+                // the real file content, not memory or a previous cached version.
+                if (!filesReadThisRequest.Contains(filePath))
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact blocked: {FilePath} not read this request — forcing get_artefact first",
+                        filePath);
+                    return $"Error: FILE_NOT_READ: You must call get_artefact on '{filePath}' before editing it. " +
+                           "For large files this returns a structural outline of all CSS selectors and HTML sections — " +
+                           "use that to find your anchor, then call search_in_artefact if you need the exact surrounding lines.";
+                }
+
+                // Block edits where get_artefact was called in the same turn — the file content
+                // is not yet in Claude's context window and the anchor will fail.
+                if (filesReadThisTurn.Contains(filePath))
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact blocked: {FilePath} was read in the same turn — must wait for next turn",
+                        filePath);
+                    return $"Error: FILE_READ_SAME_TURN: You called search_in_artefact and edit_artefact for '{filePath}' " +
+                           "in the same response. The search results are not in your context yet. " +
+                           "On your next response, copy a verbatim snippet from the search_in_artefact result you just received and use it as old_str.";
+                }
+
+                // Load latest version
+                var existingArtefact = await _artefactRepository.GetByProjectAndFilePathAsync(
+                    projectId, filePath, cancellationToken);
+
+                if (existingArtefact is null)
+                    return $"Error: FILE_NOT_FOUND: No artefact found at path '{filePath}'. Use list_artefacts to see available files.";
+
+                var existingContent = await _artefactStorageService.GetContentAsync(
+                    existingArtefact.S3Key, cancellationToken);
+
+                if (existingContent is null)
+                    return $"Error: FILE_NOT_FOUND: Artefact content could not be retrieved for '{filePath}'.";
+
+                // Normalise to NFC so emoji and multi-codepoint characters compare correctly
+                // regardless of whether Claude or the stored file used a different normalisation form.
+                var normalisedContent = ToNfc(existingContent);
+                var normalisedOldStr = ToNfc(oldStr);
+
+                var occurrences = CountOccurrences(normalisedContent, normalisedOldStr);
+
+                if (occurrences == 0)
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact: ANCHOR_NOT_FOUND for {FilePath} (old_str length {Length})",
+                        filePath, oldStr.Length);
+
+                    // Remove the file from filesReadThisRequest so Claude is forced to search again
+                    filesReadThisRequest.Remove(filePath);
+
+                    return $"Error: ANCHOR_NOT_FOUND: The anchor string was not found in '{filePath}'. " +
+                           "Do NOT retry with a different guess. Instead: call search_in_artefact with a distinctive keyword " +
+                           "from the area you want to change (e.g. 'nav', 'background-colour', 'header', 'banner'). " +
+                           "Copy old_str verbatim character-for-character from the search results — never reconstruct from memory.";
+                }
+
+                if (occurrences > 1)
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact: ANCHOR_AMBIGUOUS for {FilePath} ({Count} occurrences, old_str length {Length})",
+                        filePath, occurrences, oldStr.Length);
+                    return $"Error: ANCHOR_AMBIGUOUS: The anchor string appears {occurrences} times in '{filePath}'. " +
+                           "Use a longer, more unique anchor string.";
+                }
+
+                // Apply edit — replace on the normalised content so the substitution site is correct
+                var normalisedNewStr = ToNfc(newStr);
+                var updatedContent = normalisedContent.Replace(normalisedOldStr, normalisedNewStr, StringComparison.Ordinal);
+                var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(updatedContent);
+                if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
+                    duplicateInjectedHeading is not null)
+                {
+                    _logger.LogWarning(
+                        "Tool edit_artefact rejected for duplicate injected section heading: {FilePath} / {Heading}",
+                        filePath, duplicateInjectedHeading);
+                    return $"Error: DUPLICATE_SECTION_HEADING: '{duplicateInjectedHeading}' appears more than once in '{filePath}' after the edit. " +
+                           "Do not append the same stage-added section twice. Read the file, keep one canonical section, and remove duplicates instead of adding another copy.";
+                }
+
+                var bytesChanged = Math.Abs(
+                    System.Text.Encoding.UTF8.GetByteCount(updatedContent) -
+                    System.Text.Encoding.UTF8.GetByteCount(normalisedContent));
+
+                var contentType = existingArtefact.ContentType;
+                var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+                    projectId, filePath, cancellationToken);
+
+                var storageKey = await _artefactStorageService.SaveContentAsync(
+                    projectId, filePath, nextVersion, updatedContent, contentType, cancellationToken);
+
+                var editedArtefact = Artefact.CreateS3Artefact(
+                    projectId,
+                    nextVersion,
+                    filePath,
+                    storageKey,
+                    contentType,
+                    System.Text.Encoding.UTF8.GetByteCount(updatedContent),
+                    createdBy,
+                    _timeProvider);
+
+                await _artefactRepository.AddAsync(editedArtefact, cancellationToken);
+                await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+                await _artefactRepository.DeletePreviousVersionsAsync(
+                    projectId, filePath, nextVersion, cancellationToken);
+
+                savedArtefacts.Add(editedArtefact);
+
+                _logger.LogInformation(
+                    "Tool edit_artefact: edited {FilePath} v{Version} ({BytesChanged} bytes changed, total {Total} bytes, {ContentType})",
+                    filePath, nextVersion, bytesChanged, System.Text.Encoding.UTF8.GetByteCount(updatedContent), contentType);
+
+                // Trigger prototype assembly if fragment path and flag enabled
+                if (_tokenOptimisationOptions.PrototypeFragmentsEnabled &&
+                    filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
+                }
+
+                return $"Edited {filePath} (version {nextVersion}, {bytesChanged} bytes changed, total {System.Text.Encoding.UTF8.GetByteCount(updatedContent)} bytes)";
             }
 
             default:
@@ -967,6 +1589,112 @@ public class ConversationStreamController : ControllerBase
         }
 
         return ValidationResult.Ok();
+    }
+
+    private static string BuildFileOutline(string content, string filePath)
+    {
+        var sb = new System.Text.StringBuilder();
+        var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+        var isHtmlOrCss = ext is ".html" or ".htm" or ".css";
+
+        if (!isHtmlOrCss)
+        {
+            // For non-HTML/CSS files, return first 2000 chars as a preview
+            sb.AppendLine(content.Length > 2000 ? content[..2000] + "\n\n[...truncated...]" : content);
+            return sb.ToString();
+        }
+
+        sb.AppendLine("### CSS Custom Properties (`:root` variables)");
+        var rootMatch = System.Text.RegularExpressions.Regex.Match(
+            content, @":root\s*\{([^}]+)\}", System.Text.RegularExpressions.RegexOptions.Singleline);
+        if (rootMatch.Success)
+        {
+            // Extract just the property names (no values) to keep it compact
+            var props = System.Text.RegularExpressions.Regex.Matches(
+                rootMatch.Groups[1].Value, @"--[\w-]+");
+            foreach (System.Text.RegularExpressions.Match prop in props)
+                sb.Append("  ").AppendLine(prop.Value);
+        }
+        else
+        {
+            sb.AppendLine("  (none found)");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("### CSS Selectors (classes and IDs)");
+        var selectorMatches = System.Text.RegularExpressions.Regex.Matches(
+            content,
+            @"(?:^|\})\s*((?:[.#][\w-]+(?:\s+[.#>+~]?[\w-]+)*(?::[:\w-]+)?(?:\s*,\s*)?)+)\s*\{",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        var seen = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+        foreach (System.Text.RegularExpressions.Match m in selectorMatches)
+        {
+            var selector = m.Groups[1].Value.Trim();
+            if (selector.Length > 0 && seen.Add(selector))
+                sb.Append("  ").AppendLine(selector);
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("### HTML Section Comments");
+        var commentMatches = System.Text.RegularExpressions.Regex.Matches(
+            content, @"<!--\s*([A-Z][A-Z\s/\-]{2,60}?)\s*-->");
+        foreach (System.Text.RegularExpressions.Match m in commentMatches)
+            sb.Append("  <!-- ").Append(m.Groups[1].Value.Trim()).AppendLine(" -->");
+
+        return sb.ToString();
+    }
+
+    private static string BuildPrototypeIntentRoutingDirective(
+        StageType? stageType,
+        string? latestUserMessage,
+        IReadOnlyList<Artefact> artefactManifest)
+    {
+        if (stageType != StageType.Prototype || string.IsNullOrWhiteSpace(latestUserMessage))
+        {
+            return string.Empty;
+        }
+
+        var hasExistingPrototypeHtml = artefactManifest.Any(artefact =>
+            artefact.FilePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase));
+
+        if (!hasExistingPrototypeHtml)
+        {
+            return string.Empty;
+        }
+
+        var normalisedRequest = latestUserMessage.ToLowerInvariant();
+        var targetedChangeHints = new[]
+        {
+            "replace", "swap", "update", "change", "fix", "tweak", "adjust", "refine", "improve",
+            // Styling / reskin requests — these are always targeted edits, never regenerations
+            "apply", "style", "restyle", "theme", "colour", "design", "emis", "token",
+            "font", "spacing", "layout", "nav", "sidebar", "header", "button", "badge", "card"
+        };
+        var fullRegenerationHints = new[]
+        {
+            "regenerate", "from scratch", "start over", "full redesign", "full rewrite", "rebuild"
+        };
+
+        // If a prototype already exists, default to targeted edit mode unless the user explicitly
+        // asked for a full regeneration. "Apply EMIS-X UI", "style the nav", "change font" etc.
+        // are all restyling tasks — the LLM should NOT re-read requirements files for these.
+        var isTargetedChange = !fullRegenerationHints.Any(normalisedRequest.Contains) &&
+                               (targetedChangeHints.Any(normalisedRequest.Contains) ||
+                                // Default: if prototype exists and no regeneration hint, assume targeted
+                                true);
+
+        if (!isTargetedChange)
+        {
+            return string.Empty;
+        }
+
+        return @"**IMPORTANT — API-ENFORCED ROUTING: User intent is a targeted update to an existing prototype.**
+- Do NOT call get_artefact or list_artefacts on requirements files (REQ-*.md, manifest.md etc.)
+- Do NOT read project requirements to understand what to build — the structure already exists
+- DO call get_artefact on prototype/index.html to get its structural outline, then use search_in_artefact for specific sections
+- DO apply changes as surgical edit_artefact calls targeting only the affected CSS/HTML sections
+- This is a RESTYLE task: apply design tokens, update colours/fonts/layout. The existing HTML structure stays.";
     }
 
     private static ValidationResult ValidatePrototypeHtmlContract(string htmlContent)
@@ -1100,6 +1828,188 @@ public class ConversationStreamController : ControllerBase
         return "text/markdown";
     }
 
+    private static string ToNfc(string text)
+    {
+        return text.ToNfc();
+    }
+
+    internal static int CountOccurrences(string source, string target)
+    {
+        if (string.IsNullOrEmpty(target))
+            return 0;
+
+        var count = 0;
+        var index = 0;
+        while ((index = source.IndexOf(target, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += target.Length;
+        }
+        return count;
+    }
+
+    internal static string? FindDuplicateInjectedSectionHeading(string content)
+    {
+        var headingCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (Match match in InjectedSectionHeadingRegex.Matches(content))
+        {
+            var heading = match.Groups["heading"].Value;
+            if (!headingCounts.TryAdd(heading, 1))
+            {
+                headingCounts[heading]++;
+            }
+        }
+
+        foreach (var headingCount in headingCounts)
+        {
+            if (headingCount.Value > 1)
+            {
+                return headingCount.Key;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns up to 5 regions from <paramref name="fileContent"/> that contain <paramref name="query"/>,
+    /// each with ±5 lines of context. Result is a compact excerpt for Claude to pick a verbatim anchor
+    /// without loading the full file.
+    /// </summary>
+    internal static string BuildSearchResult(string fileContent, string query, string filePath, int version)
+    {
+        const int contextLines = 5;
+        const int maxRegions = 5;
+        const int maxResultChars = 4000;
+
+        if (string.IsNullOrWhiteSpace(query))
+            return "Error: query must not be empty.";
+
+        var lines = fileContent.Split('\n');
+        var matchedIndices = new List<int>();
+
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        {
+            if (lines[lineIndex].Contains(query, StringComparison.OrdinalIgnoreCase))
+                matchedIndices.Add(lineIndex);
+        }
+
+        if (matchedIndices.Count == 0)
+            return $"SEARCH_NOT_FOUND: No lines in '{filePath}' contain '{query}'. Try a different keyword.";
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(System.Globalization.CultureInfo.InvariantCulture,
+            $"## search_in_artefact: '{query}' in {filePath} v{version} ({matchedIndices.Count} match(es))\n");
+        sb.AppendLine("Copy a unique verbatim substring from below as old_str for edit_artefact.\n");
+
+        var regionsShown = 0;
+        var lastEnd = -1;
+
+        foreach (var centreIndex in matchedIndices)
+        {
+            if (regionsShown >= maxRegions)
+                break;
+
+            var start = Math.Max(0, centreIndex - contextLines);
+            var end = Math.Min(lines.Length - 1, centreIndex + contextLines);
+
+            if (start <= lastEnd)
+            {
+                lastEnd = Math.Max(lastEnd, end);
+                continue;
+            }
+
+            lastEnd = end;
+
+            sb.AppendLine(System.Globalization.CultureInfo.InvariantCulture,
+                $"--- lines {start + 1}–{end + 1} ---");
+
+            for (var lineIndex = start; lineIndex <= end; lineIndex++)
+                sb.AppendLine(lines[lineIndex]);
+
+            regionsShown++;
+
+            if (sb.Length >= maxResultChars)
+                break;
+        }
+
+        var result = sb.ToString();
+        if (result.Length > maxResultChars)
+            result = string.Concat(result.AsSpan(0, maxResultChars), "\n...(truncated — use a more specific query)");
+
+        return result;
+    }
+
+    /// <summary>
+    /// Extracts up to 5 lines from <paramref name="fileContent"/> that contain words from
+    /// <paramref name="attemptedAnchor"/>, with ±3 lines of surrounding context each.
+    /// Returns a compact excerpt Claude can use to pick a real verbatim anchor.
+    /// </summary>
+    internal static string BuildAnchorContextHint(string fileContent, string attemptedAnchor)
+    {
+        const int contextLines = 3;
+        const int maxSnippets = 3;
+        const int maxHintChars = 3000;
+
+        // Extract meaningful search words (≥4 chars, no HTML tags, no punctuation-only tokens)
+        var searchWords = attemptedAnchor
+            .Split([' ', '\n', '\r', '\t', '<', '>', '"', '\'', '=', '{', '}', ';', ':', ','], StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => word.Length >= 4 && !word.StartsWith("//", StringComparison.Ordinal))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .ToArray();
+
+        if (searchWords.Length == 0)
+            return "(No search terms could be extracted — use get_artefact to read the full file)";
+
+        var lines = fileContent.Split('\n');
+        var matchedLineIndices = new HashSet<int>();
+
+        foreach (var word in searchWords)
+        {
+            for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+            {
+                if (lines[lineIndex].Contains(word, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchedLineIndices.Add(lineIndex);
+                    if (matchedLineIndices.Count >= maxSnippets * 5)
+                        break;
+                }
+            }
+        }
+
+        if (matchedLineIndices.Count == 0)
+            return $"(No lines found containing words from your anchor: {string.Join(", ", searchWords)})";
+
+        var sb = new System.Text.StringBuilder();
+        var snippetCount = 0;
+
+        foreach (var centreIndex in matchedLineIndices.OrderBy(index => index))
+        {
+            if (snippetCount >= maxSnippets)
+                break;
+
+            var start = Math.Max(0, centreIndex - contextLines);
+            var end = Math.Min(lines.Length - 1, centreIndex + contextLines);
+
+            sb.AppendLine(System.Globalization.CultureInfo.InvariantCulture, $"--- lines {start + 1}–{end + 1} ---");
+            for (var lineIndex = start; lineIndex <= end; lineIndex++)
+                sb.AppendLine(lines[lineIndex]);
+
+            snippetCount++;
+
+            if (sb.Length >= maxHintChars)
+                break;
+        }
+
+        var hint = sb.ToString();
+        if (hint.Length > maxHintChars)
+            hint = hint[..maxHintChars] + "\n...(truncated)";
+
+        return hint;
+    }
+
     private static string BuildStateContext(Conversation conversation, IReadOnlyList<ParkingLotItem> projectParkingLotItems)
     {
         var sb = new System.Text.StringBuilder();
@@ -1132,6 +2042,136 @@ public class ConversationStreamController : ControllerBase
         sb.AppendLine("**IMPORTANT:** You do NOT manage the parking lot or phase tracking. The API handles that. Focus on asking questions, analyzing answers, and generating content. Do NOT include progress bars or parking lot summaries in your responses — the UI displays those from API data.");
 
         return sb.ToString();
+    }
+
+    private static string BuildContinuationCheckpointFilePath(Guid conversationId)
+    {
+        return $"checkpoints/conversation-{conversationId}.md";
+    }
+
+    private async Task SaveContinuationCheckpointAsync(
+        Conversation conversation,
+        Guid projectId,
+        string latestUserMessage,
+        string latestAssistantOutput,
+        IReadOnlyList<Artefact> savedArtefacts,
+        IReadOnlyList<ParkingLotItem> savedParkingLotItems,
+        string createdBy,
+        CancellationToken cancellationToken)
+    {
+        var filePath = BuildContinuationCheckpointFilePath(conversation.Id);
+        var content = BuildContinuationCheckpointContent(
+            conversation,
+            latestUserMessage,
+            latestAssistantOutput,
+            savedArtefacts,
+            savedParkingLotItems);
+        var contentType = "text/markdown";
+
+        var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+            projectId,
+            filePath,
+            cancellationToken);
+
+        var storageKey = await _artefactStorageService.SaveContentAsync(
+            projectId,
+            filePath,
+            nextVersion,
+            content,
+            contentType,
+            cancellationToken);
+
+        var artefact = Artefact.CreateS3Artefact(
+            projectId,
+            nextVersion,
+            filePath,
+            storageKey,
+            contentType,
+            Encoding.UTF8.GetByteCount(content),
+            createdBy,
+            _timeProvider);
+
+        await _artefactRepository.AddAsync(artefact, cancellationToken);
+        await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        await _artefactRepository.DeletePreviousVersionsAsync(projectId, filePath, nextVersion, cancellationToken);
+    }
+
+    private static string BuildContinuationCheckpointContent(
+        Conversation conversation,
+        string latestUserMessage,
+        string latestAssistantOutput,
+        IReadOnlyList<Artefact> savedArtefacts,
+        IReadOnlyList<ParkingLotItem> savedParkingLotItems)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("# Conversation Checkpoint");
+        sb.AppendLine();
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Conversation ID: {conversation.Id}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Phase: {conversation.CurrentPhase} ({conversation.PhaseName})");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Questions asked: {conversation.QuestionsAsked}");
+        if (!string.IsNullOrWhiteSpace(conversation.RequirementId))
+        {
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Requirement window: {conversation.RequirementId}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("## What Was Just Completed");
+        if (savedArtefacts.Count == 0)
+        {
+            sb.AppendLine("- No artefacts were saved in this interrupted turn.");
+        }
+        else
+        {
+            foreach (var artefact in savedArtefacts)
+            {
+                sb.AppendLine(CultureInfo.InvariantCulture, $"- Saved {artefact.FilePath} v{artefact.Version}");
+            }
+        }
+
+        if (savedParkingLotItems.Count > 0)
+        {
+            sb.AppendLine("- Parking lot updates in this interrupted turn:");
+            foreach (var item in savedParkingLotItems)
+            {
+                sb.AppendLine(CultureInfo.InvariantCulture, $"  - [{item.Status}] {item.Content}");
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("## Last User Instruction");
+        sb.AppendLine("```");
+        sb.AppendLine(TrimForCheckpoint(latestUserMessage, 2000));
+        sb.AppendLine("```");
+
+        if (!string.IsNullOrWhiteSpace(latestAssistantOutput))
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Last Assistant Output (partial if interrupted)");
+            sb.AppendLine("```");
+            sb.AppendLine(TrimForCheckpoint(latestAssistantOutput, 3000));
+            sb.AppendLine("```");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("## Where To Continue");
+        sb.AppendLine("- Continue from the current phase and requirement window.");
+        sb.AppendLine("- Do not repeat completed writes listed above.");
+        sb.AppendLine("- Start with the next unresolved requirement or unanswered question.");
+
+        return sb.ToString();
+    }
+
+    private static string TrimForCheckpoint(string value, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "(empty)";
+        }
+
+        return value.Length <= maxChars
+            ? value
+            : value[..maxChars] + "...";
     }
 
     private static string BuildProjectContext(ProjectContext? project)
@@ -1178,20 +2218,4 @@ public class ConversationStreamController : ControllerBase
         }
     }
 
-    private sealed class ToolExecutionFailedException : Exception
-    {
-        public string ToolName { get; }
-
-        public ToolExecutionFailedException(string toolName, string message)
-            : base(message)
-        {
-            ToolName = toolName;
-        }
-
-        public ToolExecutionFailedException(string toolName, string message, Exception innerException)
-            : base(message, innerException)
-        {
-            ToolName = toolName;
-        }
-    }
 }

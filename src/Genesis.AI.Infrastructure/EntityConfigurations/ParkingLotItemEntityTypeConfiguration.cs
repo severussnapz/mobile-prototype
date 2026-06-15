@@ -39,6 +39,9 @@ public class ParkingLotItemEntityTypeConfiguration : IEntityTypeConfiguration<Pa
         builder.Property(parkingLotItem => parkingLotItem.ResolvedAt)
             .HasColumnName("resolved_at");
 
+        builder.Property(parkingLotItem => parkingLotItem.ClosureDecision)
+            .HasColumnName("closure_decision");
+
         builder.Property(parkingLotItem => parkingLotItem.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

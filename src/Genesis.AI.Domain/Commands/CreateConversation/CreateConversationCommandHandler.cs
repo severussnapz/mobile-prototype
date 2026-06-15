@@ -27,34 +27,129 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
 
     public async Task<Guid> Handle(CreateConversationCommand request, CancellationToken cancellationToken)
     {
-        // Load project with all stages for prerequisite validation
-        var project = await _projectRepository.GetByStageIdAsync(request.StageId, cancellationToken)
-            ?? throw new InvalidOperationException($"No project found for stage '{request.StageId}'.");
-
+        var project = await GetProjectForStageAsync(request.StageId, cancellationToken);
         var targetStage = project.PipelineStages.First(stage => stage.Id == request.StageId);
+        var effectiveRequirementId = await ResolveEffectiveRequirementIdAsync(request, cancellationToken);
 
-        // Cannot start a Blocked stage
-        if (targetStage.Status == PipelineStageStatus.Blocked)
-            throw new InvalidOperationException($"Stage '{targetStage.StageType}' is blocked and cannot be started.");
+        EnsureStageCanStart(project, targetStage, request.ContinuedFromConversationId.HasValue);
+        await ActivateStageIfRequiredAsync(project, targetStage, request.ContinuedFromConversationId.HasValue, cancellationToken);
 
-        // Validate prerequisite stages are complete
-        ValidatePrerequisites(targetStage, project);
-
-        // Mark stage as InProgress if currently NotStarted or Complete (re-entering)
-        if (targetStage.Status is PipelineStageStatus.NotStarted or PipelineStageStatus.Complete)
-        {
-            await ActivateStageAsync(project, targetStage, cancellationToken);
-        }
-
-        var stageType = targetStage.StageType;
-        var totalPhases = _promptService.GetTotalPhases(stageType);
-
-        var conversation = new Conversation(request.StageId, totalPhases, _timeProvider, request.RequirementId);
-
-        await _conversationRepository.AddAsync(conversation, cancellationToken);
-        await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        var conversation = CreateConversation(request, targetStage.StageType, effectiveRequirementId);
+        await SaveConversationAsync(conversation, cancellationToken);
 
         return conversation.Id;
+    }
+
+    private async Task<Project> GetProjectForStageAsync(Guid stageId, CancellationToken cancellationToken)
+    {
+        return await _projectRepository.GetByStageIdAsync(stageId, cancellationToken)
+            ?? throw new InvalidOperationException($"No project found for stage '{stageId}'.");
+    }
+
+    private async Task<string?> ResolveEffectiveRequirementIdAsync(
+        CreateConversationCommand request,
+        CancellationToken cancellationToken)
+    {
+        var effectiveRequirementId = string.IsNullOrWhiteSpace(request.RequirementId)
+            ? null
+            : request.RequirementId;
+
+        if (!request.ContinuedFromConversationId.HasValue)
+        {
+            return effectiveRequirementId;
+        }
+
+        var priorConversation = await GetPriorConversationAsync(
+            request.ContinuedFromConversationId.Value,
+            cancellationToken);
+
+        ValidateContinuationStage(request.StageId, priorConversation.StageId);
+        return ResolveContinuationRequirementId(effectiveRequirementId, priorConversation.RequirementId);
+    }
+
+    private async Task<Conversation> GetPriorConversationAsync(
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        return await _conversationRepository.GetByIdAsync(conversationId, cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"Continuation source conversation '{conversationId}' was not found.");
+    }
+
+    private static void ValidateContinuationStage(Guid requestedStageId, Guid priorStageId)
+    {
+        if (priorStageId != requestedStageId)
+        {
+            throw new InvalidOperationException(
+                "Continuation source conversation stage does not match requested stage.");
+        }
+    }
+
+    private static string? ResolveContinuationRequirementId(string? requestedRequirementId, string? priorRequirementId)
+    {
+        if (requestedRequirementId is null)
+        {
+            return priorRequirementId;
+        }
+
+        if (!string.Equals(requestedRequirementId, priorRequirementId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Continuation source conversation requirement does not match requested requirement.");
+        }
+
+        return requestedRequirementId;
+    }
+
+    private static void EnsureStageCanStart(Project project, PipelineStage targetStage, bool isContinuationRequest)
+    {
+        if (isContinuationRequest)
+        {
+            return;
+        }
+
+        if (targetStage.Status == PipelineStageStatus.Blocked)
+        {
+            throw new InvalidOperationException($"Stage '{targetStage.StageType}' is blocked and cannot be started.");
+        }
+
+        ValidatePrerequisites(targetStage, project);
+    }
+
+    private async Task ActivateStageIfRequiredAsync(
+        Project project,
+        PipelineStage targetStage,
+        bool isContinuationRequest,
+        CancellationToken cancellationToken)
+    {
+        if (isContinuationRequest ||
+            targetStage.Status is not (PipelineStageStatus.NotStarted or PipelineStageStatus.Complete))
+        {
+            return;
+        }
+
+        await ActivateStageAsync(project, targetStage, cancellationToken);
+    }
+
+    private Conversation CreateConversation(
+        CreateConversationCommand request,
+        StageType stageType,
+        string? effectiveRequirementId)
+    {
+        var totalPhases = _promptService.GetTotalPhases(stageType);
+
+        return new Conversation(
+            request.StageId,
+            totalPhases,
+            _timeProvider,
+            effectiveRequirementId,
+            request.ContinuedFromConversationId);
+    }
+
+    private async Task SaveConversationAsync(Conversation conversation, CancellationToken cancellationToken)
+    {
+        await _conversationRepository.AddAsync(conversation, cancellationToken);
+        await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private async Task ActivateStageAsync(

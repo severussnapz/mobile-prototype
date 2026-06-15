@@ -26,7 +26,7 @@ public class ResolveParkingLotItemCommandHandler : IRequestHandler<ResolveParkin
         if (item is null)
             return new ParkingLotItemResult(Found: false);
 
-        item.Resolve(_timeProvider);
+        item.Resolve(_timeProvider, request.ClosureDecision);
         await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ParkingLotItemResult(Found: true, Item: item);

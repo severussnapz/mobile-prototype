@@ -128,3 +128,5 @@ Policy files (all stages reference these via Shared Governance section):
 3. Do not remove the fail-closed rules in `CorePolicy.md`.
 4. Do not change `PipelineContract.md` carry-forward expectations without running a value-chain integrity check against a real project.
 5. Do not add new required inputs to a stage without populating the upstream stage that produces them.
+6. Do not rename the GENESIS marker strings (`<!-- GENESIS:STYLES -->`, `<!-- GENESIS:NAV -->`, `<!-- GENESIS:SCREENS -->`, `<!-- GENESIS:DATA -->`, `<!-- GENESIS:APP -->`) — they are load-bearing and matched by `PrototypeAssemblyService`.
+7. Do not change the `prototype/fragments/` path prefix or the `_shell.html`, `_styles.css`, `_app.js`, `data.js` fragment naming convention without updating `PrototypeAssemblyService` constants.

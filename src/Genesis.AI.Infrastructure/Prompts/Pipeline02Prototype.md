@@ -139,7 +139,60 @@ Use `list_artefacts` and `get_artefact` tools to load these at the start of the 
 
 ---
 
+## FRAGMENT GENERATION CONTRACT (active when PrototypeFragments.Enabled = true)
+
+> This section is injected when the platform has fragment assembly enabled.
+> When this section is present, it OVERRIDES all single-file generation rules below.
+
+### Fragment directory layout
+
+Generate fragments under `prototype/fragments/` — NEVER save `prototype/index.html` directly.
+The platform assembles it automatically after every fragment save or edit.
+
+```
+prototype/fragments/
+  _shell.html            ← document scaffold with GENESIS: markers (generate once, edit-discouraged)
+  _styles.css            ← all CSS (generate once)
+  _app.js                ← navigation/show-hide/form logic (generate once)
+  data.js                ← ALL fictional data as inline constants (single source of truth)
+  screen-NN-{slug}.html  ← one fragment per screen, NN = two-digit display order
+```
+
+### Build order
+`_shell.html` → `_styles.css` → `_app.js` → `data.js` → screens one at a time, each via its own `save_artefact` call.
+
+### Shell markers (load-bearing — these exact strings must appear in _shell.html)
+```
+<!-- GENESIS:STYLES -->
+<!-- GENESIS:NAV -->
+<!-- GENESIS:SCREENS -->
+<!-- GENESIS:DATA -->
+<!-- GENESIS:APP -->
+```
+
+### Mutation contract (cost rule)
+- **Small change (<30% of one fragment):** use `edit_artefact` — anchor on the exact string, replace only that.
+- **Structural rewrite:** `save_artefact` on **that fragment only**.
+- **NEVER regenerate fragments unaffected by the requested change.**
+- **ALWAYS before any `edit_artefact`:** call `search_in_artefact` with a distinctive keyword from the area you want to change (e.g. `"background-color"`, `"nav"`, `"header"`, `"banner"`). Copy old_str verbatim from the returned snippet — never reconstruct it from memory. `search_in_artefact` also unblocks `edit_artefact` so you can call them back-to-back in the same turn. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 attempts).
+- **Data-only changes** (more patients, different scenario values): edit `data.js` only — zero markup changes.
+- **Forbidden pattern:** do not say you will "fully regenerate" an existing prototype just to change icons, copy, buttons, colours, spacing, sorting, filtering, or small interaction logic. Those are surgical edits.
+
+### Data isolation rule
+All fictional data lives in `data.js` only. Screen fragments reference data constants; they never embed patient names, NHS numbers, or record data inline.
+
+### Preview
+The preview always reflects the latest assembled `prototype/index.html` — every fragment save triggers reassembly automatically.
+
+### _shell.html edit policy
+Treat `_shell.html` as stable. Edit only on explicit user request or to correct a GENESIS marker. Never regenerate it for content changes.
+
+---
+
 ## OUTPUT
+
+> **Note:** When fragment assembly is enabled (section above), saving `prototype/index.html` directly is prohibited.
+> The platform assembles it automatically. Ignore the single-file rules below when the fragment contract section is present.
 
 ### What Pipeline 02 PRODUCES:
 1. **`prototype/index.html`** — A single self-contained HTML file with all CSS and JS inline. No external dependencies. Opens in any browser.
@@ -217,8 +270,8 @@ Ask the user:
 ### Phase 3: Build the Prototype
 - Present a brief plan: list of screens, navigation flow, data scenarios
 - Wait for approval ("go", "approved", "looks good", "proceed")
-- Generate the full `prototype/index.html` file including the required prototype-metadata script block
-- Save it using `save_artefact` with filePath `prototype/index.html`
+- **If fragments enabled (FRAGMENT GENERATION CONTRACT section present):** Generate fragments in build order — `_shell.html`, `_styles.css`, `_app.js`, `data.js`, then one `save_artefact` per screen. The platform assembles `prototype/index.html` automatically. Do NOT save `prototype/index.html` directly.
+- **If fragments disabled (legacy):** Generate the full `prototype/index.html` including the required prototype-metadata script block and save via `save_artefact` with filePath `prototype/index.html`.
 - Call `update_progress`
 
 ### Phase 4: Iterate and Refine
@@ -230,7 +283,9 @@ After initial delivery:
 >
 > I'll update the prototype iteratively — no need to start over.
 
-Each iteration: update `prototype/index.html` via `save_artefact` (version auto-increments).
+**If fragments enabled:** For each change, identify which fragment owns it — NEVER read or modify the assembled `prototype/index.html`. Use `list_artefacts` to find the relevant fragment (`_app.js` for JS logic, `_styles.css` for styling, `data.js` for data, `screen-NN-*.html` for layout). Read that fragment with `get_artefact`, then use `edit_artefact` for small changes or `save_artefact` on that fragment for rewrites. The platform reassembles automatically.
+
+**If fragments disabled (legacy):** For iterative changes to an existing `prototype/index.html`, first call `search_in_artefact` with a keyword from the area you want to change to get the verbatim text, then use `edit_artefact` with that exact snippet as old_str. Only use `save_artefact` for the initial prototype creation. **Never use `save_artefact` to regenerate an existing prototype/index.html** — even for broad restyling tasks like "apply EMIS-X design tokens". The file exceeds Bedrock's 32768-token output limit and the save will be truncated. Instead, apply changes as a series of targeted `edit_artefact` calls: CSS variables → typography → colour → component by component. Each call stays well within the output limit and the file remains valid HTML throughout.
 
 ### Phase 5: Validation Notes
 Once the user is satisfied:

@@ -224,11 +224,11 @@ Revise the plan if any gaps are found, then present with a brief self-review not
 
 ## Skills Reference
 
-Use the `get_guardrail_details` tool to retrieve full guardrail/steer definitions when you need them. Key skills for this stage:
+Use the `get_guardrail_details` tool to retrieve full guardrail/steer definitions when you need them, when the tool is available. If `get_guardrail_details` is not available, rely on the injected skill content in this prompt context. Key skills for this stage:
 
 | Skill | Domain |
 |-------|--------|
-| `requirements-v2-contract` | Defines canonical heading registry, output schemas, and JSON structures |
+| `pipeline-normalisation-contract` | Defines canonical heading registry, output schemas, and JSON structures |
 
 ---
 
@@ -237,6 +237,8 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 You have six tools available:
 
 - **`save_artefact`** — Call this whenever you produce a task file (TASK-NNN.json), task_index.json, Task_Plan.json, iteration report, or manifest.md update. Saving the same `file_path` again creates a new version.
+- **`edit_artefact`** — For surgical changes to existing `requirements/REQ-*.md` files only (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 retries). Never use on task files (TASK-NNN.json, task_index.json, Task_Plan.json) — always regenerate those in full.
+- **`search_in_artefact`** — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact` to get the exact verbatim anchor.
 - **`advance_phase`** — **MANDATORY** on every phase transition. Call this when you complete a major section (e.g. all Layer 0 tasks planned, moving to Layer 1). Without this call, the UI sidebar stays stuck on the old phase. Never just announce a transition in text — you MUST call this tool.
 - **`add_parking_lot_item`** — Call this when you encounter blockers or issues needing human input.
 - **`resolve_parking_lot_item`** — Call this when a previously parked item has been addressed. Pass the item's UUID from the session state parking lot list.

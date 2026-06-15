@@ -26,21 +26,10 @@ public static class DependencyInjection
     {
         AddPersistence(services, configuration);
 
-        services.AddScoped<IProjectRepository, ProjectRepository>();
-        services.AddScoped<IConversationRepository, ConversationRepository>();
-        services.AddScoped<IArtefactRepository, ArtefactRepository>();
-        services.AddScoped<IProjectNoteRepository, ProjectNoteRepository>();
-        services.AddScoped<IProjectDecisionRepository, ProjectDecisionRepository>();
-        services.AddSingleton<IAiService, BedrockAiService>();
-        services.AddSingleton<IPromptService, EmbeddedPromptService>();
-        services.AddSingleton<ISkillContentService, SkillContentService>();
-        services.AddSingleton<IHazardRegistryParser, HazardRegistryParser>();
-        services.AddSingleton<IHazardLogExcelBuilder, HazardLogExcelBuilder>();
-        services.AddSingleton<IDpiaDocxBuilder, Pr1625DpiaDocxBuilder>();
-        services.AddSingleton<ISecurityReviewReportBuilder, SecurityReviewReportBuilder>();
-        services.AddScoped<INormalisationGateService, NormalisationGateService>();
-        services.AddScoped<IPlanningGateService, PlanningGateService>();
-        services.AddScoped<IFoundationService, FoundationService>();
+        AddRepositories(services);
+        AddPipelineServices(services);
+        AddDocumentBuilders(services);
+        AddWorkflowServices(services);
 
         services.Configure<TokenOptimisationOptions>(
             configuration.GetSection(TokenOptimisationOptions.SectionName));
@@ -48,6 +37,40 @@ public static class DependencyInjection
         AddS3(services, configuration);
 
         return services;
+    }
+
+    private static void AddRepositories(IServiceCollection services)
+    {
+        services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IArtefactRepository, ArtefactRepository>();
+        services.AddScoped<IProjectNoteRepository, ProjectNoteRepository>();
+        services.AddScoped<IProjectDecisionRepository, ProjectDecisionRepository>();
+    }
+
+    private static void AddPipelineServices(IServiceCollection services)
+    {
+        services.AddSingleton<IAiService, BedrockAiService>();
+        services.AddSingleton<IPromptService, EmbeddedPromptService>();
+        services.AddSingleton<ISkillContentService, SkillContentService>();
+        services.AddSingleton<IActiveSkillsService, ActiveSkillsService>();
+        services.AddScoped<IRoutingContextService, RoutingContextService>();
+    }
+
+    private static void AddDocumentBuilders(IServiceCollection services)
+    {
+        services.AddSingleton<IHazardRegistryParser, HazardRegistryParser>();
+        services.AddSingleton<IHazardLogExcelBuilder, HazardLogExcelBuilder>();
+        services.AddSingleton<IDpiaDocxBuilder, Pr1625DpiaDocxBuilder>();
+        services.AddSingleton<ISecurityReviewReportBuilder, SecurityReviewReportBuilder>();
+    }
+
+    private static void AddWorkflowServices(IServiceCollection services)
+    {
+        services.AddScoped<INormalisationGateService, NormalisationGateService>();
+        services.AddScoped<IPlanningGateService, PlanningGateService>();
+        services.AddScoped<IFoundationService, FoundationService>();
+        services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
     }
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)

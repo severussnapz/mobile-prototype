@@ -3,17 +3,55 @@
 -- This is NOT a Flyway migration — it is a manual local-only script.
 -- The seed service runs every db/seeds/*.sql file; each file deletes and
 -- re-inserts its own project, so re-running is idempotent.
+
+-- Guard: skip entirely if this project has live activity beyond the seed
+-- baseline (messages or artefacts). Prevents accidental data loss on docker restart.
+-- To force a reset: SEED_FORCE_RESET=true docker compose up -d --build
+SELECT
+    CASE
+        WHEN current_setting('app.seed_force_reset', true) = 'true' THEN false
+        WHEN COUNT(*) > 0 THEN true
+        ELSE false
+    END AS seed_should_quit,
+    COUNT(*) AS live_count
+FROM (
+    SELECT 1
+    FROM message m
+    JOIN conversation c ON m.conversation_id = c.conversation_id
+    JOIN pipeline_stage ps ON c.stage_id = ps.pipeline_stage_id
+    WHERE ps.project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'
+      AND m.created_at > '2026-05-29 10:00:00+00'
+
+    UNION ALL
+
+    SELECT 1
+    FROM artefact a
+    WHERE a.project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'
+      AND a.created_at > '2026-05-29 10:00:00+00'
+) AS live_activity
+\gset
+
+\if :seed_should_quit
+\echo 'DOCMAN seed skipped —' :live_count 'live records detected beyond seed baseline.'
+\quit
+\endif
+
 -- Clean up any existing seed data for this project
-DELETE FROM token_usage WHERE conversation_id IN (SELECT conversation_id FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'));
-DELETE FROM parking_lot_item WHERE conversation_id IN (SELECT conversation_id FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'));
-DELETE FROM message WHERE conversation_id IN (SELECT conversation_id FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001'));
-DELETE FROM conversation WHERE stage_id IN (SELECT pipeline_stage_id FROM pipeline_stage WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001');
-DELETE FROM artefact WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001';
-DELETE FROM project_note WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001';
-DELETE FROM project_decision WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001';
-DELETE FROM pipeline_stage WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001';
-DELETE FROM project WHERE project_id = 'd0cf7a10-0000-4d0c-8a00-000000000001';
--- ============================================================
+FROM (
+    SELECT 1
+    FROM message m
+    JOIN conversation c ON m.conversation_id = c.conversation_id
+    JOIN pipeline_stage ps ON c.stage_id = ps.pipeline_stage_id
+    WHERE ps.project_id = '03735ad1-8759-414e-a93f-ce8cc7bfc1fc'
+      AND m.created_at > '2026-06-05 12:00:00+00'
+
+    UNION ALL
+
+    SELECT 1
+    FROM artefact a
+    WHERE a.project_id = '03735ad1-8759-414e-a93f-ce8cc7bfc1fc'
+      AND a.created_at > '2026-06-05 12:00:00+00'
+) AS live_activity
 -- PROJECT: Documents Management Core
 -- ============================================================
 INSERT INTO project (project_id, code, name, description, time_sheet_code, compliance_domain, status, created_by, created_at, updated_at, is_deleted) VALUES ('d0cf7a10-0000-4d0c-8a00-000000000001', 'DOCMAN', 'Documents Management Core', 'The initial 30-day delivery phase of the EMIS-X Documents Manager — a generic document management solution for General Practice in England. Covers inbound document inbox and triage, safe filing to the care record with governance, and clinical and operational actions (scanning, export, annotations, coding). Regulated under DCB0129/0160.', 'DOCMAN0000001', 'clinical_uk', 'in_progress', 'ern:emis:user:user:7ae7b859-c480-4644-b3be-d77d628f6e7e', '2026-05-18 09:02:11.000000+00', '2026-05-29 16:40:48.000000+00', false);

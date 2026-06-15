@@ -40,4 +40,8 @@ public sealed class ConversationResource
     [JsonPropertyName("tokenUsage")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TokenUsageSummaryResource? TokenUsage { get; init; }
+
+    [JsonPropertyName("continuedFromConversationId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? ContinuedFromConversationId { get; init; }
 }
