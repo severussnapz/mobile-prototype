@@ -113,6 +113,8 @@ Stages can be revisited in any order. When a user returns to a stage after other
 | `get_guardrail_details` | Load a skill/guardrail document | Read-only (returns skill content) |
 | `advance_requirement` | Move to the next requirement window (per-requirement processing) | Completes the current requirement conversation and opens the next |
 | `set_orchestration_mode` | Switch between `forward_sweep` and `cross_check` modes (P6–P8) | Updates the conversation's orchestration mode |
+| `search_in_artefact` | Search for lines in an artefact file containing a query string (returns +/-5 lines context) | Read-only — must be called before `edit_artefact` on the same turn |
+| `edit_artefact` | Make a surgical edit to an existing artefact by replacing an exact anchor string | Replaces content in-place; blocked until `search_in_artefact` has read the file |
 
 ---
 
@@ -123,8 +125,11 @@ Project (aggregate root)
 ├── PipelineStage × 10 (auto-created)
 │   └── Conversations (one or more per stage)
 │       ├── Messages (user + assistant turns)
-│       └── ParkingLotItems (stored per-conversation)
-└── Artefacts (stored at project level, tagged by stage)
+│       ├── ParkingLotItems (stored per-conversation, with closure_decision)
+│       └── TokenUsageRecords (input, output, cache read/write tokens)
+├── Artefacts (stored at project level, tagged by stage)
+├── Notes (free-text notes with author metadata)
+└── Decisions (ADR-style decisions with title, context, decision, consequences)
 ```
 
 ### Key Design: Artefacts Are Project-Scoped
@@ -261,22 +266,39 @@ src/
 │   │   ├── Conversations/
 │   │   ├── Artefacts/
 │   │   ├── Stages/
-│   │   └── Export/
+│   │   ├── Export/
+│   │   ├── Notes/
+│   │   ├── Decisions/
+│   │   ├── Normalisation/
+│   │   ├── Planning/
+│   │   ├── HazardLog/
+│   │   ├── SecurityReviewReport/
+│   │   └── DataProtectionImpactAssessment/
 │   └── Http/                    # Shared envelopes: ApiResponse<T>, ApiErrorResponse, ApiError
 ├── Genesis.AI.Core/             # Base types (Entity, IAggregateRoot, logging)
 ├── Genesis.AI.Domain/           # Business logic (aggregates, commands, queries, enums)
-│   └── Interfaces/              # IArtefactStorageService (+ other contracts)
+│   ├── AggregatesModel/         # Project, PipelineStage, Conversation, Message, ParkingLotItem, Artefact, ProjectNote, ProjectDecision
+│   ├── Commands/                # CQRS write operations
+│   ├── Queries/                 # CQRS read operations
+│   ├── Enums/                   # Domain enums (PostgreSQL native types)
+│   ├── Interfaces/              # IArtefactStorageService (+ other contracts)
+│   ├── Dpia/                    # DPIA domain logic
+│   ├── HazardLog/               # Hazard log domain logic
+│   ├── Normalisation/           # Normalisation domain logic
+│   ├── Planning/                # Planning domain logic
+│   └── SecurityReviewReport/    # Security review report domain logic
 └── Genesis.AI.Infrastructure/   # Data access (EF Core, repositories, AI services)
     ├── Prompts/                 # Embedded system prompts per stage (.md)
     ├── Services/                # S3ArtefactStorageService, BedrockAiService, etc.
-    └── Skills/                  # Embedded skill/guardrail content (.md)
+    ├── Skills/                  # Embedded skill/guardrail content (.md)
+    └── EntityConfigurations/    # EF Core fluent API configs
 tests/
 ├── Genesis.AI.Tests/            # Unit tests (xUnit v3 + Moq)
 ├── Genesis.AI.IntegrationTests/ # Integration tests (WebApplicationFactory + InMemory)
 ├── Genesis.AI.ApiTests/         # E2E tests (Refit, hits running API)
 └── Genesis.AI.TestFramework/    # Shared utilities (MockTokenGenerator)
 db/
-├── migrations/                  # Flyway SQL (V1–V9)
+├── migrations/                  # Flyway SQL (V1–V12)
 ├── seeds/                       # Per-project seed files (<project-code>.sql); all run on boot
 localstack/
 └── init-s3.sh                   # Creates genesis-ai-artefacts bucket on LocalStack startup
@@ -319,6 +341,7 @@ JWT Bearer with scope-based policies. Every controller action requires `[Authori
 |--------|------|---------|
 | GET | `/api/v1/projects/{id}/artefacts` | List all project artefacts |
 | GET | `/api/v1/projects/{id}/artefacts/{artefactId}` | Get artefact with content |
+| GET | `/api/v1/projects/{id}/artefacts/{artefactId}/download` | Download raw binary content |
 | POST | `/api/v1/projects/{id}/artefacts` | Save one or more artefacts |
 
 ### Conversations
@@ -328,6 +351,8 @@ JWT Bearer with scope-based policies. Every controller action requires `[Authori
 | POST | `/api/v1/conversations` | Create conversation for a stage |
 | GET | `/api/v1/conversations/{id}` | Get conversation with messages |
 | GET | `/api/v1/conversations/by-stage/{stageId}` | List conversations for a stage |
+| GET | `/api/v1/conversations/by-stage/{stageId}/requirements` | List per-requirement conversations for a stage |
+| POST | `/api/v1/conversations/{id}/messages` | Send message (non-streaming) |
 | POST | `/api/v1/conversations/{id}/stream` | Send message (SSE streaming) |
 
 ### Conversation State
@@ -341,6 +366,7 @@ JWT Bearer with scope-based policies. Every controller action requires `[Authori
 | POST | `/{id}/parking-lot` | Add parking lot item |
 | POST | `/{id}/parking-lot/{itemId}/resolve` | Resolve item |
 | POST | `/{id}/parking-lot/{itemId}/defer` | Defer item |
+| POST | `/{id}/parking-lot/{itemId}/reopen` | Reopen resolved/deferred item |
 | DELETE | `/{id}/parking-lot/{itemId}` | Delete item |
 
 ### Pipeline Stages
@@ -349,6 +375,62 @@ JWT Bearer with scope-based policies. Every controller action requires `[Authori
 |--------|------|---------|
 | POST | `/api/v1/stages/{stageId}/complete` | Mark stage complete |
 | POST | `/api/v1/stages/{stageId}/skip` | Skip a stage |
+
+### Notes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/projects/{id}/notes` | List project notes |
+| POST | `/api/v1/projects/{id}/notes` | Create note |
+| PATCH | `/api/v1/projects/{id}/notes/{noteId}` | Update note |
+| DELETE | `/api/v1/projects/{id}/notes/{noteId}` | Delete note |
+
+### Decisions
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/projects/{id}/decisions` | List project decisions |
+| POST | `/api/v1/projects/{id}/decisions` | Create decision |
+| PATCH | `/api/v1/projects/{id}/decisions/{decisionId}` | Update decision |
+| DELETE | `/api/v1/projects/{id}/decisions/{decisionId}` | Delete decision |
+
+### Normalisation
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/v1/projects/{id}/normalisation/extract-requirements` | Run local normaliser |
+| POST | `/api/v1/projects/{id}/normalisation/verify-complete` | Verify completeness |
+| POST | `/api/v1/projects/{id}/normalisation/bypass-planning-gate` | Admin override to bypass planning gate |
+| GET | `/api/v1/projects/{id}/normalisation/artefacts` | Get generated artefacts |
+| GET | `/api/v1/projects/{id}/normalisation/status` | Get normalisation status |
+
+### Planning
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/v1/projects/{id}/planning/run-preflight` | Run planning preflight |
+| POST | `/api/v1/projects/{id}/planning/approve-em-review` | Approve EM review |
+| POST | `/api/v1/projects/{id}/planning/split-tasks` | Split planning tasks |
+| GET | `/api/v1/projects/{id}/planning/artefacts` | Get planning artefacts |
+| GET | `/api/v1/projects/{id}/planning/status` | Get planning status |
+
+### Hazard Log
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/v1/projects/{id}/hazard-log` | Generate IF678 hazard log (.xlsx) |
+
+### Security Review Report
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/v1/projects/{id}/security-review-report` | Generate security review report (.xlsx) |
+
+### Data Protection Impact Assessment
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/v1/projects/{id}/data-protection-impact-assessment` | Generate DPIA report (.docx) |
 
 ---
 
@@ -367,8 +449,11 @@ Flyway format: `V{version}__description.sql` in `db/migrations/`.
 - `V7__backfill_ig_security_pipeline_stages.sql` — Backfills the new stages onto existing projects
 - `V8__add_requirement_id_to_conversation.sql` — Adds `requirement_id` column + index (per-requirement windowing)
 - `V9__add_orchestration_mode_to_conversation.sql` — Adds `orchestration_mode` enum type + column (forward sweep / cross-check)
+- `V10__add_continued_from_conversation_id.sql` — Adds `continued_from_conversation_id` column for conversation handover support
+- `V11__add_parking_lot_closure_decision.sql` — Adds `closure_decision` text column for parking lot closure rationale
+- `V12__harden_continuation_conversation_link.sql` — Adds FK constraint + index for continuation chain referential integrity
 
-To add a new migration: create the next versioned file (e.g. `V10__description.sql`) and rebuild.
+To add a new migration: create the next versioned file (e.g. `V13__description.sql`) and rebuild.
 
 ### Enum Handling
 
@@ -395,7 +480,7 @@ Run without arguments to list available projects.
 ## Testing
 
 ```bash
-# Unit tests (193 tests)
+# Unit tests (605 tests)
 dotnet test tests/Genesis.AI.Tests/
 
 # Integration tests (WebApplicationFactory + InMemory database)
@@ -430,6 +515,12 @@ dotnet test tests/Genesis.AI.ApiTests/
 13. **Foundation prompt prefix** — Stable upstream artefacts (Category A) are loaded in full and placed *before* the Bedrock cache point so they are cached across turns (~10× cheaper cached tokens). Mapped per stage by `StageFoundationMap` and assembled by `FoundationService`. Toggled via `TokenOptimisation:FoundationPrefixEnabled`
 14. **Per-requirement windowing** — Conversations can be scoped to a single requirement (`requirement_id`), giving each a bounded message window. The AI moves between requirements with the `advance_requirement` tool. Toggled via `TokenOptimisation:RequirementWindowingEnabled`
 15. **Explicit orchestration modes** — `forward_sweep` (default, windowed) and `cross_check` (non-windowed holistic pass for P6–P8). The mode is switched explicitly via `set_orchestration_mode`, never inferred. Toggled via `TokenOptimisation:NonWindowedCrossCheckEnabled`
+16. **Conversation continuation** — Conversations can link to a predecessor via `continued_from_conversation_id` when restarted (e.g. after hitting the tool-use limit). Handover context is injected into the system prompt. Toggled via `TokenOptimisation:ContinuationHandoverEnabled`
+17. **Parking lot closure decisions** — When resolving or deferring parking lot items, the human's rationale is captured in `closure_decision`. Toggled via `TokenOptimisation:ClosureDecisionEnabled`
+18. **Active skill injection** — `ActiveSkillsService` concatenates universal, stage-specific, and phase-specific skill documents into the system prompt before the cache breakpoint for ~90% cost savings. Removes `get_guardrail_details` tool when skills are pre-injected. Toggled via `TokenOptimisation:ActiveSkillInjectionEnabled`
+19. **Prototype intent routing** — API-enforced directive in the Prototype stage that prevents the LLM from unnecessarily re-reading requirements files when user intent is a targeted update. Uses `search_in_artefact` + `edit_artefact` for surgical edits. Toggled via `TokenOptimisation:EditArtefactEnabled`
+20. **Notes & Decisions** — Standalone project-scoped entities (never injected into AI context). Notes are free-text; Decisions follow ADR format (title, context, decision, consequences)
+21. **Normalisation & Planning gates** — Normalisation transforms human-readable requirements into machine-readable JSON with a completeness verification gate. Planning requires preflight checks, EM approval, and task splitting before proceeding
 
 ---
 

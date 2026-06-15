@@ -59,7 +59,16 @@ src/
 │   │   │                        # ArtefactDetailResponse, CreateArtefactsRequest,
 │   │   │                        # CreateArtefactRequestItem
 │   │   ├── Stages/              # PipelineStagesController, StageStatusResponse, StageMessageResponse
-│   │   └── Export/              # ProjectExportController
+│   │   ├── Export/              # ProjectExportController
+│   │   ├── Notes/               # NotesController, NoteResource, CreateNoteRequest, UpdateNoteRequest, NoteMappingProfile
+│   │   ├── Decisions/           # DecisionsController, DecisionResource, CreateDecisionRequest, UpdateDecisionRequest, DecisionMappingProfile
+│   │   ├── Normalisation/       # NormalisationController, NormalisationStatusResponse, NormalisationRunActionResponse,
+│   │   │                        # NormalisationVerifyResponse, NormalisationArtefactResponse, BypassNormalisationPlanningGateRequest
+│   │   ├── Planning/            # PlanningController, PlanningStatusResponse, PlanningRunActionResponse,
+│   │   │                        # PlanningSplitResponse, PlanningArtefactResponse, ApproveEmReviewRequest
+│   │   ├── HazardLog/           # HazardLogController
+│   │   ├── SecurityReviewReport/ # SecurityReviewReportController
+│   │   └── DataProtectionImpactAssessment/ # DataProtectionImpactAssessmentController
 ├── Genesis.AI.Core/             # Shared base types
 │   ├── Data/                    # (reserved)
 │   ├── Domain/                  # Entity base class, IAggregateRoot
@@ -68,18 +77,28 @@ src/
 ├── Genesis.AI.Domain/           # Business logic (pure, no infrastructure deps)
 │   ├── AggregatesModel/         # Aggregate roots + child entities
 │   │   ├── ArtefactAggregate/
-│   │   ├── ConversationAggregate/   # Conversation, Message, ParkingLotItem
-│   │   └── ProjectAggregate/        # Project, PipelineStage
+│   │   ├── ConversationAggregate/   # Conversation, Message, ParkingLotItem (with closure_decision, continued_from_conversation_id)
+│   │   ├── ProjectAggregate/        # Project, PipelineStage
+│   │   ├── ProjectNoteAggregate/    # ProjectNote (aggregate root)
+│   │   └── ProjectDecisionAggregate/ # ProjectDecision (aggregate root)
 │   ├── Commands/                # Write operations (one folder per command)
 │   ├── Queries/                 # Read operations (one folder per query)
 │   ├── Enums/                   # Domain enums (all mapped to PostgreSQL native types)
-│   └── Interfaces/              # Repository + service contracts, AI DTOs
+│   ├── Interfaces/              # Repository + service contracts, AI DTOs
+│   ├── Dpia/                    # DPIA domain logic
+│   ├── HazardLog/               # Hazard log domain logic
+│   ├── Normalisation/           # Normalisation domain logic
+│   ├── Planning/                # Planning domain logic
+│   └── SecurityReviewReport/    # Security review report domain logic
 └── Genesis.AI.Infrastructure/   # Data access + external services
     ├── EntityConfigurations/    # EF Core fluent API config
     ├── Repositories/            # IProjectRepository, IConversationRepository, IArtefactRepository
-    ├── Services/                # BedrockAiService, EmbeddedPromptService, SkillContentService, PipelineToolDefinitions, S3ArtefactStorageService, FoundationService, StageFoundationMap
+    ├── Services/                # BedrockAiService, EmbeddedPromptService, SkillContentService, PipelineToolDefinitions,
+    │                            # S3ArtefactStorageService, FoundationService, StageFoundationMap,
+    │                            # ActiveSkillsService, PhaseSkillMap, ArtefactToolBuilder
     ├── Skills/                  # Embedded skill content (.md files) injected into AI context
-    └── Prompts/                 # Stage-specific system prompts (embedded resources)
+    ├── Prompts/                 # Stage-specific system prompts (embedded resources)
+    └── Configuration/           # Token optimisation options (TokenOptimisationOptions)
 ```
 
 ### CQRS Pattern
@@ -101,14 +120,16 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 ### Domain Model
 
 **Aggregate Roots:**
-- `Project` — Contains `PipelineStage` collection. Auto-initialises 10 stages on creation. Supports soft-delete.
-- `Conversation` — Contains `Message` and `ParkingLotItem` collections. Tracks phase progress, questions asked, requirements captured. Optionally scoped to a single requirement via `RequirementId` (per-requirement windowing) and carries an `OrchestrationMode` (forward sweep / cross-check).
+- `Project` — Contains `PipelineStage` collection. Auto-initialises 10 stages on creation. Supports soft-delete. Has `TimesheetCode` property.
+- `Conversation` — Contains `Message` and `ParkingLotItem` collections. Tracks phase progress, questions asked, requirements captured. Optionally scoped to a single requirement via `RequirementId` (per-requirement windowing) and carries an `OrchestrationMode` (forward sweep / cross-check). Has `ContinuedFromConversationId` for conversation handover linking.
 - `Artefact` — Metadata stored in DB; content stored in S3 (LocalStack locally). Properties: `S3Key`, `ContentType`, `SizeBytes`. Use `CreateS3Artefact` factory. Versioned per file path per project.
+- `ProjectNote` — Standalone project-scoped note. Properties: `Content`, `AuthorErn`, `AuthorGivenName`, `AuthorFamilyName`, `CreatedAt`, `UpdatedAt`. Never injected into AI conversation context.
+- `ProjectDecision` — Standalone project-scoped ADR-style decision. Properties: `Title`, `Context`, `Decision`, `Consequences`, `AuthorErn`, `AuthorGivenName`, `AuthorFamilyName`, `CreatedAt`, `UpdatedAt`. Never injected into AI conversation context.
 
 **Child Entities (not aggregate roots):**
 - `PipelineStage` — Owned by Project. State machine: NotStarted → InProgress → Complete (or Blocked).
 - `Message` — Owned by Conversation. Stores role, content, token count, user identity (`UserErn`, `GivenName`, `FamilyName`), optional image/document attachments (JSONB).
-- `ParkingLotItem` — Owned by Conversation. Stores content, priority, status, source phase.
+- `ParkingLotItem` — Owned by Conversation. Stores content, priority, status, source phase, `ClosureDecision` (rationale when resolved/deferred).
 - `TokenUsageRecord` — Owned by Conversation. Stores input, output, cache read, and cache write token counts per AI turn.
 
 **Parking Lot Scoping:**
@@ -122,7 +143,9 @@ The `Genesis.AI.Api` layer is organised by **feature slice**, not by technical r
 - `Project.RecalculateStatus()` calls `UnblockAvailableStages()` which checks prerequisites and transitions Blocked → NotStarted when dependencies are satisfied
 - `PipelineStage.Start()` / `.Complete()` / `.Skip()` / `.Block()` / `.Reopen()` — state transitions with iteration tracking
 - `Conversation.AddMessage()` / `.AdvancePhase()` / `.SetPhase()` / `.UpdateProgress()` / `.Complete()` / `.Pause()` / `.Resume()`
-- `ParkingLotItem.Resolve()` / `.Defer()` / `.UpdatePriority()` / `.UpdateContent()`
+- `ParkingLotItem.Resolve(timeProvider, closureDecision)` / `.Defer(timeProvider, closureDecision)` / `.Reopen()` / `.UpdatePriority()` / `.UpdateContent()`
+- `ProjectNote.UpdateContent(content, timeProvider)`
+- `ProjectDecision.Update(title, context, decision, consequences, timeProvider)`
 - Stage reopening increments `Iteration` and resets status to InProgress
 - Always fix forward dont fake passing tests by supressing always find a solution
 
@@ -193,7 +216,7 @@ Default values use `HasDefaultValueSql("'value'::enum_type")`, never `HasDefault
 | `ProjectStatus` | `project_status` | discovery, in_progress, complete, archived |
 | `StageType` | `stage_type` | requirements_discovery, prototype, architecture, design, pxd, clinical_safety, information_governance, security, normalisation, planning |
 | `PipelineStageStatus` | `pipeline_stage_status` | not_started, in_progress, complete, blocked |
-| `ConversationStatus` | `conversation_status` | active, completed, paused |
+| `ConversationStatus` | `conversation_status` | active, paused, completed |
 | `ParkingLotPriority` | `parking_lot_priority` | critical, high, medium |
 | `ParkingLotStatus` | `parking_lot_status` | open, resolved, deferred |
 | `MessageRole` | `message_role` | user, assistant, system |
@@ -228,6 +251,9 @@ Current migrations:
 - `V7__backfill_ig_security_pipeline_stages.sql` — Backfills the new stages onto existing projects
 - `V8__add_requirement_id_to_conversation.sql` — Adds `requirement_id` column + index (per-requirement windowing)
 - `V9__add_orchestration_mode_to_conversation.sql` — Adds `orchestration_mode` enum type + column (forward sweep / cross-check)
+- `V10__add_continued_from_conversation_id.sql` — Adds `continued_from_conversation_id` column for conversation handover linking
+- `V11__add_parking_lot_closure_decision.sql` — Adds `closure_decision` text column for parking lot closure rationale
+- `V12__harden_continuation_conversation_link.sql` — Adds FK constraint + index for continuation chain referential integrity
 
 ### Adding Migrations
 
@@ -279,7 +305,7 @@ Requires `.env` file with `IDENTITY_URL`, `AUDIENCE`, and credentials (`JFROG_US
 ## Testing
 
 ```bash
-# Unit tests (193 tests)
+# Unit tests (605 tests)
 dotnet test tests/Genesis.AI.Tests/
 
 # Integration tests (WebApplicationFactory + InMemory database + mock IArtefactStorageService)
@@ -317,6 +343,7 @@ dotnet test tests/Genesis.AI.ApiTests/
 |--------|------|--------|---------|
 | GET | `/projects/{id}/artefacts` | ProjectRead | List all artefacts for project |
 | GET | `/projects/{id}/artefacts/{artefactId}` | ProjectRead | Get artefact with content |
+| GET | `/projects/{id}/artefacts/{artefactId}/download` | ProjectRead | Download raw binary content |
 | POST | `/projects/{id}/artefacts` | ProjectWrite | Save one or more artefacts |
 
 ### Conversations (`/api/v1/conversations`)
@@ -326,6 +353,8 @@ dotnet test tests/Genesis.AI.ApiTests/
 | POST | `/conversations` | ConversationWrite | Create conversation for a stage |
 | GET | `/conversations/{id}` | ConversationRead | Get conversation with messages |
 | GET | `/conversations/by-stage/{stageId}` | ConversationRead | List conversations for stage |
+| GET | `/conversations/by-stage/{stageId}/requirements` | ConversationRead | Per-requirement conversations |
+| POST | `/conversations/{id}/messages` | ConversationWrite | Send message (non-streaming) |
 | POST | `/conversations/{id}/stream` | ConversationWrite | Send message (SSE streaming) |
 
 ### Conversation State (`/api/v1/conversations/{id}/...`)
@@ -339,6 +368,7 @@ dotnet test tests/Genesis.AI.ApiTests/
 | POST | `/conversations/{id}/parking-lot` | ConversationWrite | Add parking lot item |
 | POST | `/conversations/{id}/parking-lot/{itemId}/resolve` | ConversationWrite | Resolve item |
 | POST | `/conversations/{id}/parking-lot/{itemId}/defer` | ConversationWrite | Defer item |
+| POST | `/conversations/{id}/parking-lot/{itemId}/reopen` | ConversationWrite | Reopen resolved/deferred item |
 | DELETE | `/conversations/{id}/parking-lot/{itemId}` | ConversationWrite | Delete item |
 
 ### Pipeline Stages (`/api/v1/stages`)
@@ -347,6 +377,62 @@ dotnet test tests/Genesis.AI.ApiTests/
 |--------|------|--------|---------|
 | POST | `/stages/{stageId}/complete` | ProjectWrite | Mark stage complete |
 | POST | `/stages/{stageId}/skip` | ProjectWrite | Skip a stage |
+
+### Notes (`/api/v1/projects/{projectId}/notes`)
+
+| Method | Path | Policy | Purpose |
+|--------|------|--------|---------|
+| GET | `/projects/{id}/notes` | ProjectRead | List project notes |
+| POST | `/projects/{id}/notes` | ProjectWrite | Create note |
+| PATCH | `/projects/{id}/notes/{noteId}` | ProjectWrite | Update note |
+| DELETE | `/projects/{id}/notes/{noteId}` | ProjectWrite | Delete note |
+
+### Decisions (`/api/v1/projects/{projectId}/decisions`)
+
+| Method | Path | Policy | Purpose |
+|--------|------|--------|---------|
+| GET | `/projects/{id}/decisions` | ProjectRead | List project decisions |
+| POST | `/projects/{id}/decisions` | ProjectWrite | Create decision |
+| PATCH | `/projects/{id}/decisions/{decisionId}` | ProjectWrite | Update decision |
+| DELETE | `/projects/{id}/decisions/{decisionId}` | ProjectWrite | Delete decision |
+
+### Normalisation (`/api/v1/projects/{projectId}/normalisation`)
+
+| Method | Path | Policy | Purpose |
+|--------|------|--------|---------|
+| POST | `/projects/{id}/normalisation/extract-requirements` | ProjectWrite | Run local normaliser |
+| POST | `/projects/{id}/normalisation/verify-complete` | ProjectWrite | Verify completeness |
+| POST | `/projects/{id}/normalisation/bypass-planning-gate` | AdminOnly | Admin override to bypass planning gate |
+| GET | `/projects/{id}/normalisation/artefacts` | ProjectRead | Get generated artefacts |
+| GET | `/projects/{id}/normalisation/status` | ProjectRead | Get normalisation status |
+
+### Planning (`/api/v1/projects/{projectId}/planning`)
+
+| Method | Path | Policy | Purpose |
+|--------|------|--------|---------|
+| POST | `/projects/{id}/planning/run-preflight` | ProjectWrite | Run planning preflight |
+| POST | `/projects/{id}/planning/approve-em-review` | ProjectWrite | Approve EM review |
+| POST | `/projects/{id}/planning/split-tasks` | ProjectWrite | Split planning tasks |
+| GET | `/projects/{id}/planning/artefacts` | ProjectRead | Get planning artefacts |
+| GET | `/projects/{id}/planning/status` | ProjectRead | Get planning status |
+
+### Hazard Log (`/api/v1/projects/{projectId}/hazard-log`)
+
+| Method | Path | Policy | Purpose |
+|--------|------|--------|---------|
+| POST | `/projects/{id}/hazard-log` | ClinicalSafetyConverse | Generate IF678 hazard log (.xlsx) |
+
+### Security Review Report (`/api/v1/projects/{projectId}/security-review-report`)
+
+| Method | Path | Policy | Purpose |
+|--------|------|--------|---------|
+| POST | `/projects/{id}/security-review-report` | ProjectWrite | Generate security review report (.xlsx) |
+
+### Data Protection Impact Assessment (`/api/v1/projects/{projectId}/data-protection-impact-assessment`)
+
+| Method | Path | Policy | Purpose |
+|--------|------|--------|---------|
+| POST | `/projects/{id}/data-protection-impact-assessment` | ProjectWrite | Generate DPIA report (.docx) |
 
 ---
 
@@ -389,6 +475,9 @@ Artefact content lives in S3; the `artefacts` table stores metadata and the S3 k
   - `Pipeline10Planning.md` — Task generation and dependency ordering
 - **Skills:** `SkillContentService` — loads guardrail/steer skill content from `Infrastructure/Skills/` for injection into AI context
 - **Tool definitions:** `PipelineToolDefinitions` — defines AI tools (save_artefact, advance_phase, update_progress, add_parking_lot_item, resolve_parking_lot_item, list_artefacts, get_artefact, get_guardrail_details, advance_requirement, set_orchestration_mode)
+- **Artefact editing tools:** `ArtefactToolBuilder` — defines `search_in_artefact` (search for lines in an artefact) and `edit_artefact` (surgical edit by replacing exact anchor string). Gated by `TokenOptimisationOptions.EditArtefactEnabled` (defaults to `false`). `edit_artefact` is blocked until `search_in_artefact` has read the file on a prior turn.
+- **Active skill injection:** `ActiveSkillsService` — concatenates universal, stage-specific, and phase-specific skill documents into the system prompt before the cache breakpoint (~90% cost savings). When enabled and the stage has skills, `get_guardrail_details` is removed from the tool list. Toggled via `TokenOptimisation:ActiveSkillInjectionEnabled`. Maps stages to skills via `PhaseSkillMap`.
+- **Prototype intent routing:** `BuildPrototypeIntentRoutingDirective()` — API-enforced directive in the Prototype stage that prevents the LLM from unnecessarily re-reading requirements when user intent is a targeted update. Uses `search_in_artefact` + `edit_artefact` for surgical edits. Toggled via `TokenOptimisation:EditArtefactEnabled`.
 - **Streaming:** SSE via `text/event-stream` content type from `ConversationStreamController`
 - **Tool loop:** Up to 40 tool turns per message (generous limit for output-heavy phases saving 15+ files)
 
@@ -438,6 +527,8 @@ When a user returns to a stage after other stages have modified artefacts:
 | `get_guardrail_details` | Load a skill/guardrail document | Read-only |
 | `advance_requirement` | Move to the next requirement window | Completes the current requirement conversation and opens the next |
 | `set_orchestration_mode` | Switch between `forward_sweep` and `cross_check` (P6–P8) | Updates the conversation's orchestration mode |
+| `search_in_artefact` | Search for lines in an artefact file containing a query string (returns +/-5 lines context) | Read-only — must be called before `edit_artefact` on the same turn |
+| `edit_artefact` | Make a surgical edit to an existing artefact by replacing an exact anchor string | Replaces content in-place; blocked until `search_in_artefact` has read the file |
 
 ### SSE Streaming Events
 
@@ -488,3 +579,7 @@ Suppressions are documented in `.guardrail-suppressions.yaml` with justification
 13. **`CreateS3Artefact` is the only factory** — the old `CreateTextArtefact` factory was removed; always use `Artefact.CreateS3Artefact(...)` when creating artefact entities
 14. **Feature slices, not technical folders** — new controllers, request models, response models go in `Features/{FeatureName}/`; no `Controllers/`, `Dtos/`, `Requests/`, `Resources/`, or `Mapping/` folders (ARCH-008)
 15. **Response models need concrete types** — no `new { ... }` anonymous objects in controller body helpers (API-017); request/response models must live in a feature slice or `Http/` (ARCH-007)
+16. **Notes and decisions are standalone** — `ProjectNote` and `ProjectDecision` are aggregate roots never injected into AI conversation context
+17. **Parking lot closure decisions** — `ParkingLotItem.Resolve()` and `.Defer()` accept a `closureDecision` parameter to capture the rationale
+18. **Conversation continuation** — `Conversation.ContinuedFromConversationId` links to a predecessor conversation for handover context injection
+19. **Project timesheet code** — `Project.TimesheetCode` is a tracked property on the project aggregate
