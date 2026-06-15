@@ -1887,20 +1887,63 @@ public class ConversationStreamController : ControllerBase
             return "Error: query must not be empty.";
 
         var lines = fileContent.Split('\n');
-        var matchedIndices = new List<int>();
 
+        // Primary match: the query appears as an exact contiguous substring on a single line.
+        var exactIndices = new List<int>();
         for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
             if (lines[lineIndex].Contains(query, StringComparison.OrdinalIgnoreCase))
-                matchedIndices.Add(lineIndex);
+                exactIndices.Add(lineIndex);
         }
 
-        if (matchedIndices.Count == 0)
-            return $"SEARCH_NOT_FOUND: No lines in '{filePath}' contain '{query}'. Try a different keyword.";
+        var fuzzy = false;
+        List<int> matchedIndices;
+
+        if (exactIndices.Count > 0)
+        {
+            matchedIndices = exactIndices;
+        }
+        else
+        {
+            // Fallback: rank lines by how many distinct query words they contain. This rescues
+            // natural-language queries (e.g. "thumbs up feedback") that never appear verbatim
+            // on a line but whose words do — making the search far less brittle on prototypes.
+            var queryWords = ExtractSearchTokens(query);
+            if (queryWords.Length == 0)
+                return $"SEARCH_NOT_FOUND: No lines in '{filePath}' contain '{query}'. Try a different keyword.";
+
+            var scored = new List<(int LineIndex, int Score)>();
+            for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+            {
+                var line = lines[lineIndex];
+                var score = queryWords.Count(word => line.Contains(word, StringComparison.OrdinalIgnoreCase));
+                if (score > 0)
+                    scored.Add((lineIndex, score));
+            }
+
+            if (scored.Count == 0)
+                return $"SEARCH_NOT_FOUND: No lines in '{filePath}' contain '{query}' or any of its words " +
+                       $"({string.Join(", ", queryWords)}). Try a different keyword.";
+
+            // Keep the strongest matches (highest word overlap, earliest on ties), then present
+            // them in file order so the overlapping-region merge below behaves correctly.
+            matchedIndices = scored
+                .OrderByDescending(entry => entry.Score)
+                .ThenBy(entry => entry.LineIndex)
+                .Take(maxRegions)
+                .Select(entry => entry.LineIndex)
+                .OrderBy(lineIndex => lineIndex)
+                .ToList();
+            fuzzy = true;
+        }
+
+        var matchDescriptor = fuzzy
+            ? $"{matchedIndices.Count} fuzzy match(es) — no exact phrase found, showing closest lines by word overlap"
+            : $"{matchedIndices.Count} match(es)";
 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine(System.Globalization.CultureInfo.InvariantCulture,
-            $"## search_in_artefact: '{query}' in {filePath} v{version} ({matchedIndices.Count} match(es))\n");
+            $"## search_in_artefact: '{query}' in {filePath} v{version} ({matchDescriptor})\n");
         sb.AppendLine("Copy a unique verbatim substring from below as old_str for edit_artefact.\n");
 
         var regionsShown = 0;
@@ -1939,6 +1982,23 @@ public class ConversationStreamController : ControllerBase
             result = string.Concat(result.AsSpan(0, maxResultChars), "\n...(truncated — use a more specific query)");
 
         return result;
+    }
+
+    /// <summary>
+    /// Splits a search query into distinct, meaningful tokens (≥3 characters, punctuation and
+    /// markup stripped) used for the fuzzy fallback in <see cref="BuildSearchResult"/>. Returns
+    /// at most 8 tokens, preserving first-seen order.
+    /// </summary>
+    internal static string[] ExtractSearchTokens(string query)
+    {
+        return query
+            .Split(
+                [' ', '\n', '\r', '\t', '<', '>', '"', '\'', '=', '{', '}', ';', ':', ',', '(', ')', '.', '/', '\\', '-', '_'],
+                StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => word.Length >= 3)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
     }
 
     /// <summary>
