@@ -1,0 +1,68 @@
+# KRO ApplicationStack — provisions this service's AWS resources via ACK controllers.
+#
+# Resources requested:
+#   - S3 bucket            (artefact storage; replaces LocalStack used locally)
+#   - Aurora PostgreSQL    (Serverless v2; replaces the local postgres container)
+#   - Bedrock invoke IAM   (scoped to a single foundation model in eu-west-2)
+#   - ECR repository       (derived from repositoryName)
+#   - Pod Identity IAM role (workload AWS access, scoped to githubRepoPattern)
+#
+# IMPORTANT — branch dependency (still outstanding):
+#   - enableRDS support lives on emisx-platform-engineering branch
+#     `feat/kro-rds-definition` and is NOT yet on main. The `enableRDS` toggle
+#     and the `rds` block below will be rejected at admission until that branch
+#     merges and the ApplicationStack RGD is re-published.
+#   - enableBedrock is merged to main (emisx-platform-engineering PR #1951).
+#
+# ApplicationStack instances are served under `genesis.io/v1alpha1` (confirmed
+# against the published RGD), so the apiVersion below is correct.
+apiVersion: genesis.io/v1alpha1
+kind: ApplicationStack
+metadata:
+  name: genesis-ai-requirements-api
+  namespace: genesis-ai-requirements-api-ns
+spec:
+  instance: genesis-ai-requirements-api
+  repositoryName: genesis-ai-requirements-api
+  description: "Genesis AI Requirements API"
+  githubRepoPattern: "repo:emisgroup/genesis-ai-requirements-api:*"
+
+  # --- S3: artefact storage -------------------------------------------------
+  enableS3Bucket: true
+  enableExternalS3Access: false
+  s3:
+    instance: ""            # defaults to .spec.instance
+    enableVersioning: true
+
+  # --- SNS / SQS: not required ----------------------------------------------
+  enableSNS: false
+  enableSQS: false
+
+  # --- RDS: Aurora PostgreSQL Serverless v2 ---------------------------------
+  enableRDS: true
+  rds:
+    databaseName: genesis_ai_requirements
+    username: genesis_ai_app
+    databaseSubnetGroupName: genesis-net-vpc
+    vpcId: vpc-0fbc6b9fe9caf4982
+    vpcCidr: 100.69.64.0/18
+    ingressSecurityGroupIds: []
+    engineVersion: "16.9"
+    instanceType: "db.serverless"
+    deletionProtection: true
+    backupRetentionPeriod: 7
+    enableReader: false
+    enableProxy: false
+    proxyIamAuth: "REQUIRED"
+
+  # --- Bedrock: scoped model invoke -----------------------------------------
+  enableBedrock: true
+  bedrock:
+    # Claude Sonnet 4.6 — the model BedrockAiService targets. Confirm the exact
+    # eu-west-2 foundation-model / inference-profile id available in the account.
+    modelId: anthropic.claude-sonnet-4-6
+
+  # --- Required tags --------------------------------------------------------
+  application: emisx-genesis-ai-requirements-api
+  service: genesis-ai-requirements-api
+  repo: "emisgroup/genesis-ai-requirements-api"

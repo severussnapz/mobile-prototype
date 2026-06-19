@@ -1,0 +1,94 @@
+# Shared Helm values for the emisx-service chart (centraluk.jfrog.io/genesis-helm-rel-loc/emisx-service).
+# Environment overlays (gitops/overlays/<env>/values.yaml) layer image tag,
+# replica count and environment-specific config on top of these.
+#
+# NOTE: validate these keys against the pinned chart version (0.3.6) — the chart
+# is the source of truth for supported value structure.
+nameOverride: genesis-ai-requirements-api
+namespaceOverride: genesis-ai-requirements-api-ns
+
+# Standard EMIS-X resource tags (mirrors the genesis-hello-world reference).
+# TODO: confirm the cost-allocation tags (ask_id, project_code, owner, team)
+# with the owning team — these currently inherit the genesis-platform values.
+labels:
+  emis-x.uk/Module: ecs-service
+  emis-x.uk/Repo: genesis-ai-requirements-api
+  emis-x.uk/application: genesis-ai-requirements-api
+  emis-x.uk/ask_id: aide_0091384
+  emis-x.uk/business_unit: primary-care
+  emis-x.uk/cost_centre: emis-x
+  emis-x.uk/env: dev
+  emis-x.uk/environment: non-prod
+  emis-x.uk/hosting_location: aws.442042551704
+  emis-x.uk/lifecycle: production
+  emis-x.uk/owner: group.emisx-platform-engineering
+  emis-x.uk/portfolio: "442042551704"
+  emis-x.uk/product: emis-x
+  emis-x.uk/programme_name: emis-x-gp
+  emis-x.uk/project_code: prj0012275
+  emis-x.uk/project_name: genesis-platform
+  emis-x.uk/service: genesis-ai-requirements-api
+  emis-x.uk/service_location: england
+  emis-x.uk/service_tier: p1
+  emis-x.uk/team: group.emisx-platform-engineering
+  emis-x.uk/value_stream: nhs-integrated-care
+
+serviceAccount:
+  create: true
+
+# Container listens on 8080 (ASPNETCORE default in the container image).
+service:
+  port: 8080
+
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+# /health        — liveness (overall health, requires auth-free probe)
+# /health/ready  — readiness (AllowAnonymous; checks PostgreSQL connectivity)
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 20
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 20
+
+nodeSelector:
+  kubernetes.io/os: linux
+  kubernetes.io/arch: arm64
+
+# Prefer cheaper Karpenter spot capacity (mirrors the reference).
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      preference:
+        matchExpressions:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+          - spot
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# NOTE: application `env` is intentionally NOT set here.
+#
+# Argo CD / Helm REPLACE list values across valueFiles (lists are not merged),
+# so the full `env` list is declared once, in each environment overlay
+# (gitops/overlays/<env>/values.yaml). The API authenticates to RDS, S3 and
+# Bedrock entirely via the EKS Pod Identity role provisioned by the
+# ApplicationStack — there is no DB password, so no ExternalSecret is required.
