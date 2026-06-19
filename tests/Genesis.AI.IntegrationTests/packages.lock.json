@@ -60,8 +60,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "3.7.402.82",
-        "contentHash": "TyFbwJMYCk44hNynALtAsnvATs1JIZUncks6u7tEhyknJW2grGyvWcJXnReaJ35TzkVaw902JhE9PWfsoGLnfQ=="
+        "resolved": "3.7.402.91",
+        "contentHash": "B0oP+hfVhLacXwqVOcCAcFj44wEYdfzX3fF0CSEDw8hoiLAyyDyjHtbTrqqtyiwW3fyTOrvrKfgPHOejGBu7gw=="
       },
       "Castle.Core": {
         "type": "Transitive",
@@ -255,22 +255,6 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0",
           "Microsoft.Extensions.Options": "10.0.0"
         }
-      },
-      "Microsoft.Extensions.Diagnostics.HealthChecks": {
-        "type": "Transitive",
-        "resolved": "8.0.11",
-        "contentHash": "zLgN22Zp9pk8RHlwssRTexw4+a6wqOnKWN+VejdPn5Yhjql4XiBhkFo35Nu8mmqHIk/UEmmCnMGLWq75aFfkOw==",
-        "dependencies": {
-          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "8.0.11",
-          "Microsoft.Extensions.Hosting.Abstractions": "8.0.1",
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Options": "8.0.2"
-        }
-      },
-      "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": {
-        "type": "Transitive",
-        "resolved": "8.0.11",
-        "contentHash": "So3JUdRxozRjvQ3cxU6F3nI/i4emDnjane6yMYcJhvTTTu29ltlIdoXjkFGRceIWz8yKvuEpzXItZ0x5GvN2nQ=="
       },
       "Microsoft.Extensions.FileProviders.Abstractions": {
         "type": "Transitive",
@@ -726,7 +710,6 @@
       "genesis.ai.api": {
         "type": "Project",
         "dependencies": {
-          "AspNetCore.HealthChecks.NpgSql": "[9.0.0, )",
           "AutoMapper": "[13.0.1, )",
           "Emis.JsonApi": "[3.0.0, )",
           "Genesis.AI.Core": "[1.0.0, )",
@@ -760,6 +743,7 @@
         "dependencies": {
           "AWSSDK.BedrockRuntime": "[3.7.422, )",
           "AWSSDK.Extensions.NETCore.Setup": "[3.7.301, )",
+          "AWSSDK.RDS": "[3.7.415.15, )",
           "AWSSDK.S3": "[3.7.416.7, )",
           "ClosedXML": "[0.104.2, )",
           "DocumentFormat.OpenXml": "[3.2.0, )",
@@ -773,16 +757,6 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.0, )"
-        }
-      },
-      "AspNetCore.HealthChecks.NpgSql": {
-        "type": "CentralTransitive",
-        "requested": "[9.0.0, )",
-        "resolved": "9.0.0",
-        "contentHash": "npc58/AD5zuVxERdhCl2Kb7WnL37mwX42SJcXIwvmEig0/dugOLg3SIwtfvvh3TnvTwR/sk5LYNkkPaBdks61A==",
-        "dependencies": {
-          "Microsoft.Extensions.Diagnostics.HealthChecks": "8.0.11",
-          "Npgsql": "8.0.3"
         }
       },
       "AutoMapper": {
@@ -813,6 +787,15 @@
           "Microsoft.Extensions.Configuration.Abstractions": "2.0.0",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "2.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "2.0.0"
+        }
+      },
+      "AWSSDK.RDS": {
+        "type": "CentralTransitive",
+        "requested": "[3.7.415.15, )",
+        "resolved": "3.7.415.15",
+        "contentHash": "R4EQDFLHlpLUtD2FHqtWyqb0JPQtfyumPiqmuo+LMDzoQoT9xDc1op7zh8iVZiHN0rdOls8GoIA0uxZ+rCtQkg==",
+        "dependencies": {
+          "AWSSDK.Core": "[3.7.402.91, 4.0.0)"
         }
       },
       "AWSSDK.S3": {

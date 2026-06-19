@@ -12,9 +12,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Amazon;
+using Amazon.RDS.Util;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.Extensions.NETCore.Setup;
+using System.Globalization;
 
 namespace Genesis.AI.Infrastructure;
 
@@ -75,13 +77,36 @@ public static class DependencyInjection
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+        var connectionString = BuildConnectionString(configuration);
 
         // Build NpgsqlDataSource with native enum mappings
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.EnableDynamicJson();
         MapEnums(dataSourceBuilder);
+
+        // In AWS, authenticate to RDS with short-lived IAM tokens rather than a
+        // static password. The presence of RDS_HOST signals a deployed
+        // environment; local development keeps using the password embedded in
+        // the DefaultConnection string.
+        var rdsHost = configuration["RDS_HOST"];
+        if (!string.IsNullOrEmpty(rdsHost))
+        {
+            var rdsPort = int.Parse(configuration["RDS_PORT"] ?? "5432", CultureInfo.InvariantCulture);
+            var rdsUser = configuration["RDS_USER"] ?? "genesis_ai_app";
+
+            dataSourceBuilder.UsePeriodicPasswordProvider(
+                (_, _) =>
+                {
+                    // IAM auth tokens are valid for 15 minutes; the default
+                    // credential chain (EKS Pod Identity) and AWS_REGION supply
+                    // the signing context.
+                    var token = RDSAuthTokenGenerator.GenerateAuthToken(rdsHost, rdsPort, rdsUser);
+                    return ValueTask.FromResult(token);
+                },
+                TimeSpan.FromMinutes(10),  // refresh ahead of the 15-minute expiry
+                TimeSpan.FromMinutes(1));   // retry quickly on failure
+        }
+
         var dataSource = dataSourceBuilder.Build();
 
         services.AddDbContext<GenesisAiDbContext>(options =>
@@ -97,6 +122,25 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<MessageRole>("message_role");
                 npgsqlOptions.MapEnum<OrchestrationMode>("orchestration_mode");
             }));
+    }
+
+    private static string BuildConnectionString(IConfiguration configuration)
+    {
+        // In AWS the connection string is assembled from the RDS_* settings and
+        // uses IAM authentication (no password). Locally we use the full
+        // connection string supplied in configuration.
+        var rdsHost = configuration["RDS_HOST"];
+        if (!string.IsNullOrEmpty(rdsHost))
+        {
+            var rdsPort = configuration["RDS_PORT"] ?? "5432";
+            var rdsDbName = configuration["RDS_DB_NAME"] ?? "genesis_ai_requirements";
+            var rdsUser = configuration["RDS_USER"] ?? "genesis_ai_app";
+
+            return $"Host={rdsHost};Port={rdsPort};Database={rdsDbName};Username={rdsUser};SSL Mode=Require;Trust Server Certificate=true";
+        }
+
+        return configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
     }
 
     private static void MapEnums(NpgsqlDataSourceBuilder dataSourceBuilder)

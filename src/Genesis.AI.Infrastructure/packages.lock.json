@@ -23,6 +23,15 @@
           "Microsoft.Extensions.Logging.Abstractions": "2.0.0"
         }
       },
+      "AWSSDK.RDS": {
+        "type": "Direct",
+        "requested": "[3.7.415.15, )",
+        "resolved": "3.7.415.15",
+        "contentHash": "R4EQDFLHlpLUtD2FHqtWyqb0JPQtfyumPiqmuo+LMDzoQoT9xDc1op7zh8iVZiHN0rdOls8GoIA0uxZ+rCtQkg==",
+        "dependencies": {
+          "AWSSDK.Core": "[3.7.402.91, 4.0.0)"
+        }
+      },
       "AWSSDK.S3": {
         "type": "Direct",
         "requested": "[3.7.416.7, )",
@@ -79,8 +88,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "3.7.402.82",
-        "contentHash": "TyFbwJMYCk44hNynALtAsnvATs1JIZUncks6u7tEhyknJW2grGyvWcJXnReaJ35TzkVaw902JhE9PWfsoGLnfQ=="
+        "resolved": "3.7.402.91",
+        "contentHash": "B0oP+hfVhLacXwqVOcCAcFj44wEYdfzX3fF0CSEDw8hoiLAyyDyjHtbTrqqtyiwW3fyTOrvrKfgPHOejGBu7gw=="
       },
       "ClosedXML.Parser": {
         "type": "Transitive",

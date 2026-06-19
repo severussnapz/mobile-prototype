@@ -1,4 +1,5 @@
 using Genesis.AI.Api.Authentication;
+using Genesis.AI.Api.Health;
 using Genesis.AI.Api.Middleware;
 using Genesis.AI.Core.Filters;
 using Genesis.AI.Core.Logging;
@@ -15,12 +16,11 @@ builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 // Serilog (OBS-002)
 builder.Host.ConfigureSerilog();
 
-// Health checks (OBS-004)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-
+// Health checks (OBS-004). The readiness probe verifies database connectivity
+// through the EF Core DbContext, which uses the IAM-authenticated data source
+// in AWS and the local connection string in development.
 builder.Services.AddHealthChecks()
-    .AddNpgSql(connectionString, name: "postgresql");
+    .AddCheck<PostgresHealthCheck>("postgresql", tags: ["ready"]);
 
 // Authentication (AUTH-005, AUTH-006)
 var jwtAuthority = builder.Configuration["Authentication:Authority"];
