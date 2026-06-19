@@ -151,12 +151,15 @@ if (app.Environment.IsDevelopment())
 }
 
 // Health check probes (OBS-004)
-app.MapHealthChecks("/health", new HealthCheckOptions
+// Liveness (/healthz) runs no checks — it only confirms the process is up, so a
+// dependency blip cannot trigger a pod restart. Readiness (/healthz/ready) runs
+// the registered checks (e.g. PostgreSQL) to gate load-balancer traffic.
+app.MapHealthChecks("/healthz", new HealthCheckOptions
 {
     Predicate = _ => false
 });
 
-app.MapHealthChecks("/health/ready", new HealthCheckOptions
+app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
 {
     Predicate = _ => true
 }).AllowAnonymous();
