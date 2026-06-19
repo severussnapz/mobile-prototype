@@ -107,3 +107,85 @@ IG content
         Assert.DoesNotContain("updated text", updated);
     }
 }
+
+public class ConversationStreamControllerSearchTests
+{
+    private const string PrototypeHtml = """
+        <header class="site-header">
+          <nav class="primary-nav">Home</nav>
+        </header>
+        <section class="hero" style="background-color: #003087;">
+          <h1>Welcome</h1>
+        </section>
+        <div class="message-actions">
+          <button class="feedback-thumbs-up" aria-label="Helpful">👍</button>
+          <button class="feedback-thumbs-down" aria-label="Not helpful">👎</button>
+        </div>
+        """;
+
+    [Fact]
+    public void BuildSearchResult_WhenExactPhraseOnLine_ReturnsExactMatchRegion()
+    {
+        var result = ConversationStreamController.BuildSearchResult(
+            PrototypeHtml, "primary-nav", "prototype/index.html", 3);
+
+        Assert.Contains("match(es))", result);
+        Assert.DoesNotContain("fuzzy match", result);
+        Assert.Contains("class=\"primary-nav\"", result);
+    }
+
+    [Fact]
+    public void BuildSearchResult_WhenPhraseNotVerbatim_FallsBackToWordOverlap()
+    {
+        // "thumbs up feedback" never appears as a contiguous substring, but the words do.
+        var result = ConversationStreamController.BuildSearchResult(
+            PrototypeHtml, "thumbs up feedback", "prototype/index.html", 3);
+
+        Assert.Contains("fuzzy match", result);
+        Assert.Contains("feedback-thumbs-up", result);
+    }
+
+    [Fact]
+    public void BuildSearchResult_WhenFuzzyMatch_RanksLineWithMostWordsFirst()
+    {
+        // "background hero colour" — the hero line contains both "background" and "hero".
+        var result = ConversationStreamController.BuildSearchResult(
+            PrototypeHtml, "background hero colour", "prototype/index.html", 1);
+
+        Assert.Contains("fuzzy match", result);
+        Assert.Contains("background-color", result);
+    }
+
+    [Fact]
+    public void BuildSearchResult_WhenNoWordsMatch_ReturnsSearchNotFound()
+    {
+        var result = ConversationStreamController.BuildSearchResult(
+            PrototypeHtml, "zzz nonexistent qqtoken", "prototype/index.html", 1);
+
+        Assert.StartsWith("SEARCH_NOT_FOUND", result);
+    }
+
+    [Fact]
+    public void BuildSearchResult_WhenQueryEmpty_ReturnsError()
+    {
+        var result = ConversationStreamController.BuildSearchResult(
+            PrototypeHtml, "   ", "prototype/index.html", 1);
+
+        Assert.StartsWith("Error:", result);
+    }
+
+    [Fact]
+    public void ExtractSearchTokens_StripsMarkupAndShortWords_ReturnsDistinctTokens()
+    {
+        var tokens = ConversationStreamController.ExtractSearchTokens("<button class=\"feedback-thumbs\"> up up </button>");
+
+        Assert.Contains("button", tokens);
+        Assert.Contains("class", tokens);
+        Assert.Contains("feedback", tokens);
+        Assert.Contains("thumbs", tokens);
+        // "up" is below the 3-char threshold and must be excluded.
+        Assert.DoesNotContain("up", tokens);
+        // "button" appears twice in the input but tokens are distinct.
+        Assert.Single(tokens, token => token == "button");
+    }
+}

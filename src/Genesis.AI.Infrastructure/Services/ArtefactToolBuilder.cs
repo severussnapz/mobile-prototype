@@ -103,6 +103,9 @@ internal static class ArtefactToolBuilder
             Name: PipelineToolDefinitions.SearchInArtefact,
             Description: "Search for lines in an artefact file that contain a given query string. " +
                          "Returns up to 5 matching regions with ±5 lines of surrounding context each. " +
+                         "If the exact phrase is not found on any single line, the search falls back to " +
+                         "word-overlap matching and returns the lines that contain the most query words — " +
+                         "so natural phrases like 'thumbs up feedback' still locate 'class=\"feedback-thumbs\"'. " +
                          "Use this BEFORE edit_artefact to find the exact verbatim anchor string to pass as old_str — " +
                          "copy the anchor directly from the search results, never from memory.",
             InputSchema: JsonDocument.Parse("""
@@ -115,7 +118,7 @@ internal static class ArtefactToolBuilder
                     },
                     "query": {
                         "type": "string",
-                        "description": "A keyword or short phrase to search for (case-insensitive). Use a distinctive word from the content you want to change, e.g. 'nav', 'background', 'header'."
+                        "description": "A keyword or short phrase to search for (case-insensitive). A distinctive single word works best (e.g. 'nav', 'background', 'header'), but multi-word phrases also work — unmatched phrases fall back to word-overlap matching."
                     }
                 },
                 "required": ["file_path", "query"]
