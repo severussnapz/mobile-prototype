@@ -1,0 +1,91 @@
+# Builds the production container image and pushes it to ECR for dev.
+#
+# Delegates to the shared EMIS-X build-and-push template (OIDC -> ECR, arm64
+# build). Mirrors the genesis-hello-world reference. The build also emits an
+# OpenAPI spec (see Dockerfile) which the optional update-apim-spec job PRs into
+# emisgroup/apim so APIM can front this API.
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_apim_pr:
+        description: "Create APIM PR for the generated OpenAPI spec"
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - "main"
+    paths:
+      - "src/**"
+      - "Dockerfile"
+      - "Directory.Packages.props"
+      - "Directory.Build.props"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-push:
+    name: "Build & Push"
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/docker-build-push-template.yaml@bb01c9db204291901add2e3417bb029658a77e37 # shared-gha-workflow-templates v7.9.0
+    with:
+      image-name: genesis-ai-requirements-api
+      dockerfile: Dockerfile
+      environments: "['dev']"
+      tag: latest
+      project_key: emis
+      artifact-paths: '[{"artifact": "openapi-spec", "path": "/app/docs/openapi/specification.json"}]'
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_ROLE_ARN: ${{ secrets.ECR_ROLE_ARN }}
+      GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+      ZSCALER_BASE64_ROOT_CA: ${{ secrets.ZSCALER_BASE64_ROOT_CA }}
+
+  update-apim-spec:
+    name: Update APIM Spec
+    if: ${{ github.event.inputs.create_apim_pr }}
+    needs: build-and-push
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/pull-request-from-artifacts.yaml@bb01c9db204291901add2e3417bb029658a77e37 # shared-gha-workflow-templates v7.9.0
+    with:
+      artifacts: '[{"artifact": "openapi-spec", "path": "apiops/artifacts/apis/genesis-ai-requirements-api/specification.json"}]'
+      target-repo: emisgroup/apim
+      target-branch-base: update-genesis-ai-requirements-api-spec
+      pr-title: "Update Genesis AI Requirements API OpenAPI spec"
+      pr-body: |
+        ## 🤖 Auto-generated APIM Spec Update
+
+        **API:** `genesis-ai-requirements-api`
+
+        ### Source Information
+        - **Repository:** [${{ github.repository }}](${{ github.server_url }}/${{ github.repository }})
+        - **Commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+        - **Workflow Run:** [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+        ### Changes
+        - **Updated:** `apiops/artifacts/apis/genesis-ai-requirements-api/specification.json`
+
+        ### APIOps GitOps Structure
+        This PR follows the Microsoft APIOps GitOps pattern:
+        - **Specification:** OpenAPI 3.0 spec in `specification.json`
+        - **Configuration:** API metadata in `apiInformation.json` (kebab-case naming)
+        - **Auto-Discovery:** No manual `apis:` section needed in config files
+
+        ### Checklist
+        - [ ] OpenAPI spec is valid OpenAPI 3.0 format
+        - [ ] API follows kebab-case naming convention
+        - [ ] No breaking changes in minor/patch updates
+
+        ### Next Steps
+        After merge, APIOps will automatically deploy to:
+        - **dev** → Auto-deployed to `apim-emisx-nonprd` control plane
+        - **int/stg/prd** → Manual promotion via `publish-apim-artifacts.yml` workflow
+
+        /cc @platform-engineering-team
+      pr-labels: '["automated", "apiops", "openapi-spec", "genesis-ai-requirements-api"]'
+    secrets:
+      GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+      GIT_SIGNING_KEY: ${{ secrets.GIT_SIGNING_KEY }}
+      GIT_SIGNING_PASSPHRASE: ${{ secrets.GIT_SIGNING_PASSPHRASE }}
