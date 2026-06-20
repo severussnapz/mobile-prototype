@@ -1584,8 +1584,11 @@ public class ConversationStreamController : ControllerBase
                     case "derive_from_text_content":
                         valueResults = await new DeriveFromTextContentStrategy().DeriveValuesAsync(listResult.Matches, null, cancellationToken);
                         break;
+                    case "generate_from_context":
+                        valueResults = await new GenerateFromContextStrategy(_aiService).DeriveValuesAsync(listResult.Matches, null, cancellationToken);
+                        break;
                     default:
-                        return $"Error: apply_to_scope strategy='{strategy}' is not yet implemented. Use literal or derive_from_text_content.";
+                        return $"Error: apply_to_scope strategy='{strategy}' is not valid. Use literal, derive_from_text_content, or generate_from_context.";
                 }
 
                 // Parse operation

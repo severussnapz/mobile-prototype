@@ -102,3 +102,104 @@ public class ApplyToScopeStrategyTests
             SiblingContext: "");
     }
 }
+
+public class GenerateFromContextStrategyTests
+{
+    [Fact]
+    public async Task GenerateFromContextStrategy_ReturnsValuesMatchedByTextSnippet()
+    {
+        var matches = new List<PrototypeDomSearchMatch>
+        {
+            BuildMatch("prototype/fragments/screen-01.html|A1", "Hide queue"),
+            BuildMatch("prototype/fragments/screen-01.html|A2", "Save & close"),
+            BuildMatch("prototype/fragments/screen-01.html|A3", "Print"),
+        };
+
+        var aiJson = """
+            [
+              {"text_snippet":"Hide queue","value":"Hide document queue panel"},
+              {"text_snippet":"Save & close","value":"Save and close document"},
+              {"text_snippet":"Print","value":"Print document"}
+            ]
+            """;
+
+        var mockAiService = new Mock<IAiService>();
+        mockAiService
+            .Setup(s => s.GenerateResponseAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AiResponse(aiJson, 100, 50));
+
+        var strategy = new GenerateFromContextStrategy(mockAiService.Object);
+        var results = await strategy.DeriveValuesAsync(matches, null, CancellationToken.None);
+
+        Assert.Equal(3, results.Count);
+        Assert.Equal("Hide document queue panel", results.Single(r => r.NodeKey.Contains("A1")).Value);
+        Assert.Equal("Save and close document", results.Single(r => r.NodeKey.Contains("A2")).Value);
+        Assert.Equal("Print document", results.Single(r => r.NodeKey.Contains("A3")).Value);
+    }
+
+    [Fact]
+    public async Task GenerateFromContextStrategy_WhenSnippetNotMatched_UsesEmptyValue()
+    {
+        var matches = new List<PrototypeDomSearchMatch>
+        {
+            BuildMatch("prototype/fragments/screen-01.html|A1", "Unknown button"),
+        };
+
+        var aiJson = """
+            [{"text_snippet":"Something else entirely","value":"Some value"}]
+            """;
+
+        var mockAiService = new Mock<IAiService>();
+        mockAiService
+            .Setup(s => s.GenerateResponseAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AiResponse(aiJson, 100, 50));
+
+        var strategy = new GenerateFromContextStrategy(mockAiService.Object);
+        var results = await strategy.DeriveValuesAsync(matches, null, CancellationToken.None);
+
+        Assert.Single(results);
+        Assert.Equal(string.Empty, results[0].Value);
+    }
+
+    [Fact]
+    public async Task GenerateFromContextStrategy_WhenAiReturnsInvalidJson_ReturnsEmptyValues()
+    {
+        var matches = new List<PrototypeDomSearchMatch>
+        {
+            BuildMatch("prototype/fragments/screen-01.html|A1", "Save"),
+        };
+
+        var mockAiService = new Mock<IAiService>();
+        mockAiService
+            .Setup(s => s.GenerateResponseAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AiResponse("not valid json", 100, 50));
+
+        var strategy = new GenerateFromContextStrategy(mockAiService.Object);
+        var results = await strategy.DeriveValuesAsync(matches, null, CancellationToken.None);
+
+        Assert.Single(results);
+        Assert.Equal(string.Empty, results[0].Value);
+    }
+
+    private static PrototypeDomSearchMatch BuildMatch(string nodeKey, string textSnippet)
+    {
+        return new PrototypeDomSearchMatch(
+            NodeKey: nodeKey,
+            FragmentPath: nodeKey.Split('|')[0],
+            TagName: "button",
+            TextSnippet: textSnippet,
+            CssSelector: "button",
+            ClassList: [],
+            ParentContext: "",
+            SiblingContext: "");
+    }
+}
