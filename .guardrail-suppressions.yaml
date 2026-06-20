@@ -122,3 +122,8 @@ suppressions:
   - id: SEC-002
     path: "src/Genesis.AI.Infrastructure/Services/PrototypeDomToolBuilder.cs"
     justification: "String concatenation builds AI tool description text, not SQL queries"
+  # PG-005: V13 index names use legacy ux_/ix_ prefixes intentionally —
+  # V16 renames them forward-only to preserve Flyway checksum history.
+  - id: PG-005
+    path: "db/migrations/V13__add_message_feedback.sql"
+    justification: "Legacy index names preserved to avoid Flyway checksum mismatch — V16 renames them"
