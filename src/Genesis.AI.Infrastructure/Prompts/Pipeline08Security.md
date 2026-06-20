@@ -237,8 +237,12 @@ The API manages all session state automatically. You do NOT write to files or ma
 You have six tools available:
 
 - `save_artefact`
-- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 retries). Never use on security outputs (SECURITY_ASSURANCE_DATA.json, SDP_EVIDENCE.json, threat_model.md).
-- `search_in_artefact` — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact` to get the exact verbatim anchor.
+- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor. Verify you are editing the correct occurrence (never assume the first match is correct). Never use on security outputs (SECURITY_ASSURANCE_DATA.json, SDP_EVIDENCE.json, threat_model.md).
+- Layered retry policy for anchor matching (mandatory):
+  1. First failure (`ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`): run `search_in_artefact` again with a more specific keyword and richer surrounding context.
+  2. Second failure: run `search_in_artefact` again using a unique nearby phrase (for example heading text plus a key term) and retry `edit_artefact`.
+  3. Third failure: stop retrying and explain clearly what the user should do next. Tell the user to open prototype preview (or relevant rendered output), inspect the target element/text, copy the exact HTML/markdown snippet, and paste it into chat so you can anchor the edit exactly.
+- `search_in_artefact` — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact`, do not edit from memory, and confirm the chosen match is unique and context-correct.
 - `advance_phase`
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`

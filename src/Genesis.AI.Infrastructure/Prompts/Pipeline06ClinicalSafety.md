@@ -129,9 +129,14 @@ use `get_artefact` to load it — do not assume earlier turn summaries are prese
 Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
 Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
 
-**`edit_artefact` — surgical edits to REQ files:** For changes affecting less than ~30% of a `requirements/REQ-*.md` file, use `edit_artefact` instead of rewriting the whole file. Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (maximum 2 retries). Never use `edit_artefact` on clinical safety outputs (HAZARD-REGISTRY.md, DPIA.md, or any standalone clinical safety report).
+**`edit_artefact` — surgical edits to REQ files:** For changes affecting less than ~30% of a `requirements/REQ-*.md` file, use `edit_artefact` instead of rewriting the whole file. Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor and verify you are editing the correct occurrence (never assume the first match is correct). Never use `edit_artefact` on clinical safety outputs (HAZARD-REGISTRY.md, DPIA.md, or any standalone clinical safety report).
 
-**`search_in_artefact` — find exact text before editing:** Call this with a keyword before every `edit_artefact`. Returns matching lines with context so you can copy the verbatim anchor.
+Layered retry policy for anchor matching (mandatory):
+1. First failure (`ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`): run `search_in_artefact` again with a more specific keyword and richer surrounding context.
+2. Second failure: run `search_in_artefact` again using a unique nearby phrase (for example heading text plus a key term) and retry `edit_artefact`.
+3. Third failure: stop retrying and explain clearly what the user should do next. Tell the user to open prototype preview (or relevant rendered output), inspect the target element/text, copy the exact HTML/markdown snippet, and paste it into chat so you can anchor the edit exactly.
+
+**`search_in_artefact` — find exact text before editing:** Call this before every `edit_artefact`. Do not edit from memory. Confirm the selected match is unique and context-correct before editing.
 
 **P06 MANDATORY EXCEPTION — `get_guardrail_details` REQUIRED:**
 Despite PROJECT FOUNDATION, you MUST still call `get_guardrail_details` at the start of phase 0
