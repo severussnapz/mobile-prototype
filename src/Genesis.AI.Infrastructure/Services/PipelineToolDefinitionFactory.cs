@@ -22,32 +22,52 @@ internal static class PipelineToolDefinitionFactory
     }
 
     internal static AiToolDefinition BuildEditArtefactTool()
-        => ArtefactToolBuilder.BuildEditArtefactTool();
+    {
+        return ArtefactToolBuilder.BuildEditArtefactTool();
+    }
 
     internal static AiToolDefinition BuildEditArtefactByGraphNodeTool()
-        => ArtefactToolBuilder.BuildEditArtefactByGraphNodeTool();
+    {
+        return ArtefactToolBuilder.BuildEditArtefactByGraphNodeTool();
+    }
 
     internal static AiToolDefinition BuildSearchInArtefactTool()
-        => ArtefactToolBuilder.BuildSearchInArtefactTool();
+    {
+        return ArtefactToolBuilder.BuildSearchInArtefactTool();
+    }
 
     internal static AiToolDefinition BuildSetNodeAttributeTool()
-        => ArtefactToolBuilder.BuildSetNodeAttributeTool();
+    {
+        return PrototypeDomToolBuilder.BuildSetNodeAttributeTool();
+    }
 
     internal static AiToolDefinition BuildSetNodeTextTool()
-        => ArtefactToolBuilder.BuildSetNodeTextTool();
+    {
+        return PrototypeDomToolBuilder.BuildSetNodeTextTool();
+    }
 
     internal static AiToolDefinition BuildAddNodeClassTool()
-        => ArtefactToolBuilder.BuildAddNodeClassTool();
+    {
+        return PrototypeDomToolBuilder.BuildAddNodeClassTool();
+    }
 
     internal static AiToolDefinition BuildRemoveNodeClassTool()
-        => ArtefactToolBuilder.BuildRemoveNodeClassTool();
+    {
+        return PrototypeDomToolBuilder.BuildRemoveNodeClassTool();
+    }
 
     internal static AiToolDefinition BuildInsertAdjacentHtmlTool()
-        => ArtefactToolBuilder.BuildInsertAdjacentHtmlTool();
+    {
+        return PrototypeDomToolBuilder.BuildInsertAdjacentHtmlTool();
+    }
 
     internal static AiToolDefinition BuildRemoveElementTool()
-        => ArtefactToolBuilder.BuildRemoveElementTool();
+    {
+        return PrototypeDomToolBuilder.BuildRemoveElementTool();
+    }
 
     internal static AiToolDefinition BuildApplyToScopeTool()
-        => ArtefactToolBuilder.BuildApplyToScopeTool();
+    {
+        return PrototypeDomToolBuilder.BuildApplyToScopeTool();
+    }
 }

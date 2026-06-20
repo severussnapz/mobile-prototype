@@ -18,11 +18,11 @@ CREATE TABLE conversation_message_feedback (
         ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX ux_message_feedback_message_created_by
+CREATE UNIQUE INDEX idx_uq_conversation_message_feedback_message_id_created_by
     ON conversation_message_feedback (message_id, created_by);
 
-CREATE INDEX ix_message_feedback_stage_type_created_at
+CREATE INDEX idx_conversation_message_feedback_stage_type_created_at
     ON conversation_message_feedback (stage_type, created_at DESC);
 
-CREATE INDEX ix_message_feedback_conversation_id
+CREATE INDEX idx_conversation_message_feedback_conversation_id
     ON conversation_message_feedback (conversation_id);

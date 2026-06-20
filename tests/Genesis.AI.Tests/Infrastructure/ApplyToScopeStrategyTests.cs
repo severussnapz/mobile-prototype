@@ -8,7 +8,7 @@ namespace Genesis.AI.Tests.Infrastructure;
 public class ApplyToScopeStrategyTests
 {
     [Fact]
-    public async Task LiteralStrategy_AppliesValueToAllElements()
+    public async Task DeriveValuesAsync_WhenLiteralStrategy_AppliesSameValueToAllElements()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {
@@ -25,7 +25,7 @@ public class ApplyToScopeStrategyTests
     }
 
     [Fact]
-    public async Task LiteralStrategy_MapsNodeKeyFromMatch()
+    public async Task DeriveValuesAsync_WhenLiteralStrategy_PreservesNodeKeyFromMatch()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {
@@ -40,7 +40,7 @@ public class ApplyToScopeStrategyTests
     }
 
     [Fact]
-    public async Task DeriveFromTextContentStrategy_StripsLeadingEmoji()
+    public async Task DeriveValuesAsync_WhenDeriveFromTextContentStrategy_StripsLeadingEmoji()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {
@@ -58,7 +58,7 @@ public class ApplyToScopeStrategyTests
     }
 
     [Fact]
-    public async Task DeriveFromTextContentStrategy_HandlesDuplicateText()
+    public async Task DeriveValuesAsync_WhenDeriveFromTextContentStrategy_DeduplicatesRepeatedWords()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {
@@ -74,7 +74,7 @@ public class ApplyToScopeStrategyTests
     }
 
     [Fact]
-    public async Task DeriveFromTextContentStrategy_StripsArrowPrefixes()
+    public async Task DeriveValuesAsync_WhenDeriveFromTextContentStrategy_StripsArrowPrefixes()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {
@@ -106,7 +106,7 @@ public class ApplyToScopeStrategyTests
 public class GenerateFromContextStrategyTests
 {
     [Fact]
-    public async Task GenerateFromContextStrategy_ReturnsValuesMatchedByTextSnippet()
+    public async Task DeriveValuesAsync_WhenAiReturnsMatchingSnippets_ReturnsCorrectValues()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {
@@ -141,7 +141,7 @@ public class GenerateFromContextStrategyTests
     }
 
     [Fact]
-    public async Task GenerateFromContextStrategy_WhenSnippetNotMatched_UsesEmptyValue()
+    public async Task DeriveValuesAsync_WhenSnippetNotMatchedInAiResponse_ReturnsEmptyValue()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {
@@ -168,7 +168,7 @@ public class GenerateFromContextStrategyTests
     }
 
     [Fact]
-    public async Task GenerateFromContextStrategy_WhenAiReturnsInvalidJson_ReturnsEmptyValues()
+    public async Task DeriveValuesAsync_WhenAiReturnsInvalidJson_ReturnsEmptyValuesForAllMatches()
     {
         var matches = new List<PrototypeDomSearchMatch>
         {

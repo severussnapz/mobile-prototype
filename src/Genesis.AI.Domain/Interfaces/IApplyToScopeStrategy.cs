@@ -7,8 +7,3 @@ public interface IApplyToScopeStrategy
         string? literalValue,
         CancellationToken cancellationToken);
 }
-
-public sealed record ApplyToScopeValueResult(
-    string NodeKey,
-    string FragmentPath,
-    string Value);

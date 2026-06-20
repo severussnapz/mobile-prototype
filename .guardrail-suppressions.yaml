@@ -112,3 +112,13 @@ suppressions:
   # does not carry JWTs. Auth enforced at network level (security groups/ingress).
   - id: OBS-004
     justification: "Platform API deployed behind API gateway — readiness probe consumed by container orchestration without JWTs. Auth enforced at network level."
+  # SEC-002: String concatenation in ArtefactToolBuilder is NOT SQL —
+  # it's multiline AI tool description strings. No database query involved.
+  - id: SEC-002
+    path: "src/Genesis.AI.Infrastructure/Services/ArtefactToolBuilder.cs"
+    justification: "String concatenation builds AI tool description text, not SQL queries"
+  # SEC-002: String concatenation in PrototypeDomToolBuilder is NOT SQL —
+  # it's multiline AI tool description strings. No database query involved.
+  - id: SEC-002
+    path: "src/Genesis.AI.Infrastructure/Services/PrototypeDomToolBuilder.cs"
+    justification: "String concatenation builds AI tool description text, not SQL queries"

@@ -34,10 +34,8 @@ public sealed class PrototypeDomMutationService : IPrototypeDomMutationService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-
         var batchResult = await ApplyBatchMutationAsync([request], cancellationToken);
         var first = batchResult.Results[0];
-
         return new PrototypeDomMutationResult(
             Success: first.Success,
             Message: first.Message,
@@ -50,14 +48,10 @@ public sealed class PrototypeDomMutationService : IPrototypeDomMutationService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(requests);
-
         if (requests.Count == 0)
         {
             return new PrototypeDomBatchMutationResult(
-                TotalMutations: 0,
-                SuccessfulMutations: 0,
-                Results: [],
-                PersistedFragments: []);
+                TotalMutations: 0, SuccessfulMutations: 0, Results: [], PersistedFragments: []);
         }
 
         var indexedRequests = requests
@@ -73,165 +67,9 @@ public sealed class PrototypeDomMutationService : IPrototypeDomMutationService
                      item => item,
                      EqualityComparer<(Guid ProjectId, string FragmentPath)>.Default))
         {
-            var projectId = grouped.Key.ProjectId;
-            var fragmentPath = grouped.Key.FragmentPath;
-            var firstRequest = grouped.First().Request;
-
-            if (string.IsNullOrWhiteSpace(fragmentPath))
-            {
-                foreach (var item in grouped)
-                {
-                    orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
-                        NodeKey: item.Request.NodeKey,
-                        Success: false,
-                        Message: "fragment_path is required",
-                        FragmentPath: null,
-                        Version: null);
-                }
-
-                continue;
-            }
-
-            var fragmentArtefact = await _artefactRepository.GetByProjectAndFilePathAsync(
-                projectId,
-                fragmentPath,
-                cancellationToken);
-            if (fragmentArtefact is null)
-            {
-                foreach (var item in grouped)
-                {
-                    orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
-                        NodeKey: item.Request.NodeKey,
-                        Success: false,
-                        Message: "fragment not found",
-                        FragmentPath: fragmentPath,
-                        Version: null);
-                }
-
-                continue;
-            }
-
-            var originalHtml = await _artefactStorageService.GetContentAsync(fragmentArtefact.S3Key, cancellationToken);
-            if (string.IsNullOrWhiteSpace(originalHtml))
-            {
-                foreach (var item in grouped)
-                {
-                    orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
-                        NodeKey: item.Request.NodeKey,
-                        Success: false,
-                        Message: "fragment content missing",
-                        FragmentPath: fragmentPath,
-                        Version: null);
-                }
-
-                continue;
-            }
-
-            var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
-            var document = await browsingContext.OpenAsync(
-                response => response.Content(originalHtml),
-                cancellationToken);
-
-            var successfulIndexes = new List<int>();
-            foreach (var item in grouped)
-            {
-                var targetElement = ResolveTargetElement(document, item.Request.NodeKey, fragmentPath);
-                if (targetElement is null)
-                {
-                    orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
-                        NodeKey: item.Request.NodeKey,
-                        Success: false,
-                        Message: "target element not found",
-                        FragmentPath: fragmentPath,
-                        Version: null);
-                    continue;
-                }
-
-                var applyError = ApplyMutation(targetElement, item.Request.Operation, item.Request.Attribute, item.Request.Value);
-                if (applyError is not null)
-                {
-                    orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
-                        NodeKey: item.Request.NodeKey,
-                        Success: false,
-                        Message: applyError,
-                        FragmentPath: fragmentPath,
-                        Version: null);
-                    continue;
-                }
-
-                successfulIndexes.Add(item.Index);
-            }
-
-            if (successfulIndexes.Count == 0)
-            {
-                continue;
-            }
-
-            var serialisedHtml = SerializeDocument(document, originalHtml);
-            if (string.Equals(serialisedHtml, originalHtml, StringComparison.Ordinal))
-            {
-                foreach (var successIndex in successfulIndexes)
-                {
-                    var request = requests[successIndex];
-                    orderedResults[successIndex] = new PrototypeDomBatchMutationItemResult(
-                        NodeKey: request.NodeKey,
-                        Success: true,
-                        Message: "no-op",
-                        FragmentPath: fragmentPath,
-                        Version: null);
-                }
-
-                continue;
-            }
-
-            var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
-                projectId,
-                fragmentPath,
-                cancellationToken);
-
-            var contentType = string.IsNullOrWhiteSpace(fragmentArtefact.ContentType)
-                ? "text/html"
-                : fragmentArtefact.ContentType;
-            var storageKey = await _artefactStorageService.SaveContentAsync(
-                projectId,
-                fragmentPath,
-                nextVersion,
-                serialisedHtml,
-                contentType,
-                cancellationToken);
-
-            var updatedArtefact = Artefact.CreateS3Artefact(
-                projectId,
-                nextVersion,
-                fragmentPath,
-                storageKey,
-                contentType,
-                Encoding.UTF8.GetByteCount(serialisedHtml),
-                firstRequest.CreatedBy,
-                _timeProvider,
-                true);
-
-            await _artefactRepository.AddAsync(updatedArtefact, cancellationToken);
-            await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
-            await _artefactRepository.DeletePreviousVersionsAsync(
-                projectId,
-                fragmentPath,
-                nextVersion,
-                cancellationToken);
-
-            persistedFragments.Add(new PrototypeDomMutationFragmentResult(projectId, fragmentPath, nextVersion));
-            shouldAssembleByProject.Add(projectId);
-
-            foreach (var successIndex in successfulIndexes)
-            {
-                var request = requests[successIndex];
-                orderedResults[successIndex] = new PrototypeDomBatchMutationItemResult(
-                    NodeKey: request.NodeKey,
-                    Success: true,
-                    Message: "ok",
-                    FragmentPath: fragmentPath,
-                    Version: nextVersion);
-            }
+            await ProcessFragmentGroupAsync(
+                grouped, requests, orderedResults, persistedFragments,
+                shouldAssembleByProject, cancellationToken);
         }
 
         foreach (var projectId in shouldAssembleByProject)
@@ -240,7 +78,6 @@ public sealed class PrototypeDomMutationService : IPrototypeDomMutationService
         }
 
         var successfulMutations = orderedResults.Count(result => result.Success);
-
         return new PrototypeDomBatchMutationResult(
             TotalMutations: requests.Count,
             SuccessfulMutations: successfulMutations,
@@ -248,211 +85,196 @@ public sealed class PrototypeDomMutationService : IPrototypeDomMutationService
             PersistedFragments: persistedFragments);
     }
 
-    private static IElement? ResolveTargetElement(IDocument document, string nodeKey, string fragmentPath)
+    private async Task ProcessFragmentGroupAsync(
+        IEnumerable<(PrototypeDomMutationRequest Request, int Index)> grouped,
+        IReadOnlyList<PrototypeDomMutationRequest> requests,
+        PrototypeDomBatchMutationItemResult[] orderedResults,
+        List<PrototypeDomMutationFragmentResult> persistedFragments,
+        HashSet<Guid> shouldAssembleByProject,
+        CancellationToken cancellationToken)
     {
-        var stableLocator = ExtractStableLocator(nodeKey, fragmentPath);
-        if (string.IsNullOrWhiteSpace(stableLocator))
+        var items = grouped.ToList();
+        var projectId = items[0].Request.ProjectId;
+        var fragmentPath = items[0].Request.FragmentPath;
+        var firstRequest = items[0].Request;
+
+        if (string.IsNullOrWhiteSpace(fragmentPath))
         {
-            return null;
+            SetGroupFailureResults(items, orderedResults, "fragment_path is required", null);
+            return;
         }
 
-        if (stableLocator.StartsWith("css:", StringComparison.Ordinal))
+        var (originalHtml, contentType, loadError) = await LoadFragmentAsync(
+            projectId, fragmentPath, cancellationToken);
+        if (loadError is not null)
         {
-            stableLocator = stableLocator[4..];
+            SetGroupFailureResults(items, orderedResults, loadError, fragmentPath);
+            return;
         }
 
-        var dataGenesisSelector = $"[data-genesis-id=\"{EscapeCssString(stableLocator)}\"]";
-        var dataGenesisMatch = document.QuerySelector(dataGenesisSelector);
-        if (dataGenesisMatch is not null)
+        await ApplyAndPersistMutationsAsync(
+            items, requests, orderedResults, persistedFragments, shouldAssembleByProject,
+            originalHtml!, contentType!, projectId, fragmentPath, firstRequest.CreatedBy,
+            cancellationToken);
+    }
+
+    private async Task ApplyAndPersistMutationsAsync(
+        List<(PrototypeDomMutationRequest Request, int Index)> items,
+        IReadOnlyList<PrototypeDomMutationRequest> requests,
+        PrototypeDomBatchMutationItemResult[] orderedResults,
+        List<PrototypeDomMutationFragmentResult> persistedFragments,
+        HashSet<Guid> shouldAssembleByProject,
+        string originalHtml,
+        string contentType,
+        Guid projectId,
+        string fragmentPath,
+        string createdBy,
+        CancellationToken cancellationToken)
+    {
+        var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
+        var document = await browsingContext.OpenAsync(
+            response => response.Content(originalHtml), cancellationToken);
+
+        var successfulIndexes = ApplyMutationsToDocument(items, orderedResults, document, fragmentPath);
+        if (successfulIndexes.Count == 0)
         {
-            return dataGenesisMatch;
+            return;
         }
 
-        if (stableLocator.Length > 0 && !char.IsDigit(stableLocator[0]))
+        var serialisedHtml = PrototypeDomMutationHelper.SerializeDocument(document, originalHtml);
+        if (string.Equals(serialisedHtml, originalHtml, StringComparison.Ordinal))
         {
-            var idSelector = $"#{EscapeCssIdentifier(stableLocator)}";
-            var idMatch = document.QuerySelector(idSelector);
-            if (idMatch is not null)
+            SetGroupNoOpResults(successfulIndexes, requests, orderedResults, fragmentPath);
+            return;
+        }
+
+        var version = await PersistMutatedFragmentAsync(
+            projectId, fragmentPath, serialisedHtml, contentType, createdBy, cancellationToken);
+
+        persistedFragments.Add(new PrototypeDomMutationFragmentResult(projectId, fragmentPath, version));
+        shouldAssembleByProject.Add(projectId);
+        SetGroupSuccessResults(successfulIndexes, requests, orderedResults, fragmentPath, version);
+    }
+
+    private static void SetGroupSuccessResults(
+        List<int> successfulIndexes,
+        IReadOnlyList<PrototypeDomMutationRequest> requests,
+        PrototypeDomBatchMutationItemResult[] orderedResults,
+        string fragmentPath,
+        int version)
+    {
+        foreach (var successIndex in successfulIndexes)
+        {
+            orderedResults[successIndex] = new PrototypeDomBatchMutationItemResult(
+                NodeKey: requests[successIndex].NodeKey,
+                Success: true,
+                Message: "ok",
+                FragmentPath: fragmentPath,
+                Version: version);
+        }
+    }
+
+    private async Task<(string? Html, string? ContentType, string? Error)> LoadFragmentAsync(
+        Guid projectId, string fragmentPath, CancellationToken cancellationToken)
+    {
+        var fragmentArtefact = await _artefactRepository.GetByProjectAndFilePathAsync(
+            projectId, fragmentPath, cancellationToken);
+        if (fragmentArtefact is null)
+        {
+            return (null, null, "fragment not found");
+        }
+
+        var originalHtml = await _artefactStorageService.GetContentAsync(
+            fragmentArtefact.S3Key, cancellationToken);
+        if (string.IsNullOrWhiteSpace(originalHtml))
+        {
+            return (null, null, "fragment content missing");
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(fragmentArtefact.ContentType)
+            ? "text/html"
+            : fragmentArtefact.ContentType;
+
+        return (originalHtml, contentType, null);
+    }
+
+    private static List<int> ApplyMutationsToDocument(
+        List<(PrototypeDomMutationRequest Request, int Index)> items,
+        PrototypeDomBatchMutationItemResult[] orderedResults,
+        IDocument document,
+        string fragmentPath)
+    {
+        var successfulIndexes = new List<int>();
+        foreach (var item in items)
+        {
+            var targetElement = PrototypeDomMutationHelper.ResolveTargetElement(document, item.Request.NodeKey, fragmentPath);
+            if (targetElement is null)
             {
-                return idMatch;
-            }
-        }
-
-        try
-        {
-            return document.QuerySelector(stableLocator);
-        }
-        catch (Exception)
-        {
-            return null;
-        }
-    }
-
-    private static string? ApplyMutation(
-        IElement element,
-        PrototypeDomMutationOperation operation,
-        string? attribute,
-        string? value)
-    {
-        switch (operation)
-        {
-            case PrototypeDomMutationOperation.SetAttribute:
-                if (string.IsNullOrWhiteSpace(attribute))
-                {
-                    return "attribute is required for SetAttribute";
-                }
-
-                element.SetAttribute(attribute, value ?? string.Empty);
-                return null;
-
-            case PrototypeDomMutationOperation.SetText:
-                element.TextContent = value ?? string.Empty;
-                return null;
-
-            case PrototypeDomMutationOperation.AddClass:
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    return "value is required for AddClass";
-                }
-
-                element.ClassList.Add(value);
-                return null;
-
-            case PrototypeDomMutationOperation.RemoveClass:
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    return "value is required for RemoveClass";
-                }
-
-                element.ClassList.Remove(value);
-                return null;
-
-            case PrototypeDomMutationOperation.InsertAdjacentHtml:
-                if (string.IsNullOrWhiteSpace(attribute))
-                {
-                    return "position is required for InsertAdjacentHtml";
-                }
-
-                if (!TryParseInsertPosition(attribute, out var insertPosition))
-                {
-                    return "position must be one of: beforebegin, afterbegin, beforeend, afterend";
-                }
-
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    return "value is required for InsertAdjacentHtml";
-                }
-
-                element.Insert(insertPosition, value);
-                return null;
-
-            case PrototypeDomMutationOperation.RemoveElement:
-                element.Remove();
-                return null;
-
-            default:
-                return "unsupported operation";
-        }
-    }
-
-    private static bool TryParseInsertPosition(string position, out AdjacentPosition adjacentPosition)
-    {
-        if (position.Equals("beforebegin", StringComparison.OrdinalIgnoreCase))
-        {
-            adjacentPosition = AdjacentPosition.BeforeBegin;
-            return true;
-        }
-
-        if (position.Equals("afterbegin", StringComparison.OrdinalIgnoreCase))
-        {
-            adjacentPosition = AdjacentPosition.AfterBegin;
-            return true;
-        }
-
-        if (position.Equals("beforeend", StringComparison.OrdinalIgnoreCase))
-        {
-            adjacentPosition = AdjacentPosition.BeforeEnd;
-            return true;
-        }
-
-        if (position.Equals("afterend", StringComparison.OrdinalIgnoreCase))
-        {
-            adjacentPosition = AdjacentPosition.AfterEnd;
-            return true;
-        }
-
-        adjacentPosition = AdjacentPosition.BeforeEnd;
-        return false;
-    }
-
-    private static string ExtractStableLocator(string nodeKey, string fragmentPath)
-    {
-        if (string.IsNullOrWhiteSpace(nodeKey))
-        {
-            return string.Empty;
-        }
-
-        var separatorIndex = nodeKey.IndexOf('|', StringComparison.Ordinal);
-        if (separatorIndex < 0)
-        {
-            return nodeKey.Trim();
-        }
-
-        var nodeKeyFragmentPath = nodeKey[..separatorIndex];
-        if (!nodeKeyFragmentPath.Equals(fragmentPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return nodeKey[(separatorIndex + 1)..].Trim();
-        }
-
-        return nodeKey[(separatorIndex + 1)..].Trim();
-    }
-
-    private static string SerializeDocument(IDocument document, string originalHtml)
-    {
-        if (LooksLikeDocument(originalHtml))
-        {
-            var documentElement = document.DocumentElement?.OuterHtml ?? string.Empty;
-            var doctype = document.Doctype?.ToHtml();
-            if (string.IsNullOrWhiteSpace(doctype))
-            {
-                return documentElement;
-            }
-
-            return string.Concat(doctype, documentElement);
-        }
-
-        return document.Body?.InnerHtml ?? string.Empty;
-    }
-
-    private static bool LooksLikeDocument(string html)
-    {
-        var trimmed = html.TrimStart();
-        return trimmed.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) ||
-               trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string EscapeCssString(string value)
-    {
-        return value
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
-    }
-
-    private static string EscapeCssIdentifier(string value)
-    {
-        var builder = new StringBuilder(value.Length);
-        foreach (var character in value)
-        {
-            if (char.IsLetterOrDigit(character) || character is '-' or '_')
-            {
-                builder.Append(character);
+                orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
+                    NodeKey: item.Request.NodeKey, Success: false,
+                    Message: "target element not found", FragmentPath: fragmentPath, Version: null);
                 continue;
             }
 
-            builder.Append('\\');
-            builder.Append(character);
+            var applyError = PrototypeDomMutationHelper.ApplyMutation(
+                targetElement, item.Request.Operation, item.Request.Attribute, item.Request.Value);
+            if (applyError is not null)
+            {
+                orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
+                    NodeKey: item.Request.NodeKey, Success: false,
+                    Message: applyError, FragmentPath: fragmentPath, Version: null);
+                continue;
+            }
+
+            successfulIndexes.Add(item.Index);
         }
 
-        return builder.ToString();
+        return successfulIndexes;
     }
+
+    private async Task<int> PersistMutatedFragmentAsync(
+        Guid projectId, string fragmentPath, string serialisedHtml,
+        string contentType, string createdBy, CancellationToken cancellationToken)
+    {
+        var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+            projectId, fragmentPath, cancellationToken);
+        var storageKey = await _artefactStorageService.SaveContentAsync(
+            projectId, fragmentPath, nextVersion, serialisedHtml, contentType, cancellationToken);
+        var updatedArtefact = Artefact.CreateS3Artefact(
+            projectId, nextVersion, fragmentPath, storageKey, contentType,
+            Encoding.UTF8.GetByteCount(serialisedHtml), createdBy, _timeProvider, true);
+        await _artefactRepository.AddAsync(updatedArtefact, cancellationToken);
+        await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        await _artefactRepository.DeletePreviousVersionsAsync(
+            projectId, fragmentPath, nextVersion, cancellationToken);
+        return nextVersion;
+    }
+
+    private static void SetGroupFailureResults(
+        List<(PrototypeDomMutationRequest Request, int Index)> items,
+        PrototypeDomBatchMutationItemResult[] orderedResults,
+        string message, string? fragmentPath)
+    {
+        foreach (var item in items)
+        {
+            orderedResults[item.Index] = new PrototypeDomBatchMutationItemResult(
+                NodeKey: item.Request.NodeKey, Success: false,
+                Message: message, FragmentPath: fragmentPath, Version: null);
+        }
+    }
+
+    private static void SetGroupNoOpResults(
+        List<int> successfulIndexes,
+        IReadOnlyList<PrototypeDomMutationRequest> requests,
+        PrototypeDomBatchMutationItemResult[] orderedResults,
+        string fragmentPath)
+    {
+        foreach (var successIndex in successfulIndexes)
+        {
+            orderedResults[successIndex] = new PrototypeDomBatchMutationItemResult(
+                NodeKey: requests[successIndex].NodeKey, Success: true,
+                Message: "no-op", FragmentPath: fragmentPath, Version: null);
+        }
+    }
+
 }

@@ -25,7 +25,7 @@ public sealed class GenerateFromContextStrategy : IApplyToScopeStrategy
         if (matches.Count == 0)
             return [];
 
-        var snippetList = string.Join("\n", matches.Select((m, i) => $"{i + 1}. \"{m.TextSnippet}\""));
+        var snippetList = string.Join("\n", matches.Select((match, index) => $"{index + 1}. \"{match.TextSnippet}\""));
 
         var prompt = "You are generating accessible label values for UI elements.\n" +
             "For each element below, return a clean, descriptive value suitable for an aria-label or title attribute.\n" +
@@ -97,11 +97,9 @@ public sealed class GenerateFromContextStrategy : IApplyToScopeStrategy
     private static List<ApplyToScopeValueResult> BuildEmptyResults(
         IReadOnlyList<PrototypeDomSearchMatch> matches)
     {
-        return matches.Select(m => new ApplyToScopeValueResult(
-            NodeKey: m.NodeKey,
-            FragmentPath: m.FragmentPath,
+        return matches.Select(match => new ApplyToScopeValueResult(
+            NodeKey: match.NodeKey,
+            FragmentPath: match.FragmentPath,
             Value: string.Empty)).ToList();
     }
 }
-
-internal sealed record GeneratedScopeValue(string TextSnippet, string Value);

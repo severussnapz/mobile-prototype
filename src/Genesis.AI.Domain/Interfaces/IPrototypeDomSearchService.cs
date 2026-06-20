@@ -14,30 +14,3 @@ public interface IPrototypeDomSearchService
         PrototypeDomListRequest request,
         CancellationToken cancellationToken);
 }
-
-public sealed record PrototypeDomSearchRequest(
-    Guid ProjectId,
-    string FilePath,
-    string Query,
-    string CreatedBy);
-
-public sealed record PrototypeDomListRequest(
-    Guid ProjectId,
-    string Selector,
-    string? ScopeNodeId,
-    string CreatedBy);
-
-public sealed record PrototypeDomSearchResult(
-    IReadOnlyList<PrototypeDomSearchMatch> Matches,
-    bool Truncated,
-    int TotalMatches);
-
-public sealed record PrototypeDomSearchMatch(
-    string NodeKey,
-    string FragmentPath,
-    string TagName,
-    string TextSnippet,
-    string CssSelector,
-    IReadOnlyList<string> ClassList,
-    string ParentContext,
-    string SiblingContext);

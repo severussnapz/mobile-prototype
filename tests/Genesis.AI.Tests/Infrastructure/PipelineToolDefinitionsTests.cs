@@ -116,7 +116,7 @@ public class PipelineToolDefinitionsTests
     public void ApplyToScope_ToolDescription_ContainsStrategyInstructions()
     {
         var artefactToolBuilderType = typeof(PipelineToolDefinitions).Assembly
-            .GetType("Genesis.AI.Infrastructure.Services.ArtefactToolBuilder");
+            .GetType("Genesis.AI.Infrastructure.Services.PrototypeDomToolBuilder");
         Assert.NotNull(artefactToolBuilderType);
 
         var buildMethod = artefactToolBuilderType!.GetMethod(

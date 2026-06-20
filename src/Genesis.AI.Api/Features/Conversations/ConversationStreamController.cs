@@ -1593,20 +1593,20 @@ public class ConversationStreamController : ControllerBase
 
                 // Parse operation
                 if (!Enum.TryParse<PrototypeDomMutationOperation>(
-                    string.Concat(operation.Split('_').Select(w => char.ToUpperInvariant(w[0]) + w[1..])),
+                    string.Concat(operation.Split('_').Select(word => char.ToUpperInvariant(word[0]) + word[1..])),
                     out var mutationOperation))
                 {
                     return $"Error: apply_to_scope operation='{operation}' is not valid.";
                 }
 
                 // Apply mutations
-                var requests = valueResults.Select(v => new PrototypeDomMutationRequest(
+                var requests = valueResults.Select(valueResult => new PrototypeDomMutationRequest(
                     ProjectId: projectId,
-                    FragmentPath: v.FragmentPath,
-                    NodeKey: v.NodeKey,
+                    FragmentPath: valueResult.FragmentPath,
+                    NodeKey: valueResult.NodeKey,
                     Operation: mutationOperation,
                     Attribute: attribute,
-                    Value: v.Value,
+                    Value: valueResult.Value,
                     CreatedBy: createdBy)).ToList();
 
                 var batchResult = await _prototypeDomMutationService.ApplyBatchMutationAsync(requests, cancellationToken);
@@ -1619,8 +1619,8 @@ public class ConversationStreamController : ControllerBase
                     return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
 
                 var failures = batchResult.Results
-                    .Where(r => !r.Success)
-                    .Select(r => $"{r.NodeKey}: {r.Message}")
+                    .Where(result => !result.Success)
+                    .Select(result => $"{result.NodeKey}: {result.Message}")
                     .Take(5)
                     .ToList();
                 return $"PARTIAL FAILURE: applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations}. Failures: {string.Join("; ", failures)}";

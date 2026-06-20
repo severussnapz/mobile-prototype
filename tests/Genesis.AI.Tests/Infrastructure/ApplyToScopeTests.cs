@@ -6,35 +6,35 @@ namespace Genesis.AI.Tests.Infrastructure;
 public class ApplyToScopeTests
 {
     [Fact]
-    public void PipelineToolDefinitions_HasApplyToScopeConstant()
+    public void ApplyToScope_WhenConstantAccessed_ReturnsCorrectToolName()
     {
         Assert.Equal("apply_to_scope", PipelineToolDefinitions.ApplyToScope);
     }
 
     [Fact]
-    public void PipelineToolDefinitions_DoesNotHaveListElementsConstant()
+    public void PipelineToolDefinitions_WhenInspected_DoesNotExposeListElementsConstant()
     {
         var fields = typeof(PipelineToolDefinitions)
             .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-            .Select(f => f.Name)
+            .Select(field => field.Name)
             .ToList();
 
         Assert.DoesNotContain("ListElements", fields);
     }
 
     [Fact]
-    public void PipelineToolDefinitions_DoesNotHaveApplyBulkAttributesConstant()
+    public void PipelineToolDefinitions_WhenInspected_DoesNotExposeApplyBulkAttributesConstant()
     {
         var fields = typeof(PipelineToolDefinitions)
             .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-            .Select(f => f.Name)
+            .Select(field => field.Name)
             .ToList();
 
         Assert.DoesNotContain("ApplyBulkAttributes", fields);
     }
 
     [Fact]
-    public void GetTools_PrototypeWithDomModeEnabled_IncludesApplyToScope()
+    public void GetTools_WhenPrototypeWithDomModeEnabled_IncludesApplyToScope()
     {
         var options = new Genesis.AI.Infrastructure.Configuration.TokenOptimisationOptions
         {
@@ -43,13 +43,13 @@ public class ApplyToScopeTests
         };
 
         var tools = PipelineToolDefinitions.GetTools(options, Genesis.AI.Domain.Enums.StageType.Prototype);
-        var toolNames = tools.Select(t => t.Name).ToList();
+        var toolNames = tools.Select(tool => tool.Name).ToList();
 
         Assert.Contains("apply_to_scope", toolNames);
     }
 
     [Fact]
-    public void GetTools_PrototypeWithDomModeEnabled_DoesNotIncludeListElements()
+    public void GetTools_WhenPrototypeWithDomModeEnabled_ExcludesListElements()
     {
         var options = new Genesis.AI.Infrastructure.Configuration.TokenOptimisationOptions
         {
@@ -58,13 +58,13 @@ public class ApplyToScopeTests
         };
 
         var tools = PipelineToolDefinitions.GetTools(options, Genesis.AI.Domain.Enums.StageType.Prototype);
-        var toolNames = tools.Select(t => t.Name).ToList();
+        var toolNames = tools.Select(tool => tool.Name).ToList();
 
         Assert.DoesNotContain("list_elements", toolNames);
     }
 
     [Fact]
-    public void GetTools_PrototypeWithDomModeEnabled_DoesNotIncludeApplyBulkAttributes()
+    public void GetTools_WhenPrototypeWithDomModeEnabled_ExcludesApplyBulkAttributes()
     {
         var options = new Genesis.AI.Infrastructure.Configuration.TokenOptimisationOptions
         {
@@ -73,7 +73,7 @@ public class ApplyToScopeTests
         };
 
         var tools = PipelineToolDefinitions.GetTools(options, Genesis.AI.Domain.Enums.StageType.Prototype);
-        var toolNames = tools.Select(t => t.Name).ToList();
+        var toolNames = tools.Select(tool => tool.Name).ToList();
 
         Assert.DoesNotContain("apply_bulk_attributes", toolNames);
     }
