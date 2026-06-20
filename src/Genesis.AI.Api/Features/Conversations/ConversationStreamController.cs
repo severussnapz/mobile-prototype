@@ -42,6 +42,8 @@ public class ConversationStreamController : ControllerBase
     private readonly IActiveSkillsService _activeSkillsService;
     private readonly IFoundationService _foundationService;
     private readonly IPrototypeAssemblyService _prototypeAssemblyService;
+    private readonly IPrototypeDomSearchService? _prototypeDomSearchService;
+    private readonly IPrototypeDomMutationService? _prototypeDomMutationService;
     private readonly TokenOptimisationOptions _tokenOptimisationOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConversationStreamController> _logger;
@@ -58,7 +60,9 @@ public class ConversationStreamController : ControllerBase
         IPrototypeAssemblyService prototypeAssemblyService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
         TimeProvider timeProvider,
-        ILogger<ConversationStreamController> logger)
+        ILogger<ConversationStreamController> logger,
+        IPrototypeDomSearchService? prototypeDomSearchService = null,
+        IPrototypeDomMutationService? prototypeDomMutationService = null)
     {
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
@@ -69,6 +73,8 @@ public class ConversationStreamController : ControllerBase
         _activeSkillsService = activeSkillsService ?? throw new ArgumentNullException(nameof(activeSkillsService));
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
         _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
+        _prototypeDomSearchService = prototypeDomSearchService;
+        _prototypeDomMutationService = prototypeDomMutationService;
         _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -1529,6 +1535,92 @@ public class ConversationStreamController : ControllerBase
                 }
 
                 return $"Edited {filePath} (version {nextVersion}, {bytesChanged} bytes changed, total {System.Text.Encoding.UTF8.GetByteCount(updatedContent)} bytes)";
+            }
+
+
+            case PipelineToolDefinitions.ApplyToScope:
+            {
+                if (!_tokenOptimisationOptions.PrototypeDomModeEnabled || _prototypeDomSearchService is null || _prototypeDomMutationService is null)
+                    return "Error: apply_to_scope is only available when PrototypeDomModeEnabled is enabled.";
+
+                var scope = root.TryGetProperty("scope", out var scopeProp) ? scopeProp.GetString() : null;
+                var selector = root.TryGetProperty("selector", out var selectorProp) ? selectorProp.GetString() : null;
+                var operation = root.TryGetProperty("operation", out var operationProp) ? operationProp.GetString() : null;
+                var strategy = root.TryGetProperty("strategy", out var strategyProp) ? strategyProp.GetString() : null;
+                var value = root.TryGetProperty("value", out var valueProp) ? valueProp.GetString() : null;
+                var attribute = root.TryGetProperty("attribute", out var attrProp) ? attrProp.GetString() : null;
+
+                if (string.IsNullOrWhiteSpace(scope) || string.IsNullOrWhiteSpace(selector) ||
+                    string.IsNullOrWhiteSpace(operation) || string.IsNullOrWhiteSpace(strategy))
+                    return "Error: apply_to_scope requires scope, selector, operation, and strategy.";
+
+                // Resolve scope to a node_id by searching for the scope identifier
+                var scopeSearchResult = await _prototypeDomSearchService.SearchAsync(
+                    new PrototypeDomSearchRequest(projectId, "prototype/index.html", scope, createdBy),
+                    cancellationToken);
+
+                var scopeNodeId = scopeSearchResult.Matches.Count > 0 ? scopeSearchResult.Matches[0].NodeKey : null;
+
+                // List all matching elements within scope
+                var listResult = await _prototypeDomSearchService.ListAllAsync(
+                    new PrototypeDomListRequest(projectId, selector, scopeNodeId, createdBy),
+                    cancellationToken);
+
+                if (listResult.Matches.Count == 0)
+                {
+                    _logger.LogWarning("apply_to_scope: no elements matched selector='{Selector}' scope='{Scope}'", selector, scope);
+                    return $"apply_to_scope: no elements found matching selector='{selector}' in scope='{scope}'. Verify the selector and scope are correct.";
+                }
+
+                // Derive values using the selected strategy
+                IReadOnlyList<ApplyToScopeValueResult> valueResults;
+                switch (strategy)
+                {
+                    case "literal":
+                        if (string.IsNullOrWhiteSpace(value))
+                            return "Error: apply_to_scope with strategy=literal requires a value parameter.";
+                        valueResults = await new LiteralStrategy().DeriveValuesAsync(listResult.Matches, value, cancellationToken);
+                        break;
+                    case "derive_from_text_content":
+                        valueResults = await new DeriveFromTextContentStrategy().DeriveValuesAsync(listResult.Matches, null, cancellationToken);
+                        break;
+                    default:
+                        return $"Error: apply_to_scope strategy='{strategy}' is not yet implemented. Use literal or derive_from_text_content.";
+                }
+
+                // Parse operation
+                if (!Enum.TryParse<PrototypeDomMutationOperation>(
+                    string.Concat(operation.Split('_').Select(w => char.ToUpperInvariant(w[0]) + w[1..])),
+                    out var mutationOperation))
+                {
+                    return $"Error: apply_to_scope operation='{operation}' is not valid.";
+                }
+
+                // Apply mutations
+                var requests = valueResults.Select(v => new PrototypeDomMutationRequest(
+                    ProjectId: projectId,
+                    FragmentPath: v.FragmentPath,
+                    NodeKey: v.NodeKey,
+                    Operation: mutationOperation,
+                    Attribute: attribute,
+                    Value: v.Value,
+                    CreatedBy: createdBy)).ToList();
+
+                var batchResult = await _prototypeDomMutationService.ApplyBatchMutationAsync(requests, cancellationToken);
+
+                _logger.LogInformation(
+                    "apply_to_scope: scope='{Scope}' selector='{Selector}' operation='{Operation}' strategy='{Strategy}' — applied {Success}/{Total}",
+                    scope, selector, operation, strategy, batchResult.SuccessfulMutations, batchResult.TotalMutations);
+
+                if (batchResult.SuccessfulMutations == batchResult.TotalMutations)
+                    return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
+
+                var failures = batchResult.Results
+                    .Where(r => !r.Success)
+                    .Select(r => $"{r.NodeKey}: {r.Message}")
+                    .Take(5)
+                    .ToList();
+                return $"PARTIAL FAILURE: applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations}. Failures: {string.Join("; ", failures)}";
             }
 
             default:
