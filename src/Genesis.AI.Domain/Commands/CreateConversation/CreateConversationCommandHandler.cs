@@ -12,17 +12,20 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
     private readonly IProjectRepository _projectRepository;
     private readonly IPromptService _promptService;
     private readonly TimeProvider _timeProvider;
+    private readonly IPrototypeLockRepository? _prototypeLockRepository;
 
     public CreateConversationCommandHandler(
         IConversationRepository conversationRepository,
         IProjectRepository projectRepository,
         IPromptService promptService,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IPrototypeLockRepository? prototypeLockRepository = null)
     {
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _prototypeLockRepository = prototypeLockRepository;
     }
 
     public async Task<Guid> Handle(CreateConversationCommand request, CancellationToken cancellationToken)
@@ -158,9 +161,19 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
         CancellationToken cancellationToken)
     {
         if (stage.Status == PipelineStageStatus.NotStarted)
+        {
             stage.Start(_timeProvider);
+        }
         else
+        {
             stage.Reopen(_timeProvider);
+
+            // Reopening Prototype explicitly starts a fresh lock cycle.
+            if (stage.StageType == StageType.Prototype && _prototypeLockRepository is not null)
+            {
+                await _prototypeLockRepository.ClearByStageIdAsync(stage.Id, cancellationToken);
+            }
+        }
 
         project.RecalculateStatus(_timeProvider);
         await _projectRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
@@ -229,32 +242,24 @@ public class CreateConversationCommandHandler : IRequestHandler<CreateConversati
         RequireStageComplete(project, StageType.Architecture, target);
         RequireStageComplete(project, StageType.Design, target);
         RequireStageComplete(project, StageType.Pxd, target);
-        RequireStageCompleteOrBlocked(project, StageType.ClinicalSafety, target);
-    }
 
-    private static void RequireStageComplete(Project project, StageType prerequisite, StageType target)
-    {
-        var prerequisiteStage = project.PipelineStages
-            .FirstOrDefault(stage => stage.StageType == prerequisite);
-
-        if (prerequisiteStage is null || prerequisiteStage.Status != PipelineStageStatus.Complete)
+        var clinicalSafetyStage = project.PipelineStages.FirstOrDefault(stage => stage.StageType == StageType.ClinicalSafety);
+        if (clinicalSafetyStage is not null &&
+            clinicalSafetyStage.Status != PipelineStageStatus.Complete &&
+            clinicalSafetyStage.Status != PipelineStageStatus.Blocked)
         {
             throw new InvalidOperationException(
-                $"Cannot start stage '{target}' because '{prerequisite}' is not yet complete.");
+                $"Cannot start '{target}'. Prerequisite stage '{StageType.ClinicalSafety}' must be complete.");
         }
     }
 
-    private static void RequireStageCompleteOrBlocked(Project project, StageType prerequisite, StageType target)
+    private static void RequireStageComplete(Project project, StageType requiredStageType, StageType target)
     {
-        var prerequisiteStage = project.PipelineStages
-            .FirstOrDefault(stage => stage.StageType == prerequisite);
-
-        if (prerequisiteStage is null ||
-            (prerequisiteStage.Status != PipelineStageStatus.Complete &&
-             prerequisiteStage.Status != PipelineStageStatus.Blocked))
+        var requiredStage = project.PipelineStages.FirstOrDefault(stage => stage.StageType == requiredStageType);
+        if (requiredStage?.Status != PipelineStageStatus.Complete)
         {
             throw new InvalidOperationException(
-                $"Cannot start stage '{target}' because '{prerequisite}' is not yet complete.");
+                $"Cannot start '{target}'. Prerequisite stage '{requiredStageType}' must be complete.");
         }
     }
 }

@@ -124,8 +124,7 @@ public sealed class ApproveEmReviewCommandHandler
             newStorageKey,
             JsonContentType,
             payload.Length,
-            userId,
-            _timeProvider);
+            userId, _timeProvider, true);
 
         await _artefactRepository.AddAsync(artefact, cancellationToken);
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

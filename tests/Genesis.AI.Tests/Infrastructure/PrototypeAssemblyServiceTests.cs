@@ -35,7 +35,7 @@ public class PrototypeAssemblyServiceTests
     private Artefact CreateArtefact(Guid projectId, string filePath, string content)
     {
         var key = $"projects/{projectId}/{filePath}";
-        var artefact = Artefact.CreateS3Artefact(projectId, 1, filePath, key, "text/html", content.Length, "test", _timeProvider);
+        var artefact = Artefact.CreateS3Artefact(projectId, 1, filePath, key, "text/html", content.Length, "test", _timeProvider, true);
 
         _artefactStorageServiceMock
             .Setup(storage => storage.GetContentAsync(key, It.IsAny<CancellationToken>()))

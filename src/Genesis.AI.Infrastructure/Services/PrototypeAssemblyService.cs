@@ -113,6 +113,8 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
         return allArtefacts
             .Where(artefact => artefact.FilePath.StartsWith(FragmentPrefix, StringComparison.OrdinalIgnoreCase)
                 && System.IO.Path.GetFileName(artefact.FilePath).StartsWith("screen-", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(artefact => artefact.FilePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(artefact => artefact.Version).First())
             .OrderBy(artefact => ExtractScreenNumber(artefact.FilePath))
             .ToList();
     }
@@ -122,11 +124,16 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
         int screenCount,
         CancellationToken cancellationToken)
     {
-        var stylesArtefact = allArtefacts.FirstOrDefault(artefact =>
+        var latestByFilePath = allArtefacts
+            .GroupBy(artefact => artefact.FilePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(artefact => artefact.Version).First())
+            .ToList();
+
+        var stylesArtefact = latestByFilePath.FirstOrDefault(artefact =>
             artefact.FilePath.Equals(StylesPath, StringComparison.OrdinalIgnoreCase));
-        var appArtefact = allArtefacts.FirstOrDefault(artefact =>
+        var appArtefact = latestByFilePath.FirstOrDefault(artefact =>
             artefact.FilePath.Equals(AppPath, StringComparison.OrdinalIgnoreCase));
-        var dataArtefact = allArtefacts.FirstOrDefault(artefact =>
+        var dataArtefact = latestByFilePath.FirstOrDefault(artefact =>
             artefact.FilePath.Equals(DataPath, StringComparison.OrdinalIgnoreCase));
 
         if (screenCount > 0 && (stylesArtefact is null || appArtefact is null || dataArtefact is null))
@@ -195,7 +202,7 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
 
     private static string? ValidateAssembledOutput(string html)
     {
-        if (!html.Contains("<script id=\"prototype-metadata\" type=\"application/json\">", StringComparison.OrdinalIgnoreCase))
+        if (!html.Contains("id=\"prototype-metadata\"", StringComparison.OrdinalIgnoreCase))
             return "Missing prototype-metadata script block";
 
         if (!html.Contains(PrototypeBanner, StringComparison.Ordinal))
@@ -264,13 +271,10 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
             storageKey,
             "text/html",
             System.Text.Encoding.UTF8.GetByteCount(assembled),
-            "system-assembly",
-            _timeProvider);
+            "system-assembly", _timeProvider, true);
 
         await _artefactRepository.AddAsync(outputArtefact, cancellationToken);
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
-        await _artefactRepository.DeletePreviousVersionsAsync(
-            projectId, OutputPath, nextVersion, cancellationToken);
 
         _logger.LogInformation(
             "PrototypeAssembly: assembled {OutputPath} v{Version} ({Screens} screens, {Bytes} bytes)",

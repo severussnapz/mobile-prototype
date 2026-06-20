@@ -126,8 +126,7 @@ public sealed class RunLocalNormaliserCommandHandler
             storageKey,
             JsonContentType,
             payload.Length,
-            request.UserId,
-            _timeProvider);
+            request.UserId, _timeProvider, true);
 
         await _artefactRepository.AddAsync(artefact, cancellationToken);
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

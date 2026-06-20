@@ -59,7 +59,7 @@ public class GenerateSecurityReviewReportCommandHandlerTests
             "application/json",
             100,
             "user-1",
-            _timeProvider);
+            _timeProvider, true);
     }
 
     private Artefact CreateSdpEvidenceArtefact(Guid projectId)
@@ -72,7 +72,7 @@ public class GenerateSecurityReviewReportCommandHandlerTests
             "application/json",
             100,
             "user-1",
-            _timeProvider);
+            _timeProvider, true);
     }
 
     [Fact]

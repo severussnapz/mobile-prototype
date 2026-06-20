@@ -6,6 +6,7 @@ public class Artefact : Entity, IAggregateRoot
 {
     public Guid ProjectId { get; private set; }
     public int Version { get; private set; }
+    public bool IsPublished { get; private set; }
     public string FilePath { get; private set; } = null!;
     public string S3Key { get; private set; } = null!;
     public string ContentType { get; private set; } = null!;
@@ -27,7 +28,8 @@ public class Artefact : Entity, IAggregateRoot
         string contentType,
         long sizeBytes,
         string createdBy,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        bool isPublished)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(s3Key);
@@ -37,6 +39,7 @@ public class Artefact : Entity, IAggregateRoot
             Id = Guid.NewGuid(),
             ProjectId = projectId,
             Version = version,
+            IsPublished = isPublished,
             FilePath = filePath,
             S3Key = s3Key,
             ContentType = contentType,
@@ -68,5 +71,16 @@ public class Artefact : Entity, IAggregateRoot
         SizeBytes = sizeBytes;
         CreatedBy = updatedBy;
         CreatedAt = timeProvider.GetUtcNow();
+    }
+
+    public bool PromoteToPublished()
+    {
+        if (IsPublished)
+        {
+            return false;
+        }
+
+        IsPublished = true;
+        return true;
     }
 }

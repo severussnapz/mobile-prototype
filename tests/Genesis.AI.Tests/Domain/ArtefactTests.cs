@@ -18,8 +18,7 @@ public class ArtefactTests
             "projects/abc/artefacts/requirements/REQ-001.md/v2",
             "text/markdown",
             1024,
-            "user-1",
-            _timeProvider);
+            "user-1", _timeProvider, true);
 
         Assert.NotEqual(Guid.Empty, artefact.Id);
         Assert.Equal(projectId, artefact.ProjectId);
@@ -35,7 +34,7 @@ public class ArtefactTests
     public void CreateS3Artefact_WhenCalled_SetsCreatedAtTimestamp()
     {
         var artefact = Artefact.CreateS3Artefact(
-            Guid.NewGuid(), 1, "manifest.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider);
+            Guid.NewGuid(), 1, "manifest.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider, true);
 
         Assert.True(artefact.CreatedAt <= DateTimeOffset.UtcNow);
         Assert.True(artefact.CreatedAt > DateTimeOffset.UtcNow.AddMinutes(-1));
@@ -47,14 +46,14 @@ public class ArtefactTests
     public void CreateS3Artefact_WithBlankFilePath_ThrowsArgumentException(string filePath)
     {
         Assert.Throws<ArgumentException>(() => Artefact.CreateS3Artefact(
-            Guid.NewGuid(), 1, filePath, "s3-key", "text/markdown", 10, "user-1", _timeProvider));
+            Guid.NewGuid(), 1, filePath, "s3-key", "text/markdown", 10, "user-1", _timeProvider, true));
     }
 
     [Fact]
     public void CreateS3Artefact_WithNullFilePath_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>(() => Artefact.CreateS3Artefact(
-            Guid.NewGuid(), 1, null!, "s3-key", "text/markdown", 10, "user-1", _timeProvider));
+            Guid.NewGuid(), 1, null!, "s3-key", "text/markdown", 10, "user-1", _timeProvider, true));
     }
 
     [Theory]
@@ -63,13 +62,37 @@ public class ArtefactTests
     public void CreateS3Artefact_WithBlankS3Key_ThrowsArgumentException(string s3Key)
     {
         Assert.Throws<ArgumentException>(() => Artefact.CreateS3Artefact(
-            Guid.NewGuid(), 1, "manifest.md", s3Key, "text/markdown", 10, "user-1", _timeProvider));
+            Guid.NewGuid(), 1, "manifest.md", s3Key, "text/markdown", 10, "user-1", _timeProvider, true));
     }
 
     [Fact]
     public void CreateS3Artefact_WithNullS3Key_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>(() => Artefact.CreateS3Artefact(
-            Guid.NewGuid(), 1, "manifest.md", null!, "text/markdown", 10, "user-1", _timeProvider));
+            Guid.NewGuid(), 1, "manifest.md", null!, "text/markdown", 10, "user-1", _timeProvider, true));
+    }
+
+    [Fact]
+    public void PromoteToPublished_WhenDraft_FlipsToPublishedAndReturnsTrue()
+    {
+        var artefact = Artefact.CreateS3Artefact(
+            Guid.NewGuid(), 1, "prototype/fragments/screen-01.html", "s3-key", "text/html", 10, "user-1", _timeProvider, false);
+
+        var promoted = artefact.PromoteToPublished();
+
+        Assert.True(promoted);
+        Assert.True(artefact.IsPublished);
+    }
+
+    [Fact]
+    public void PromoteToPublished_WhenAlreadyPublished_ReturnsFalseAndStaysPublished()
+    {
+        var artefact = Artefact.CreateS3Artefact(
+            Guid.NewGuid(), 1, "requirements/REQ-001.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider, true);
+
+        var promoted = artefact.PromoteToPublished();
+
+        Assert.False(promoted);
+        Assert.True(artefact.IsPublished);
     }
 }

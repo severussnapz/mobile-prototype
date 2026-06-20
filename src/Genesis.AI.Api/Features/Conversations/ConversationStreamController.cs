@@ -1048,7 +1048,8 @@ public class ConversationStreamController : ControllerBase
                     contentType,
                     System.Text.Encoding.UTF8.GetByteCount(content),
                     createdBy,
-                    _timeProvider);
+                    _timeProvider,
+                    true);
 
                 // Save new version first, then delete old ones
                 await _artefactRepository.AddAsync(artefact, cancellationToken);
@@ -1506,7 +1507,8 @@ public class ConversationStreamController : ControllerBase
                     contentType,
                     System.Text.Encoding.UTF8.GetByteCount(updatedContent),
                     createdBy,
-                    _timeProvider);
+                    _timeProvider,
+                    true);
 
                 await _artefactRepository.AddAsync(editedArtefact, cancellationToken);
                 await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
@@ -2149,7 +2151,8 @@ public class ConversationStreamController : ControllerBase
             contentType,
             Encoding.UTF8.GetByteCount(content),
             createdBy,
-            _timeProvider);
+            _timeProvider,
+            true);
 
         await _artefactRepository.AddAsync(artefact, cancellationToken);
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

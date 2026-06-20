@@ -34,7 +34,7 @@ public class PlanningQueryHandlerTests
     private Artefact CreateArtefact(Guid projectId, string filePath)
     {
         return Artefact.CreateS3Artefact(
-            projectId, 1, filePath, $"s3-{filePath}", "application/json", 10, "user-1", _timeProvider);
+            projectId, 1, filePath, $"s3-{filePath}", "application/json", 10, "user-1", _timeProvider, true);
     }
 
     // ========================================================================

@@ -63,7 +63,7 @@ public class GenerateHazardLogCommandHandlerTests
     private Artefact CreateRegistryArtefact(Guid projectId)
     {
         return Artefact.CreateS3Artefact(
-            projectId, 1, RegistryFilePath, "s3-registry-key", "text/markdown", 100, "user-1", _timeProvider);
+            projectId, 1, RegistryFilePath, "s3-registry-key", "text/markdown", 100, "user-1", _timeProvider, true);
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class GenerateHazardLogCommandHandlerTests
         var existing = Artefact.CreateS3Artefact(
             project.Id, 9, hazardLogPath, "s3-hazard-log-key-v9",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            10, "user-0", _timeProvider);
+            10, "user-0", _timeProvider, true);
 
         _projectRepositoryMock
             .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
