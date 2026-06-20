@@ -1,5 +1,6 @@
 using Genesis.AI.Core.Data;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
+using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectDecisionAggregate;
@@ -29,6 +30,7 @@ public sealed class GenesisAiDbContext(
     public DbSet<ProjectDecision> ProjectDecisions { get; set; }
     public DbSet<UiDelta> UiDeltas { get; set; }
     public DbSet<PrototypeLock> PrototypeLocks { get; set; }
+    public DbSet<RequirementChange> RequirementChanges => Set<RequirementChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
