@@ -37,6 +37,8 @@ public interface IArtefactRepository
     /// </summary>
     Task<Artefact?> GetByProjectAndFilePathAsync(Guid projectId, string filePath, CancellationToken cancellationToken);
 
+    Task<Artefact?> GetPreviousVersionAsync(Guid projectId, string filePath, CancellationToken cancellationToken);
+
     /// <summary>
     /// Gets a single draft artefact by project ID and file path (latest draft version).
     /// Used by prototype graph-node editing staged writes.

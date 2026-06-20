@@ -156,4 +156,18 @@ public class ArtefactRepository : IArtefactRepository
             .OrderByDescending(artefact => artefact.Version)
             .ToListAsync(cancellationToken);
     }
+    public async Task<Artefact?> GetPreviousVersionAsync(
+        Guid projectId,
+        string filePath,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Artefacts
+            .Where(artefact => artefact.ProjectId == projectId &&
+                               artefact.FilePath == filePath)
+            .OrderByDescending(artefact => artefact.Version)
+            .Skip(1)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+
 }
