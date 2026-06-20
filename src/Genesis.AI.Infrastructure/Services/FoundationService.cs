@@ -106,33 +106,166 @@ public sealed class FoundationService : IFoundationService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var content = await _artefactStorageService.GetContentAsync(
-                artefact.S3Key, cancellationToken);
-
+            var content = await LoadFoundationArtefactContentAsync(artefact, cancellationToken);
             if (content is null)
             {
-                _logger.LogWarning(
-                    "Foundation artefact {FilePath} (v{Version}) not found in storage — skipping",
-                    artefact.FilePath, artefact.Version);
                 continue;
             }
 
-            // SEC-003: log only path and character length — never content
-            _logger.LogDebug(
-                "Loaded foundation artefact {FilePath} (v{Version}): {CharCount} chars",
-                artefact.FilePath, artefact.Version, content.Length);
+            AppendFoundationArtefactSection(builder, artefact, content, out var appendedChars);
+            totalChars += appendedChars;
 
-            builder.AppendLine(System.Globalization.CultureInfo.InvariantCulture, $"### {artefact.FilePath} (v{artefact.Version})");
-            builder.AppendLine();
-            builder.AppendLine(content);
-            builder.AppendLine();
-            builder.AppendLine("---");
-            builder.AppendLine();
-
-            totalChars += content.Length;
             loadedCount++;
         }
 
         return (loadedCount, totalChars);
+    }
+
+    private async Task<string?> LoadFoundationArtefactContentAsync(
+        Artefact artefact,
+        CancellationToken cancellationToken)
+    {
+        var content = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
+        if (content is null)
+        {
+            _logger.LogWarning(
+                "Foundation artefact {FilePath} (v{Version}) not found in storage — skipping",
+                artefact.FilePath,
+                artefact.Version);
+            return null;
+        }
+
+        // SEC-003: log only path and character length — never content
+        _logger.LogDebug(
+            "Loaded foundation artefact {FilePath} (v{Version}): {CharCount} chars",
+            artefact.FilePath,
+            artefact.Version,
+            content.Length);
+
+        return content;
+    }
+
+    private static void AppendFoundationArtefactSection(
+        StringBuilder builder,
+        Artefact artefact,
+        string content,
+        out int appendedChars)
+    {
+        builder.AppendLine(System.Globalization.CultureInfo.InvariantCulture, $"### {artefact.FilePath} (v{artefact.Version})");
+        builder.AppendLine();
+
+        var sectionContent = BuildCachedSectionContent(content, artefact.FilePath, out appendedChars);
+        builder.AppendLine(sectionContent);
+        builder.AppendLine();
+        builder.AppendLine("---");
+        builder.AppendLine();
+    }
+
+    private static string BuildCachedSectionContent(string content, string filePath, out int appendedChars)
+    {
+        const int largeFileThreshold = 50_000; // 50KB threshold — use outline for larger files
+        if (content.Length <= largeFileThreshold)
+        {
+            appendedChars = content.Length;
+            return content;
+        }
+
+        var outline = BuildFileOutline(content, filePath);
+        appendedChars = outline.Length;
+        return "**OUTLINE** (file too large for full caching — use `get_artefact` for full content):\n\n" + outline;
+    }
+
+    /// <summary>
+    /// Builds a structural outline for large files (50KB+) to reduce cache write cost.
+    /// Extracts CSS variables, selectors, HTML elements, and section comments.
+    /// </summary>
+    private static string BuildFileOutline(string content, string filePath)
+    {
+        var sb = new System.Text.StringBuilder();
+        var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+        if (ext is not ".html" and not ".htm" and not ".css")
+        {
+            return BuildNonHtmlOutline(content);
+        }
+
+        AppendCssCustomProperties(sb, content);
+        AppendCssSelectors(sb, content);
+        AppendHtmlElements(sb, content);
+
+        return sb.ToString();
+    }
+
+    private static string BuildNonHtmlOutline(string content)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("(First 1000 chars only)");
+        sb.AppendLine(content.Length > 1000 ? content[..1000] + "\n[...truncated...]" : content);
+        return sb.ToString();
+    }
+
+    private static void AppendCssCustomProperties(StringBuilder sb, string content)
+    {
+        sb.AppendLine("#### CSS Custom Properties");
+        var rootMatch = System.Text.RegularExpressions.Regex.Match(
+            content,
+            @":root\s*\{([^}]+)\}",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        if (!rootMatch.Success)
+        {
+            sb.AppendLine("(none)");
+            sb.AppendLine();
+            return;
+        }
+
+        var properties = System.Text.RegularExpressions.Regex.Matches(rootMatch.Groups[1].Value, @"--[\w-]+");
+        foreach (System.Text.RegularExpressions.Match property in properties)
+        {
+            sb.Append("- ").AppendLine(property.Value);
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void AppendCssSelectors(StringBuilder sb, string content)
+    {
+        sb.AppendLine("#### CSS Selectors");
+        var selectorMatches = System.Text.RegularExpressions.Regex.Matches(
+            content,
+            @"(?:^|\})\s*((?:[.#][\w-]+(?:\s+[.#>+~]?[\w-]+)*(?::[:\w-]+)?(?:\s*,\s*)?)+)\s*\{",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        var seenSelectors = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+        foreach (System.Text.RegularExpressions.Match selectorMatch in selectorMatches)
+        {
+            var selector = selectorMatch.Groups[1].Value.Trim();
+            if (selector.Length > 0 && seenSelectors.Add(selector))
+            {
+                sb.Append("- ").AppendLine(selector);
+            }
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void AppendHtmlElements(StringBuilder sb, string content)
+    {
+        sb.AppendLine("#### HTML Elements (id/class)");
+        var elementMatches = System.Text.RegularExpressions.Regex.Matches(
+            content,
+            @"<(?:div|nav|main|section|article|aside|header|footer)\s+(?:id=[""']([^""']+)[""']|class=[""']([^""']+)[""'])+",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        var foundElements = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+        foreach (System.Text.RegularExpressions.Match elementMatch in elementMatches)
+        {
+            var id = elementMatch.Groups[1].Value;
+            var className = elementMatch.Groups[2].Value;
+            var key = string.IsNullOrEmpty(id) ? $".{className}" : $"#{id}";
+            if (foundElements.Add(key))
+            {
+                sb.Append("- ").AppendLine(key);
+            }
+        }
     }
 }

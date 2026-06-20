@@ -6,6 +6,7 @@ using Genesis.AI.Domain.Commands.AdvancePhase;
 using Genesis.AI.Domain.Commands.ReopenParkingLotItem;
 using Genesis.AI.Domain.Commands.ResolveParkingLotItem;
 using Genesis.AI.Domain.Commands.SetPhase;
+using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.Queries.GetConversationProgress;
 using Genesis.AI.Domain.Queries.GetParkingLot;
 using MediatR;
@@ -23,10 +24,17 @@ namespace Genesis.AI.Api.Features.Conversations;
 public class ConversationStateController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IConversationRepository _conversationRepository;
+    private readonly IRequirementsFeedbackLoopService _requirementsFeedbackLoopService;
 
-    public ConversationStateController(IMediator mediator)
+    public ConversationStateController(
+        IMediator mediator,
+        IConversationRepository conversationRepository,
+        IRequirementsFeedbackLoopService requirementsFeedbackLoopService)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+        _requirementsFeedbackLoopService = requirementsFeedbackLoopService ?? throw new ArgumentNullException(nameof(requirementsFeedbackLoopService));
     }
 
     // --- Phase Management ---
@@ -86,6 +94,68 @@ public class ConversationStateController : ControllerBase
         return Ok(new ApiResponse<PhaseResponse>
         {
             Data = new PhaseResponse { Phase = result.Phase, PhaseName = result.PhaseName }
+        });
+    }
+
+    /// <summary>
+    /// Explicitly locks prototype edits for a requirement and appends substantive deltas to the requirement artefact.
+    /// </summary>
+    [HttpPost("prototype-lock")]
+    public async Task<IActionResult> LockPrototype(
+        Guid conversationId,
+        [FromBody] LockPrototypeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await _conversationRepository.GetByIdWithMessagesAsync(conversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return NotFound();
+        }
+
+        var stageType = await _conversationRepository.GetStageTypeByStageIdAsync(conversation.StageId, cancellationToken);
+        if (stageType != Domain.Enums.StageType.Prototype)
+        {
+            return BadRequest(ApiErrorResponse.Create("400", "Prototype lock is only valid for Prototype stage conversations."));
+        }
+
+        var projectContext = await _conversationRepository.GetProjectContextByStageIdAsync(conversation.StageId, cancellationToken);
+        if (projectContext is null)
+        {
+            return NotFound();
+        }
+
+        var requirementId = string.IsNullOrWhiteSpace(request.RequirementId)
+            ? conversation.RequirementId
+            : request.RequirementId.Trim();
+
+        if (string.IsNullOrWhiteSpace(requirementId))
+        {
+            return BadRequest(ApiErrorResponse.Create("400", "RequirementId is required for prototype lock."));
+        }
+
+        var requirementFilePath = string.IsNullOrWhiteSpace(request.RequirementFilePath)
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"requirements/{requirementId}.md")
+            : request.RequirementFilePath.Trim();
+
+        var lockedBy = User.GetUserErn() ?? User.FindFirst("sub")?.Value ?? "system";
+
+        var result = await _requirementsFeedbackLoopService.LockPrototypeAsync(
+            projectContext.ProjectId,
+            requirementId,
+            requirementFilePath,
+            lockedBy,
+            cancellationToken);
+
+        return Ok(new ApiResponse<PrototypeLockResponse>
+        {
+            Data = new PrototypeLockResponse
+            {
+                Success = result.Success,
+                Message = result.Message,
+                AppendedDeltaCount = result.AppendedDeltaCount,
+                LockedAt = result.LockedAt,
+                LockBatchId = result.LockBatchId
+            }
         });
     }
 

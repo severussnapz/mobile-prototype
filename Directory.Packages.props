@@ -41,6 +41,9 @@
     <!-- JSON:API -->
     <PackageVersion Include="Emis.JsonApi" Version="3.0.0" />
 
+    <!-- HTML DOM parsing -->
+    <PackageVersion Include="AngleSharp" Version="1.3.0" />
+
     <!-- Testing -->
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.1" />

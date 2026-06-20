@@ -43,9 +43,12 @@ public static class DependencyInjection
     {
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IMessageFeedbackRepository, MessageFeedbackRepository>();
         services.AddScoped<IArtefactRepository, ArtefactRepository>();
         services.AddScoped<IProjectNoteRepository, ProjectNoteRepository>();
         services.AddScoped<IProjectDecisionRepository, ProjectDecisionRepository>();
+        services.AddScoped<IUiDeltaRepository, UiDeltaRepository>();
+        services.AddScoped<IPrototypeLockRepository, PrototypeLockRepository>();
     }
 
     private static void AddPipelineServices(IServiceCollection services)
@@ -71,6 +74,14 @@ public static class DependencyInjection
         services.AddScoped<IPlanningGateService, PlanningGateService>();
         services.AddScoped<IFoundationService, FoundationService>();
         services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
+        services.AddScoped<IPrototypeDomSearchService, PrototypeDomSearchService>();
+        services.AddScoped<IPrototypeDomMutationService, PrototypeDomMutationService>();
+        services.AddScoped<StructuralEditDraftService>();
+        services.AddScoped<IStructuralEditReorderService, StructuralEditReorderService>();
+        services.AddScoped<IStructuralEditMutationService, StructuralEditMutationService>();
+        services.AddScoped<IStructuralEditService, StructuralEditService>();
+        services.AddScoped<IRequirementImpactClassifier, RequirementImpactClassifier>();
+        services.AddScoped<IRequirementsFeedbackLoopService, RequirementsFeedbackLoopService>();
     }
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
@@ -96,6 +107,7 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<ParkingLotStatus>("parking_lot_status");
                 npgsqlOptions.MapEnum<MessageRole>("message_role");
                 npgsqlOptions.MapEnum<OrchestrationMode>("orchestration_mode");
+                npgsqlOptions.MapEnum<RequirementImpact>("requirement_impact");
             }));
     }
 
@@ -110,6 +122,7 @@ public static class DependencyInjection
         dataSourceBuilder.MapEnum<ParkingLotStatus>("parking_lot_status");
         dataSourceBuilder.MapEnum<MessageRole>("message_role");
         dataSourceBuilder.MapEnum<OrchestrationMode>("orchestration_mode");
+        dataSourceBuilder.MapEnum<RequirementImpact>("requirement_impact");
     }
 
     private static void AddS3(IServiceCollection services, IConfiguration configuration)

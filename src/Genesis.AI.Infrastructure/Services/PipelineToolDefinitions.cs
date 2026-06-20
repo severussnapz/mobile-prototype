@@ -26,13 +26,22 @@ public static class PipelineToolDefinitions
     public const string SetOrchestrationMode = "set_orchestration_mode";
     public const string AdvanceRequirement = "advance_requirement";
     public const string EditArtefact = "edit_artefact";
+    public const string EditArtefactByGraphNode = "edit_artefact_by_graph_node";
     public const string SearchInArtefact = "search_in_artefact";
+    public const string SetNodeAttribute = "set_node_attribute";
+    public const string SetNodeText = "set_node_text";
+    public const string AddNodeClass = "add_node_class";
+    public const string RemoveNodeClass = "remove_node_class";
+    public const string InsertAdjacentHtml = "insert_adjacent_html";
+    public const string RemoveElement = "remove_element";
+    public const string ListElements = "list_elements";
+    public const string ApplyBulkAttributes = "apply_bulk_attributes";
 
     /// <summary>
     /// Returns the tool list conditioned on <paramref name="options"/> and <paramref name="stageType"/>.
-    /// Includes <c>edit_artefact</c> when <see cref="TokenOptimisationOptions.EditArtefactEnabled"/> is true.
-    /// Excludes <c>get_guardrail_details</c> when the stage already has skills injected via active skill injection
-    /// — Claude has everything it needs in the system prompt and should not burn tool turns fetching skills.
+    /// <c>edit_artefact</c> is registered for all non-Prototype stages when <see cref="TokenOptimisationOptions.EditArtefactEnabled"/> is true.
+    /// Prototype stage uses node-targeted tools; <c>edit_artefact_by_graph_node</c> is offered only when DOM mode is disabled.
+    /// Excludes <c>get_guardrail_details</c> when the stage already has skills injected via active skill injection.
     /// </summary>
     public static IReadOnlyList<AiToolDefinition> GetTools(TokenOptimisationOptions options, Domain.Enums.StageType? stageType = null)
     {
@@ -50,7 +59,33 @@ public static class PipelineToolDefinitions
         if (!options.EditArtefactEnabled)
             return base_.AsReadOnly();
 
-        base_.Add(PipelineToolDefinitionFactory.BuildEditArtefactTool());
+        // Prototype stage uses node-targeted editing tools.
+        // Keep graph-node replacement only when DOM mode is disabled.
+        if (stageType == Domain.Enums.StageType.Prototype)
+        {
+            if (!options.PrototypeDomModeEnabled)
+            {
+                base_.Add(PipelineToolDefinitionFactory.BuildEditArtefactByGraphNodeTool());
+            }
+
+            base_.Add(PipelineToolDefinitionFactory.BuildSetNodeAttributeTool());
+            base_.Add(PipelineToolDefinitionFactory.BuildSetNodeTextTool());
+            base_.Add(PipelineToolDefinitionFactory.BuildAddNodeClassTool());
+            base_.Add(PipelineToolDefinitionFactory.BuildRemoveNodeClassTool());
+
+            if (options.PrototypeDomModeEnabled)
+            {
+                base_.Add(PipelineToolDefinitionFactory.BuildInsertAdjacentHtmlTool());
+                base_.Add(PipelineToolDefinitionFactory.BuildRemoveElementTool());
+                base_.Add(PipelineToolDefinitionFactory.BuildListElementsTool());
+                base_.Add(PipelineToolDefinitionFactory.BuildApplyBulkAttributesTool());
+            }
+        }
+        else
+        {
+            base_.Add(PipelineToolDefinitionFactory.BuildEditArtefactTool());
+        }
+
         base_.Add(PipelineToolDefinitionFactory.BuildSearchInArtefactTool());
         return base_.AsReadOnly();
     }

@@ -19,7 +19,9 @@ public class ArtefactController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IArtefactStorageService _artefactStorageService;
 
-    public ArtefactController(IMediator mediator, IArtefactStorageService artefactStorageService)
+    public ArtefactController(
+        IMediator mediator,
+        IArtefactStorageService artefactStorageService)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
@@ -147,4 +149,5 @@ public class ArtefactController : ControllerBase
 
         return Created(string.Empty, dtos);
     }
+
 }

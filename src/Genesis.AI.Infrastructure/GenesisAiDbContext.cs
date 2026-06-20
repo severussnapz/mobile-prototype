@@ -4,6 +4,8 @@ using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectDecisionAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectNoteAggregate;
+using Genesis.AI.Domain.AggregatesModel.PrototypeLockAggregate;
+using Genesis.AI.Domain.AggregatesModel.UiDeltaAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Infrastructure.EntityConfigurations;
 using MediatR;
@@ -19,13 +21,23 @@ public sealed class GenesisAiDbContext(
     public DbSet<PipelineStage> PipelineStages { get; set; }
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
+    public DbSet<MessageFeedback> MessageFeedback { get; set; }
     public DbSet<ParkingLotItem> ParkingLotItems { get; set; }
     public DbSet<TokenUsageRecord> TokenUsageRecords { get; set; }
     public DbSet<Artefact> Artefacts { get; set; }
     public DbSet<ProjectNote> ProjectNotes { get; set; }
     public DbSet<ProjectDecision> ProjectDecisions { get; set; }
+    public DbSet<UiDelta> UiDeltas { get; set; }
+    public DbSet<PrototypeLock> PrototypeLocks { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        RegisterPostgresEnums(modelBuilder);
+        ApplyEntityConfigurations(modelBuilder);
+        base.OnModelCreating(modelBuilder);
+    }
+
+    private void RegisterPostgresEnums(ModelBuilder modelBuilder)
     {
         // Native PostgreSQL enum types — skip for in-memory provider (integration tests)
         if (!Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) ?? false)
@@ -39,17 +51,23 @@ public sealed class GenesisAiDbContext(
             modelBuilder.HasPostgresEnum<ParkingLotStatus>("parking_lot_status");
             modelBuilder.HasPostgresEnum<MessageRole>("message_role");
             modelBuilder.HasPostgresEnum<OrchestrationMode>("orchestration_mode");
+            modelBuilder.HasPostgresEnum<RequirementImpact>("requirement_impact");
         }
+    }
 
+    private static void ApplyEntityConfigurations(ModelBuilder modelBuilder)
+    {
         modelBuilder.ApplyConfiguration(new ProjectEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PipelineStageEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ConversationEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new MessageEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new MessageFeedbackEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ParkingLotItemEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new TokenUsageRecordEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ArtefactEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectNoteEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectDecisionEntityTypeConfiguration());
-        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfiguration(new UiDeltaEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new PrototypeLockEntityTypeConfiguration());
     }
 }

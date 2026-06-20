@@ -8,6 +8,7 @@ public interface IArtefactRepository
     IUnitOfWork UnitOfWork { get; }
 
     Task AddAsync(Artefact artefact, CancellationToken cancellationToken);
+    Task DeleteByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<Artefact?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<Artefact>> GetByProjectIdAsync(Guid projectId, CancellationToken cancellationToken);
     Task<int> GetNextVersionAsync(Guid projectId, CancellationToken cancellationToken);
@@ -37,6 +38,12 @@ public interface IArtefactRepository
     Task<Artefact?> GetByProjectAndFilePathAsync(Guid projectId, string filePath, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Gets a single draft artefact by project ID and file path (latest draft version).
+    /// Used by prototype graph-node editing staged writes.
+    /// </summary>
+    Task<Artefact?> GetLatestDraftByProjectAndFilePathAsync(Guid projectId, string filePath, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Gets the timestamp of the most recently created/modified artefact for a project.
     /// Used for staleness detection.
     /// </summary>
@@ -47,4 +54,10 @@ public interface IArtefactRepository
     /// (any file matching requirements/REQ-*.md). Used by the advance_requirement completion gate.
     /// </summary>
     Task<bool> HasRequirementArtefactAsync(Guid projectId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets all versions of a specific file within a project, ordered by version descending.
+    /// Used for prototype version recovery/history.
+    /// </summary>
+    Task<IReadOnlyList<Artefact>> GetVersionsByFilePathAsync(Guid projectId, string filePath, CancellationToken cancellationToken);
 }
