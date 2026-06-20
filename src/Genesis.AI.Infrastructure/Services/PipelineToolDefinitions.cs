@@ -34,8 +34,7 @@ public static class PipelineToolDefinitions
     public const string RemoveNodeClass = "remove_node_class";
     public const string InsertAdjacentHtml = "insert_adjacent_html";
     public const string RemoveElement = "remove_element";
-    public const string ListElements = "list_elements";
-    public const string ApplyBulkAttributes = "apply_bulk_attributes";
+    public const string ApplyToScope = "apply_to_scope";
 
     /// <summary>
     /// Returns the tool list conditioned on <paramref name="options"/> and <paramref name="stageType"/>.
@@ -77,8 +76,7 @@ public static class PipelineToolDefinitions
             {
                 base_.Add(PipelineToolDefinitionFactory.BuildInsertAdjacentHtmlTool());
                 base_.Add(PipelineToolDefinitionFactory.BuildRemoveElementTool());
-                base_.Add(PipelineToolDefinitionFactory.BuildListElementsTool());
-                base_.Add(PipelineToolDefinitionFactory.BuildApplyBulkAttributesTool());
+                base_.Add(PipelineToolDefinitionFactory.BuildApplyToScopeTool());
             }
         }
         else

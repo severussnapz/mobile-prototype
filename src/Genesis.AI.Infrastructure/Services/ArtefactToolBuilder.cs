@@ -301,78 +301,55 @@ internal static class ArtefactToolBuilder
             """));
     }
 
-    internal static AiToolDefinition BuildListElementsTool()
+    internal static AiToolDefinition BuildApplyToScopeTool()
     {
         return new AiToolDefinition(
-            Name: PipelineToolDefinitions.ListElements,
-            Description: "Returns ALL elements matching a CSS selector in the prototype, optionally scoped to a specific container node.\n\n" +
-                         "TWO-STEP WORKFLOW FOR SCOPED SEARCHES:\n" +
-                         "Step 1: Use search_in_artefact to find the container element\n" +
-                         "  e.g. search_in_artefact('screen-gallery-file') to find the\n" +
-                         "  document viewer screen — note the node_id returned.\n" +
-                         "Step 2: Call list_elements with that node_id as scope_node_id\n" +
-                         "  e.g. list_elements(selector='button',\n" +
-                         "       scope_node_id='prototype/fragments/screen-01-legacy.html|ABC123')\n" +
-                         "  This returns ONLY buttons inside that container.\n\n" +
-                         "Without scope_node_id: returns all matching elements across\n" +
-                         "the entire prototype (may return hundreds — use with caution).\n" +
-                         "With scope_node_id: returns only elements inside that container.",
+            Name: PipelineToolDefinitions.ApplyToScope,
+            Description:
+                "Bulk DOM operation — one call, API handles everything.\n\n" +
+                "RULES:\n" +
+                "- Call once. Do NOT call list_elements or search_in_artefact before this tool.\n" +
+                "- API resolves scope, finds elements, generates values, applies, and verifies.\n" +
+                "- A partial success is treated as failure. Check the result before claiming done.\n\n" +
+                "Strategies:\n" +
+                "- literal: same value applied to every matched element. Fast, deterministic, no LLM call.\n" +
+                "- derive_from_text_content: API cleans each element's text (strips emoji, arrows, duplicates).\n" +
+                "- generate_from_context: one focused LLM call returns [{text_snippet, value}], API matches and applies.\n\n" +
+                "Examples:\n" +
+                "  Add aria-labels to all buttons: scope=screen-gallery-file, selector=button, operation=set_attribute, attribute=aria-label, strategy=derive_from_text_content\n" +
+                "  Add a class to all nav items: scope=shell, selector=.nav-item, operation=add_class, value=btn-primary, strategy=literal",
             InputSchema: JsonDocument.Parse("""
             {
                 "type": "object",
                 "properties": {
+                    "scope": {
+                        "type": "string",
+                        "description": "Fragment scope identifier e.g. screen-gallery-file, shell"
+                    },
                     "selector": {
                         "type": "string",
-                        "description": "CSS selector to match elements, e.g. 'button', '.btn', \"input[type='submit']\"."
+                        "description": "CSS selector to match elements e.g. button, .nav-item, input[type='submit']"
                     },
-                    "scope_node_id": {
+                    "operation": {
                         "type": "string",
-                        "description": "Optional node_id (NodeKey format fragmentPath|stableId) from a previous search result. If provided, matches are scoped to descendants of that node; otherwise searches whole prototype."
-                    }
-                },
-                "required": ["selector"]
-            }
-            """));
-    }
-
-    internal static AiToolDefinition BuildApplyBulkAttributesTool()
-    {
-        return new AiToolDefinition(
-            Name: PipelineToolDefinitions.ApplyBulkAttributes,
-            Description: "WORKFLOW:\n" +
-                         "1. Run list_elements to get all target text_snippet, parent, and siblings context.\n" +
-                         "2. Derive one value per node from that context.\n" +
-                         "3. Call apply_bulk_attributes ONCE with attribute and snippet_value_pairs.\n" +
-                         "4. Do NOT call set_node_attribute for this batch.\n" +
-                         "This tool applies all mutations and reassembles once at the end.",
-            InputSchema: JsonDocument.Parse("""
-            {
-                "type": "object",
-                "properties": {
+                        "enum": ["set_attribute", "add_class", "remove_class", "set_text", "remove_attribute", "insert_adjacent_html"],
+                        "description": "DOM operation to apply to all matched elements"
+                    },
                     "attribute": {
                         "type": "string",
-                        "description": "Attribute name applied to all snippet_value_pairs, e.g. aria-label, title, placeholder."
+                        "description": "Attribute name for set_attribute or remove_attribute operations e.g. aria-label, title, placeholder"
                     },
-                    "snippet_value_pairs": {
-                        "type": "array",
-                        "description": "List of text_snippet to value pairs in list_elements order.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "text_snippet": {
-                                    "type": "string",
-                                    "description": "Text snippet copied from list_elements output."
-                                },
-                                "value": {
-                                    "type": "string",
-                                    "description": "Attribute value to set."
-                                }
-                            },
-                            "required": ["text_snippet", "value"]
-                        }
+                    "strategy": {
+                        "type": "string",
+                        "enum": ["literal", "derive_from_text_content", "generate_from_context"],
+                        "description": "Value derivation strategy. literal=same value to all; derive_from_text_content=API cleans each element text; generate_from_context=one LLM call generates values"
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "Required for literal strategy. The value applied to all matched elements."
                     }
                 },
-                "required": ["attribute", "snippet_value_pairs"]
+                "required": ["scope", "selector", "operation", "strategy"]
             }
             """));
     }

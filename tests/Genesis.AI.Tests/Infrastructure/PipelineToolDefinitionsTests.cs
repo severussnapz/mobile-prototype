@@ -63,11 +63,11 @@ public class PipelineToolDefinitionsTests
         Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.EditArtefactByGraphNode);
         Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.InsertAdjacentHtml);
         Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.RemoveElement);
-        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.ApplyBulkAttributes);
+        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.ApplyToScope);
     }
 
     [Fact]
-    public void GetTools_PrototypeWithDomModeEnabled_BuildsValidApplyBulkAttributesInputSchema()
+    public void GetTools_PrototypeWithDomModeEnabled_BuildsValidApplyToScopeInputSchema()
     {
         var options = new TokenOptimisationOptions
         {
@@ -77,28 +77,22 @@ public class PipelineToolDefinitionsTests
         };
 
         var tools = PipelineToolDefinitions.GetTools(options, StageType.Prototype);
-        var bulkTool = Assert.Single(tools, tool => tool.Name == PipelineToolDefinitions.ApplyBulkAttributes);
+        var scopeTool = Assert.Single(tools, tool => tool.Name == PipelineToolDefinitions.ApplyToScope);
 
-        var schemaRoot = bulkTool.InputSchema.RootElement;
+        var schemaRoot = scopeTool.InputSchema.RootElement;
         Assert.Equal("object", schemaRoot.GetProperty("type").GetString());
 
         var properties = schemaRoot.GetProperty("properties");
-        Assert.Equal("string", properties.GetProperty("attribute").GetProperty("type").GetString());
-
-        var snippetValuePairs = properties.GetProperty("snippet_value_pairs");
-        Assert.Equal("array", snippetValuePairs.GetProperty("type").GetString());
-
-        var itemProperties = snippetValuePairs.GetProperty("items").GetProperty("properties");
-        Assert.Equal("string", itemProperties.GetProperty("text_snippet").GetProperty("type").GetString());
-        Assert.Equal("string", itemProperties.GetProperty("value").GetProperty("type").GetString());
-
-        var itemRequired = snippetValuePairs.GetProperty("items").GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray();
-        Assert.Contains("text_snippet", itemRequired);
-        Assert.Contains("value", itemRequired);
+        Assert.Equal("string", properties.GetProperty("scope").GetProperty("type").GetString());
+        Assert.Equal("string", properties.GetProperty("selector").GetProperty("type").GetString());
+        Assert.Equal("string", properties.GetProperty("operation").GetProperty("type").GetString());
+        Assert.Equal("string", properties.GetProperty("strategy").GetProperty("type").GetString());
 
         var required = schemaRoot.GetProperty("required").EnumerateArray().Select(value => value.GetString()).ToArray();
-        Assert.Contains("attribute", required);
-        Assert.Contains("snippet_value_pairs", required);
+        Assert.Contains("scope", required);
+        Assert.Contains("selector", required);
+        Assert.Contains("operation", required);
+        Assert.Contains("strategy", required);
     }
 
     [Fact]
@@ -119,22 +113,22 @@ public class PipelineToolDefinitionsTests
     }
 
     [Fact]
-    public void ApplyBulkAttributes_ToolDescription_ContainsWorkflowInstructions()
+    public void ApplyToScope_ToolDescription_ContainsStrategyInstructions()
     {
         var artefactToolBuilderType = typeof(PipelineToolDefinitions).Assembly
             .GetType("Genesis.AI.Infrastructure.Services.ArtefactToolBuilder");
         Assert.NotNull(artefactToolBuilderType);
 
         var buildMethod = artefactToolBuilderType!.GetMethod(
-            "BuildApplyBulkAttributesTool",
+            "BuildApplyToScopeTool",
             System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(buildMethod);
 
         var tool = buildMethod!.Invoke(null, null) as AiToolDefinition;
         Assert.NotNull(tool);
 
-        Assert.Contains("apply_bulk_attributes ONCE", tool!.Description, StringComparison.Ordinal);
-        Assert.Contains("Do NOT call set_node_attribute", tool.Description, StringComparison.Ordinal);
-        Assert.Contains("WORKFLOW", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("literal", tool!.Description, StringComparison.Ordinal);
+        Assert.Contains("derive_from_text_content", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("generate_from_context", tool.Description, StringComparison.Ordinal);
     }
 }
