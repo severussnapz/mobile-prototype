@@ -43,11 +43,14 @@ public class ApproveRequirementChangeCommandTests
             """;
 
         var realArtefact = Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact.CreateS3Artefact(
-            projectId, 1, "requirements/REQ-001.md", "s3-key-v1", "text/markdown", 100, "idris.issa", TimeProvider.System, true);
+            projectId, 1, "requirements/REQ-001-unified-inbound-inbox.md", "s3-key-v1", "text/markdown", 100, "idris.issa", TimeProvider.System, true);
         artefactRepositoryMock
-            .Setup(r => r.GetByProjectAndFilePathAsync(
-                projectId, "requirements/REQ-001.md", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(realArtefact);
+            .Setup(r => r.GetProjectArtefactManifestAsync(
+                projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact> { realArtefact });
+        artefactRepositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact>(), It.IsAny<CancellationToken>()))
+            .Returns(System.Threading.Tasks.Task.CompletedTask);
         artefactStorageMock
             .Setup(s => s.GetContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(reqContent);
@@ -222,11 +225,14 @@ public class ApproveRequirementChangeCommandTests
         string reqContent)
     {
         var realArtefact = Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact.CreateS3Artefact(
-            projectId, 1, "requirements/REQ-001.md", "s3-key-v1", "text/markdown", 100, "idris.issa", TimeProvider.System, true);
+            projectId, 1, "requirements/REQ-001-unified-inbound-inbox.md", "s3-key-v1", "text/markdown", 100, "idris.issa", TimeProvider.System, true);
         artefactRepositoryMock
-            .Setup(r => r.GetByProjectAndFilePathAsync(
-                projectId, "requirements/REQ-001.md", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(realArtefact);
+            .Setup(r => r.GetProjectArtefactManifestAsync(
+                projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact> { realArtefact });
+        artefactRepositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact>(), It.IsAny<CancellationToken>()))
+            .Returns(System.Threading.Tasks.Task.CompletedTask);
         artefactStorageMock
             .Setup(s => s.GetContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(reqContent);

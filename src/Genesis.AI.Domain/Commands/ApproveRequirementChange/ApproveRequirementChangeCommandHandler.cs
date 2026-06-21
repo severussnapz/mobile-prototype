@@ -1,3 +1,4 @@
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
 using Genesis.AI.Domain.Interfaces;
 
@@ -53,15 +54,27 @@ public sealed class ApproveRequirementChangeCommandHandler
         RequirementChange change,
         CancellationToken cancellationToken)
     {
-        var reqFilePath = $"requirements/{change.ReqId}.md";
+        // Look up the full REQ file path from the artefact manifest.
+        // The req_id is e.g. REQ-001 but the actual file path may be
+        // requirements/increment-1-inbox-and-triage/REQ-001-unified-inbound-inbox.md
+        var allArtefacts = await _artefactRepository.GetProjectArtefactManifestAsync(
+            change.ProjectId, cancellationToken);
 
-        var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(
-            change.ProjectId, reqFilePath, cancellationToken);
+        var reqPrefix = $"requirements/";
+        var reqIdPrefix = $"{change.ReqId}-";
+        var reqIdExact = $"{change.ReqId}.md";
+
+        var artefact = allArtefacts.FirstOrDefault(artefact =>
+            artefact.FilePath.StartsWith(reqPrefix, StringComparison.OrdinalIgnoreCase) &&
+            (artefact.FilePath.Contains($"/{change.ReqId}-", StringComparison.OrdinalIgnoreCase) ||
+             artefact.FilePath.EndsWith($"/{change.ReqId}.md", StringComparison.OrdinalIgnoreCase)));
 
         if (artefact is null)
         {
             return;
         }
+
+        var reqFilePath = artefact.FilePath;
 
         var content = await _artefactStorageService.GetContentAsync(
             artefact.S3Key, cancellationToken);
@@ -81,12 +94,25 @@ public sealed class ApproveRequirementChangeCommandHandler
         var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
             change.ProjectId, reqFilePath, cancellationToken);
 
-        await _artefactStorageService.SaveContentAsync(
+        var storageKey = await _artefactStorageService.SaveContentAsync(
             change.ProjectId,
             reqFilePath,
             nextVersion,
             updatedContent,
             "text/markdown",
             cancellationToken);
+
+        var newArtefact = Artefact.CreateS3Artefact(
+            change.ProjectId,
+            nextVersion,
+            reqFilePath,
+            storageKey,
+            "text/markdown",
+            System.Text.Encoding.UTF8.GetByteCount(updatedContent),
+            change.ApprovedBy ?? "system",
+            _timeProvider,
+            true);
+
+        await _artefactRepository.AddAsync(newArtefact, cancellationToken);
     }
 }
