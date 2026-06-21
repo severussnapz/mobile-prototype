@@ -790,6 +790,14 @@ public class ConversationStreamController : ControllerBase
             """;
     }
 
+    private static string GetStageTypePgName(Domain.Enums.StageType stageType)
+    {
+        var field = stageType.GetType().GetField(stageType.ToString());
+        var attr = field?.GetCustomAttributes(typeof(NpgsqlTypes.PgNameAttribute), false)
+            .FirstOrDefault() as NpgsqlTypes.PgNameAttribute;
+        return attr?.PgName ?? stageType.ToString().ToLowerInvariant();
+    }
+
     private static Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel ParseImpactLevel(string? value)
     {
         return value?.ToLowerInvariant() switch
@@ -1657,7 +1665,7 @@ public class ConversationStreamController : ControllerBase
                 };
 
                 var raisingPipeline = stageType.HasValue
-                    ? $"pipeline_{(int)stageType.Value:D2}_{stageType.Value.ToString().ToLowerInvariant()}"
+                    ? $"pipeline_{(int)stageType.Value + 1:D2}_{GetStageTypePgName(stageType.Value)}"
                     : "pipeline_unknown";
 
                 var csImpact = root.TryGetProperty("clinical_safety_impact", out var csProp)
