@@ -82,4 +82,37 @@ public class ToolCallWiringTests
             $"case in ConversationStreamController.ExecuteToolCallAsync:\n" +
             string.Join("\n", unwiredTools.Select(t => $"  - {t}")));
     }
+
+    [Fact]
+    public void ApplyToScope_ControllerCase_TriggersAssemblyAfterSuccessfulMutations()
+    {
+        // Regression guard: apply_to_scope was completing mutations but not calling
+        // AssemblePrototypeAsync — index.html was never updated after bulk edits.
+        var controllerSource = File.ReadAllText(
+            Path.Combine(
+                Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!,
+                "..", "..", "..", "..", "..",
+                "src", "Genesis.AI.Api", "Features", "Conversations",
+                "ConversationStreamController.cs"));
+
+        var applyToScopeIndex = controllerSource.IndexOf(
+            "case PipelineToolDefinitions.ApplyToScope:",
+            StringComparison.Ordinal);
+
+        Assert.True(applyToScopeIndex >= 0, "apply_to_scope case not found in controller");
+
+        var nextCaseIndex = controllerSource.IndexOf(
+            "case PipelineToolDefinitions.",
+            applyToScopeIndex + 1,
+            StringComparison.Ordinal);
+
+        var applyToScopeBlock = nextCaseIndex > 0
+            ? controllerSource[applyToScopeIndex..nextCaseIndex]
+            : controllerSource[applyToScopeIndex..];
+
+        Assert.Contains(
+            "AssemblePrototypeAsync",
+            applyToScopeBlock,
+            StringComparison.Ordinal);
+    }
 }

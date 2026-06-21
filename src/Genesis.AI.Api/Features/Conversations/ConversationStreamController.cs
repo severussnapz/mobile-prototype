@@ -1653,6 +1653,13 @@ public class ConversationStreamController : ControllerBase
                     "apply_to_scope: scope='{Scope}' selector='{Selector}' operation='{Operation}' strategy='{Strategy}' — applied {Success}/{Total}",
                     scope, selector, operation, strategy, batchResult.SuccessfulMutations, batchResult.TotalMutations);
 
+                // Trigger assembly after successful DOM mutations so index.html stays current.
+                // Regression fix: apply_to_scope was completing mutations without reassembling.
+                if (batchResult.SuccessfulMutations > 0 && _tokenOptimisationOptions.PrototypeFragmentsEnabled)
+                {
+                    await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
+                }
+
                 if (batchResult.SuccessfulMutations == batchResult.TotalMutations)
                     return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
 

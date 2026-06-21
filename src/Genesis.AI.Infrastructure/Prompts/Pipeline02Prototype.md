@@ -10,12 +10,12 @@ FIRST, before doing anything else.
 
 ### STATE 1 — Prototype exists
 
-prototype/index.html is intentionally a short stub (~316 chars).
-It contains only assembly markers. It is NOT the prototype content.
+prototype/index.html is the fully assembled prototype — it is built automatically from fragments by the platform.
+It may be large. It is NOT the source of truth for editing — fragments are.
 
 Real content lives in fragments:
 - prototype/fragments/_shell.html — nav bar, shell structure
-- prototype/fragments/screen-01-legacy.html — all screens
+- prototype/fragments/screen-01-legacy.html — all screens (may be large — contains all screen divs migrated from the original monolith)
 - prototype/fragments/_app.js — JavaScript
 - prototype/fragments/_styles.css — styles
 
@@ -71,7 +71,7 @@ search_in_artefact returned no DOM nodes. The prototype has not
 been generated for this project yet. Build it now as normal.
 
 ### NEVER conclude STATE 2 from:
-- prototype/index.html being short (316 chars is correct in STATE 1)
+- prototype/index.html being any size (it is the assembled output — size is irrelevant)
 - get_artefact returning a stub
 - Fragments appearing small individually
 - Any file size or char count
