@@ -10,4 +10,7 @@ public sealed record ProposeRequirementChangeCommand(
     Guid? RaisingPipelineConversationId,
     string? ProposedAcText,
     string Rationale,
-    string CreatedBy);
+    string CreatedBy,
+    ImpactLevel ClinicalSafetyImpact = ImpactLevel.None,
+    ImpactLevel IgImpact = ImpactLevel.None,
+    ImpactLevel SecurityImpact = ImpactLevel.None);

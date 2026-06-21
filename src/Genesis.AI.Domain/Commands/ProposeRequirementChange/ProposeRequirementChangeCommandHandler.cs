@@ -25,7 +25,10 @@ public sealed class ProposeRequirementChangeCommandHandler
             raisingPipelineConversationId: command.RaisingPipelineConversationId,
             proposedAcText: command.ProposedAcText,
             rationale: command.Rationale,
-            createdBy: command.CreatedBy);
+            createdBy: command.CreatedBy,
+            clinicalSafetyImpact: command.ClinicalSafetyImpact,
+            igImpact: command.IgImpact,
+            securityImpact: command.SecurityImpact);
 
         await _repository.AddAsync(change, cancellationToken);
         await _repository.UnitOfWork.SaveChangesAsync(cancellationToken);

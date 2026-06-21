@@ -44,7 +44,10 @@ public sealed class RequirementChange
         Guid? raisingPipelineConversationId,
         string? proposedAcText,
         string rationale,
-        string createdBy)
+        string createdBy,
+        ImpactLevel clinicalSafetyImpact = ImpactLevel.None,
+        ImpactLevel igImpact = ImpactLevel.None,
+        ImpactLevel securityImpact = ImpactLevel.None)
     {
         if (changeType != ChangeType.Contradiction && string.IsNullOrWhiteSpace(proposedAcText))
         {
@@ -64,9 +67,9 @@ public sealed class RequirementChange
             ProposedAcText = proposedAcText,
             Rationale = rationale,
             Status = ChangeStatus.Pending,
-            ClinicalSafetyImpact = ImpactLevel.None,
-            IgImpact = ImpactLevel.None,
-            SecurityImpact = ImpactLevel.None,
+            ClinicalSafetyImpact = clinicalSafetyImpact,
+            IgImpact = igImpact,
+            SecurityImpact = securityImpact,
             ClinicalSafetyReviewed = false,
             IgReviewed = false,
             SecurityReviewed = false,
