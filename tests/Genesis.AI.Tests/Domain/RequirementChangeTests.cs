@@ -104,7 +104,7 @@ public class RequirementChangeTests
         change.Undo(undoneBy: "idris.issa", rationale: "Wrong wording",
             timeProvider: TimeProvider.System);
 
-        Assert.Equal(ChangeStatus.Undone, change.Status);
+        Assert.Equal(ChangeStatus.Pending, change.Status);
         Assert.Equal("idris.issa", change.UndoneBy);
         Assert.Equal("Wrong wording", change.UndoRationale);
         Assert.NotNull(change.UndoneAt);

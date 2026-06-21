@@ -68,7 +68,7 @@ public class UndoApproveRequirementChangeCommandTests
 
         await handler.Handle(command, CancellationToken.None);
 
-        Assert.Equal(ChangeStatus.Undone, change.Status);
+        Assert.Equal(ChangeStatus.Pending, change.Status);
         Assert.Equal("idris.issa", change.UndoneBy);
         Assert.Equal("Wrong wording", change.UndoRationale);
         artefactStorageMock.Verify(s => s.GetContentAsync("s3-key-v1",
@@ -135,7 +135,7 @@ public class UndoApproveRequirementChangeCommandTests
             UndoRationale: null),
         CancellationToken.None);
 
-        Assert.Equal(ChangeStatus.Undone, change.Status);
+        Assert.Equal(ChangeStatus.Pending, change.Status);
         artefactStorageMock.Verify(s => s.SaveContentAsync(
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(),
             It.IsAny<string>(), It.IsAny<string>(),

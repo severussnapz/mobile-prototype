@@ -111,7 +111,7 @@ public sealed class RequirementChange
         UndoneBy = undoneBy;
         UndoneAt = timeProvider.GetUtcNow();
         UndoRationale = rationale;
-        Status = ChangeStatus.Undone;
+        Status = ChangeStatus.Pending;
     }
 
     public void Reject(string rejectedBy, TimeProvider timeProvider)
