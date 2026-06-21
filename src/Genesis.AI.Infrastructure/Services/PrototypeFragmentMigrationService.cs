@@ -41,6 +41,17 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
 
         if (shellArtefact is not null)
         {
+            // Shell exists — check if it needs metadata injection (legacy migration without metadata)
+            var shellContent = await _storageService.GetContentAsync(
+                shellArtefact.S3Key, cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(shellContent) &&
+                !shellContent.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase))
+            {
+                await InjectMetadataIntoShellAsync(projectId, shellArtefact, shellContent, cancellationToken);
+                return new PrototypeFragmentMigrationResult(Migrated: true);
+            }
+
             return new PrototypeFragmentMigrationResult(Migrated: false);
         }
 
@@ -94,6 +105,19 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
 
         var shellContent = document.DocumentElement?.OuterHtml ?? string.Empty;
 
+        // Inject prototype-metadata block if missing — required by assembly validation contract.
+        // Legacy prototypes built before the metadata contract do not have this block.
+        if (!shellContent.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase))
+        {
+            var metadataStub = "<script id=\"prototype-metadata\" type=\"application/json\">\n"
+                + "{\"contractVersion\":\"1.0\",\"stageCode\":\"prototype\",\"prototypeOnly\":true,"
+                + "\"generatedAtUtc\":\"2026-01-01T00:00:00Z\",\"requirementsCovered\":[],"
+                + "\"flows\":[],\"privacySafetyConstraints\":[\"no real data\"]}\n"
+                + "</script>";
+            shellContent = shellContent.Replace("</head>", metadataStub + "\n</head>",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         // Save all four fragments
         await SaveFragmentAsync(projectId, StylesFragmentPath, cssContent, "text/css", initiatedBy, cancellationToken);
         await SaveFragmentAsync(projectId, AppJsFragmentPath, jsContent, "application/javascript", initiatedBy, cancellationToken);
@@ -101,6 +125,28 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
         await SaveFragmentAsync(projectId, ScreensFragmentPath, screensContent, "text/html", initiatedBy, cancellationToken);
 
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task InjectMetadataIntoShellAsync(
+        Guid projectId,
+        Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact shellArtefact,
+        string shellContent,
+        CancellationToken cancellationToken)
+    {
+        var metadataStub = "<script id=\"prototype-metadata\" type=\"application/json\">\n"
+            + "{\"contractVersion\":\"1.0\",\"stageCode\":\"prototype\",\"prototypeOnly\":true,"
+            + "\"generatedAtUtc\":\"2026-01-01T00:00:00Z\",\"requirementsCovered\":[],"
+            + "\"flows\":[],\"privacySafetyConstraints\":[\"no real data\"]}\n"
+            + "</script>";
+
+        var updatedShell = shellContent.Replace("</head>", metadataStub + "\n</head>",
+            StringComparison.OrdinalIgnoreCase);
+
+        await SaveFragmentAsync(projectId, ShellFragmentPath, updatedShell, "text/html",
+            "system-migration", cancellationToken);
+
+        await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        await _assemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
     }
 
     private async Task SaveFragmentAsync(

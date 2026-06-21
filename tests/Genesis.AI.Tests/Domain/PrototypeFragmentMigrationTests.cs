@@ -550,4 +550,27 @@ public sealed class PrototypeFragmentMigrationTests
         // Assembly only called once — on first migration
         assemblyMock.Verify(a => a.AssemblePrototypeAsync(projectId, It.IsAny<CancellationToken>()), Times.Once);
     }
+    [Fact]
+    public async Task WhenMonolithHasNoPrototypeMetadata_ShellFragmentContainsInjectedMetadataBlock()
+    {
+        // Regression guard: legacy prototypes built before the metadata contract
+        // do not have a prototype-metadata script block. Assembly validation requires it.
+        // Migration must inject a minimal stub so assembly succeeds on migrated prototypes.
+        var projectId = Guid.NewGuid();
+        string? savedShell = null;
+        var (storage, _, _, sut) = BuildSut(projectId, MonolithicHtml); // MonolithicHtml has no prototype-metadata
+
+        storage
+            .Setup(s => s.SaveContentAsync(projectId, "prototype/fragments/_shell.html",
+                It.IsAny<int>(), It.IsAny<string>(), "text/html", It.IsAny<CancellationToken>()))
+            .Callback<Guid, string, int, string, string, CancellationToken>(
+                (_, _, _, content, _, _) => savedShell = content)
+            .ReturnsAsync("s3-key");
+
+        await sut.MigrateIfNeededAsync(projectId, "idris.issa", CancellationToken.None);
+
+        Assert.NotNull(savedShell);
+        Assert.Contains("prototype-metadata", savedShell);
+    }
+
 }

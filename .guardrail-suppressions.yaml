@@ -183,3 +183,11 @@ suppressions:
       (SetAttribute, SetText, AddClass, RemoveClass, SwapClass, InsertAdjacentHtml, RemoveElement,
       RemoveAttribute). Each case is 2-3 lines. Splitting into sub-methods would add indirection
       with no clarity benefit for what is essentially a dispatch table.'
+
+  - id: ENG-009
+    path: 'src/Genesis.AI.Infrastructure/Services/PrototypeFragmentMigrationService.cs'
+    justification:
+      'MigrateAsync has 22 statements — sequential orchestration of parse, extract CSS,
+      extract JS, extract screens, inject metadata stub, remove elements from shell, save
+      4 fragments. All statements are part of one coherent migration operation. Splitting
+      into sub-methods would add indirection with no clarity benefit.'
