@@ -8,6 +8,7 @@ using Genesis.AI.Api.Http;
 using Genesis.AI.Core.Extensions;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
+using Genesis.AI.Domain.Commands.ProposeRequirementChange;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Configuration;
@@ -47,8 +48,10 @@ public class ConversationStreamController : ControllerBase
     private readonly TokenOptimisationOptions _tokenOptimisationOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConversationStreamController> _logger;
+    private readonly ProposeRequirementChangeCommandHandler _proposeRequirementChangeHandler;
 
     public ConversationStreamController(
+        ProposeRequirementChangeCommandHandler proposeRequirementChangeHandler,
         IConversationRepository conversationRepository,
         IArtefactRepository artefactRepository,
         IArtefactStorageService artefactStorageService,
@@ -78,6 +81,7 @@ public class ConversationStreamController : ControllerBase
         _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _proposeRequirementChangeHandler = proposeRequirementChangeHandler ?? throw new ArgumentNullException(nameof(proposeRequirementChangeHandler));
     }
 
     /// <summary>
@@ -1624,6 +1628,43 @@ public class ConversationStreamController : ControllerBase
                     .Take(5)
                     .ToList();
                 return $"PARTIAL FAILURE: applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations}. Failures: {string.Join("; ", failures)}";
+            }
+
+            case PipelineToolDefinitions.ProposeRequirementChange:
+            {
+                var reqId = root.GetProperty("req_id").GetString()!;
+                var changeTypeStr = root.GetProperty("change_type").GetString()!;
+                var rationale = root.GetProperty("rationale").GetString()!;
+                var proposedAcText = root.TryGetProperty("proposed_ac_text", out var acProp)
+                    ? acProp.GetString() : null;
+
+                var changeType = changeTypeStr.ToLowerInvariant() switch
+                {
+                    "gap" => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Gap,
+                    "clarification" => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Clarification,
+                    "contradiction" => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Contradiction,
+                    _ => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Gap
+                };
+
+                var raisingPipeline = stageType.HasValue
+                    ? $"pipeline_{(int)stageType.Value:D2}_{stageType.Value.ToString().ToLowerInvariant()}"
+                    : "pipeline_unknown";
+
+                var command = new ProposeRequirementChangeCommand(
+                    ProjectId: projectId,
+                    ReqId: reqId,
+                    ChangeType: changeType,
+                    RaisingPipeline: raisingPipeline,
+                    RaisingPipelineConversationId: conversation.Id,
+                    ProposedAcText: proposedAcText,
+                    Rationale: rationale,
+                    CreatedBy: createdBy);
+
+                var result = await _proposeRequirementChangeHandler.Handle(command, cancellationToken);
+
+                return $"CHANGE_PROPOSED: change_id={result.ChangeId}\n" +
+                       "Your proposed change is pending human approval in the UI.\n" +
+                       "Do not apply this change yourself. Continue your current pipeline work.";
             }
 
             default:
