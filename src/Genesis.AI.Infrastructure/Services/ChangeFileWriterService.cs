@@ -6,7 +6,7 @@ using Genesis.AI.Domain.Interfaces;
 
 namespace Genesis.AI.Infrastructure.Services;
 
-public sealed class ChangeFileWriterService
+public sealed class ChangeFileWriterService : IChangeFileWriterService
 {
     private readonly IArtefactRepository _artefactRepository;
     private readonly IArtefactStorageService _artefactStorageService;
