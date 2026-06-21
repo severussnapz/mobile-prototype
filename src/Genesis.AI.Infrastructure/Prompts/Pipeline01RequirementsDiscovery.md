@@ -223,6 +223,7 @@ If conflict exists with CORE_POLICY, fail closed and request clarification.
 Use only:
 - save_artefact
 - advance_phase
+- propose_requirement_change
 - add_parking_lot_item
 - resolve_parking_lot_item
 - update_progress
@@ -635,3 +636,20 @@ On successful completion:
 - ensure delta routing register complete
 - ensure unresolved gaps register complete
 - transition phase with advance_phase
+---
+
+## Requirement Change Protocol
+
+When you identify a gap, clarification need, or contradiction in a requirement during this pipeline stage, call `propose_requirement_change`. Do not use `edit_artefact` to modify REQ files directly.
+
+**Change types:**
+- `gap` — a capability is missing from the acceptance criteria that this pipeline stage requires
+- `clarification` — an existing AC is ambiguous or needs refinement
+- `contradiction` — two ACs conflict; describe both verbatim in the rationale, do not propose a resolution
+
+**Rules:**
+- Call `propose_requirement_change` and then continue your current work — do not wait for approval
+- For `gap` and `clarification`: provide `proposed_ac_text` starting with `- [ ]`
+- For `contradiction`: omit `proposed_ac_text`; describe the conflict in the rationale
+- Never use `edit_artefact` on files under `requirements/` — always use `propose_requirement_change`
+- Impact classification is set by the human in the UI — do not attempt to classify impact yourself
