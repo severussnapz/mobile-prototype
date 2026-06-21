@@ -206,7 +206,7 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
         if (!html.Contains("id=\"prototype-metadata\"", StringComparison.OrdinalIgnoreCase))
             return "Missing prototype-metadata script block";
 
-        if (!html.Contains(PrototypeBanner, StringComparison.Ordinal))
+        if (!html.Contains("⚠️ PROTOTYPE ONLY", StringComparison.Ordinal))
             return "Missing prototype banner string";
 
         // Check no GENESIS markers remain

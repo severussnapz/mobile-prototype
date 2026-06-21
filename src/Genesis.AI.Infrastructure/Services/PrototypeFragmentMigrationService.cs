@@ -118,7 +118,7 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
         }
 
         // Inject prototype banner if missing — required by assembly validation contract.
-        if (!shellContent.Contains(PrototypeBanner, StringComparison.Ordinal))
+        if (!shellContent.Contains("⚠️ PROTOTYPE ONLY", StringComparison.Ordinal))
         {
             var bannerHtml = $"<div class=\"proto-banner\">{PrototypeBanner}</div>";
             shellContent = shellContent.Replace("<body>", "<body>\n" + bannerHtml,
@@ -157,7 +157,7 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
         }
 
         // Inject prototype banner if missing
-        if (!updatedShell.Contains(PrototypeBanner, StringComparison.Ordinal))
+        if (!updatedShell.Contains("⚠️ PROTOTYPE ONLY", StringComparison.Ordinal))
         {
             var bannerHtml = $"<div class=\"proto-banner\">{PrototypeBanner}</div>";
             updatedShell = updatedShell.Replace("<body>", "<body>\n" + bannerHtml,
