@@ -1,9 +1,5 @@
 namespace Genesis.AI.Domain.Interfaces;
 
-public sealed record ContractValidationResult(
-    bool IsValid,
-    IReadOnlyList<string> Violations);
-
 public interface IContractValidationService
 {
     ContractValidationResult ValidatePipeline01(string reqContent);

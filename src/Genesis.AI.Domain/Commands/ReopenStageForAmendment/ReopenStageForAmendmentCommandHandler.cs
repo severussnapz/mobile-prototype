@@ -42,7 +42,7 @@ public sealed class ReopenStageForAmendmentCommandHandler
                 ErrorMessage: $"Project for stage '{command.StageId}' not found.");
         }
 
-        var stage = project.PipelineStages.FirstOrDefault(s => s.Id == command.StageId);
+        var stage = project.PipelineStages.FirstOrDefault(stage => stage.Id == command.StageId);
         if (stage is null)
         {
             return new ReopenStageForAmendmentResult(

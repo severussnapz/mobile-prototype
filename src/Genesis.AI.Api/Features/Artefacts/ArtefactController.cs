@@ -54,7 +54,7 @@ public class ArtefactController : ControllerBase
         if (!string.IsNullOrEmpty(prefix))
         {
             dtos = dtos
-                .Where(a => a.FilePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Where(artefact => artefact.FilePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 

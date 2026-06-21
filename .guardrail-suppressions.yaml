@@ -127,3 +127,51 @@ suppressions:
   - id: PG-005
     path: "db/migrations/V13__add_message_feedback.sql"
     justification: "Legacy index names preserved to avoid Flyway checksum mismatch — V16 renames them"
+
+  # Approve/Undo/Reject/Review are state transitions on existing resources, not resource creation
+  - id: API-007
+    path: 'src/Genesis.AI.Api/Features/RequirementChanges/RequirementChangesController.cs'
+    justification:
+      'Approve, Undo, Reject, and Review actions are state transitions on an existing
+      RequirementChange resource — not new resource creation. Ok(200) is semantically
+      correct. Created(201) with Location header is inappropriate for state mutation.'
+
+  # RequirementChanges per project is bounded — max one change per AC per pipeline run
+  - id: API-011
+    path: 'src/Genesis.AI.Api/Features/RequirementChanges/RequirementChangesController.cs'
+    justification:
+      'Requirement changes are bounded per project — typically fewer than 50 per project.
+      Pagination adds complexity with no benefit. Consistent with other bounded collections
+      in this API (notes, decisions, parking lot items).'
+
+  # Controller filter/select are query parameter application, not business logic
+  - id: ENG-008
+    justification:
+      'The .Where and .Select in controllers apply query parameters (prefix filter, DTO
+      projection) passed directly from the HTTP request. This is request shaping, not
+      business logic. Moving to handlers would require passing query params through
+      MediatR commands, adding unnecessary complexity for simple collection filtering.'
+
+  # AddWorkflowServices and BuildChangeFileContent complexity
+  - id: ENG-009
+    path: 'src/Genesis.AI.Infrastructure/DependencyInjection.cs'
+    justification:
+      'AddWorkflowServices has 21 statements (1 over limit) — all are DI registrations
+      with no branching logic. Splitting into sub-methods would add indirection with no
+      clarity benefit.'
+
+  - id: ENG-009
+    path: 'src/Genesis.AI.Infrastructure/Services/ChangeFileWriterService.cs'
+    justification:
+      'BuildChangeFileContent has 49 statements building a structured markdown document.
+      All statements are sequential string/interpolation operations with no branching.
+      Splitting would fragment a single coherent document construction.'
+
+  # Test naming follows {Subject}_{Scenario}_{Expected} — valid alternative to {Method}_{Scenario}_{Expected}
+  - id: TEST-007
+    justification:
+      'Test methods use {Subject}_{Scenario}_{Expected} convention where Subject is the
+      class or component under test rather than a single method name. This is appropriate
+      for tests covering multiple methods or structural/wiring concerns (e.g.
+      PipelinePrompt_ContainsProposeRequirementChangeTool). The convention is consistent
+      across the test suite and provides equal readability.'

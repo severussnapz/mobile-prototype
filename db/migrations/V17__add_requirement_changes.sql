@@ -1,5 +1,5 @@
 CREATE TABLE requirement_changes (
-    id                               uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    requirement_change_id            uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id                       uuid         NOT NULL,
     req_id                           varchar(50)  NOT NULL,
     change_type                      varchar(20)  NOT NULL,

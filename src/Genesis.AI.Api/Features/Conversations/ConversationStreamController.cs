@@ -790,13 +790,15 @@ public class ConversationStreamController : ControllerBase
             """;
     }
 
-    private static Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel ParseImpactLevel(string? value) =>
-        value?.ToLowerInvariant() switch
+    private static Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel ParseImpactLevel(string? value)
+    {
+        return value?.ToLowerInvariant() switch
         {
             "possible" => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.Possible,
             "definite" => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.Definite,
-            _ => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None
+            _ => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None,
         };
+    }
 
     private async Task SendToolStartSseEventAsync(AiToolCall toolCall, CancellationToken cancellationToken)
     {

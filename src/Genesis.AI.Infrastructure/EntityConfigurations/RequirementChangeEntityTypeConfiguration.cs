@@ -14,7 +14,7 @@ public sealed class RequirementChangeEntityTypeConfiguration
         builder.HasKey(change => change.Id);
 
         builder.Property(change => change.Id)
-            .HasColumnName("id");
+            .HasColumnName("requirement_change_id");
 
         builder.Property(change => change.ProjectId)
             .HasColumnName("project_id")
