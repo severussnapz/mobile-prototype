@@ -72,4 +72,10 @@ public sealed class TokenOptimisationOptions
     /// services instead of the graph pipeline. Default is <c>false</c> until cutover.
     /// </summary>
     public bool PrototypeDomModeEnabled { get; set; }
+    /// <summary>
+    /// When enabled, the propose_requirement_change tool is registered and available
+    /// in all pipeline stage conversations. Allows any pipeline to propose AC additions,
+    /// clarifications, or contradiction flags back to requirement files.
+    /// </summary>
+    public bool RequirementFeedbackEnabled { get; set; }
 }

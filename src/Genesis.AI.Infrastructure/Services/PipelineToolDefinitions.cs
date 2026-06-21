@@ -35,6 +35,7 @@ public static class PipelineToolDefinitions
     public const string InsertAdjacentHtml = "insert_adjacent_html";
     public const string RemoveElement = "remove_element";
     public const string ApplyToScope = "apply_to_scope";
+    public const string ProposeRequirementChange = "propose_requirement_change";
 
     /// <summary>
     /// Returns the tool list conditioned on <paramref name="options"/> and <paramref name="stageType"/>.
@@ -53,6 +54,11 @@ public static class PipelineToolDefinitions
             && Configuration.PhaseSkillMap.HasStageSkills(stageType.Value))
         {
             base_.RemoveAll(tool => tool.Name == GetGuardrailDetails);
+        }
+
+        if (options.RequirementFeedbackEnabled)
+        {
+            base_.Add(FeedbackToolBuilder.BuildProposeRequirementChangeTool());
         }
 
         if (!options.EditArtefactEnabled)
@@ -85,6 +91,7 @@ public static class PipelineToolDefinitions
         }
 
         base_.Add(PipelineToolDefinitionFactory.BuildSearchInArtefactTool());
+
         return base_.AsReadOnly();
     }
 }
