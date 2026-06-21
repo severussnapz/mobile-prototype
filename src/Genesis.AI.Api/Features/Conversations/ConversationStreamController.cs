@@ -790,6 +790,14 @@ public class ConversationStreamController : ControllerBase
             """;
     }
 
+    private static Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel ParseImpactLevel(string? value) =>
+        value?.ToLowerInvariant() switch
+        {
+            "possible" => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.Possible,
+            "definite" => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.Definite,
+            _ => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None
+        };
+
     private async Task SendToolStartSseEventAsync(AiToolCall toolCall, CancellationToken cancellationToken)
     {
         var description = toolCall.ToolName switch
@@ -1650,6 +1658,13 @@ public class ConversationStreamController : ControllerBase
                     ? $"pipeline_{(int)stageType.Value:D2}_{stageType.Value.ToString().ToLowerInvariant()}"
                     : "pipeline_unknown";
 
+                var csImpact = root.TryGetProperty("clinical_safety_impact", out var csProp)
+                    ? ParseImpactLevel(csProp.GetString()) : Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None;
+                var igImpact = root.TryGetProperty("ig_impact", out var igProp)
+                    ? ParseImpactLevel(igProp.GetString()) : Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None;
+                var secImpact = root.TryGetProperty("security_impact", out var secProp)
+                    ? ParseImpactLevel(secProp.GetString()) : Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None;
+
                 var command = new ProposeRequirementChangeCommand(
                     ProjectId: projectId,
                     ReqId: reqId,
@@ -1658,7 +1673,10 @@ public class ConversationStreamController : ControllerBase
                     RaisingPipelineConversationId: conversation.Id,
                     ProposedAcText: proposedAcText,
                     Rationale: rationale,
-                    CreatedBy: createdBy);
+                    CreatedBy: createdBy,
+                    ClinicalSafetyImpact: csImpact,
+                    IgImpact: igImpact,
+                    SecurityImpact: secImpact);
 
                 var result = await _proposeRequirementChangeHandler.Handle(command, cancellationToken);
 

@@ -42,9 +42,24 @@ internal static class FeedbackToolBuilder
                     "rationale": {
                         "type": "string",
                         "description": "Why this change is needed. For contradiction: describe both conflicting items verbatim."
+                    },
+                    "clinical_safety_impact": {
+                        "type": "string",
+                        "enum": ["none", "possible", "definite"],
+                        "description": "Clinical safety domain impact assessment. Use possible if there is any patient safety consideration, definite if DCB0129 hazard applies."
+                    },
+                    "ig_impact": {
+                        "type": "string",
+                        "enum": ["none", "possible", "definite"],
+                        "description": "Information governance domain impact. Use possible if UK GDPR/DSPT may apply, definite if Article 9 special category data or consent is involved."
+                    },
+                    "security_impact": {
+                        "type": "string",
+                        "enum": ["none", "possible", "definite"],
+                        "description": "Security domain impact. Use possible if authentication/authorisation or data access controls may be affected, definite if a security control is missing."
                     }
                 },
-                "required": ["req_id", "change_type", "rationale"]
+                "required": ["req_id", "change_type", "rationale", "clinical_safety_impact", "ig_impact", "security_impact"]
             }
             """));
     }

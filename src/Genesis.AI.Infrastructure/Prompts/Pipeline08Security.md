@@ -486,4 +486,8 @@ When you identify a gap, clarification need, or contradiction in a requirement d
 - For `gap` and `clarification`: provide `proposed_ac_text` starting with `- [ ]`
 - For `contradiction`: omit `proposed_ac_text`; describe the conflict in the rationale
 - Never use `edit_artefact` on files under `requirements/` — always use `propose_requirement_change`
-- Impact classification is set by the human in the UI — do not attempt to classify impact yourself
+- Classify domain impact as part of every proposal:
+  - clinical_safety_impact: none | possible | definite (possible if patient safety consideration exists, definite if DCB0129 hazard)
+  - ig_impact: none | possible | definite (possible if UK GDPR/DSPT may apply, definite if Article 9 or consent involved)
+  - security_impact: none | possible | definite (possible if access controls affected, definite if security control missing)
+- The human will confirm or override your classification on approval — give your best assessment
