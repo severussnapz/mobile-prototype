@@ -1,6 +1,6 @@
 CREATE TABLE requirement_changes (
     id                               uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id                       uuid         NOT NULL REFERENCES projects(id),
+    project_id                       uuid         NOT NULL,
     req_id                           varchar(50)  NOT NULL,
     change_type                      varchar(20)  NOT NULL,
     raising_pipeline                 varchar(50)  NOT NULL,

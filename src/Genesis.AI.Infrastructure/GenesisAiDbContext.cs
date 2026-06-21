@@ -71,5 +71,6 @@ public sealed class GenesisAiDbContext(
         modelBuilder.ApplyConfiguration(new ProjectDecisionEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new UiDeltaEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PrototypeLockEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new RequirementChangeEntityTypeConfiguration());
     }
 }

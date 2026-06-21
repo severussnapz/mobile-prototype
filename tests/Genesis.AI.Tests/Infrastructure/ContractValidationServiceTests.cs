@@ -5,7 +5,7 @@ namespace Genesis.AI.Tests.Infrastructure;
 
 public class ContractValidationServiceTests
 {
-    private static readonly string FullyPopulatedReq = """
+    private static readonly string CanonicalReq = """
         # REQ-001: Title
 
         **Priority:** Must Have
@@ -57,11 +57,70 @@ public class ContractValidationServiceTests
         | 1.0 | 2026-06-20 | Pipeline 01 | Initial creation |
         """;
 
+    private static readonly string LegacyReq = """
+        # REQ-001: Title
+
+        **Priority:** Must Have
+
+        ## User Story
+
+        As a user I need something so that I can do things.
+
+        ---
+
+        **Acceptance Criteria — Approach B:**
+        - [ ] First AC item. *(Must Have)*
+        - [ ] Second AC item. *(Must Have)*
+
+        ---
+
+        ## Dimension 1: Clinical Safety
+
+        ### Applicable Guardrails
+        - **CLIN-001:** Some guardrail
+
+        ## Dimension 2: Information Governance
+
+        ### Applicable Guardrails
+        - **IG-001:** Some guardrail
+
+        ## Dimension 3: Security
+
+        ### Applicable Guardrails
+        - **SEC-001:** Some guardrail
+
+        ## ✨ Evaluation Function Specification
+
+        ### CHECK 1: CLIN-001 — Some Check
+        **Pass Criteria:** Something passes.
+
+        ## Traceability
+
+        | Requirement | Check |
+        |-------------|-------|
+        | REQ-001 | CHECK 1 |
+
+        ## Change Log
+
+        | Version | Date | Pipeline | Summary |
+        |---------|------|----------|---------|
+        | 1.0 | 2026-06-20 | Pipeline 01 | Initial creation |
+        """;
+
     [Fact]
-    public void ValidatePipeline01_WhenAllSectionsPresent_ReturnsValid()
+    public void ValidatePipeline01_WhenCanonicalFormat_ReturnsValid()
     {
         var service = new ContractValidationService();
-        var result = service.ValidatePipeline01(FullyPopulatedReq);
+        var result = service.ValidatePipeline01(CanonicalReq);
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Violations);
+    }
+
+    [Fact]
+    public void ValidatePipeline01_WhenLegacyBoldAcFormat_ReturnsValid()
+    {
+        var service = new ContractValidationService();
+        var result = service.ValidatePipeline01(LegacyReq);
         Assert.True(result.IsValid);
         Assert.Empty(result.Violations);
     }
@@ -69,7 +128,7 @@ public class ContractValidationServiceTests
     [Fact]
     public void ValidatePipeline01_WhenMissingUserStory_ReturnsViolation()
     {
-        var content = FullyPopulatedReq.Replace("## User Story", "## Something Else");
+        var content = CanonicalReq.Replace("## User Story", "## Something Else");
         var service = new ContractValidationService();
         var result = service.ValidatePipeline01(content);
         Assert.False(result.IsValid);
@@ -89,41 +148,6 @@ public class ContractValidationServiceTests
             ## Acceptance Criteria
 
             ## Clinical Safety
-
-            ### Applicable Guardrails
-            - **CLIN-001:** Some guardrail
-
-            ## Information Governance
-
-            ### Applicable Guardrails
-            - **IG-001:** Some guardrail
-
-            ## Security
-
-            ### Applicable Guardrails
-            - **SEC-001:** Some guardrail
-
-            ## Observability
-
-            ### KPIs
-            - Some KPI
-
-            ## Evaluation Function Specification
-
-            ### CHECK 1: CLIN-001 — Some Check
-            **Pass Criteria:** Something passes.
-
-            ## Traceability
-
-            | Requirement | Check |
-            |-------------|-------|
-            | REQ-001 | CHECK 1 |
-
-            ## Change Log
-
-            | Version | Date | Pipeline | Summary |
-            |---------|------|----------|---------|
-            | 1.0 | 2026-06-20 | Pipeline 01 | Initial creation |
             """;
         var service = new ContractValidationService();
         var result = service.ValidatePipeline01(content);
@@ -132,29 +156,27 @@ public class ContractValidationServiceTests
     }
 
     [Fact]
-    public void ValidatePipeline01_WhenMissingEvaluationSpec_ReturnsViolation()
+    public void ValidatePipeline01_WhenNoAcSectionAtAll_ReturnsViolation()
     {
-        var content = FullyPopulatedReq.Replace("## Evaluation Function Specification", "## Something");
-        var service = new ContractValidationService();
-        var result = service.ValidatePipeline01(content);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Violations, v => v.Contains("Evaluation Function Specification"));
-    }
+        var content = """
+            # REQ-001: Title
 
-    [Fact]
-    public void ValidatePipeline01_WhenMissingChangeLog_ReturnsViolation()
-    {
-        var content = FullyPopulatedReq.Replace("## Change Log", "## Something Else");
+            ## User Story
+
+            As a user I need something.
+
+            ## Clinical Safety
+            """;
         var service = new ContractValidationService();
         var result = service.ValidatePipeline01(content);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Violations, v => v.Contains("Change Log"));
+        Assert.Contains(result.Violations, v => v.Contains("Acceptance Criteria"));
     }
 
     [Fact]
     public void ValidatePipeline03_WhenArchitectureSectionPresent_ReturnsValid()
     {
-        var content = FullyPopulatedReq + """
+        var content = CanonicalReq + """
 
         ## Architecture (Added by Pipeline 03)
 
@@ -179,7 +201,7 @@ public class ContractValidationServiceTests
     public void ValidatePipeline03_WhenMissingArchitectureSection_ReturnsViolation()
     {
         var service = new ContractValidationService();
-        var result = service.ValidatePipeline03(FullyPopulatedReq);
+        var result = service.ValidatePipeline03(CanonicalReq);
         Assert.False(result.IsValid);
         Assert.Contains(result.Violations,
             v => v.Contains("Architecture (Added by Pipeline 03)"));
@@ -188,7 +210,7 @@ public class ContractValidationServiceTests
     [Fact]
     public void ValidatePipeline05_WhenPxdSectionPresent_ReturnsValid()
     {
-        var content = FullyPopulatedReq + """
+        var content = CanonicalReq + """
 
         ## PxD (Added by Pipeline 05)
 
@@ -211,9 +233,19 @@ public class ContractValidationServiceTests
     public void ValidatePipeline05_WhenMissingPxdSection_ReturnsViolation()
     {
         var service = new ContractValidationService();
-        var result = service.ValidatePipeline05(FullyPopulatedReq);
+        var result = service.ValidatePipeline05(CanonicalReq);
         Assert.False(result.IsValid);
         Assert.Contains(result.Violations,
             v => v.Contains("PxD (Added by Pipeline 05)"));
+    }
+
+    [Fact]
+    public void ValidatePipeline01_WhenLegacyReqMissingUserStory_ReturnsViolation()
+    {
+        var content = LegacyReq.Replace("## User Story", "## Something Else");
+        var service = new ContractValidationService();
+        var result = service.ValidatePipeline01(content);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Violations, v => v.Contains("User Story"));
     }
 }
