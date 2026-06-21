@@ -43,6 +43,7 @@ public class ConversationStreamController : ControllerBase
     private readonly IActiveSkillsService _activeSkillsService;
     private readonly IFoundationService _foundationService;
     private readonly IPrototypeAssemblyService _prototypeAssemblyService;
+    private readonly IPrototypeFragmentMigrationService _prototypeFragmentMigrationService;
     private readonly IPrototypeDomSearchService? _prototypeDomSearchService;
     private readonly IPrototypeDomMutationService? _prototypeDomMutationService;
     private readonly TokenOptimisationOptions _tokenOptimisationOptions;
@@ -61,6 +62,7 @@ public class ConversationStreamController : ControllerBase
         IActiveSkillsService activeSkillsService,
         IFoundationService foundationService,
         IPrototypeAssemblyService prototypeAssemblyService,
+        IPrototypeFragmentMigrationService prototypeFragmentMigrationService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
         TimeProvider timeProvider,
         ILogger<ConversationStreamController> logger,
@@ -76,6 +78,7 @@ public class ConversationStreamController : ControllerBase
         _activeSkillsService = activeSkillsService ?? throw new ArgumentNullException(nameof(activeSkillsService));
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
         _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
+        _prototypeFragmentMigrationService = prototypeFragmentMigrationService ?? throw new ArgumentNullException(nameof(prototypeFragmentMigrationService));
         _prototypeDomSearchService = prototypeDomSearchService;
         _prototypeDomMutationService = prototypeDomMutationService;
         _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
@@ -191,6 +194,19 @@ public class ConversationStreamController : ControllerBase
         var artefactManifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
         var artefactManifestSection = BuildArtefactManifest(artefactManifest);
         var prototypeIntentDirective = BuildPrototypeIntentRoutingDirective(stageType, request.Content, artefactManifest);
+
+        // Prototype fragment migration — runs before LLM initialises, fully awaited (no race condition).
+        // Detection: prototype/fragments/_shell.html exists → skip. Monolith present → split into fragments.
+        // Pure C#, no LLM call, deterministic. Safe to call on every Prototype conversation.
+        if (stageType == StageType.Prototype)
+        {
+            await _prototypeFragmentMigrationService.MigrateIfNeededAsync(
+                projectId, initiatedBy: User.GetUserErn() ?? "system", cancellationToken);
+
+            // Refresh manifest so LLM sees the newly created fragment artefacts
+            artefactManifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
+            artefactManifestSection = BuildArtefactManifest(artefactManifest);
+        }
 
         // Build handover block if this conversation continues from a previous one that hit the tool limit.
         // Injected into the mutable system prompt so the AI knows where the previous session left off.

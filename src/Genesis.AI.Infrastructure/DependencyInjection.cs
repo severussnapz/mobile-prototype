@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IContractValidationService, ContractValidationService>();
         services.AddScoped<IPipelineReadinessService, PipelineReadinessService>();
         services.AddScoped<ProposeRequirementChangeCommandHandler>();
+        services.AddScoped<IPrototypeFragmentMigrationService, PrototypeFragmentMigrationService>();
         services.AddScoped<ApproveRequirementChangeCommandHandler>();
         services.AddScoped<UndoApproveRequirementChangeCommandHandler>();
         services.AddScoped<RejectRequirementChangeCommandHandler>();
