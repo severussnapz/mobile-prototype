@@ -105,6 +105,21 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
 
         var shellContent = document.DocumentElement?.OuterHtml ?? string.Empty;
 
+        // Inject GENESIS markers required by assembly service to stitch fragments back together.
+        // The migrated shell has no markers — inject them at the correct positions.
+        if (!shellContent.Contains("<!-- GENESIS:STYLES -->", StringComparison.Ordinal))
+        {
+            shellContent = shellContent.Replace(
+                "</head>", "<!-- GENESIS:STYLES -->\n</head>", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!shellContent.Contains("<!-- GENESIS:SCREENS -->", StringComparison.Ordinal))
+        {
+            shellContent = shellContent.Replace(
+                "</body>", "<!-- GENESIS:SCREENS -->\n<!-- GENESIS:NAV -->\n<!-- GENESIS:DATA -->\n<!-- GENESIS:APP -->\n</body>",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         // Inject prototype-metadata block if missing — required by assembly validation contract.
         if (!shellContent.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase))
         {
