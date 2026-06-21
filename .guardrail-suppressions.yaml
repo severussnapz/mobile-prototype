@@ -175,3 +175,11 @@ suppressions:
       for tests covering multiple methods or structural/wiring concerns (e.g.
       PipelinePrompt_ContainsProposeRequirementChangeTool). The convention is consistent
       across the test suite and provides equal readability.'
+
+  - id: ENG-009
+    path: 'src/Genesis.AI.Infrastructure/Services/PrototypeDomMutationHelper.cs'
+    justification:
+      'ApplyMutation has 25 statements — all are sequential switch cases for DOM operations
+      (SetAttribute, SetText, AddClass, RemoveClass, SwapClass, InsertAdjacentHtml, RemoveElement,
+      RemoveAttribute). Each case is 2-3 lines. Splitting into sub-methods would add indirection
+      with no clarity benefit for what is essentially a dispatch table.'

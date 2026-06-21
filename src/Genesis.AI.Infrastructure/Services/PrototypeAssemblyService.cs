@@ -136,7 +136,8 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
         var dataArtefact = latestByFilePath.FirstOrDefault(artefact =>
             artefact.FilePath.Equals(DataPath, StringComparison.OrdinalIgnoreCase));
 
-        if (screenCount > 0 && (stylesArtefact is null || appArtefact is null || dataArtefact is null))
+        // data.js is optional — legacy migrated prototypes embed data inline in _app.js
+        if (screenCount > 0 && (stylesArtefact is null || appArtefact is null))
         {
             _logger.LogWarning(
                 "PrototypeAssembly: screen fragments exist but required fragments missing " +

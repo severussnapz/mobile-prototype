@@ -260,4 +260,41 @@ public class PrototypeAssemblyServiceTests
         Assert.Contains("screen-01-patient-search", savedContent);
         Assert.Contains("screen-02-booking", savedContent);
     }
+    [Fact]
+    public async Task AssemblePrototypeAsync_WhenDataJsMissing_AssemblesSuccessfully()
+    {
+        // Regression guard: assembly was silently skipping when data.js was absent.
+        // Legacy migrated prototypes embed data inline in _app.js — data.js is optional.
+        var projectId = Guid.NewGuid();
+        var shell = CreateArtefact(projectId, "prototype/fragments/_shell.html", ValidShell());
+        var styles = CreateArtefact(projectId, "prototype/fragments/_styles.css", "body { color: #333; }");
+        var appJs = CreateArtefact(projectId, "prototype/fragments/_app.js", "const patients = []; function showScreen(id) {}");
+        var screen1 = CreateArtefact(projectId, "prototype/fragments/screen-01-inbox.html", "<section id=\"screen-01-inbox\">Inbox</section>");
+
+        // No data.js artefact created — this is the regression scenario
+
+        _artefactRepositoryMock
+            .Setup(repo => repo.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([shell, styles, appJs, screen1]);
+
+        _artefactRepositoryMock
+            .Setup(repo => repo.GetNextVersionForFileAsync(projectId, "prototype/index.html", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        _artefactStorageServiceMock
+            .Setup(storage => storage.SaveContentAsync(projectId, "prototype/index.html", 1,
+                It.IsAny<string>(), "text/html", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("projects/key/prototype/index.html/v1");
+
+        // Act — should NOT throw or skip
+        await _service.AssemblePrototypeAsync(projectId, CancellationToken.None);
+
+        // Assert — index.html was saved (assembly ran)
+        _artefactStorageServiceMock.Verify(
+            storage => storage.SaveContentAsync(
+                projectId, "prototype/index.html", It.IsAny<int>(),
+                It.IsAny<string>(), "text/html", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
 }

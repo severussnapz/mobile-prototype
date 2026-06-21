@@ -10,6 +10,7 @@ You are in STATE 1 - fragments exist. Pick ONE tool, call it ONCE, trust the res
 What are you changing?
 - One specific HTML element: search_in_artefact to get node_id, then set_node_attribute or set_node_text
 - Same property across multiple HTML elements: apply_to_scope - one call, done
+- Swap one CSS class for another across multiple elements: apply_to_scope with operation=swap_class, value=old-class:new-class - one call, atomic
 - CSS rules or variables: save_artefact on prototype/fragments/_styles.css
 - JavaScript functions or logic: save_artefact on prototype/fragments/_app.js
 - Shell structure or nav: save_artefact on prototype/fragments/_shell.html
@@ -46,13 +47,18 @@ Wrong: search for each button, then set_node_attribute x N - causes offset error
 
 ### Class swap pattern
 
-To swap class A for class B across multiple elements - two sequential calls, no search between them:
+Use swap_class to atomically replace one class with another - ONE call, done.
 
-Call 1: apply_to_scope remove_class A (scope=X, selector=Y)
-Call 2: apply_to_scope add_class B (same scope=X, same selector=Y but without class A)
+apply_to_scope({
+  scope: "screen-01-legacy",
+  selector: "button.btn-danger",
+  operation: "swap_class",
+  value: "btn-danger:btn-primary",
+  strategy: "literal"
+})
 
-Do NOT search between call 1 and call 2. The selector changes after call 1 removes the class.
-For call 2 use a selector that still matches the elements (e.g. a parent scope or a shared class).
+The API removes btn-danger and adds btn-primary atomically on every matched element.
+Never use remove_class + add_class as two separate calls for a class swap.
 
 ### Assembly
 

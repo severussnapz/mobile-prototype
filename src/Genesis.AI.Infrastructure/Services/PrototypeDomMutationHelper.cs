@@ -75,6 +75,13 @@ internal static class PrototypeDomMutationHelper
                 if (string.IsNullOrWhiteSpace(attribute)) { return "attribute is required for RemoveAttribute"; }
                 element.RemoveAttribute(attribute);
                 return null;
+            case PrototypeDomMutationOperation.SwapClass:
+                if (string.IsNullOrWhiteSpace(value)) { return "value is required for SwapClass — format: old-class:new-class"; }
+                var swapParts = value.Split(':', 2);
+                if (swapParts.Length != 2) { return "SwapClass value must be in format old-class:new-class"; }
+                element.ClassList.Remove(swapParts[0].Trim());
+                element.ClassList.Add(swapParts[1].Trim());
+                return null;
             default:
                 return "unsupported operation";
         }

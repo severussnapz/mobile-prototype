@@ -937,4 +937,72 @@ public class PrototypeDomMutationServiceTests
             TimeProvider.System,
             true);
     }
+    [Fact]
+    public async Task ApplyBatchMutationAsync_SwapClass_RemovesOldAndAddsNewAtomically()
+    {
+        // swap_class must be atomic — removes old class and adds new class in one operation
+        // so the agent never needs two separate apply_to_scope calls for a class swap
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string storageKey = "s3://fragment-v1";
+        const string original = "<section><button data-genesis-id=\"NODE-1\" class=\"btn btn-danger\">Reject</button><button data-genesis-id=\"NODE-2\" class=\"btn btn-danger\">Delete</button></section>";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        var prototypeAssemblyService = new Mock<IPrototypeAssemblyService>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+
+        artefactRepository.Setup(r => r.UnitOfWork).Returns(unitOfWork.Object);
+        unitOfWork.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        artefactRepository.Setup(r => r.GetByProjectAndFilePathAsync(projectId, fragmentPath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreatePublishedArtefact(projectId, fragmentPath, storageKey, 1));
+        artefactRepository.Setup(r => r.GetNextVersionForFileAsync(projectId, fragmentPath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+        artefactRepository.Setup(r => r.AddAsync(It.IsAny<Artefact>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        artefactRepository.Setup(r => r.DeletePreviousVersionsAsync(projectId, fragmentPath, 2, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        artefactStorageService.Setup(s => s.GetContentAsync(storageKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(original);
+
+        string? persistedContent = null;
+        artefactStorageService.Setup(s => s.SaveContentAsync(projectId, fragmentPath, 2, It.IsAny<string>(), "text/html", It.IsAny<CancellationToken>()))
+            .Callback<Guid, string, int, string, string, CancellationToken>((_, _, _, content, _, _) => persistedContent = content)
+            .ReturnsAsync("s3://fragment-v2");
+
+        var sut = new PrototypeDomMutationService(
+            NullLogger<PrototypeDomMutationService>.Instance,
+            artefactRepository.Object,
+            artefactStorageService.Object,
+            prototypeAssemblyService.Object,
+            TimeProvider.System);
+
+        var requests = new[]
+        {
+            new PrototypeDomMutationRequest(
+                ProjectId: projectId,
+                FragmentPath: fragmentPath,
+                NodeKey: "NODE-1",
+                Operation: PrototypeDomMutationOperation.SwapClass,
+                Attribute: null,
+                Value: "btn-danger:btn-primary",
+                CreatedBy: "test"),
+            new PrototypeDomMutationRequest(
+                ProjectId: projectId,
+                FragmentPath: fragmentPath,
+                NodeKey: "NODE-2",
+                Operation: PrototypeDomMutationOperation.SwapClass,
+                Attribute: null,
+                Value: "btn-danger:btn-primary",
+                CreatedBy: "test"),
+        };
+
+        var result = await sut.ApplyBatchMutationAsync(requests, CancellationToken.None);
+
+        Assert.Equal(2, result.SuccessfulMutations);
+        Assert.NotNull(persistedContent);
+        Assert.DoesNotContain("btn-danger", persistedContent);
+        Assert.Contains("btn-primary", persistedContent);
+    }
+
 }

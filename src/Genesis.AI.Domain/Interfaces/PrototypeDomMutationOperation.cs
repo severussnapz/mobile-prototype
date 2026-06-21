@@ -8,5 +8,6 @@ public enum PrototypeDomMutationOperation
     RemoveClass = 4,
     InsertAdjacentHtml = 5,
     RemoveElement = 6,
-    RemoveAttribute = 7
+    RemoveAttribute = 7,
+    SwapClass = 8
 }

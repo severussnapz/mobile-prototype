@@ -182,8 +182,8 @@ internal static class PrototypeDomToolBuilder
                     },
                     "operation": {
                         "type": "string",
-                        "enum": ["set_attribute", "add_class", "remove_class", "set_text", "remove_attribute", "insert_adjacent_html"],
-                        "description": "DOM operation to apply to all matched elements"
+                        "enum": ["set_attribute", "add_class", "remove_class", "swap_class", "set_text", "remove_attribute", "insert_adjacent_html"],
+                        "description": "DOM operation to apply to all matched elements. swap_class removes old class and adds new class atomically — value format: old-class:new-class"
                     },
                     "attribute": {
                         "type": "string",
