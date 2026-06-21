@@ -573,4 +573,26 @@ public sealed class PrototypeFragmentMigrationTests
         Assert.Contains("prototype-metadata", savedShell);
     }
 
+    [Fact]
+    public async Task WhenMonolithHasNoPrototypeBanner_ShellFragmentContainsInjectedBanner()
+    {
+        // Regression guard: legacy prototypes may not have the exact banner string
+        // required by assembly validation. Migration must inject it.
+        var projectId = Guid.NewGuid();
+        string? savedShell = null;
+        var (storage, _, _, sut) = BuildSut(projectId, MonolithicHtml);
+
+        storage
+            .Setup(s => s.SaveContentAsync(projectId, "prototype/fragments/_shell.html",
+                It.IsAny<int>(), It.IsAny<string>(), "text/html", It.IsAny<CancellationToken>()))
+            .Callback<Guid, string, int, string, string, CancellationToken>(
+                (_, _, _, content, _, _) => savedShell = content)
+            .ReturnsAsync("s3-key");
+
+        await sut.MigrateIfNeededAsync(projectId, "idris.issa", CancellationToken.None);
+
+        Assert.NotNull(savedShell);
+        Assert.Contains("PROTOTYPE ONLY", savedShell);
+    }
+
 }

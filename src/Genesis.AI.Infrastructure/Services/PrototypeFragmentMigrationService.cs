@@ -106,7 +106,6 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
         var shellContent = document.DocumentElement?.OuterHtml ?? string.Empty;
 
         // Inject prototype-metadata block if missing — required by assembly validation contract.
-        // Legacy prototypes built before the metadata contract do not have this block.
         if (!shellContent.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase))
         {
             var metadataStub = "<script id=\"prototype-metadata\" type=\"application/json\">\n"
@@ -115,6 +114,14 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
                 + "\"flows\":[],\"privacySafetyConstraints\":[\"no real data\"]}\n"
                 + "</script>";
             shellContent = shellContent.Replace("</head>", metadataStub + "\n</head>",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Inject prototype banner if missing — required by assembly validation contract.
+        if (!shellContent.Contains(PrototypeBanner, StringComparison.Ordinal))
+        {
+            var bannerHtml = $"<div class=\"proto-banner\">{PrototypeBanner}</div>";
+            shellContent = shellContent.Replace("<body>", "<body>\n" + bannerHtml,
                 StringComparison.OrdinalIgnoreCase);
         }
 
@@ -127,20 +134,35 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
     }
 
+    private const string PrototypeBanner = "⚠️ PROTOTYPE ONLY — Requirements validation artefact. Not for production use.";
+
     private async Task InjectMetadataIntoShellAsync(
         Guid projectId,
         Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact shellArtefact,
         string shellContent,
         CancellationToken cancellationToken)
     {
-        var metadataStub = "<script id=\"prototype-metadata\" type=\"application/json\">\n"
-            + "{\"contractVersion\":\"1.0\",\"stageCode\":\"prototype\",\"prototypeOnly\":true,"
-            + "\"generatedAtUtc\":\"2026-01-01T00:00:00Z\",\"requirementsCovered\":[],"
-            + "\"flows\":[],\"privacySafetyConstraints\":[\"no real data\"]}\n"
-            + "</script>";
+        var updatedShell = shellContent;
 
-        var updatedShell = shellContent.Replace("</head>", metadataStub + "\n</head>",
-            StringComparison.OrdinalIgnoreCase);
+        // Inject prototype-metadata block if missing
+        if (!updatedShell.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase))
+        {
+            var metadataStub = "<script id=\"prototype-metadata\" type=\"application/json\">\n"
+                + "{\"contractVersion\":\"1.0\",\"stageCode\":\"prototype\",\"prototypeOnly\":true,"
+                + "\"generatedAtUtc\":\"2026-01-01T00:00:00Z\",\"requirementsCovered\":[],"
+                + "\"flows\":[],\"privacySafetyConstraints\":[\"no real data\"]}\n"
+                + "</script>";
+            updatedShell = updatedShell.Replace("</head>", metadataStub + "\n</head>",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Inject prototype banner if missing
+        if (!updatedShell.Contains(PrototypeBanner, StringComparison.Ordinal))
+        {
+            var bannerHtml = $"<div class=\"proto-banner\">{PrototypeBanner}</div>";
+            updatedShell = updatedShell.Replace("<body>", "<body>\n" + bannerHtml,
+                StringComparison.OrdinalIgnoreCase);
+        }
 
         await SaveFragmentAsync(projectId, ShellFragmentPath, updatedShell, "text/html",
             "system-migration", cancellationToken);
