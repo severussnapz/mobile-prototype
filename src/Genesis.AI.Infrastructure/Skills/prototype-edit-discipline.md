@@ -44,6 +44,16 @@ apply_to_scope({
 
 Wrong: search for each button, then set_node_attribute x N - causes offset errors.
 
+### Class swap pattern
+
+To swap class A for class B across multiple elements - two sequential calls, no search between them:
+
+Call 1: apply_to_scope remove_class A (scope=X, selector=Y)
+Call 2: apply_to_scope add_class B (same scope=X, same selector=Y but without class A)
+
+Do NOT search between call 1 and call 2. The selector changes after call 1 removes the class.
+For call 2 use a selector that still matches the elements (e.g. a parent scope or a shared class).
+
 ### Assembly
 
 The platform automatically reassembles prototype/index.html after every fragment save or DOM mutation. Do NOT save prototype/index.html directly.
