@@ -116,9 +116,14 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
 
         if (!shellContent.Contains("<!-- GENESIS:SCREENS -->", StringComparison.Ordinal))
         {
+            const string footerAnchor = "<div style=\"background:#1a1a2e";
+            var insertionPoint = shellContent.Contains(footerAnchor, StringComparison.Ordinal)
+                ? footerAnchor
+                : "</body>";
             shellContent = shellContent.Replace(
-                "</body>", "<!-- GENESIS:SCREENS -->\n<!-- GENESIS:NAV -->\n<!-- GENESIS:DATA -->\n<!-- GENESIS:APP -->\n</body>",
-                StringComparison.OrdinalIgnoreCase);
+                insertionPoint,
+                "<!-- GENESIS:SCREENS -->\n<!-- GENESIS:NAV -->\n<!-- GENESIS:DATA -->\n<!-- GENESIS:APP -->\n" + insertionPoint,
+                StringComparison.Ordinal);
         }
 
         // Inject prototype-metadata block if missing — required by assembly validation contract.
@@ -169,10 +174,14 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
 
         if (!updatedShell.Contains("<!-- GENESIS:SCREENS -->", StringComparison.Ordinal))
         {
+            const string footerAnchor = "<div style=\"background:#1a1a2e";
+            var insertionPoint = updatedShell.Contains(footerAnchor, StringComparison.Ordinal)
+                ? footerAnchor
+                : "</body>";
             updatedShell = updatedShell.Replace(
-                "</body>",
-                "<!-- GENESIS:SCREENS -->\n<!-- GENESIS:NAV -->\n<!-- GENESIS:DATA -->\n<!-- GENESIS:APP -->\n</body>",
-                StringComparison.OrdinalIgnoreCase);
+                insertionPoint,
+                "<!-- GENESIS:SCREENS -->\n<!-- GENESIS:NAV -->\n<!-- GENESIS:DATA -->\n<!-- GENESIS:APP -->\n" + insertionPoint,
+                StringComparison.Ordinal);
         }
 
         // Inject prototype-metadata block if missing
