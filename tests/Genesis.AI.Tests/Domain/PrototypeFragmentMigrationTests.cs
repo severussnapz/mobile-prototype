@@ -595,4 +595,40 @@ public sealed class PrototypeFragmentMigrationTests
         Assert.Contains("PROTOTYPE ONLY", savedShell);
     }
 
+    [Fact]
+    public async Task WhenShellExistsWithMetadataButNoGenesisMarkers_PatchesAndReassembles()
+    {
+        var projectId = Guid.NewGuid();
+        string? savedShell = null;
+        var storageMock = new Mock<IArtefactStorageService>();
+        var repoMock = new Mock<IArtefactRepository>();
+        var assemblyMock = new Mock<IPrototypeAssemblyService>();
+        var unitOfWorkMock = new Mock<Genesis.AI.Core.Data.IUnitOfWork>();
+        repoMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
+        unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        const string shellNoMarkers =
+            "<!DOCTYPE html><html><head>" +
+            "<script id=\"prototype-metadata\" type=\"application/json\">{}</script>" +
+            "</head><body>" +
+            "<p>\u26a0\ufe0f PROTOTYPE ONLY \u2014 custom banner</p>" +
+            "<nav>nav</nav><main>content</main>" +
+            "</body></html>";
+        var shellArtefact = MakeArtefact(projectId, "prototype/fragments/_shell.html", "s3-shell-key");
+        repoMock.Setup(r => r.GetByProjectAndFilePathAsync(projectId, "prototype/fragments/_shell.html", It.IsAny<CancellationToken>())).ReturnsAsync(shellArtefact);
+        storageMock.Setup(s => s.GetContentAsync("s3-shell-key", It.IsAny<CancellationToken>())).ReturnsAsync(shellNoMarkers);
+        storageMock.Setup(s => s.SaveContentAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, string, int, string, string, CancellationToken>((_, _, _, c, _, _) => savedShell = c)
+            .ReturnsAsync("s3-new-key");
+        repoMock.Setup(r => r.GetNextVersionForFileAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(2);
+        repoMock.Setup(r => r.AddAsync(It.IsAny<Artefact>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var sut = new PrototypeFragmentMigrationService(storageMock.Object, repoMock.Object, assemblyMock.Object, TimeProvider.System);
+        var result = await sut.MigrateIfNeededAsync(projectId, "idris.issa", CancellationToken.None);
+        Assert.True(result.Migrated);
+        Assert.NotNull(savedShell);
+        Assert.Contains("<!-- GENESIS:STYLES -->", savedShell);
+        Assert.Contains("<!-- GENESIS:SCREENS -->", savedShell);
+        Assert.Contains("<!-- GENESIS:APP -->", savedShell);
+        assemblyMock.Verify(a => a.AssemblePrototypeAsync(projectId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
 }

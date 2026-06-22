@@ -46,7 +46,8 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
                 shellArtefact.S3Key, cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(shellContent) &&
-                !shellContent.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase))
+                (!shellContent.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase) ||
+                 !shellContent.Contains("<!-- GENESIS:STYLES -->", StringComparison.Ordinal)))
             {
                 await InjectMetadataIntoShellAsync(projectId, shellArtefact, shellContent, cancellationToken);
                 return new PrototypeFragmentMigrationResult(Migrated: true);
@@ -158,6 +159,21 @@ public sealed class PrototypeFragmentMigrationService : IPrototypeFragmentMigrat
         CancellationToken cancellationToken)
     {
         var updatedShell = shellContent;
+
+        // Inject GENESIS markers if missing — required by assembly service
+        if (!updatedShell.Contains("<!-- GENESIS:STYLES -->", StringComparison.Ordinal))
+        {
+            updatedShell = updatedShell.Replace(
+                "</head>", "<!-- GENESIS:STYLES -->\n</head>", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!updatedShell.Contains("<!-- GENESIS:SCREENS -->", StringComparison.Ordinal))
+        {
+            updatedShell = updatedShell.Replace(
+                "</body>",
+                "<!-- GENESIS:SCREENS -->\n<!-- GENESIS:NAV -->\n<!-- GENESIS:DATA -->\n<!-- GENESIS:APP -->\n</body>",
+                StringComparison.OrdinalIgnoreCase);
+        }
 
         // Inject prototype-metadata block if missing
         if (!updatedShell.Contains("prototype-metadata", StringComparison.OrdinalIgnoreCase))
