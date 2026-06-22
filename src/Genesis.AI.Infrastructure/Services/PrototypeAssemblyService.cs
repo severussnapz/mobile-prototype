@@ -184,7 +184,10 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
                 $"<li><a href=\"#{screenId}\" onclick=\"showScreen('{screenId}')\">{navLabel}</a></li>");
         }
 
-        return (screensBuilder.ToString(), navBuilder.ToString());
+        var navHtml = navBuilder.Length > 0
+            ? $"<ul>\n{navBuilder}</ul>"
+            : string.Empty;
+        return (screensBuilder.ToString(), navHtml);
     }
 
     private static string BuildAssembledDocument(
@@ -193,12 +196,17 @@ public sealed class PrototypeAssemblyService : IPrototypeAssemblyService
         string screensHtml,
         string navHtml)
     {
-        return shell
+        var assembled = shell
             .Replace(MarkerStyles, $"<style>\n{fragments.Styles}\n</style>", StringComparison.Ordinal)
             .Replace(MarkerNav, navHtml, StringComparison.Ordinal)
             .Replace(MarkerScreens, screensHtml, StringComparison.Ordinal)
             .Replace(MarkerData, $"<script>\n{fragments.DataJs}\n</script>", StringComparison.Ordinal)
             .Replace(MarkerApp, $"<script>\n{fragments.AppJs}\n</script>", StringComparison.Ordinal);
+        if (!assembled.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+        {
+            assembled = "<!DOCTYPE html>\n" + assembled;
+        }
+        return assembled;
     }
 
     private static string? ValidateAssembledOutput(string html)
