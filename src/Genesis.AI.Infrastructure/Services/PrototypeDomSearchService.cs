@@ -256,4 +256,52 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
 
         return [];
     }
+
+    public async Task<PrototypeDomSearchResult> ListAllInScopeAsync(
+        Guid projectId,
+        string scope,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+        {
+            return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
+        }
+
+        var prototypeFragments = await LoadPrototypeFragmentsAsync(projectId, cancellationToken);
+        if (prototypeFragments.Count == 0)
+        {
+            return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
+        }
+
+        var targetFragment = prototypeFragments.FirstOrDefault(fragment =>
+            System.IO.Path.GetFileNameWithoutExtension(fragment.FragmentPath)
+                .Equals(scope, StringComparison.OrdinalIgnoreCase));
+
+        if (string.IsNullOrEmpty(targetFragment.FragmentPath))
+        {
+            return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
+        }
+
+        var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
+        var document = await browsingContext.OpenAsync(
+            response => response.Content(targetFragment.Content), cancellationToken);
+
+        var elements = document.All
+            .OfType<IElement>()
+            .Where(element => !ExcludedTags.Contains(element.TagName))
+            .Select(element => PrototypeDomSearchHelper.BuildSearchMatch(targetFragment.FragmentPath, element))
+            .DistinctBy(match => match.NodeKey)
+            .Take(MaxResultCount)
+            .ToList();
+
+        _logger.LogInformation(
+            "PrototypeDomSearchService ListAllInScopeAsync for project {ProjectId}: scope={Scope}, elementsFound={Count}",
+            projectId, scope, elements.Count);
+
+        return new PrototypeDomSearchResult(
+            Matches: elements,
+            Truncated: false,
+            TotalMatches: elements.Count);
+    }
+
 }

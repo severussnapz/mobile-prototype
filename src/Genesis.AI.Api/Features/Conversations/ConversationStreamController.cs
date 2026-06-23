@@ -1650,7 +1650,26 @@ public class ConversationStreamController : ControllerBase
                 if (listResult.Matches.Count == 0)
                 {
                     _logger.LogWarning("apply_to_scope: no elements matched selector='{Selector}' scope='{Scope}'", selector, scope);
-                    return $"apply_to_scope: no elements found matching selector='{selector}' in scope='{scope}'. Verify the selector and scope are correct.";
+
+                    // Plan 3f enforcement: refuse to write. Return the elements ACTUALLY present in the
+                    // scope so the correct selector is discoverable. A wrong selector can never be
+                    // silently written, and the agent cannot narrate false success.
+                    var actualElements = await _prototypeDomSearchService.ListAllInScopeAsync(
+                        projectId, scope, cancellationToken);
+
+                    if (actualElements.Matches.Count == 0)
+                        return $"apply_to_scope: no elements matched selector='{selector}' and scope='{scope}' contains no editable elements. " +
+                               "Verify the scope is a real fragment name (filename without extension). Ask the user to paste the HTML element from the browser inspector.";
+
+                    var present = actualElements.Matches.Take(10).Select(match =>
+                    {
+                        var cls = match.ClassList.Count > 0 ? "." + string.Join(".", match.ClassList) : "(no class)";
+                        return $"  {match.TagName} {cls} — \"{match.TextSnippet}\"";
+                    });
+                    return $"NOTHING WAS WRITTEN. selector='{selector}' matched 0 elements in scope='{scope}'. " +
+                           $"Do NOT claim success. The elements actually present in this scope are:\n" +
+                           string.Join("\n", present) + "\n\n" +
+                           "Use a selector taken from the list above (do not invent one), or ask the user to paste the exact HTML element.";
                 }
 
                 // Derive values using the selected strategy

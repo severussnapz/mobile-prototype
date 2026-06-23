@@ -756,6 +756,66 @@ public class PrototypeDomSearchServiceTests
         Assert.Empty(result.Matches);
     }
 
+    // ── Plan 3f: wrong selector finds nothing ───────────────────────────────────
+    [Fact]
+    public async Task ListAllAsync_WhenAgentSelectorIsWrong_MatchesNothing()
+    {
+        // The agent guesses ".smart-view-item" but the real class is ".sv-item" — must match nothing.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://screen-01-legacy";
+        const string html = """
+<aside class="smart-views">
+  <div class="sv-item" id="sv-all">All documents</div>
+  <div class="sv-item" id="sv-urgent">Urgent Letters</div>
+</aside>
+""";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
+
+        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
+
+        var result = await service.ListAllAsync(
+            new PrototypeDomListRequest(projectId, ".smart-view-item", null, "user"),
+            CancellationToken.None);
+
+        Assert.Empty(result.Matches);
+    }
+
+    // ── Plan 3f: real elements stay discoverable via scope listing ───────────────
+    [Fact]
+    public async Task ListAllInScopeAsync_WhenCalledForScope_ReturnsActualElementsWithRealClasses()
+    {
+        // The scope-wide listing returns the elements ACTUALLY present (with their real classes)
+        // so the correct selector is discoverable and a wrong selector can never be silently written.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://screen-01-legacy";
+        const string html = """
+<aside class="smart-views">
+  <div class="sv-item" id="sv-all">All documents</div>
+  <div class="sv-item" id="sv-urgent">Urgent Letters</div>
+  <div class="sv-item" id="sv-cardiology">Cardiology Follow-up</div>
+</aside>
+""";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
+
+        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
+
+        var result = await service.ListAllInScopeAsync(projectId, "screen-01-legacy", CancellationToken.None);
+
+        Assert.Contains(result.Matches, m => m.ClassList.Contains("sv-item"));
+    }
+
     private static Artefact CreatePublishedArtefact(Guid projectId, string filePath, string s3Key, int version)
     {
         return Artefact.CreateS3Artefact(
