@@ -1452,28 +1452,6 @@ public class ConversationStreamController : ControllerBase
                                "Replace ... with operation, attribute, strategy as needed.";
                     }
 
-                    // Check if all matches share the same CSS class — if so treat as bulk operation
-                    var allClasses = domResult.Matches
-                        .Where(match => match.ClassList.Count > 0)
-                        .Select(match => match.ClassList[0])
-                        .Distinct()
-                        .ToList();
-                    var allFragments = domResult.Matches
-                        .Select(match => match.FragmentPath)
-                        .Distinct()
-                        .ToList();
-
-                    if (allClasses.Count == 1 && allFragments.Count == 1)
-                    {
-                        // All matches share one class in one fragment — return bulk apply_to_scope call
-                        var bulkScope = System.IO.Path.GetFileNameWithoutExtension(allFragments[0]);
-                        var bulkSelector = $".{allClasses[0]}";
-                        return $"Found {domResult.Matches.Count} elements matching '{query}' — all share class '{allClasses[0]}' in fragment '{allFragments[0]}'.\n\n" +
-                               $"Ready to apply bulk operation. Use this exact call:\n" +
-                               $"  apply_to_scope(scope=\"{bulkScope}\", selector=\"{bulkSelector}\", ...)\n\n" +
-                               "Replace ... with operation, attribute, strategy as needed.";
-                    }
-
                     var candidateLines = domResult.Matches.Take(5).Select((match, index) =>
                         $"  [{index + 1}] node_id: {match.NodeKey} | tag: {match.TagName} | text: {match.TextSnippet}");
                     return $"Found {domResult.Matches.Count} multiple/ambiguous matches for '{query}':\n" +
