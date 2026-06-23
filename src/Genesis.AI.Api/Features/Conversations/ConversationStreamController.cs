@@ -1661,6 +1661,18 @@ public class ConversationStreamController : ControllerBase
                         return $"apply_to_scope: no elements matched selector='{selector}' and scope='{scope}' contains no editable elements. " +
                                "Verify the scope is a real fragment name (filename without extension). Ask the user to paste the HTML element from the browser inspector.";
 
+                    // If the scope's elements collapse to one shared class, name it as the confirmed
+                    // selector — the agent must retry with exactly this, never its own guess.
+                    var confirmedSelector = await _prototypeDomSearchService.ResolveConfirmedSelectorForScope(
+                        projectId, scope, cancellationToken);
+                    if (confirmedSelector is not null)
+                    {
+                        return $"NOTHING WAS WRITTEN. selector='{selector}' matched 0 elements in scope='{scope}'. " +
+                               $"The confirmed selector for this scope is '{confirmedSelector}'. " +
+                               $"Retry apply_to_scope now with selector='{confirmedSelector}' and the same operation/attribute/strategy. " +
+                               "Do not respond to the user until a write succeeds.";
+                    }
+
                     var present = actualElements.Matches.Take(10).Select(match =>
                     {
                         var cls = match.ClassList.Count > 0 ? "." + string.Join(".", match.ClassList) : "(no class)";

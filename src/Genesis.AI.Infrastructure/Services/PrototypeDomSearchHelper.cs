@@ -140,4 +140,29 @@ internal static class PrototypeDomSearchHelper
     {
         return value.Normalize(System.Text.NormalizationForm.FormC);
     }
+
+    /// <summary>
+    /// Returns the single class shared by every match that carries a class, or null when the
+    /// matches do not collapse to exactly one shared class. Elements with no class are ignored
+    /// so structural containers do not dilute detection. Pure and domain-agnostic.
+    /// </summary>
+    internal static string? FindSingleSharedClass(IReadOnlyList<PrototypeDomSearchMatch> matches)
+    {
+        var classedElements = matches
+            .Where(match => match.ClassList.Count > 0)
+            .Select(match => (IReadOnlyCollection<string>)match.ClassList)
+            .ToList();
+
+        if (classedElements.Count == 0)
+        {
+            return null;
+        }
+
+        var sharedClasses = classedElements
+            .Aggregate((accumulated, next) => accumulated.Intersect(next).ToList())
+            .ToList();
+
+        return sharedClasses.Count == 1 ? sharedClasses[0] : null;
+    }
+
 }

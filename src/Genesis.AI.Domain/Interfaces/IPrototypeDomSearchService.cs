@@ -24,4 +24,14 @@ public interface IPrototypeDomSearchService
         Guid projectId,
         string scope,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the single CSS class selector shared by ALL editable elements in a scope, as ".class".
+    /// Returns null when the elements do not collapse to exactly one shared class (genuinely ambiguous).
+    /// Domain-agnostic: reasons about how many distinct selectors describe what is present, not meaning.
+    /// </summary>
+    Task<string?> ResolveConfirmedSelectorForScope(
+        Guid projectId,
+        string scope,
+        CancellationToken cancellationToken);
 }

@@ -304,4 +304,20 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
             TotalMatches: elements.Count);
     }
 
+
+    public async Task<string?> ResolveConfirmedSelectorForScope(
+        Guid projectId,
+        string scope,
+        CancellationToken cancellationToken)
+    {
+        var elements = await ListAllInScopeAsync(projectId, scope, cancellationToken);
+        if (elements.Matches.Count == 0)
+        {
+            return null;
+        }
+
+        var sharedClass = PrototypeDomSearchHelper.FindSingleSharedClass(elements.Matches);
+        return sharedClass is null ? null : $".{sharedClass}";
+    }
+
 }

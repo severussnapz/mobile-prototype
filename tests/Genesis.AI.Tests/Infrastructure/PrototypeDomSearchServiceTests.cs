@@ -816,6 +816,63 @@ public class PrototypeDomSearchServiceTests
         Assert.Contains(result.Matches, m => m.ClassList.Contains("sv-item"));
     }
 
+    // ── Plan 3f: confirmed single selector when scope is unambiguous ─────────────
+    [Fact]
+    public async Task ResolveConfirmedSelectorForScope_WhenAllElementsShareOneClass_ReturnsThatSelector()
+    {
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://screen-01-legacy";
+        const string html = """
+<aside>
+  <div class="sv-item" id="sv-all">All documents</div>
+  <div class="sv-item" id="sv-urgent">Urgent Letters</div>
+  <div class="sv-item" id="sv-card">Cardiology Follow-up</div>
+</aside>
+""";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
+
+        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
+
+        var confirmed = await service.ResolveConfirmedSelectorForScope(projectId, "screen-01-legacy", CancellationToken.None);
+
+        Assert.Equal(".sv-item", confirmed);
+    }
+
+    // ── Plan 3f: ambiguous scope returns null so caller lists and asks ───────────
+    [Fact]
+    public async Task ResolveConfirmedSelectorForScope_WhenElementsHaveNoSingleSharedClass_ReturnsNull()
+    {
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://screen-01-legacy";
+        const string html = """
+<aside>
+  <div class="sv-item" id="a">One</div>
+  <nav class="nav-link" id="b">Two</nav>
+  <span class="chip" id="c">Three</span>
+</aside>
+""";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
+
+        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
+
+        var confirmed = await service.ResolveConfirmedSelectorForScope(projectId, "screen-01-legacy", CancellationToken.None);
+
+        Assert.Null(confirmed);
+    }
+
+
     private static Artefact CreatePublishedArtefact(Guid projectId, string filePath, string s3Key, int version)
     {
         return Artefact.CreateS3Artefact(
