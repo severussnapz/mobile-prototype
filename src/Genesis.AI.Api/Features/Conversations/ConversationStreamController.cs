@@ -1757,7 +1757,7 @@ public class ConversationStreamController : ControllerBase
                 }
 
                 // Log failures for debugging
-                foreach (var failedResult in batchResult.Results.Where(r => !r.Success))
+                foreach (var failedResult in batchResult.Results.Where(result => !result.Success))
                     _logger.LogWarning("apply_to_scope failure: node={NodeKey} message={Message}", failedResult.NodeKey, failedResult.Message);
 
                 var failures = batchResult.Results
