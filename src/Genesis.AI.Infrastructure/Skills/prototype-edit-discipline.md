@@ -37,6 +37,7 @@ You are in STATE 1 - fragments exist. Pick ONE tool, call it ONCE, trust the res
 What are you changing?
 - One specific HTML element: search_in_artefact on the fragment → set_node_attribute or set_node_text
 - Same property across multiple HTML elements: search_in_artefact on the fragment → apply_to_scope
+- Add new HTML element near existing elements: search_in_artefact to confirm selector → apply_to_scope with operation=insert_adjacent_html (attribute=afterend to insert after, afterbegin to insert inside at start, beforeend to insert inside at end)
 - Swap one CSS class for another across multiple elements: search_in_artefact on the fragment → apply_to_scope with operation=swap_class
 - CSS rules or variables: save_artefact on prototype/fragments/_styles.css
 - JavaScript functions or logic: save_artefact on prototype/fragments/_app.js
