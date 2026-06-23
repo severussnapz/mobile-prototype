@@ -1311,24 +1311,14 @@ public class ConversationStreamController : ControllerBase
                 // This orients the LLM in one call (CSS selectors, HTML section headers)
                 // rather than forcing 20+ individual search_in_artefact probes.
                 const int largeFileThreshold = 50_000;
-                const int regenerateThreshold = 50_000;
                 if (artefactContent.Length > largeFileThreshold)
                 {
                     _logger.LogWarning(
                         "Tool get_artefact: large file {FilePath} ({Length} chars) — returning structural outline",
                         filePath, artefactContent.Length);
 
-                    if (artefactContent.Length > regenerateThreshold && filePath.StartsWith("prototype/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // File is too large for targeted edit_artefact — exact old_str matching is not feasible.
-                        // Instruct the LLM to do a full regeneration via save_artefact (which is permitted for large files).
-                        filesReadThisRequest.Add(filePath);
-                        return $"## {filePath} (v{artefact.Version}) — TOO LARGE TO EDIT\n\n" +
-                               $"File is {artefactContent.Length:N0} chars — too large for targeted edit_artefact (requires exact anchor strings).\n\n" +
-                               $"**Action required**: Use save_artefact to produce a complete replacement. " +
-                               $"Full regeneration is explicitly permitted for prototype/index.html files above 100KB. " +
-                               $"Do NOT attempt further search_in_artefact calls — regenerate the full file directly.";
-                    }
+                    // Fragment files are never "too large to edit" — search_in_artefact finds the anchor.
+                    // Only the assembled prototype/index.html triggers full regeneration guidance.
 
                     var outline = BuildFileOutline(artefactContent, filePath);
                     filesReadThisRequest.Add(filePath);
@@ -1490,6 +1480,10 @@ public class ConversationStreamController : ControllerBase
                 _logger.LogInformation(
                     "Tool search_in_artefact: searched {FilePath} v{Version} for '{Query}' ({Length} chars file)",
                     filePath, artefact.Version, query, content.Length);
+
+                _logger.LogInformation(
+                    "Tool search_in_artefact: result preview = {Preview}",
+                    searchResult.Length > 300 ? searchResult[..300] : searchResult);
 
                 // Unblock edit_artefact for this file — the result contains real verbatim snippets
                 filesReadThisRequest.Add(filePath);
@@ -1699,6 +1693,13 @@ public class ConversationStreamController : ControllerBase
                            string.Join("\n", present) + "\n\n" +
                            "Use a selector taken from the list above (do not invent one), or ask the user to paste the exact HTML element.";
                 }
+
+                // Reject invalid strategy/operation combinations
+                if (operation.Equals("insert_adjacent_html", StringComparison.OrdinalIgnoreCase) &&
+                    strategy.Equals("generate_from_context", StringComparison.OrdinalIgnoreCase))
+                    return "Error: insert_adjacent_html requires strategy=literal. " +
+                           "generate_from_context generates text values and cannot produce HTML to insert. " +
+                           "Provide the HTML to insert as the value parameter and use strategy=literal.";
 
                 // Derive values using the selected strategy
                 IReadOnlyList<ApplyToScopeValueResult> valueResults;

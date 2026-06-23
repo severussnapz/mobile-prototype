@@ -259,4 +259,26 @@ public class ToolCallWiringTests
             "search_in_artefact handler must track per-file search count and hard-stop after 3 searches without a mutation.");
     }
 
+    [Fact]
+    public void ApplyToScope_WhenInsertAdjacentHtmlWithGenerateFromContext_RejectsWithActionableError()
+    {
+        // generate_from_context generates text values (e.g. aria-labels) — it cannot generate
+        // HTML to insert. Using it with insert_adjacent_html is always wrong and the API must
+        // reject it with a clear error rather than silently returning 0 mutations.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        var applyToScopeIndex = controllerSource.IndexOf(
+            "case PipelineToolDefinitions.ApplyToScope:", StringComparison.Ordinal);
+        var nextCaseIndex = controllerSource.IndexOf(
+            "case PipelineToolDefinitions.", applyToScopeIndex + 1, StringComparison.Ordinal);
+        var handlerBody = controllerSource[applyToScopeIndex..nextCaseIndex];
+
+        Assert.True(
+            handlerBody.Contains("insert_adjacent_html", StringComparison.Ordinal) &&
+            handlerBody.Contains("generate_from_context", StringComparison.Ordinal),
+            "apply_to_scope must reject insert_adjacent_html + generate_from_context combination.");
+    }
+
 }
