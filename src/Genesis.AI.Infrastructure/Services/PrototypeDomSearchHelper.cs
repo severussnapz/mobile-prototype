@@ -50,6 +50,22 @@ internal static class PrototypeDomSearchHelper
             .Where(text => !string.IsNullOrWhiteSpace(text)));
     }
 
+    internal static string GetSearchableAttributes(IElement element)
+    {
+        return string.Join(" ",
+            new[]
+            {
+                element.GetAttribute("title"),
+                element.GetAttribute("aria-label"),
+                element.GetAttribute("placeholder"),
+                element.GetAttribute("alt"),
+                element.GetAttribute("value"),
+                element.GetAttribute("name"),
+                element.GetAttribute("data-label"),
+            }
+            .Where(text => !string.IsNullOrWhiteSpace(text)));
+    }
+
     internal static PrototypeDomSearchMatch BuildSearchMatch(string fragmentPath, IElement element)
     {
         var cssSelector = element.GetSelector();
@@ -57,7 +73,43 @@ internal static class PrototypeDomSearchHelper
             ?? element.GetAttribute("id")
             ?? $"css:{cssSelector}";
         var nodeKey = string.Create(CultureInfo.InvariantCulture, $"{fragmentPath}|{stableId}");
-        var trimmedTextContent = GetAllSearchableText(element).Trim();
+
+        // Use direct text nodes only — not descendant text — so elements with child spans
+        // (e.g. sv-item containing sv-item-label and sv-item-count) return only their own
+        // whitespace-normalised text, not the concatenation of all child text.
+        // This forces callers to target the specific child element for clean values.
+        var directText = string.Concat(
+            element.ChildNodes
+                .OfType<AngleSharp.Dom.IText>()
+                .Select(textNode => textNode.Data))
+            .Trim();
+
+        // Fall back chain: attributes → first meaningful child text → full descendant text
+        string trimmedTextContent;
+        if (!string.IsNullOrWhiteSpace(directText))
+        {
+            trimmedTextContent = directText;
+        }
+        else
+        {
+            var attributes = GetSearchableAttributes(element).Trim();
+            if (!string.IsNullOrWhiteSpace(attributes))
+            {
+                trimmedTextContent = attributes;
+            }
+            else
+            {
+                // Last resort: first child element that has meaningful direct text after cleaning
+                // (skip emoji-only or symbol-only children like icon spans)
+                var firstChildText = element.Children
+                    .OfType<IElement>()
+                    .Select(child => DeriveFromTextContentStrategy.CleanTextSnippet(
+                        string.Concat(child.ChildNodes.OfType<AngleSharp.Dom.IText>().Select(textNode => textNode.Data)).Trim()))
+                    .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? string.Empty;
+                trimmedTextContent = firstChildText;
+            }
+        }
+
         if (trimmedTextContent.Length > MaxSnippetLength)
         {
             trimmedTextContent = trimmedTextContent[..MaxSnippetLength];

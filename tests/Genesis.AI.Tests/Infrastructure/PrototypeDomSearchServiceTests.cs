@@ -873,17 +873,46 @@ public class PrototypeDomSearchServiceTests
     }
 
 
+    [Fact]
+    public async Task ListAllAsync_WhenElementHasChildSpans_TextSnippetContainsOnlyDirectText()
+    {
+        // BuildSearchMatch should capture only direct text nodes, not descendant text.
+        // sv-item contains sv-item-label ("Urgent Letters") and sv-item-count ("3") as child spans.
+        // TextSnippet must NOT be "Urgent Letters 3" — it should reflect direct text only (empty or whitespace).
+        // This forces the agent to target .sv-item-label for clean tooltip values.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://screen-01-legacy";
+        const string html = """
+<div class="sv-item" id="sv-urgent">
+  <span class="sv-item-icon">🔴</span>
+  <span class="sv-item-label">Urgent Letters</span>
+  <span class="sv-item-count">3</span>
+</div>
+""";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
+
+        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
+
+        var result = await service.ListAllAsync(
+            new PrototypeDomListRequest(projectId, ".sv-item", null, "user"),
+            CancellationToken.None);
+
+        var svItem = result.Matches.FirstOrDefault(m => m.ClassList.Contains("sv-item"));
+        Assert.NotNull(svItem);
+        // Direct text only — should NOT contain "3" from the count span
+        Assert.DoesNotContain("3", svItem!.TextSnippet);
+        Assert.Contains("Urgent Letters", svItem.TextSnippet);
+    }
     private static Artefact CreatePublishedArtefact(Guid projectId, string filePath, string s3Key, int version)
     {
         return Artefact.CreateS3Artefact(
-            projectId,
-            version,
-            filePath,
-            s3Key,
-            "text/html",
-            128,
-            "test",
-            TimeProvider.System,
-            true);
+            projectId, version, filePath, s3Key, "text/html", 100, "test", TimeProvider.System, true);
     }
+
 }
