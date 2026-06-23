@@ -909,6 +909,36 @@ public class PrototypeDomSearchServiceTests
         Assert.DoesNotContain("3", svItem!.TextSnippet);
         Assert.Contains("Urgent Letters", svItem.TextSnippet);
     }
+    [Fact]
+    public async Task ListAllAsync_WhenElementHasNoMeaningfulDirectText_TextSnippetFallsBackToAriaLabel()
+    {
+        // When an element's direct text is empty or symbol-only after cleaning (e.g. arrow, icon),
+        // TextSnippet must fall back to aria-label or other searchable attributes.
+        // This gives the agent meaningful signal regardless of the element type.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://fallback";
+        const string html = """
+<span class="indicator" aria-label="High priority">↑</span>
+""";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
+
+        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
+
+        var result = await service.ListAllAsync(
+            new PrototypeDomListRequest(projectId, ".indicator", null, "user"),
+            CancellationToken.None);
+
+        var match = result.Matches.FirstOrDefault(m => m.ClassList.Contains("indicator"));
+        Assert.NotNull(match);
+        Assert.Contains("High priority", match!.TextSnippet);
+    }
+
     private static Artefact CreatePublishedArtefact(Guid projectId, string filePath, string s3Key, int version)
     {
         return Artefact.CreateS3Artefact(

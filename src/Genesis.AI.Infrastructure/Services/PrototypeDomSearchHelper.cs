@@ -84,11 +84,13 @@ internal static class PrototypeDomSearchHelper
                 .Select(textNode => textNode.Data))
             .Trim();
 
-        // Fall back chain: attributes → first meaningful child text → full descendant text
+        // Fall back chain: cleaned direct text → aria-label/attributes → first meaningful child text
+        // Covers icons, arrows, emoji spans, SVGs where visible content is not real text.
+        var cleanedDirectText = DeriveFromTextContentStrategy.CleanTextSnippet(directText);
         string trimmedTextContent;
-        if (!string.IsNullOrWhiteSpace(directText))
+        if (!string.IsNullOrWhiteSpace(cleanedDirectText))
         {
-            trimmedTextContent = directText;
+            trimmedTextContent = cleanedDirectText;
         }
         else
         {
