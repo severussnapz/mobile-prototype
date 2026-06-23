@@ -187,7 +187,7 @@ internal static class PrototypeDomToolBuilder
                     },
                     "attribute": {
                         "type": "string",
-                        "description": "Attribute name for set_attribute or remove_attribute operations e.g. aria-label, title, placeholder"
+                        "description": "Attribute name for set_attribute or remove_attribute operations (e.g. aria-label, title). For insert_adjacent_html, this is the position: beforebegin, afterbegin, beforeend, or afterend. REQUIRED for insert_adjacent_html."
                     },
                     "strategy": {
                         "type": "string",
