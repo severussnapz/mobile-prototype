@@ -1712,6 +1712,23 @@ public class ConversationStreamController : ControllerBase
                            "Use a selector taken from the list above (do not invent one), or ask the user to paste the exact HTML element.";
                 }
 
+                // Structural guard (Phase 2): invented classes are physically unwritable and
+                // CSS authoring is rejected. Existing classes are sourced from the same scope
+                // listing the zero-match path uses to surface present elements.
+                var scopeElementsForGuard = await _prototypeDomSearchService.ListAllInScopeAsync(
+                    projectId, scope, cancellationToken);
+                var existingScopeClasses = scopeElementsForGuard.Matches
+                    .SelectMany(match => match.ClassList)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+                var guardError = PrototypeApplyToScopeGuard.Validate(
+                    scope, selector, operation, value, existingScopeClasses);
+                if (guardError is not null)
+                {
+                    _logger.LogWarning("apply_to_scope guard rejected: {GuardError}", guardError);
+                    return guardError;
+                }
+
                 // Reject invalid strategy/operation combinations
                 if (operation.Equals("insert_adjacent_html", StringComparison.OrdinalIgnoreCase) &&
                     strategy.Equals("generate_from_context", StringComparison.OrdinalIgnoreCase))
