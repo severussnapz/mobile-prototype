@@ -1697,9 +1697,10 @@ public class ConversationStreamController : ControllerBase
                 // Reject invalid strategy/operation combinations
                 if (operation.Equals("insert_adjacent_html", StringComparison.OrdinalIgnoreCase) &&
                     strategy.Equals("generate_from_context", StringComparison.OrdinalIgnoreCase))
-                    return "Error: insert_adjacent_html requires strategy=literal. " +
-                           "generate_from_context generates text values and cannot produce HTML to insert. " +
-                           "Provide the HTML to insert as the value parameter and use strategy=literal.";
+                {
+                    const string insertAdjacentHtmlError = "Error: insert_adjacent_html requires strategy=literal. generate_from_context generates text values and cannot produce HTML to insert. Provide the HTML to insert as the value parameter and use strategy=literal.";
+                    return insertAdjacentHtmlError;
+                }
 
                 // Derive values using the selected strategy
                 IReadOnlyList<ApplyToScopeValueResult> valueResults;
