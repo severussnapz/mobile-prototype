@@ -89,6 +89,24 @@ public class ApplyToScopeStrategyTests
         Assert.Equal("Forward", results[1].Value);
     }
 
+    [Fact]
+    public async Task DeriveValuesAsync_WhenDeriveFromTextContentStrategy_NormalisesWhitespaceAndStripsNewlines()
+    {
+        // Regression: sv-item divs contain child spans — text content includes newlines between spans.
+        // e.g. "All documents\n27" was being set as title attribute, breaking the HTML attribute value.
+        var matches = new List<PrototypeDomSearchMatch>
+        {
+            BuildMatch("prototype/fragments/screen-01-legacy.html|#sv-all", "All documents\n27"),
+            BuildMatch("prototype/fragments/screen-01-legacy.html|#sv-urgent", "Urgent Letters\n3"),
+        };
+
+        var strategy = new DeriveFromTextContentStrategy();
+        var results = await strategy.DeriveValuesAsync(matches, null, CancellationToken.None);
+
+        Assert.Equal("All documents 27", results[0].Value);
+        Assert.Equal("Urgent Letters 3", results[1].Value);
+    }
+
     private static PrototypeDomSearchMatch BuildMatch(string nodeKey, string textSnippet)
     {
         return new PrototypeDomSearchMatch(

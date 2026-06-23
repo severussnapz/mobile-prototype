@@ -30,7 +30,12 @@ public sealed class DeriveFromTextContentStrategy : IApplyToScopeStrategy
         if (string.IsNullOrWhiteSpace(text))
             return string.Empty;
 
-        var cleaned = text.Trim();
+        // Normalise whitespace — replace newlines and multiple spaces with a single space.
+        // Regression fix: elements with child spans produce text content with newlines between spans
+        // e.g. "All documents\n27" which breaks HTML attribute values.
+        var cleaned = System.Text.RegularExpressions.Regex
+            .Replace(text.Trim(), @"\s+", " ")
+            .Trim();
 
         // Strip leading emoji (Unicode ranges)
         cleaned = StripLeadingEmoji(cleaned);

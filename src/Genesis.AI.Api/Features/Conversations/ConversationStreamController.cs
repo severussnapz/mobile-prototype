@@ -1417,6 +1417,49 @@ public class ConversationStreamController : ControllerBase
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var query = root.GetProperty("query").GetString()!;
 
+                // Plan 3f: redirect prototype/index.html searches to DOM fragment search.
+                // node_ids from assembled index.html point to prototype/index.html which cannot be mutated.
+                // Searching fragments directly gives node_ids with real fragment paths usable by mutations.
+                if (filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase)
+                    && _tokenOptimisationOptions.PrototypeDomModeEnabled
+                    && _prototypeDomSearchService is not null)
+                {
+                    var domResult = await _prototypeDomSearchService.SearchAsync(
+                        new PrototypeDomSearchRequest(projectId, filePath, query, createdBy),
+                        cancellationToken);
+
+                    _logger.LogInformation(
+                        "Tool search_in_artefact: DOM search across fragments for '{Query}' — {Count} matches",
+                        query, domResult.Matches.Count);
+
+                    if (domResult.Matches.Count == 0)
+                        return $"No elements found matching '{query}' in prototype fragments. " +
+                               "Ask the user to paste the HTML element from the browser inspector " +
+                               "(right-click element → Inspect → copy the div) so you can identify the exact CSS selector.";
+
+                    if (domResult.Matches.Count == 1)
+                    {
+                        var match = domResult.Matches[0];
+                        var scope = System.IO.Path.GetFileNameWithoutExtension(match.FragmentPath);
+                        var selector = match.ClassList.Count > 0
+                            ? $".{match.ClassList[0]}"
+                            : (match.CssSelector ?? $"#{match.NodeKey.Split('|').Last()}");
+                        return $"Found 1 match for '{query}':\n" +
+                               $"  node_id: {match.NodeKey}\n" +
+                               $"  tag: {match.TagName} | text: {match.TextSnippet} | fragment: {match.FragmentPath}\n\n" +
+                               $"Ready to apply. Use this exact call:\n" +
+                               $"  apply_to_scope(scope=\"{scope}\", selector=\"{selector}\", ...)\n\n" +
+                               "Replace ... with operation, attribute, strategy as needed.";
+                    }
+
+                    var candidateLines = domResult.Matches.Take(5).Select((match, index) =>
+                        $"  [{index + 1}] node_id: {match.NodeKey} | tag: {match.TagName} | text: {match.TextSnippet}");
+                    return $"Found {domResult.Matches.Count} multiple/ambiguous matches for '{query}':\n" +
+                           string.Join("\n", candidateLines) + "\n\n" +
+                           "Ask the user which element they mean, or ask them to paste the HTML element " +
+                           "from the browser inspector so you can identify the exact selector.";
+                }
+
                 var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, filePath, cancellationToken);
                 if (artefact is null)
                     return $"Artefact '{filePath}' not found. Use list_artefacts to see available files.";
@@ -1668,7 +1711,8 @@ public class ConversationStreamController : ControllerBase
                     .Select(result => $"{result.NodeKey}: {result.Message}")
                     .Take(5)
                     .ToList();
-                return $"PARTIAL FAILURE: applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations}. Failures: {string.Join("; ", failures)}";
+                return $"PARTIAL FAILURE: applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations}. Failures: {string.Join("; ", failures)}. " +
+                    "Consider using save_artefact to fully rebuild this fragment instead of surgical edits.";
             }
 
             case PipelineToolDefinitions.ProposeRequirementChange:
