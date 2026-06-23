@@ -49,7 +49,7 @@ public class PipelineToolDefinitionsTests
     }
 
     [Fact]
-    public void GetTools_PrototypeWithDomModeEnabled_ExcludesGraphNodeToolAndIncludesDomStructureTools()
+    public void GetTools_PrototypeWithDomModeEnabled_ExcludesGraphNodeToolAndIncludesScopeTools()
     {
         var options = new TokenOptimisationOptions
         {
@@ -61,8 +61,8 @@ public class PipelineToolDefinitionsTests
         var tools = PipelineToolDefinitions.GetTools(options, StageType.Prototype);
 
         Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.EditArtefactByGraphNode);
-        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.InsertAdjacentHtml);
-        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.RemoveElement);
+        Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.InsertAdjacentHtml);
+        Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.RemoveElement);
         Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.ApplyToScope);
     }
 
@@ -96,7 +96,7 @@ public class PipelineToolDefinitionsTests
     }
 
     [Fact]
-    public void GetTools_PrototypeWithDomModeDisabled_IncludesGraphNodeToolAndExcludesDomStructureTools()
+    public void GetTools_PrototypeWithDomModeDisabled_ExcludesGraphNodeToolAndDomStructureTools()
     {
         var options = new TokenOptimisationOptions
         {
@@ -107,7 +107,7 @@ public class PipelineToolDefinitionsTests
 
         var tools = PipelineToolDefinitions.GetTools(options, StageType.Prototype);
 
-        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.EditArtefactByGraphNode);
+        Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.EditArtefactByGraphNode);
         Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.InsertAdjacentHtml);
         Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.RemoveElement);
     }

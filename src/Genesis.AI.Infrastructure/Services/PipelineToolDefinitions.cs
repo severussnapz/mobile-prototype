@@ -40,7 +40,7 @@ public static class PipelineToolDefinitions
     /// <summary>
     /// Returns the tool list conditioned on <paramref name="options"/> and <paramref name="stageType"/>.
     /// <c>edit_artefact</c> is registered for all non-Prototype stages when <see cref="TokenOptimisationOptions.EditArtefactEnabled"/> is true.
-    /// Prototype stage uses node-targeted tools; <c>edit_artefact_by_graph_node</c> is offered only when DOM mode is disabled.
+    /// Prototype stage uses <c>apply_to_scope</c> for DOM edits when DOM mode is enabled.
     /// Excludes <c>get_guardrail_details</c> when the stage already has skills injected via active skill injection.
     /// </summary>
     public static IReadOnlyList<AiToolDefinition> GetTools(TokenOptimisationOptions options, Domain.Enums.StageType? stageType = null)
@@ -64,24 +64,11 @@ public static class PipelineToolDefinitions
         if (!options.EditArtefactEnabled)
             return base_.AsReadOnly();
 
-        // Prototype stage uses node-targeted editing tools.
-        // Keep graph-node replacement only when DOM mode is disabled.
+        // Prototype stage uses scope-targeted editing via apply_to_scope.
         if (stageType == Domain.Enums.StageType.Prototype)
         {
-            if (!options.PrototypeDomModeEnabled)
-            {
-                base_.Add(PipelineToolDefinitionFactory.BuildEditArtefactByGraphNodeTool());
-            }
-
-            base_.Add(PipelineToolDefinitionFactory.BuildSetNodeAttributeTool());
-            base_.Add(PipelineToolDefinitionFactory.BuildSetNodeTextTool());
-            base_.Add(PipelineToolDefinitionFactory.BuildAddNodeClassTool());
-            base_.Add(PipelineToolDefinitionFactory.BuildRemoveNodeClassTool());
-
             if (options.PrototypeDomModeEnabled)
             {
-                base_.Add(PipelineToolDefinitionFactory.BuildInsertAdjacentHtmlTool());
-                base_.Add(PipelineToolDefinitionFactory.BuildRemoveElementTool());
                 base_.Add(PipelineToolDefinitionFactory.BuildApplyToScopeTool());
             }
         }

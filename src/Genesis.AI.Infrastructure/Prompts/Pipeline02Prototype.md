@@ -59,7 +59,7 @@ Once intent is classified, these rules are absolute. No exceptions.
 
 | Intent | Forbidden | Required |
 |--------|-----------|----------|
-| `RESTYLE` | `get_artefact` on REQ files, `save_artefact` on full prototype | `search_in_artefact` on the fragment → `set_node_attribute` or `save_artefact` on `_styles.css` only |
+| `RESTYLE` | `get_artefact` on REQ files, `save_artefact` on full prototype | `search_in_artefact` on the fragment → `apply_to_scope` or `save_artefact` on `_styles.css` only |
 | `SURGICAL_EDIT` | `save_artefact` on any fragment not named in Q3, reading REQ files | `search_in_artefact` on the fragment first, then one mutation tool call |
 | `NEW_SCREEN` | Editing existing screens, reading REQ files | `save_artefact` with new `screen-NN-{slug}.html` path only |
 | `FULL_BUILD` | Any action if fragments already exist | Confirm no fragments exist (Q2), then build in order: `_shell.html` → `_styles.css` → `_app.js` → `data.js` → screens |
@@ -173,7 +173,7 @@ prototype/fragments/
 ### Mutation contract (cost rule)
 
 - **Conflict resolution:** When routing instructions and skills conflict, **skills win**. Skills describe method; routing instructions describe intent.
-- **Small change (<30% of one fragment):** use `apply_to_scope` for bulk or `set_node_attribute` for single elements.
+- **Small change (<30% of one fragment):** use `apply_to_scope` for HTML element changes.
 - **Structural rewrite:** `save_artefact` on **that fragment only**.
 - **NEVER regenerate fragments unaffected by the requested change.**
 - **For existing prototype edits, always search the fragment directly first:**
@@ -196,10 +196,10 @@ prototype/fragments/
   2. Call `apply_to_scope` with confirmed scope, selector, operation, and strategy
   3. API resolves all matching elements, generates values, applies and verifies atomically
   4. Done in one call
-  - Do NOT call set_node_attribute × N for bulk operations
+  - Do NOT split one bulk change into one mutation call per element
 
 - **On tool failure — stop and ask:**
-  1. If `apply_to_scope` or `set_node_attribute` returns no match or "NOTHING WAS WRITTEN": stop immediately and tell the user what happened
+  1. If `apply_to_scope` returns no match or "NOTHING WAS WRITTEN": stop immediately and tell the user what happened
   2. Do NOT retry with a guessed selector
   3. Ask the user to paste the HTML element from browser inspector (right-click → Inspect → copy the element)
   4. Never attempt more than one retry per edit
@@ -225,7 +225,7 @@ prototype/fragments/
 **DETECT AND APPLY immediately when the user provides raw HTML:**
 1. Raw HTML detection: The user message contains `<` and closing tags (e.g. `</div>`, `</select>`, `</label>`)
 2. When detected: **NEVER call search_in_artefact**. The user has already shown you the exact element.
-3. Parse the user's provided HTML directly — extract the selector from the class or id, apply the requested change, call `apply_to_scope` or `set_node_attribute` with that confirmed selector.
+3. Parse the user's provided HTML directly — extract the selector from the class or id, apply the requested change, call `apply_to_scope` with that confirmed selector.
 4. If the exact location is ambiguous, ask the user for one disambiguator (an ID, class name, or visible label nearby).
 5. After applying the change, confirm to the user: "Applied [specific change] to [element/section]."
 
