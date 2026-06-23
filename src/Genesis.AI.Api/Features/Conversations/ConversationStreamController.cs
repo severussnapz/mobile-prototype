@@ -1292,6 +1292,24 @@ public class ConversationStreamController : ControllerBase
                            "Use list_artefacts to see all fragments.";
                 }
 
+                // Structural guard: once the prototype is built, requirements/* are unreadable
+                // during a Prototype edit. _shell.html mirrors the migration step's own build
+                // detection — an edit works on the fragments, never the requirements.
+                if (stageType == StageType.Prototype &&
+                    filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase))
+                {
+                    var shellFragment = await _artefactRepository.GetByProjectAndFilePathAsync(
+                        projectId, "prototype/fragments/_shell.html", cancellationToken);
+                    var readGuardError = PrototypeReadGuard.ValidateGetArtefact(
+                        stageType, filePath, prototypeAlreadyBuilt: shellFragment is not null);
+                    if (readGuardError is not null)
+                    {
+                        _logger.LogWarning(
+                            "Tool get_artefact blocked: requirements read during built-prototype edit — {FilePath}", filePath);
+                        return readGuardError;
+                    }
+                }
+
                 var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, filePath, cancellationToken);
 
                 if (artefact is null)
