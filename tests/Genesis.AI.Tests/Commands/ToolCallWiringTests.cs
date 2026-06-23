@@ -236,4 +236,27 @@ public class ToolCallWiringTests
             "apply_to_scope partial failure must signal agent to escalate to save_artefact.");
     }
 
+    [Fact]
+    public void SearchInArtefact_WhenCalledMoreThanThreeTimesOnSameFileWithoutMutation_ReturnsHardStop()
+    {
+        // Plan 3f enforcement: after 3 search_in_artefact calls on the same file without
+        // a mutation tool call in between, the API must return a hard stop forcing the agent
+        // to act. This prevents context window exhaustion from repeated searching loops.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        var searchIndex = controllerSource.IndexOf(
+            "case PipelineToolDefinitions.SearchInArtefact:", StringComparison.Ordinal);
+        var nextCase = controllerSource.IndexOf(
+            "case PipelineToolDefinitions.", searchIndex + 1, StringComparison.Ordinal);
+        var handlerBody = controllerSource[searchIndex..nextCase];
+
+        Assert.True(
+            handlerBody.Contains("searchCount", StringComparison.OrdinalIgnoreCase) ||
+            handlerBody.Contains("SearchCount", StringComparison.OrdinalIgnoreCase) ||
+            handlerBody.Contains("search_count", StringComparison.OrdinalIgnoreCase),
+            "search_in_artefact handler must track per-file search count and hard-stop after 3 searches without a mutation.");
+    }
+
 }
