@@ -397,9 +397,9 @@ public class ConversationStreamController : ControllerBase
             // edit_artefact is blocked until the target file has been read, ensuring Claude
             // always anchors against the real file content rather than memory.
             var filesReadThisRequest = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            // Track per-file search counts. After 3 searches on the same file without a mutation,
+            // Track total search_in_artefact calls per turn. After 5 searches without a mutation,
             // hard-stop the agent to prevent context window exhaustion from search loops.
-            var searchCountPerFile = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var searchCountThisTurn = new int[1];
 
             // Read budget: cap get_artefact calls on non-prototype files per request.
             // Prevents the LLM reading all 13 REQ files before writing anything.
@@ -546,7 +546,7 @@ public class ConversationStreamController : ControllerBase
                             stageType,
                             filesReadThisRequest,
                             filesReadThisTurn,
-                            searchCountPerFile,
+                            searchCountThisTurn,
                             cancellationToken);
                     }
                     catch (ToolExecutionFailedException exception)
@@ -963,7 +963,7 @@ public class ConversationStreamController : ControllerBase
         StageType? stageType,
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
-        Dictionary<string, int> searchCountPerFile,
+        int[] searchCountThisTurn,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -981,7 +981,7 @@ public class ConversationStreamController : ControllerBase
                     stageType,
                     filesReadThisRequest,
                     filesReadThisTurn,
-                    searchCountPerFile,
+                    searchCountThisTurn,
                     cancellationToken);
             }
             catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
@@ -1018,10 +1018,10 @@ public class ConversationStreamController : ControllerBase
         StageType? stageType,
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
-        Dictionary<string, int> searchCountPerFile,
+        int[] searchCountThisTurn,
         CancellationToken cancellationToken)
     {
-        const int maxSearchesPerFile = 3;
+        const int maxSearchesPerTurn = 5;
         var root = toolCall.Input.RootElement;
 
         switch (toolCall.ToolName)
@@ -1468,14 +1468,13 @@ public class ConversationStreamController : ControllerBase
                            "from the browser inspector so you can identify the exact selector.";
                 }
 
-                // Enforce search limit — after 3 searches on the same file without a mutation,
+                // Enforce global search limit — after 5 total searches without a mutation,
                 // return a hard stop to force the agent to act rather than keep searching.
-                searchCountPerFile.TryGetValue(filePath, out var currentSearchCount);
-                if (currentSearchCount >= maxSearchesPerFile)
-                    return $"HARD STOP: You have searched '{filePath}' {currentSearchCount} times without making an edit. " +
+                searchCountThisTurn[0]++;
+                if (searchCountThisTurn[0] > maxSearchesPerTurn)
+                    return $"HARD STOP: You have called search_in_artefact {searchCountThisTurn[0]} times in this turn without making an edit. " +
                            "Stop searching. You already have the anchor text you need. " +
                            "Call edit_artefact or save_artefact now. Do not search again.";
-                searchCountPerFile[filePath] = currentSearchCount + 1;
 
                 var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, filePath, cancellationToken);
                 if (artefact is null)
@@ -1752,7 +1751,10 @@ public class ConversationStreamController : ControllerBase
                 }
 
                 if (batchResult.SuccessfulMutations == batchResult.TotalMutations)
+                {
+                    searchCountThisTurn[0] = 0; // Reset after successful mutation
                     return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
+                }
 
                 var failures = batchResult.Results
                     .Where(result => !result.Success)
