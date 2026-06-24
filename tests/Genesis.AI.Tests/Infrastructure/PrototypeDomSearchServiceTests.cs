@@ -199,15 +199,14 @@ public class PrototypeDomSearchServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_WhenOnlyTextContentMatches_ReturnsNoMatches()
+    public async Task SearchAsync_WhenOnlyTextContentMatches_FindsButtonByLabelText()
     {
-        // A query that matches only visible text — not a CSS selector and not a class name —
-        // must NOT fuzzy-match. Search returns nothing so the caller hard-stops and asks the
-        // user for an exact class name or pasted HTML element.
+        // Third-priority text-content fallback: when selector/class matching fails,
+        // visible label text can still find actionable elements.
         var projectId = Guid.NewGuid();
         const string fragmentPath = "prototype/fragments/screen-01.html";
         const string s3Key = "s3://screen-01";
-        const string html = "<section><h2>Clinical Safety Review</h2><p>Guidance text</p></section>";
+        const string html = "<section><button class=\"btn\">Upload Document</button><p>Guidance text</p></section>";
 
         var artefactRepository = new Mock<IArtefactRepository>();
         artefactRepository
@@ -227,10 +226,12 @@ public class PrototypeDomSearchServiceTests
             artefactStorageService.Object);
 
         var result = await service.SearchAsync(
-            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "Clinical Safety", "test"),
+            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "Upload Document", "test"),
             CancellationToken.None);
 
-        Assert.Empty(result.Matches);
+        Assert.Single(result.Matches);
+        Assert.Equal("button", result.Matches[0].TagName);
+        Assert.Contains("Upload Document", result.Matches[0].TextSnippet, StringComparison.Ordinal);
     }
 
     [Fact]

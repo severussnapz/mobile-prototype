@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
 using Genesis.AI.Domain.Interfaces;
@@ -19,6 +20,7 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
 
     private const string PrototypeFragmentsPrefix = "prototype/fragments/";
     private const int MaxResultCount = 10;
+    private static readonly Regex NonLetterOnlyRegex = new(@"^\P{L}+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public PrototypeDomSearchService(
         ILogger<PrototypeDomSearchService> logger,
@@ -67,6 +69,13 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
             var classTokenMatches = await PrototypeDomSearchHelper.SearchByClassTokensAsync(
                 browsingContext, prototypeFragments, query, ExcludedTags, cancellationToken);
             matchedElements.AddRange(classTokenMatches);
+        }
+
+        if (matchedElements.Count == 0)
+        {
+            var fallbackMatches = await SearchByTextContentAsync(
+                browsingContext, prototypeFragments, query, cancellationToken);
+            matchedElements.AddRange(fallbackMatches);
         }
 
         return BuildRankedResult(matchedElements, query, request.ProjectId);
@@ -169,6 +178,49 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         }
 
         return loadedFragments;
+    }
+
+    private static async Task<IReadOnlyList<(string FragmentPath, IElement Element)>> SearchByTextContentAsync(
+        IBrowsingContext browsingContext,
+        IReadOnlyList<(string FragmentPath, string Content)> fragments,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        var fallbackMatches = new List<(string FragmentPath, IElement Element)>();
+        foreach (var (fragmentPath, fragmentHtml) in fragments)
+        {
+            var document = await browsingContext.OpenAsync(
+                response => response.Content(fragmentHtml), cancellationToken);
+
+            var textMatches = document.All
+                .OfType<IElement>()
+                .Where(element =>
+                    !ExcludedTags.Contains(element.TagName) &&
+                    HasSearchableDirectText(element) &&
+                    PrototypeDomSearchHelper.GetAllSearchableText(element)
+                        .Contains(query, StringComparison.OrdinalIgnoreCase))
+                .Select(element => (fragmentPath, element));
+
+            fallbackMatches.AddRange(textMatches);
+        }
+
+        return fallbackMatches;
+    }
+
+    private static bool HasSearchableDirectText(IElement element)
+    {
+        var directText = string.Concat(
+            element.ChildNodes
+                .OfType<IText>()
+                .Select(textNode => textNode.Data))
+            .Trim();
+
+        if (directText.Length < 3)
+        {
+            return false;
+        }
+
+        return !NonLetterOnlyRegex.IsMatch(directText);
     }
 
     private List<IElement> QueryWithSelectorVariants(IDocument document, string query)
