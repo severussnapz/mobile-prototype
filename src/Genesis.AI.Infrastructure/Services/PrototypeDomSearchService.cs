@@ -281,8 +281,7 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         var elements = PrototypeDomSearchHelper.BuildScopeMatches(document, fragmentPath, ExcludedTags, MaxResultCount);
 
         _logger.LogInformation(
-            "PrototypeDomSearchService ListAllInScopeAsync for project {ProjectId}: scope={Scope}, elementsFound={Count}",
-            projectId, scope, elements.Count);
+            "PrototypeDomSearchService ListAllInScopeAsync for project {ProjectId}: scope={Scope}, elementsFound={Count}", projectId, scope, elements.Count);
 
         return new PrototypeDomSearchResult(
             Matches: elements,
@@ -301,7 +300,9 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
             return [];
         }
 
-        return PrototypeDomSearchHelper.CollectClassNames(resolved.Value.Document, ExcludedTags);
+        var classNames = PrototypeDomSearchHelper.CollectClassNames(resolved.Value.Document, ExcludedTags);
+        _logger.LogInformation("GetClassNamesInScopeAsync: scope={Scope} classCount={Count}", scope, classNames.Count);
+        return classNames;
     }
 
 
