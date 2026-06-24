@@ -401,6 +401,10 @@ public class ConversationStreamController : ControllerBase
             // hard-stop the agent to prevent context window exhaustion from search loops.
             var searchCountThisTurn = new int[1];
 
+            // Post-search read block: after DOM search returns matches, prevent re-reads and REQ reads
+            // until a mutation (apply_to_scope or save_artefact) succeeds. Blocks budget-burning thrashing.
+            var postSearchReadBlocked = new bool[1];
+
             // Read budget: cap get_artefact calls on non-prototype files per request.
             // Prevents the LLM reading all 13 REQ files before writing anything.
             // The artefact manifest in the system prompt already lists every file —
@@ -547,6 +551,7 @@ public class ConversationStreamController : ControllerBase
                             filesReadThisRequest,
                             filesReadThisTurn,
                             searchCountThisTurn,
+                            postSearchReadBlocked,
                             cancellationToken);
                     }
                     catch (ToolExecutionFailedException exception)
@@ -964,6 +969,7 @@ public class ConversationStreamController : ControllerBase
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
         int[] searchCountThisTurn,
+        bool[] postSearchReadBlocked,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -982,6 +988,7 @@ public class ConversationStreamController : ControllerBase
                     filesReadThisRequest,
                     filesReadThisTurn,
                     searchCountThisTurn,
+                    postSearchReadBlocked,
                     cancellationToken);
             }
             catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
@@ -1019,6 +1026,7 @@ public class ConversationStreamController : ControllerBase
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
         int[] searchCountThisTurn,
+        bool[] postSearchReadBlocked,
         CancellationToken cancellationToken)
     {
         const int maxSearchesPerTurn = 5;
@@ -1121,6 +1129,10 @@ public class ConversationStreamController : ControllerBase
                 _logger.LogInformation(
                     "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
                     filePath, nextVersion, content.Length, contentType);
+
+                // Clear post-search read block after successful save (a form of mutation)
+                postSearchReadBlocked[0] = false;
+
                 return $"Saved {filePath} (version {nextVersion}, {content.Length} chars, {contentType})";
             }
 
@@ -1280,6 +1292,24 @@ public class ConversationStreamController : ControllerBase
             case PipelineToolDefinitions.GetArtefact:
             {
                 var filePath = root.GetProperty("file_path").GetString()!;
+
+                // Post-search read block: after DOM search found matches, prevent re-reading fragments
+                // and REQ files until a mutation succeeds. This stops the agent from burning budget
+                // on reads it shouldn't be making.
+                if (postSearchReadBlocked[0])
+                {
+                    var isFragmentOrReq = filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase) ||
+                                         filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase);
+                    if (isFragmentOrReq)
+                    {
+                        _logger.LogWarning(
+                            "Tool get_artefact blocked: post-search read attempted after DOM search found matches — {FilePath}",
+                            filePath);
+                        return "BLOCKED: You have a search result with matches. Call apply_to_scope immediately to write the mutation. " +
+                               "Do not read more files until the mutation completes. Proceeding otherwise burns your read budget. " +
+                               "Use the selector from your search result and call apply_to_scope now.";
+                    }
+                }
 
                 // Block direct reads of the assembled prototype — it is the output, not a fragment to edit.
                 // The LLM should only read/edit fragment files (prototype/fragments/*).
@@ -1446,6 +1476,10 @@ public class ConversationStreamController : ControllerBase
                                "name (e.g. \".urgency-arrow\") or paste the HTML element from the browser " +
                                "inspector (right-click element → Inspect → copy the element) so you can " +
                                "identify the exact selector.";
+
+                    // Post-search read block: set flag after successful search with matches
+                    // This prevents re-reads and REQ reads until a mutation completes
+                    postSearchReadBlocked[0] = true;
 
                     if (domResult.Matches.Count == 1)
                     {
@@ -1778,6 +1812,7 @@ public class ConversationStreamController : ControllerBase
                 if (batchResult.SuccessfulMutations == batchResult.TotalMutations)
                 {
                     searchCountThisTurn[0] = 0; // Reset after successful mutation
+                    postSearchReadBlocked[0] = false; // Clear post-search read block after mutation completes
                     return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
                 }
 
