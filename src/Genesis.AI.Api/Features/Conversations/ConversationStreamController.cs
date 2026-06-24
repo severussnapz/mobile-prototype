@@ -33,6 +33,9 @@ public class ConversationStreamController : ControllerBase
     private static readonly Regex InjectedSectionHeadingRegex = new(
         @"^## (?<heading>.+ \(Added by [^)]+\))$",
         RegexOptions.Multiline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex HtmlClassAttributeRegex = new(
+        @"\bclass\s*=\s*(?:\""(?<classes>[^\""\r\n]+)\""|'(?<classes>[^'\r\n]+)')",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private readonly IConversationRepository _conversationRepository;
     private readonly IArtefactRepository _artefactRepository;
@@ -1476,6 +1479,25 @@ public class ConversationStreamController : ControllerBase
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var query = root.GetProperty("query").GetString()!;
 
+                if (stageType == StageType.Prototype)
+                {
+                    var latestUserMessageContent = conversation.Messages
+                        .OrderByDescending(message => message.CreatedAt)
+                        .FirstOrDefault(message => message.Role == MessageRole.User)
+                        ?.Content;
+
+                    if (TryExtractSelectorsFromUserProvidedHtml(latestUserMessageContent, out var selectors, out var preferredSelector))
+                    {
+                        _logger.LogWarning(
+                            "Tool search_in_artefact blocked: latest user message includes HTML class attribute; selectors={Selectors}",
+                            string.Join(", ", selectors));
+
+                        return "BLOCKED: The user already provided HTML with class names. " +
+                               "Do not call search_in_artefact when selector is known. " +
+                               $"Call apply_to_scope now using selector='{preferredSelector}' (or one of: {string.Join(", ", selectors)}).";
+                    }
+                }
+
                 // Plan 3f: serve searches of HTML prototype artefacts from the structured DOM
                 // search, which returns elements with their real ClassList — so the agent receives
                 // an authoritative selector instead of mining class names out of raw HTML lines
@@ -2316,6 +2338,46 @@ public class ConversationStreamController : ControllerBase
         }
 
         return null;
+    }
+
+    private static bool TryExtractSelectorsFromUserProvidedHtml(
+        string? messageContent,
+        out IReadOnlyList<string> selectors,
+        out string preferredSelector)
+    {
+        selectors = [];
+        preferredSelector = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(messageContent))
+        {
+            return false;
+        }
+
+        var classes = HtmlClassAttributeRegex
+            .Matches(messageContent)
+            .Cast<Match>()
+            .Select(match => match.Groups["classes"].Value)
+            .SelectMany(rawClassValue => rawClassValue.Split(
+                [' ', '\t', '\r', '\n'],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (classes.Count == 0)
+        {
+            return false;
+        }
+
+        // Prefer full compound selector from all classes in the provided element.
+        var compoundSelector = "." + string.Join(".", classes);
+        selectors =
+        [
+            compoundSelector,
+            .. classes.Select(className => $".{className}")
+        ];
+
+        preferredSelector = compoundSelector;
+        return true;
     }
 
     /// <summary>
