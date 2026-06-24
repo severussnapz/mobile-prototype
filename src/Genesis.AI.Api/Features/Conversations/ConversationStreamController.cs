@@ -1433,11 +1433,12 @@ public class ConversationStreamController : ControllerBase
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var query = root.GetProperty("query").GetString()!;
 
-                // Plan 3f: redirect prototype/index.html searches to DOM fragment search.
-                // node_ids from assembled index.html point to prototype/index.html which cannot be mutated.
-                // Searching fragments directly gives node_ids with real fragment paths usable by mutations.
-                if (filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase)
-                    && _tokenOptimisationOptions.PrototypeDomModeEnabled
+                // Plan 3f: serve searches of HTML prototype artefacts from the structured DOM
+                // search, which returns elements with their real ClassList — so the agent receives
+                // an authoritative selector instead of mining class names out of raw HTML lines
+                // (where a neighbouring element's class can be lifted and mangled). Non-HTML
+                // fragments (_styles.css, _app.js, data.js) keep the text search.
+                if (PrototypeSearchRouter.ShouldRouteToDomSearch(filePath, _tokenOptimisationOptions.PrototypeDomModeEnabled)
                     && _prototypeDomSearchService is not null)
                 {
                     var domResult = await _prototypeDomSearchService.SearchAsync(

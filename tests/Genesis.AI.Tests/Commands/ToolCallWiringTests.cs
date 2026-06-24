@@ -135,9 +135,11 @@ public class ToolCallWiringTests
     [Fact]
     public void SearchInArtefact_OnPrototypeIndexHtml_RedirectsToFragmentDomSearch()
     {
-        // Plan 3f: when search_in_artefact is called with prototype/index.html,
-        // the handler must redirect to PrototypeDomSearchService which searches actual fragments.
-        // This ensures node_ids returned contain real fragment paths usable by mutations.
+        // Plan 3f: when search_in_artefact is called with an HTML prototype artefact,
+        // the handler must delegate routing to PrototypeSearchRouter and serve the result from
+        // PrototypeDomSearchService, which searches actual fragments. This ensures node_ids
+        // returned contain real fragment paths usable by mutations. The index.html mapping itself
+        // is covered directly by PrototypeSearchRouterTests.
         var controllerSource = File.ReadAllText(
             Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
                 "Features", "Conversations", "ConversationStreamController.cs"));
@@ -149,9 +151,9 @@ public class ToolCallWiringTests
         var handlerBody = controllerSource[searchInArtefactIndex..nextCaseIndex];
 
         Assert.True(
-            handlerBody.Contains("PrototypeHtmlArtefactPath", StringComparison.Ordinal) &&
+            handlerBody.Contains("PrototypeSearchRouter.ShouldRouteToDomSearch", StringComparison.Ordinal) &&
             handlerBody.Contains("_prototypeDomSearchService", StringComparison.Ordinal),
-            "search_in_artefact must redirect prototype/index.html to DOM fragment search.");
+            "search_in_artefact must delegate routing to PrototypeSearchRouter and serve HTML prototype searches from DOM fragment search.");
     }
 
     [Fact]
