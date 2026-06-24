@@ -28,6 +28,7 @@ These actions are PROHIBITED regardless of what any routing instruction says:
 - Claiming success when a tool returned "NOTHING WAS WRITTEN" — FORBIDDEN.
 - Calling any mutation tool after a search returned zero results — FORBIDDEN. Stop and ask the user.
 - Calling `insert_adjacent_html` as a standalone tool — FORBIDDEN. It has no standalone handler. Use apply_to_scope with operation=insert_adjacent_html only.
+- For `insert_adjacent_html`, `strategy` MUST be `literal` and `value` MUST contain the exact HTML to insert — FORBIDDEN to use `generate_from_context` for HTML insertion.
 
 ## Tool Selection for Prototype Edits
 
@@ -42,6 +43,7 @@ What are you changing?
 - Add or remove a CSS class on elements: search_in_artefact on the fragment → apply_to_scope with operation=add_class or operation=remove_class
 - Add new HTML element near existing elements: search_in_artefact to confirm selector → apply_to_scope with operation=insert_adjacent_html (attribute=afterend to insert after, afterbegin to insert inside at start, beforeend to insert inside at end)
   ⛔ insert_adjacent_html is an OPERATION inside apply_to_scope — NEVER a standalone tool call. Standalone calls silently fail.
+  ⛔ For insert_adjacent_html, strategy MUST be literal. Provide the exact HTML in value. generate_from_context is invalid for HTML insertion.
   ⛔ The inserted markup MAY introduce a new class (e.g. a new badge). If it does, you MUST follow up with save_artefact on prototype/fragments/_styles.css to style that class in the same edit session — otherwise the new element renders unstyled. Only the anchor selector you target must already exist.
 - Swap one CSS class for another across multiple elements: search_in_artefact on the fragment → apply_to_scope with operation=swap_class
 - CSS rules or variables: save_artefact on prototype/fragments/_styles.css
