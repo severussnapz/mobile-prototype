@@ -1714,14 +1714,10 @@ public class ConversationStreamController : ControllerBase
                 }
 
                 // Structural guard (Phase 2): invented classes are physically unwritable and
-                // CSS authoring is rejected. Existing classes are sourced from the same scope
-                // listing the zero-match path uses to surface present elements.
-                var scopeElementsForGuard = await _prototypeDomSearchService.ListAllInScopeAsync(
+                // CSS authoring is rejected. Class existence is a set-membership test, so the full
+                // uncapped class set for the scope is used (not the capped element listing).
+                var existingScopeClasses = await _prototypeDomSearchService.GetClassNamesInScopeAsync(
                     projectId, scope, cancellationToken);
-                var existingScopeClasses = scopeElementsForGuard.Matches
-                    .SelectMany(match => match.ClassList)
-                    .Distinct(StringComparer.Ordinal)
-                    .ToList();
                 var guardError = PrototypeApplyToScopeGuard.Validate(
                     scope, selector, operation, value, existingScopeClasses);
                 if (guardError is not null)

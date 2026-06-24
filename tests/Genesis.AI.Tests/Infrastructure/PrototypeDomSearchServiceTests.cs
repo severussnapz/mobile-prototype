@@ -51,6 +51,47 @@ public class PrototypeDomSearchServiceTests
     }
 
     [Fact]
+    public async Task GetClassNamesInScopeAsync_ClassOnElementBeyondResultCap_IncludesClass()
+    {
+        // Reproduces the live false rejection: in a deep fragment the .urgency-arrow spans sit
+        // past the first 10 elements, so the capped ListAllInScopeAsync never surfaces them and
+        // the guard wrongly concludes the class does not exist. The uncapped class-existence
+        // check must return every class in the fragment regardless of element depth.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://screen-01-legacy";
+        const string html =
+            "<div class=\"screen\"><div class=\"page\"><div class=\"queue-toolbar\">" +
+            "<div class=\"c4\"><div class=\"c5\"><div class=\"c6\"><div class=\"c7\">" +
+            "<div class=\"c8\"><div class=\"c9\"><div class=\"c10\">" +
+            "<span class=\"urgency-arrow\">↑</span><span class=\"urgency-arrow\">↑</span>" +
+            "</div></div></div></div></div></div></div></div></div></div>";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository
+            .Setup(repository => repository.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)
+            ]);
+
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService
+            .Setup(storage => storage.GetContentAsync(s3Key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(html);
+
+        var service = new PrototypeDomSearchService(
+            NullLogger<PrototypeDomSearchService>.Instance,
+            artefactRepository.Object,
+            artefactStorageService.Object);
+
+        var classNames = await service.GetClassNamesInScopeAsync(
+            projectId, "screen-01-legacy", CancellationToken.None);
+
+        Assert.Contains("urgency-arrow", classNames);
+        Assert.Contains("screen", classNames);
+    }
+
+    [Fact]
     public async Task SearchAsync_WhenDataGenesisIdMissing_UsesIdForNodeKey()
     {
         var projectId = Guid.NewGuid();

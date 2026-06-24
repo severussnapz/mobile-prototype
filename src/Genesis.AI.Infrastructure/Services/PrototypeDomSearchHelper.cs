@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using AngleSharp;
 using AngleSharp.Dom;
 using Genesis.AI.Domain.Interfaces;
 
@@ -19,6 +20,65 @@ internal static class PrototypeDomSearchHelper
         }
 
         return selectorCandidates;
+    }
+
+    internal static IReadOnlyCollection<string> CollectClassNames(
+        IDocument document,
+        ISet<string> excludedTags)
+    {
+        var classNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var element in document.All
+            .OfType<IElement>()
+            .Where(element => !excludedTags.Contains(element.TagName)))
+        {
+            foreach (var className in element.ClassList)
+            {
+                classNames.Add(className);
+            }
+        }
+
+        return classNames;
+    }
+
+    internal static List<PrototypeDomSearchMatch> BuildScopeMatches(
+        IDocument document,
+        string fragmentPath,
+        ISet<string> excludedTags,
+        int maxResultCount)
+    {
+        return document.All
+            .OfType<IElement>()
+            .Where(element => !excludedTags.Contains(element.TagName))
+            .Select(element => BuildSearchMatch(fragmentPath, element))
+            .DistinctBy(match => match.NodeKey)
+            .Take(maxResultCount)
+            .ToList();
+    }
+
+    internal static async Task<(string FragmentPath, IDocument Document)?> OpenFragmentByScopeAsync(
+        IReadOnlyList<(string FragmentPath, string Content)> fragments,
+        string scope,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+        {
+            return null;
+        }
+
+        var targetFragment = fragments.FirstOrDefault(fragment =>
+            System.IO.Path.GetFileNameWithoutExtension(fragment.FragmentPath)
+                .Equals(scope, StringComparison.OrdinalIgnoreCase));
+
+        if (string.IsNullOrEmpty(targetFragment.FragmentPath))
+        {
+            return null;
+        }
+
+        var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
+        var document = await browsingContext.OpenAsync(
+            response => response.Content(targetFragment.Content), cancellationToken);
+
+        return (targetFragment.FragmentPath, document);
     }
 
     internal static bool DoesDirectTextContainQuery(IElement element, string query)

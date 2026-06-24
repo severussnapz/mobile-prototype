@@ -34,4 +34,14 @@ public interface IPrototypeDomSearchService
         Guid projectId,
         string scope,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns every distinct CSS class name present in a fragment scope, with no element cap.
+    /// Used by the apply_to_scope guard to decide class existence: the answer is a yes/no set
+    /// membership test, so it must see all classes regardless of how deep the element sits.
+    /// </summary>
+    Task<IReadOnlyCollection<string>> GetClassNamesInScopeAsync(
+        Guid projectId,
+        string scope,
+        CancellationToken cancellationToken);
 }
