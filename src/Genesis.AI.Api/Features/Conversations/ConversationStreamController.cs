@@ -405,6 +405,10 @@ public class ConversationStreamController : ControllerBase
             // until a mutation (apply_to_scope or save_artefact) succeeds. Blocks budget-burning thrashing.
             var postSearchReadBlocked = new bool[1];
 
+            // Zero-match hard block: once DOM search returns zero matches, block all subsequent
+            // tool calls for this request to force a user clarification instead of tool thrashing.
+            var zeroMatchToolBlocked = new bool[1];
+
             // Read budget: cap get_artefact calls on non-prototype files per request.
             // Prevents the LLM reading all 13 REQ files before writing anything.
             // The artefact manifest in the system prompt already lists every file —
@@ -552,6 +556,7 @@ public class ConversationStreamController : ControllerBase
                             filesReadThisTurn,
                             searchCountThisTurn,
                             postSearchReadBlocked,
+                            zeroMatchToolBlocked,
                             cancellationToken);
                     }
                     catch (ToolExecutionFailedException exception)
@@ -970,6 +975,7 @@ public class ConversationStreamController : ControllerBase
         HashSet<string> filesReadThisTurn,
         int[] searchCountThisTurn,
         bool[] postSearchReadBlocked,
+        bool[] zeroMatchToolBlocked,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -989,6 +995,7 @@ public class ConversationStreamController : ControllerBase
                     filesReadThisTurn,
                     searchCountThisTurn,
                     postSearchReadBlocked,
+                    zeroMatchToolBlocked,
                     cancellationToken);
             }
             catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
@@ -1027,10 +1034,20 @@ public class ConversationStreamController : ControllerBase
         HashSet<string> filesReadThisTurn,
         int[] searchCountThisTurn,
         bool[] postSearchReadBlocked,
+        bool[] zeroMatchToolBlocked,
         CancellationToken cancellationToken)
     {
         const int maxSearchesPerTurn = 5;
         var root = toolCall.Input.RootElement;
+
+        // Zero-match hard block: after a DOM zero-match result, no further tool calls are
+        // allowed in this request. This is structural (not advisory) and prevents tool loops.
+        if (zeroMatchToolBlocked[0])
+        {
+            return "HARD STOP ALREADY TRIGGERED: DOM search returned zero matches. " +
+                   "Do not call more tools in this turn. Ask the user for the exact CSS class " +
+                   "name or pasted HTML from browser inspector, then retry from that input.";
+        }
 
         switch (toolCall.ToolName)
         {
@@ -1470,12 +1487,15 @@ public class ConversationStreamController : ControllerBase
                         query, domResult.Matches.Count);
 
                     if (domResult.Matches.Count == 0)
+                    {
+                        zeroMatchToolBlocked[0] = true;
                         return $"No elements found matching '{query}' in prototype fragments. " +
                                "STOP — do not guess a selector or retry with variations. Tell the user you " +
                                "could not find a matching element, and ask them to provide the exact CSS class " +
                                "name (e.g. \".urgency-arrow\") or paste the HTML element from the browser " +
                                "inspector (right-click element → Inspect → copy the element) so you can " +
                                "identify the exact selector.";
+                    }
 
                     // Post-search read block: set flag after successful search with matches
                     // This prevents re-reads and REQ reads until a mutation completes
