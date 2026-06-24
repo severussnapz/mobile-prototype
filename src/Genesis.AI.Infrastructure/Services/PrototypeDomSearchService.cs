@@ -283,4 +283,11 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         return sharedClass is null ? null : $".{sharedClass}";
     }
 
+    public string? ResolveConfirmedSelectorFromMatches(IReadOnlyList<PrototypeDomSearchMatch> matches)
+    {
+        ArgumentNullException.ThrowIfNull(matches);
+        var sharedClass = PrototypeDomSearchHelper.FindSingleSharedClass(matches);
+        return sharedClass is null ? null : $".{sharedClass}";
+    }
+
 }

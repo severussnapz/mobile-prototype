@@ -200,22 +200,31 @@ public class ToolCallWiringTests
     [Fact]
     public void SearchInArtefact_AmbiguousMatch_ReturnsCandidatesAndAskUser()
     {
-        // Plan 3f: when search_in_artefact returns multiple matches,
-        // the response must return candidates and ask the user to confirm or paste HTML.
+        // Plan 3f Fix 2: when search_in_artefact returns multiple matches, the multi-match
+        // result builder lists the candidates and only asks the user to confirm/paste HTML
+        // when no confirmed selector can be derived (matches span fragments, or no shared class).
+        // When all matches share one fragment and one selector, it returns a ready apply_to_scope
+        // call instead — so the ask-user path must be guarded by the confirmed-selector check.
         var controllerSource = File.ReadAllText(
             Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
                 "Features", "Conversations", "ConversationStreamController.cs"));
 
-        var searchInArtefactIndex = controllerSource.IndexOf(
-            "case PipelineToolDefinitions.SearchInArtefact:", StringComparison.Ordinal);
-        var nextCaseIndex = controllerSource.IndexOf("case PipelineToolDefinitions.",
-            searchInArtefactIndex + 1, StringComparison.Ordinal);
-        var handlerBody = controllerSource[searchInArtefactIndex..nextCaseIndex];
+        var builderIndex = controllerSource.IndexOf(
+            "internal static string BuildDomSearchMultiMatchResult", StringComparison.Ordinal);
+        Assert.True(builderIndex >= 0,
+            "multi-match result must be built by BuildDomSearchMultiMatchResult.");
+        var builderBody = controllerSource[builderIndex..];
 
         Assert.True(
-            handlerBody.Contains("ambiguous", StringComparison.OrdinalIgnoreCase) ||
-            handlerBody.Contains("multiple", StringComparison.OrdinalIgnoreCase),
-            "search_in_artefact on multiple matches must return candidates and ask user to confirm.");
+            builderBody.Contains("ambiguous", StringComparison.OrdinalIgnoreCase) ||
+            builderBody.Contains("multiple", StringComparison.OrdinalIgnoreCase),
+            "multi-match builder must list candidates for the ambiguous matches.");
+        Assert.True(
+            builderBody.Contains("confirmedSelector is not null", StringComparison.Ordinal),
+            "multi-match builder must gate the ask-user path behind a confirmed-selector check.");
+        Assert.True(
+            builderBody.Contains("apply_to_scope", StringComparison.Ordinal),
+            "multi-match builder must offer a ready apply_to_scope call when a selector is confirmed.");
     }
 
     [Fact]

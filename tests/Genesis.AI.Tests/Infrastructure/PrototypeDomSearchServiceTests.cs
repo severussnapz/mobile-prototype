@@ -815,6 +815,56 @@ public class PrototypeDomSearchServiceTests
         Assert.Null(confirmed);
     }
 
+    // ── Plan 3f Fix 2: confirmed selector derived from the matches themselves ────
+    [Fact]
+    public void ResolveConfirmedSelectorFromMatches_WhenAllMatchesShareOneClass_ReturnsThatSelector()
+    {
+        var service = new PrototypeDomSearchService(
+            NullLogger<PrototypeDomSearchService>.Instance,
+            new Mock<IArtefactRepository>().Object,
+            new Mock<IArtefactStorageService>().Object);
+
+        var matches = new List<PrototypeDomSearchMatch>
+        {
+            CreateMatch(["urgency-arrow"]),
+            CreateMatch(["urgency-arrow"]),
+            CreateMatch(["urgency-arrow", "highlight"]),
+        };
+
+        var confirmed = service.ResolveConfirmedSelectorFromMatches(matches);
+
+        Assert.Equal(".urgency-arrow", confirmed);
+    }
+
+    [Fact]
+    public void ResolveConfirmedSelectorFromMatches_WhenMatchesHaveNoSingleSharedClass_ReturnsNull()
+    {
+        var service = new PrototypeDomSearchService(
+            NullLogger<PrototypeDomSearchService>.Instance,
+            new Mock<IArtefactRepository>().Object,
+            new Mock<IArtefactStorageService>().Object);
+
+        var matches = new List<PrototypeDomSearchMatch>
+        {
+            CreateMatch(["nav-link"]),
+            CreateMatch(["chip"]),
+        };
+
+        var confirmed = service.ResolveConfirmedSelectorFromMatches(matches);
+
+        Assert.Null(confirmed);
+    }
+
+    private static PrototypeDomSearchMatch CreateMatch(IReadOnlyList<string> classList) =>
+        new(
+            NodeKey: $"prototype/fragments/screen-01-legacy.html|css:{Guid.NewGuid()}",
+            FragmentPath: "prototype/fragments/screen-01-legacy.html",
+            TagName: "span",
+            TextSnippet: "urgency",
+            CssSelector: "css:span",
+            ClassList: classList,
+            ParentContext: "div",
+            SiblingContext: string.Empty);
 
     [Fact]
     public async Task ListAllAsync_WhenElementHasChildSpans_TextSnippetContainsOnlyDirectText()

@@ -36,6 +36,14 @@ public interface IPrototypeDomSearchService
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Returns the single CSS class selector shared by ALL supplied match elements, as ".class".
+    /// Returns null when the matches do not collapse to exactly one shared class. Pure: reasons
+    /// only over the supplied matches (not the whole scope), so a same-fragment multi-match result
+    /// can be given a confirmed, actionable selector even when the wider scope is heterogeneous.
+    /// </summary>
+    string? ResolveConfirmedSelectorFromMatches(IReadOnlyList<PrototypeDomSearchMatch> matches);
+
+    /// <summary>
     /// Returns every distinct CSS class name present in a fragment scope, with no element cap.
     /// Used by the apply_to_scope guard to decide class existence: the answer is a yes/no set
     /// membership test, so it must see all classes regardless of how deep the element sits.

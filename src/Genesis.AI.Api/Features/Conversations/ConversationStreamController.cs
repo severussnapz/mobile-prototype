@@ -1459,12 +1459,15 @@ public class ConversationStreamController : ControllerBase
                                "Replace ... with operation, attribute, strategy as needed.";
                     }
 
-                    var candidateLines = domResult.Matches.Take(5).Select((match, index) =>
-                        $"  [{index + 1}] node_id: {match.NodeKey} | tag: {match.TagName} | text: {match.TextSnippet}");
-                    return $"Found {domResult.Matches.Count} multiple/ambiguous matches for '{query}':\n" +
-                           string.Join("\n", candidateLines) + "\n\n" +
-                           "Ask the user which element they mean, or ask them to paste the HTML element " +
-                           "from the browser inspector so you can identify the exact selector.";
+                    var candidateMatches = domResult.Matches;
+                    var singleFragment = candidateMatches
+                        .Select(match => match.FragmentPath)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Count() == 1;
+                    var confirmedSelector = singleFragment
+                        ? _prototypeDomSearchService.ResolveConfirmedSelectorFromMatches(candidateMatches)
+                        : null;
+                    return BuildDomSearchMultiMatchResult(query, candidateMatches, confirmedSelector);
                 }
 
                 // Enforce global search limit — after 5 total searches without a mutation,
@@ -2180,6 +2183,37 @@ public class ConversationStreamController : ControllerBase
         return $"## {filePath} (v{version})\n\n{artefactContent}";
     }
 
+    /// <summary>
+    /// Builds the search_in_artefact result for the multi-match case. When every match is in
+    /// one fragment and the matches collapse to a single confirmed selector, this returns a
+    /// ready-to-run apply_to_scope call so the agent acts immediately. The "ask the user / paste
+    /// the HTML" instruction is emitted only when matches span multiple fragments OR no confirmed
+    /// selector can be derived — never when scope and selector are determinable from the matches.
+    /// </summary>
+    internal static string BuildDomSearchMultiMatchResult(
+        string query,
+        IReadOnlyList<PrototypeDomSearchMatch> matches,
+        string? confirmedSelector)
+    {
+        var candidateLines = matches.Take(5).Select((match, index) =>
+            $"  [{index + 1}] node_id: {match.NodeKey} | tag: {match.TagName} | text: {match.TextSnippet}");
+        var header = $"Found {matches.Count} multiple/ambiguous matches for '{query}':\n" +
+                     string.Join("\n", candidateLines) + "\n\n";
+
+        if (confirmedSelector is not null)
+        {
+            var scope = System.IO.Path.GetFileNameWithoutExtension(matches[0].FragmentPath);
+            return header +
+                   $"All {matches.Count} matches are in fragment \"{scope}\" and share one selector. " +
+                   "Ready to apply. Use this exact call:\n" +
+                   $"  apply_to_scope(scope=\"{scope}\", selector=\"{confirmedSelector}\", ...)\n\n" +
+                   "Replace ... with operation, attribute, strategy as needed.";
+        }
+
+        return header +
+               "Ask the user which element they mean, or ask them to paste the HTML element " +
+               "from the browser inspector so you can identify the exact selector.";
+    }
     internal static int CountOccurrences(string source, string target)
     {
         if (string.IsNullOrEmpty(target))
