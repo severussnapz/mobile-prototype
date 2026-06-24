@@ -1040,6 +1040,11 @@ public class ConversationStreamController : ControllerBase
         const int maxSearchesPerTurn = 5;
         var root = toolCall.Input.RootElement;
 
+        _logger.LogInformation(
+            "Tool guard check: zeroMatchToolBlocked={ZeroMatchToolBlocked}, tool={ToolName}",
+            zeroMatchToolBlocked[0],
+            toolCall.ToolName);
+
         // Zero-match hard block: after a DOM zero-match result, no further tool calls are
         // allowed in this request. This is structural (not advisory) and prevents tool loops.
         if (zeroMatchToolBlocked[0])
@@ -1149,6 +1154,7 @@ public class ConversationStreamController : ControllerBase
 
                 // Clear post-search read block after successful save (a form of mutation)
                 postSearchReadBlocked[0] = false;
+                zeroMatchToolBlocked[0] = false;
 
                 return $"Saved {filePath} (version {nextVersion}, {content.Length} chars, {contentType})";
             }
@@ -1833,6 +1839,7 @@ public class ConversationStreamController : ControllerBase
                 {
                     searchCountThisTurn[0] = 0; // Reset after successful mutation
                     postSearchReadBlocked[0] = false; // Clear post-search read block after mutation completes
+                    zeroMatchToolBlocked[0] = false;
                     return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
                 }
 
