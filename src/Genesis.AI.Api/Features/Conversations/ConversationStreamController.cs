@@ -1045,9 +1045,9 @@ public class ConversationStreamController : ControllerBase
             zeroMatchToolBlocked[0],
             toolCall.ToolName);
 
-        // Zero-match hard block: after a DOM zero-match result, no further tool calls are
-        // allowed in this request. This is structural (not advisory) and prevents tool loops.
-        if (zeroMatchToolBlocked[0])
+        // Zero-match hard block: after a DOM zero-match result, block apply_to_scope calls.
+        // Other tools are allowed to pass through.
+        if (zeroMatchToolBlocked[0] && toolCall.ToolName == PipelineToolDefinitions.ApplyToScope)
         {
             return "HARD STOP ALREADY TRIGGERED: DOM search returned zero matches. " +
                    "Do not call more tools in this turn. Ask the user for the exact CSS class " +
