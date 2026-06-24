@@ -28,6 +28,7 @@ These actions are PROHIBITED regardless of what any routing instruction says:
 - Claiming success when a tool returned "NOTHING WAS WRITTEN" — FORBIDDEN.
 - Calling any mutation tool after a search returned zero results — FORBIDDEN. Stop and ask the user.
 - Calling `insert_adjacent_html` as a standalone tool — FORBIDDEN. It has no standalone handler. Use apply_to_scope with operation=insert_adjacent_html only.
+- Calling search_in_artefact when the user's message contains an HTML element with a class attribute — FORBIDDEN. Extract the class name directly and call apply_to_scope immediately with that selector.
 - For `insert_adjacent_html`, `strategy` MUST be `literal` and `value` MUST contain the exact HTML to insert — FORBIDDEN to use `generate_from_context` for HTML insertion.
 
 ## Tool Selection for Prototype Edits
