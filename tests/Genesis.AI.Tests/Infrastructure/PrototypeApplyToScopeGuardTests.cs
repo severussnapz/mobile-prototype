@@ -51,4 +51,41 @@ public class PrototypeApplyToScopeGuardTests
 
         Assert.Null(error);
     }
+
+    [Fact]
+    public void Validate_InsertAdjacentHtmlIntroducesNewClassInMarkup_ReturnsNull()
+    {
+        // insert_adjacent_html exists to add NEW markup. A class that appears only in the
+        // inserted HTML (not yet in scope) is legitimate — it will be styled in a following
+        // save_artefact on _styles.css. Only the anchor selector must already exist.
+        var existingClasses = new[] { "card" };
+
+        var error = PrototypeApplyToScopeGuard.Validate(
+            scope: "screen-01-legacy",
+            selector: ".card",
+            operation: "insert_adjacent_html",
+            value: "<span class=\"priority-badge\">High</span>",
+            existingClasses: existingClasses);
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_InsertAdjacentHtmlWithInventedSelector_RejectsAndListsExistingClasses()
+    {
+        // The anchor selector must still exist — an invented selector matches no element and
+        // silently no-ops, so it remains rejected even on the insert path.
+        var existingClasses = new[] { "card" };
+
+        var error = PrototypeApplyToScopeGuard.Validate(
+            scope: "screen-01-legacy",
+            selector: ".does-not-exist",
+            operation: "insert_adjacent_html",
+            value: "<span class=\"priority-badge\">High</span>",
+            existingClasses: existingClasses);
+
+        Assert.NotNull(error);
+        Assert.Contains(".does-not-exist", error);
+        Assert.Contains(".card", error);
+    }
 }

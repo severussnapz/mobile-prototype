@@ -14,9 +14,6 @@ public static class PrototypeApplyToScopeGuard
     private static readonly Regex SelectorClassRegex =
         new(@"\.(-?[_a-zA-Z][_a-zA-Z0-9-]*)", RegexOptions.Compiled);
 
-    private static readonly Regex HtmlClassAttributeRegex =
-        new(@"class\s*=\s*[""']([^""']*)[""']", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
     private static readonly Regex StyleTagRegex =
         new(@"<\s*style", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -47,11 +44,11 @@ public static class PrototypeApplyToScopeGuard
 
         var existingSet = new HashSet<string>(existingClasses, StringComparer.Ordinal);
 
+        // Only the anchor selector must already exist — an invented selector matches no element
+        // and silently no-ops. Classes that appear solely in inserted HTML are allowed: an
+        // insert_adjacent_html exists to add new markup, which may introduce a new class that is
+        // styled in a following save_artefact on _styles.css.
         var referencedClasses = ExtractSelectorClasses(selector).ToList();
-        if (isInsertHtml && !string.IsNullOrWhiteSpace(value))
-        {
-            referencedClasses.AddRange(ExtractHtmlClasses(value));
-        }
 
         var inventedClass = referencedClasses.FirstOrDefault(className => !existingSet.Contains(className));
         if (inventedClass is not null)
@@ -80,13 +77,5 @@ public static class PrototypeApplyToScopeGuard
         }
 
         return SelectorClassRegex.Matches(selector).Select(match => match.Groups[1].Value);
-    }
-
-    private static IEnumerable<string> ExtractHtmlClasses(string value)
-    {
-        return HtmlClassAttributeRegex
-            .Matches(value)
-            .SelectMany(match => match.Groups[1].Value.Split(
-                [' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
     }
 }
