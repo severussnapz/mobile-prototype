@@ -1441,8 +1441,11 @@ public class ConversationStreamController : ControllerBase
 
                     if (domResult.Matches.Count == 0)
                         return $"No elements found matching '{query}' in prototype fragments. " +
-                               "Ask the user to paste the HTML element from the browser inspector " +
-                               "(right-click element → Inspect → copy the div) so you can identify the exact CSS selector.";
+                               "STOP — do not guess a selector or retry with variations. Tell the user you " +
+                               "could not find a matching element, and ask them to provide the exact CSS class " +
+                               "name (e.g. \".urgency-arrow\") or paste the HTML element from the browser " +
+                               "inspector (right-click element → Inspect → copy the element) so you can " +
+                               "identify the exact selector.";
 
                     if (domResult.Matches.Count == 1)
                     {

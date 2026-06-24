@@ -64,19 +64,24 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
 
         if (matchedElements.Count == 0)
         {
-            var fallbackMatches = await SearchByTextContentAsync(
-                browsingContext, prototypeFragments, query, cancellationToken);
-            matchedElements.AddRange(fallbackMatches);
+            var classTokenMatches = await PrototypeDomSearchHelper.SearchByClassTokensAsync(
+                browsingContext, prototypeFragments, query, ExcludedTags, cancellationToken);
+            matchedElements.AddRange(classTokenMatches);
         }
 
-        var rankedElements = matchedElements
+        return BuildRankedResult(matchedElements, query, request.ProjectId);
+    }
+
+    private PrototypeDomSearchResult BuildRankedResult(
+        IReadOnlyList<(string FragmentPath, IElement Element)> matchedElements,
+        string query,
+        Guid projectId)
+    {
+        var projectedMatches = matchedElements
             .OrderByDescending(match => match.Element.ChildElementCount == 0)
             .ThenByDescending(match => PrototypeDomSearchHelper.DoesDirectTextContainQuery(match.Element, query))
             .ThenBy(match => match.Element.ChildElementCount)
             .ThenBy(match => match.Element.TextContent.Trim().Length)
-            .ToList();
-
-        var projectedMatches = rankedElements
             .Select(match => PrototypeDomSearchHelper.BuildSearchMatch(match.FragmentPath, match.Element))
             .DistinctBy(match => match.NodeKey)
             .ToList();
@@ -86,7 +91,7 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
 
         _logger.LogInformation(
             "PrototypeDomSearchService search complete for project {ProjectId}: query={Query}, totalMatches={TotalMatches}, returned={ReturnedCount}",
-            request.ProjectId, query, totalMatches, cappedMatches.Count);
+            projectId, query, totalMatches, cappedMatches.Count);
 
         return new PrototypeDomSearchResult(
             Matches: cappedMatches,
@@ -164,32 +169,6 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         }
 
         return loadedFragments;
-    }
-
-    private static async Task<IReadOnlyList<(string FragmentPath, IElement Element)>> SearchByTextContentAsync(
-        IBrowsingContext browsingContext,
-        IReadOnlyList<(string FragmentPath, string Content)> fragments,
-        string query,
-        CancellationToken cancellationToken)
-    {
-        var fallbackMatches = new List<(string FragmentPath, IElement Element)>();
-        foreach (var (fragmentPath, fragmentHtml) in fragments)
-        {
-            var document = await browsingContext.OpenAsync(
-                response => response.Content(fragmentHtml), cancellationToken);
-
-            var textMatches = document.All
-                .OfType<IElement>()
-                .Where(element =>
-                    !ExcludedTags.Contains(element.TagName) &&
-                    PrototypeDomSearchHelper.GetAllSearchableText(element)
-                        .Contains(query, StringComparison.OrdinalIgnoreCase))
-                .Select(element => (fragmentPath, element));
-
-            fallbackMatches.AddRange(textMatches);
-        }
-
-        return fallbackMatches;
     }
 
     private List<IElement> QueryWithSelectorVariants(IDocument document, string query)

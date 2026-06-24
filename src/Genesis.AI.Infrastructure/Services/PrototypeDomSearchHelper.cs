@@ -21,6 +21,88 @@ internal static class PrototypeDomSearchHelper
         return selectorCandidates;
     }
 
+    private static readonly char[] QuerySeparators = [' ', '\t', '-', '_'];
+
+    /// <summary>
+    /// Splits a natural-language query into lowercase word tokens on whitespace, hyphens and
+    /// underscores. "urgency arrow", "urgency-arrow" and "Urgency Arrow" all tokenise identically
+    /// to ["urgency", "arrow"], so a spoken description can be matched against a kebab-case class.
+    /// </summary>
+    internal static IReadOnlyList<string> TokeniseQuery(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        return query
+            .Split(QuerySeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => token.ToLowerInvariant())
+            .ToList();
+    }
+
+    /// <summary>
+    /// True when every query token equals a hyphen/underscore segment of the class name. Uses
+    /// segment equality (not raw substring) so "view" matches the segment "view" but not "review".
+    /// Order-independent: "primary button" matches both "primary-button" and "button-primary".
+    /// Abbreviated classes are intentionally not handled — "smart view" does not match "sv-item".
+    /// </summary>
+    internal static bool ClassMatchesAllTokens(string className, IReadOnlyList<string> tokens)
+    {
+        if (tokens.Count == 0 || string.IsNullOrWhiteSpace(className))
+        {
+            return false;
+        }
+
+        var segments = className
+            .Split(QuerySeparators, StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => segment.ToLowerInvariant())
+            .ToHashSet(StringComparer.Ordinal);
+
+        return tokens.All(segments.Contains);
+    }
+
+    /// <summary>
+    /// Finds elements whose class name matches every query token by segment equality. This bridges
+    /// a natural-language query ("urgency arrow") to a kebab-case class (".urgency-arrow") without
+    /// the caller knowing the class name in advance. Class names come from the parsed class list,
+    /// so the derived ".{class}" selector is always a valid identifier.
+    /// </summary>
+    internal static async Task<IReadOnlyList<(string FragmentPath, IElement Element)>> SearchByClassTokensAsync(
+        IBrowsingContext browsingContext,
+        IReadOnlyList<(string FragmentPath, string Content)> fragments,
+        string query,
+        ISet<string> excludedTags,
+        CancellationToken cancellationToken)
+    {
+        var tokens = TokeniseQuery(query);
+        if (tokens.Count == 0)
+        {
+            return [];
+        }
+
+        var classTokenMatches = new List<(string FragmentPath, IElement Element)>();
+        foreach (var (fragmentPath, fragmentHtml) in fragments)
+        {
+            var document = await browsingContext.OpenAsync(
+                response => response.Content(fragmentHtml), cancellationToken);
+
+            var matchingClasses = CollectClassNames(document, excludedTags)
+                .Where(className => ClassMatchesAllTokens(className, tokens));
+
+            foreach (var className in matchingClasses)
+            {
+                var elements = document.QuerySelectorAll($".{className}")
+                    .OfType<IElement>()
+                    .Where(element => !excludedTags.Contains(element.TagName))
+                    .Select(element => (fragmentPath, element));
+                classTokenMatches.AddRange(elements);
+            }
+        }
+
+        return classTokenMatches;
+    }
+
     internal static IReadOnlyCollection<string> CollectClassNames(
         IDocument document,
         ISet<string> excludedTags)

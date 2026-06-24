@@ -199,8 +199,11 @@ public class PrototypeDomSearchServiceTests
     }
 
     [Fact]
-    public async Task SearchAsync_WhenCssSelectorReturnsNothing_UsesTextFallback()
+    public async Task SearchAsync_WhenOnlyTextContentMatches_ReturnsNoMatches()
     {
+        // A query that matches only visible text — not a CSS selector and not a class name —
+        // must NOT fuzzy-match. Search returns nothing so the caller hard-stops and asks the
+        // user for an exact class name or pasted HTML element.
         var projectId = Guid.NewGuid();
         const string fragmentPath = "prototype/fragments/screen-01.html";
         const string s3Key = "s3://screen-01";
@@ -227,10 +230,7 @@ public class PrototypeDomSearchServiceTests
             new PrototypeDomSearchRequest(projectId, "prototype/index.html", "Clinical Safety", "test"),
             CancellationToken.None);
 
-        Assert.NotEmpty(result.Matches);
-        Assert.Contains(
-            result.Matches,
-            match => match.TextSnippet.Contains("Clinical Safety", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(result.Matches);
     }
 
     [Fact]
@@ -501,8 +501,8 @@ public class PrototypeDomSearchServiceTests
         const string fragmentPath = "prototype/fragments/screen-01.html";
         const string s3Key = "s3://s1";
         const string html = """
-<section class="container">
-  <button class="cta">Click me</button>
+<section class="panel">
+  <button class="panel">Click me</button>
 </section>
 """;
         var artefactRepository = new Mock<IArtefactRepository>();
@@ -514,12 +514,12 @@ public class PrototypeDomSearchServiceTests
         var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
 
         var result = await service.SearchAsync(
-            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "Click me", "user"),
+            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "panel", "user"),
             CancellationToken.None);
 
-        // Should return matches without throwing — leaf button should appear
+        // Both section and button share the .panel class; the leaf button must rank first.
         Assert.NotEmpty(result.Matches);
-        Assert.Contains(result.Matches, m => m.TagName == "button");
+        Assert.Equal("button", result.Matches[0].TagName);
     }
 
     // ── T29: SearchAsync_WhenQueryMatchesTextAndClass_ReturnsResults ─────────────
@@ -974,6 +974,106 @@ public class PrototypeDomSearchServiceTests
         Assert.Single(result.Matches);
         Assert.All(result.Matches, match => Assert.Equal(fragmentPathA, match.FragmentPath));
         Assert.DoesNotContain(result.Matches, match => match.TextSnippet.Contains('B'));
+    }
+
+    // ── Plan 3f Fix 3: natural-language query → kebab class via token-segment matching ──
+    [Fact]
+    public async Task SearchAsync_MultiWordQueryMatchesHyphenatedClass_ReturnsThoseElements()
+    {
+        // User says "urgency arrow"; the class is "urgency-arrow". The element's visible text is
+        // a glyph, so substring text search cannot find it. Token-segment class matching must.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-01-legacy.html";
+        const string s3Key = "s3://screen-01-legacy";
+        const string html =
+            "<div class=\"queue\"><span class=\"urgency-arrow\">↑</span>" +
+            "<span class=\"urgency-arrow\">↑</span></div>";
+
+        var service = BuildSearchServiceForHtml(projectId, fragmentPath, s3Key, html);
+
+        var result = await service.SearchAsync(
+            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "urgency arrow", "test"),
+            CancellationToken.None);
+
+        Assert.NotEmpty(result.Matches);
+        Assert.All(result.Matches, match => Assert.Contains("urgency-arrow", match.ClassList));
+    }
+
+    [Fact]
+    public async Task SearchAsync_SpokenWordOrderDiffersFromClassOrder_StillMatches()
+    {
+        // User says "primary button"; the class is "button-primary" (reversed order). Token-segment
+        // matching is order-independent, so it must still resolve to the element.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-02-home.html";
+        const string s3Key = "s3://screen-02-home";
+        const string html = "<div><button class=\"button-primary\">Save</button></div>";
+
+        var service = BuildSearchServiceForHtml(projectId, fragmentPath, s3Key, html);
+
+        var result = await service.SearchAsync(
+            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "primary button", "test"),
+            CancellationToken.None);
+
+        Assert.NotEmpty(result.Matches);
+        Assert.All(result.Matches, match => Assert.Contains("button-primary", match.ClassList));
+    }
+
+    [Fact]
+    public async Task SearchAsync_AbbreviatedClass_DoesNotMatch()
+    {
+        // Documents the accepted limitation: "smart view item" cannot resolve to the abbreviated
+        // class "sv-item" — no synonym/abbreviation expansion. Falls through to no-match.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-03.html";
+        const string s3Key = "s3://screen-03";
+        const string html = "<div><div class=\"sv-item\">Urgent</div></div>";
+
+        var service = BuildSearchServiceForHtml(projectId, fragmentPath, s3Key, html);
+
+        var result = await service.SearchAsync(
+            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "smart view item", "test"),
+            CancellationToken.None);
+
+        Assert.Empty(result.Matches);
+    }
+
+    [Fact]
+    public async Task SearchAsync_TokenIsSubstringOfUnrelatedSegment_DoesNotFalseMatch()
+    {
+        // Precision guard for segment-equality over raw substring: the token "view" must NOT match
+        // the segment "review". Query "view item" against class "review-item-list" → no match.
+        var projectId = Guid.NewGuid();
+        const string fragmentPath = "prototype/fragments/screen-04.html";
+        const string s3Key = "s3://screen-04";
+        const string html = "<div><div class=\"review-item-list\">Reviews</div></div>";
+
+        var service = BuildSearchServiceForHtml(projectId, fragmentPath, s3Key, html);
+
+        var result = await service.SearchAsync(
+            new PrototypeDomSearchRequest(projectId, "prototype/index.html", "view item", "test"),
+            CancellationToken.None);
+
+        Assert.Empty(result.Matches);
+    }
+
+    private static PrototypeDomSearchService BuildSearchServiceForHtml(
+        Guid projectId, string fragmentPath, string s3Key, string html)
+    {
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository
+            .Setup(repository => repository.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
+
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService
+            .Setup(storage => storage.GetContentAsync(s3Key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(html);
+
+        return new PrototypeDomSearchService(
+            NullLogger<PrototypeDomSearchService>.Instance,
+            artefactRepository.Object,
+            artefactStorageService.Object);
     }
 
     private static Artefact CreatePublishedArtefact(Guid projectId, string filePath, string s3Key, int version)
