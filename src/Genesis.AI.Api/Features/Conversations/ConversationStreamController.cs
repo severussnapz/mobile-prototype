@@ -1325,32 +1325,22 @@ public class ConversationStreamController : ControllerBase
                     return $"Artefact '{filePath}' content could not be retrieved.";
                 }
 
-                // For large files, return a structural outline instead of raw content.
-                // This orients the LLM in one call (CSS selectors, HTML section headers)
-                // rather than forcing 20+ individual search_in_artefact probes.
+                // Build the result. Large non-prototype HTML/CSS files return a structural
+                // outline; prototype HTML fragments are always returned in full (the outline is
+                // a CSS digest that misreads markup-heavy fragments as near-empty stubs, and a
+                // faithful full rewrite needs the complete current markup). Prototype fragments
+                // are exempt from the read budget, so a repeated full read within one request is
+                // replaced by a pointer back to the agent's existing context.
                 const int largeFileThreshold = 50_000;
-                if (artefactContent.Length > largeFileThreshold)
-                {
-                    _logger.LogWarning(
-                        "Tool get_artefact: large file {FilePath} ({Length} chars) — returning structural outline",
-                        filePath, artefactContent.Length);
-
-                    // Fragment files are never "too large to edit" — search_in_artefact finds the anchor.
-                    // Only the assembled prototype/index.html triggers full regeneration guidance.
-
-                    var outline = BuildFileOutline(artefactContent, filePath);
-                    filesReadThisRequest.Add(filePath);
-                    return $"## {filePath} (v{artefact.Version}) — STRUCTURAL OUTLINE\n\n" +
-                           $"File is {artefactContent.Length:N0} chars (too large to return in full). " +
-                           $"Use search_in_artefact to retrieve specific sections, or edit_artefact directly using selectors from this outline.\n\n" +
-                           outline;
-                }
+                var alreadyReadThisRequest = filesReadThisRequest.Contains(filePath);
+                var getArtefactResult = BuildGetArtefactResult(
+                    filePath, artefactContent, artefact.Version, alreadyReadThisRequest, largeFileThreshold);
+                filesReadThisRequest.Add(filePath);
 
                 _logger.LogInformation(
-                    "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars)",
-                    filePath, artefact.Version, artefactContent.Length);
-                filesReadThisRequest.Add(filePath);
-                return $"## {filePath} (v{artefact.Version})\n\n{artefactContent}";
+                    "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars, alreadyRead={AlreadyRead})",
+                    filePath, artefact.Version, artefactContent.Length, alreadyReadThisRequest);
+                return getArtefactResult;
             }
 
             case PipelineToolDefinitions.AdvanceRequirement:
@@ -2147,6 +2137,47 @@ public class ConversationStreamController : ControllerBase
     private static string ToNfc(string text)
     {
         return text.ToNfc();
+    }
+
+    /// <summary>
+    /// Builds the get_artefact tool result. Large non-prototype HTML/CSS files return a
+    /// compact structural outline; prototype HTML fragments are always returned in full —
+    /// the outline is a CSS digest that misreads markup-heavy fragments as near-empty stubs,
+    /// and a faithful full rewrite needs the complete current markup. Because prototype
+    /// fragments are exempt from the read budget, a repeated full read of the same fragment
+    /// within one request is replaced by a pointer back to the agent's existing context to
+    /// avoid re-dumping tens of thousands of tokens across the tool loop.
+    /// </summary>
+    internal static string BuildGetArtefactResult(
+        string filePath,
+        string artefactContent,
+        int version,
+        bool alreadyReadThisRequest,
+        int largeFileThreshold)
+    {
+        var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+        var isPrototypeHtmlFragment =
+            filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase)
+            && extension is ".html" or ".htm";
+
+        if (isPrototypeHtmlFragment && alreadyReadThisRequest)
+        {
+            return $"## {filePath} (v{version}) — ALREADY READ\n\n" +
+                   "You have already read this fragment in full earlier in this turn. " +
+                   "Its full content is in your context above. Do not read it again — " +
+                   "make your edit or save the rewritten fragment now.";
+        }
+
+        if (artefactContent.Length > largeFileThreshold && !isPrototypeHtmlFragment)
+        {
+            var outline = BuildFileOutline(artefactContent, filePath);
+            return $"## {filePath} (v{version}) — STRUCTURAL OUTLINE\n\n" +
+                   $"File is {artefactContent.Length:N0} chars (too large to return in full). " +
+                   $"Use search_in_artefact to retrieve specific sections, or edit_artefact directly using selectors from this outline.\n\n" +
+                   outline;
+        }
+
+        return $"## {filePath} (v{version})\n\n{artefactContent}";
     }
 
     internal static int CountOccurrences(string source, string target)
