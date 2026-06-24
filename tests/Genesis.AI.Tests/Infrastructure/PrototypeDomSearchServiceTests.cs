@@ -377,71 +377,6 @@ public class PrototypeDomSearchServiceTests
         Assert.Equal(0, result.TotalMatches);
     }
 
-    [Fact]
-    public async Task ListAllAsync_WhenScopeNodeIdStartsWithDigit_DoesNotThrow()
-    {
-        // scope_node_id whose stableLocator starts with a digit triggers the buggy id-selector path
-        // in ResolveNodeByKey (#0ABCDEF...) and must not throw DomException.
-        // NOTE: element has only id=, NOT data-genesis-id, so the first attribute lookup misses.
-        var projectId = Guid.NewGuid();
-        const string fragmentPath = "prototype/fragments/screen-01.html";
-        const string s3Key = "s3://screen-01";
-        const string digitId = "0ABCDEF123456789";
-        const string html = $"<section id=\"{digitId}\"><button>Test</button></section>";
-
-        var artefactRepository = new Mock<IArtefactRepository>();
-        artefactRepository
-            .Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
-
-        var artefactStorageService = new Mock<IArtefactStorageService>();
-        artefactStorageService
-            .Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(html);
-
-        var service = new PrototypeDomSearchService(
-            NullLogger<PrototypeDomSearchService>.Instance,
-            artefactRepository.Object,
-            artefactStorageService.Object);
-
-        var exception = await Record.ExceptionAsync(() => service.ListAllAsync(
-            new PrototypeDomListRequest(
-                projectId,
-                "button",
-                $"{fragmentPath}|{digitId}",
-                "test-user"),
-            CancellationToken.None));
-
-        Assert.Null(exception);
-    }
-
-    // ── T6: already above ────────────────────────────────────────────────────────
-
-    // ── T7: ListAllAsync_WhenScopeNodeIdContainsNthChild_ReturnsEmpty ────────────
-    [Fact]
-    public async Task ListAllAsync_WhenScopeNodeIdContainsNthChild_ReturnsEmpty()
-    {
-        // scope_node_id containing :nth-child is unstable and must be rejected gracefully
-        var projectId = Guid.NewGuid();
-        const string fragmentPath = "prototype/fragments/screen-01.html";
-        const string s3Key = "s3://screen-01";
-        const string html = "<section><nav><button>Test</button></nav></section>";
-
-        var artefactRepository = new Mock<IArtefactRepository>();
-        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
-        var artefactStorageService = new Mock<IArtefactStorageService>();
-        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
-
-        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
-
-        var exception = await Record.ExceptionAsync(() => service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, "button", $"{fragmentPath}|section:nth-child(1) > nav:nth-child(1)", "user"),
-            CancellationToken.None));
-
-        Assert.Null(exception);
-    }
-
     // ── T8: SearchAsync_WhenQueryIsShellNavId_ReturnsShellNavNode ────────────────
     [Fact]
     public async Task SearchAsync_WhenQueryIsShellNavId_ReturnsShellNavNode()
@@ -534,7 +469,7 @@ public class PrototypeDomSearchServiceTests
         var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, new Mock<IArtefactStorageService>().Object);
 
         var result = await service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, "button", null, "user"),
+            new PrototypeDomListRequest(projectId, "button", "screen-01", "user"),
             CancellationToken.None);
 
         Assert.Empty(result.Matches);
@@ -710,7 +645,7 @@ public class PrototypeDomSearchServiceTests
 
         // An empty selector should produce no matches without throwing
         var exception = await Record.ExceptionAsync(() => service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, string.Empty, null, "user"),
+            new PrototypeDomListRequest(projectId, string.Empty, "screen-01", "user"),
             CancellationToken.None));
 
         Assert.Null(exception);
@@ -735,45 +670,12 @@ public class PrototypeDomSearchServiceTests
         var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
 
         var result = await service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, "li", null, "user"),
+            new PrototypeDomListRequest(projectId, "li", "screen-01", "user"),
             CancellationToken.None);
 
         // li elements with no id/data-genesis-id get CSS selector paths → may contain :nth-child
         // The important thing is no exception is thrown
         Assert.NotNull(result);
-    }
-
-    // ── T40: ListAllAsync_WhenScopedToValidNode_ReturnsOnlyDescendants ───────────
-    [Fact]
-    public async Task ListAllAsync_WhenScopedToValidNode_ReturnsOnlyDescendants()
-    {
-        var projectId = Guid.NewGuid();
-        const string fragmentPath = "prototype/fragments/screen-01.html";
-        const string s3Key = "s3://s1";
-        const string html = """
-<section>
-  <nav data-genesis-id="NAV-1">
-    <button data-genesis-id="BTN-A">Inside nav</button>
-  </nav>
-  <button data-genesis-id="BTN-B">Outside nav</button>
-</section>
-""";
-
-        var artefactRepository = new Mock<IArtefactRepository>();
-        artefactRepository.Setup(r => r.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([CreatePublishedArtefact(projectId, fragmentPath, s3Key, 1)]);
-        var artefactStorageService = new Mock<IArtefactStorageService>();
-        artefactStorageService.Setup(s => s.GetContentAsync(s3Key, It.IsAny<CancellationToken>())).ReturnsAsync(html);
-
-        var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
-
-        var result = await service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, "button", $"{fragmentPath}|NAV-1", "user"),
-            CancellationToken.None);
-
-        // Only BTN-A should be returned (inside the scoped nav), not BTN-B
-        Assert.All(result.Matches, m => Assert.DoesNotContain("BTN-B", m.NodeKey, StringComparison.Ordinal));
-        Assert.Contains(result.Matches, m => m.NodeKey.Contains("BTN-A", StringComparison.Ordinal));
     }
 
     // ── T41: SearchAsync_WhenPrototypeDoesNotExistForProject_ReturnsEmpty ────────
@@ -821,7 +723,7 @@ public class PrototypeDomSearchServiceTests
         var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
 
         var result = await service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, ".smart-view-item", null, "user"),
+            new PrototypeDomListRequest(projectId, ".smart-view-item", "screen-01-legacy", "user"),
             CancellationToken.None);
 
         Assert.Empty(result.Matches);
@@ -941,7 +843,7 @@ public class PrototypeDomSearchServiceTests
         var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
 
         var result = await service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, ".sv-item", null, "user"),
+            new PrototypeDomListRequest(projectId, ".sv-item", "screen-01-legacy", "user"),
             CancellationToken.None);
 
         var svItem = result.Matches.FirstOrDefault(m => m.ClassList.Contains("sv-item"));
@@ -972,12 +874,56 @@ public class PrototypeDomSearchServiceTests
         var service = new PrototypeDomSearchService(NullLogger<PrototypeDomSearchService>.Instance, artefactRepository.Object, artefactStorageService.Object);
 
         var result = await service.ListAllAsync(
-            new PrototypeDomListRequest(projectId, ".indicator", null, "user"),
+            new PrototypeDomListRequest(projectId, ".indicator", "screen-01-legacy", "user"),
             CancellationToken.None);
 
         var match = result.Matches.FirstOrDefault(m => m.ClassList.Contains("indicator"));
         Assert.NotNull(match);
         Assert.Contains("High priority", match!.TextSnippet);
+    }
+
+    [Fact]
+    public async Task ListAllAsync_WhenScopeMatchesOneFragment_ReturnsOnlyThatFragmentsElements()
+    {
+        // Cross-fragment contamination regression: two fragments each contain a <button>.
+        // apply_to_scope must only ever touch the named fragment. Before the file-scoped fix,
+        // the production handler passed a null scope node (filename never resolved to a node),
+        // so ListAllAsync degraded to document.QuerySelectorAll across every fragment and
+        // returned both buttons — the mutation would then write to the wrong fragment path.
+        var projectId = Guid.NewGuid();
+        const string fragmentPathA = "prototype/fragments/screen-a.html";
+        const string fragmentPathB = "prototype/fragments/screen-b.html";
+        const string s3KeyA = "s3://screen-a";
+        const string s3KeyB = "s3://screen-b";
+
+        var artefactRepository = new Mock<IArtefactRepository>();
+        artefactRepository
+            .Setup(repository => repository.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                CreatePublishedArtefact(projectId, fragmentPathA, s3KeyA, 1),
+                CreatePublishedArtefact(projectId, fragmentPathB, s3KeyB, 1)
+            ]);
+
+        var artefactStorageService = new Mock<IArtefactStorageService>();
+        artefactStorageService
+            .Setup(storage => storage.GetContentAsync(s3KeyA, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("<section><button>A</button></section>");
+        artefactStorageService
+            .Setup(storage => storage.GetContentAsync(s3KeyB, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("<section><button>B</button></section>");
+
+        var service = new PrototypeDomSearchService(
+            NullLogger<PrototypeDomSearchService>.Instance,
+            artefactRepository.Object,
+            artefactStorageService.Object);
+
+        var result = await service.ListAllAsync(
+            new PrototypeDomListRequest(projectId, "button", "screen-a", "user"),
+            CancellationToken.None);
+
+        Assert.Single(result.Matches);
+        Assert.All(result.Matches, match => Assert.Equal(fragmentPathA, match.FragmentPath));
+        Assert.DoesNotContain(result.Matches, match => match.TextSnippet.Contains('B'));
     }
 
     private static Artefact CreatePublishedArtefact(Guid projectId, string filePath, string s3Key, int version)

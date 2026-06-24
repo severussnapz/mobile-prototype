@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using AngleSharp;
 using AngleSharp.Dom;
 using Genesis.AI.Domain.Interfaces;
@@ -213,41 +212,6 @@ internal static class PrototypeDomSearchHelper
             .Take(5)
             .ToList();
         return siblingSnippets.Count == 0 ? string.Empty : string.Join(" | ", siblingSnippets);
-    }
-
-    internal static string ExtractStableLocator(string nodeKey, string fragmentPath, out bool fragmentMatches)
-    {
-        fragmentMatches = true;
-        var separatorIndex = nodeKey.IndexOf('|', StringComparison.Ordinal);
-        if (separatorIndex < 0) { return nodeKey.Trim(); }
-        var nodeKeyFragmentPath = nodeKey[..separatorIndex];
-        fragmentMatches = nodeKeyFragmentPath.Equals(fragmentPath, StringComparison.OrdinalIgnoreCase);
-        return nodeKey[(separatorIndex + 1)..].Trim();
-    }
-
-    internal static string EscapeCssString(string value)
-    {
-        return value
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
-    }
-
-    internal static string EscapeCssIdentifier(string value)
-    {
-        var builder = new StringBuilder(value.Length);
-        foreach (var character in value)
-        {
-            if (char.IsLetterOrDigit(character) || character is '-' or '_')
-            {
-                builder.Append(character);
-                continue;
-            }
-
-            builder.Append('\\');
-            builder.Append(character);
-        }
-
-        return builder.ToString();
     }
 
     internal static string ToNfc(string value)

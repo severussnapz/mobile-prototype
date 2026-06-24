@@ -1664,16 +1664,11 @@ public class ConversationStreamController : ControllerBase
                     string.IsNullOrWhiteSpace(operation) || string.IsNullOrWhiteSpace(strategy))
                     return "Error: apply_to_scope requires scope, selector, operation, and strategy.";
 
-                // Resolve scope to a node_id by searching for the scope identifier
-                var scopeSearchResult = await _prototypeDomSearchService.SearchAsync(
-                    new PrototypeDomSearchRequest(projectId, "prototype/index.html", scope, createdBy),
-                    cancellationToken);
-
-                var scopeNodeId = scopeSearchResult.Matches.Count > 0 ? scopeSearchResult.Matches[0].NodeKey : null;
-
-                // List all matching elements within scope
+                // Scope is a fragment filename. Resolve it directly against the loaded fragment
+                // set (filename match) — never a content search, which after Phase 4 returns no
+                // node for a filename and silently degraded the listing to every fragment.
                 var listResult = await _prototypeDomSearchService.ListAllAsync(
-                    new PrototypeDomListRequest(projectId, selector, scopeNodeId, createdBy),
+                    new PrototypeDomListRequest(projectId, selector, scope, createdBy),
                     cancellationToken);
 
                 if (listResult.Matches.Count == 0)

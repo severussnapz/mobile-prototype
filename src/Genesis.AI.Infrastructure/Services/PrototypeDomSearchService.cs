@@ -106,78 +106,40 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         }
 
         var prototypeFragments = await LoadPrototypeFragmentsAsync(request.ProjectId, cancellationToken);
-        if (prototypeFragments.Count == 0)
+        var resolved = await PrototypeDomSearchHelper.OpenFragmentByScopeAsync(
+            prototypeFragments, request.Scope, cancellationToken);
+        if (resolved is null)
         {
             return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
         }
 
-        var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
-        var matchedElements = new List<(string FragmentPath, IElement Element)>();
+        var (fragmentPath, document) = resolved.Value;
 
-        foreach (var (fragmentPath, fragmentHtml) in prototypeFragments)
+        List<PrototypeDomSearchMatch> allMatches;
+        try
         {
-            var document = await browsingContext.OpenAsync(
-                response => response.Content(fragmentHtml), cancellationToken);
-
-            List<IElement> cssMatches;
-            try
-            {
-                var scopeElement = ResolveNodeByKey(document, request.ScopeNodeId, fragmentPath);
-                if (!string.IsNullOrWhiteSpace(request.ScopeNodeId) && scopeElement is null)
-                {
-                    continue;
-                }
-
-                cssMatches = (scopeElement?.QuerySelectorAll(request.Selector) ?? document.QuerySelectorAll(request.Selector))
-                    .OfType<IElement>()
-                    .Where(element => !ExcludedTags.Contains(element.TagName))
-                    .ToList();
-            }
-            catch (Exception exception)
-            {
-                _logger.LogDebug(exception,
-                    "PrototypeDomSearchService ListAllAsync: CSS selector parse failed for selector {Selector}",
-                    request.Selector);
-                continue;
-            }
-
-            matchedElements.AddRange(cssMatches.Select(element => (fragmentPath, element)));
+            allMatches = document.QuerySelectorAll(request.Selector)
+                .OfType<IElement>()
+                .Where(element => !ExcludedTags.Contains(element.TagName))
+                .Select(element => PrototypeDomSearchHelper.BuildSearchMatch(fragmentPath, element))
+                .DistinctBy(match => match.NodeKey)
+                .ToList();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogDebug(exception,
+                "PrototypeDomSearchService ListAllAsync: CSS selector parse failed for selector {Selector}", request.Selector);
+            return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
         }
 
-        var allMatches = matchedElements
-            .Select(match => PrototypeDomSearchHelper.BuildSearchMatch(match.FragmentPath, match.Element))
-            .DistinctBy(match => match.NodeKey)
-            .ToList();
-
         _logger.LogInformation(
-            "PrototypeDomSearchService ListAllAsync for project {ProjectId}: selector={Selector}, scopeNodeId={ScopeNodeId}, totalMatches={TotalMatches}",
-            request.ProjectId, request.Selector, request.ScopeNodeId ?? "(none)", allMatches.Count);
+            "PrototypeDomSearchService ListAllAsync for project {ProjectId}: scope={Scope}, selector={Selector}, totalMatches={TotalMatches}",
+            request.ProjectId, request.Scope, request.Selector, allMatches.Count);
 
         return new PrototypeDomSearchResult(
             Matches: allMatches,
             Truncated: false,
             TotalMatches: allMatches.Count);
-    }
-
-    private static IElement? ResolveNodeByKey(IDocument document, string? nodeKey, string fragmentPath)
-    {
-        if (string.IsNullOrWhiteSpace(nodeKey)) { return null; }
-
-        var stableLocator = PrototypeDomSearchHelper.ExtractStableLocator(nodeKey, fragmentPath, out var fragmentMatches);
-        if (!fragmentMatches || string.IsNullOrWhiteSpace(stableLocator)) { return null; }
-
-        var dataGenesisMatch = document.QuerySelector(
-            $"[data-genesis-id=\"{PrototypeDomSearchHelper.EscapeCssString(stableLocator)}\"]");
-        if (dataGenesisMatch is not null) { return dataGenesisMatch; }
-
-        if (stableLocator.Length > 0 && !char.IsDigit(stableLocator[0]))
-        {
-            var idMatch = document.QuerySelector($"#{PrototypeDomSearchHelper.EscapeCssIdentifier(stableLocator)}");
-            if (idMatch is not null) { return idMatch; }
-        }
-
-        try { return document.QuerySelector(stableLocator); }
-        catch { return null; }
     }
 
     private async Task<IReadOnlyList<(string FragmentPath, string Content)>> LoadPrototypeFragmentsAsync(
