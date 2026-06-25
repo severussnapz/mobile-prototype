@@ -1152,6 +1152,7 @@ public class ConversationStreamController : ControllerBase
                     "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
                     filePath, nextVersion, content.Length, contentType);
 
+                searchCountThisTurn[0] = 0; // Reset after successful mutation
                 // Clear post-search read block after successful save (a form of mutation)
                 postSearchReadBlocked[0] = false;
                 zeroMatchToolBlocked[0] = false;
@@ -1533,11 +1534,11 @@ public class ConversationStreamController : ControllerBase
                     return BuildDomSearchMultiMatchResult(query, candidateMatches, confirmedSelector);
                 }
 
-                // Enforce global search limit — after 5 total searches without a mutation,
+                // Enforce non-DOM search limit — after 5 non-DOM searches without a mutation,
                 // return a hard stop to force the agent to act rather than keep searching.
                 searchCountThisTurn[0]++;
                 if (searchCountThisTurn[0] > maxSearchesPerTurn)
-                    return $"HARD STOP: You have called search_in_artefact {searchCountThisTurn[0]} times in this turn without making an edit. " +
+                    return $"HARD STOP: You have called search_in_artefact {searchCountThisTurn[0]} non-DOM times in this turn without making an edit. " +
                            "Stop searching. You already have the anchor text you need. " +
                            "Call edit_artefact or save_artefact now. Do not search again.";
 
@@ -1699,6 +1700,8 @@ public class ConversationStreamController : ControllerBase
                 {
                     await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
                 }
+
+                searchCountThisTurn[0] = 0; // Reset after successful mutation
 
                 return $"Edited {filePath} (version {nextVersion}, {bytesChanged} bytes changed, total {System.Text.Encoding.UTF8.GetByteCount(updatedContent)} bytes)";
             }
