@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using AngleSharp;
 using AngleSharp.Dom;
 using Genesis.AI.Domain.Interfaces;
@@ -84,7 +85,7 @@ internal static class PrototypeDomSearchHelper
         var classTokenMatches = new List<(string FragmentPath, IElement Element)>();
         foreach (var (fragmentPath, fragmentHtml) in fragments)
         {
-            var document = await browsingContext.OpenAsync(
+            using var document = await browsingContext.OpenAsync(
                 response => response.Content(fragmentHtml), cancellationToken);
 
             var matchingClasses = CollectClassNames(document, excludedTags)
@@ -136,10 +137,9 @@ internal static class PrototypeDomSearchHelper
             .ToList();
     }
 
-    internal static async Task<(string FragmentPath, IDocument Document)?> OpenFragmentByScopeAsync(
+    internal static (string FragmentPath, string Content)? OpenFragmentByScope(
         IReadOnlyList<(string FragmentPath, string Content)> fragments,
-        string scope,
-        CancellationToken cancellationToken)
+        string scope)
     {
         if (string.IsNullOrWhiteSpace(scope))
         {
@@ -147,7 +147,7 @@ internal static class PrototypeDomSearchHelper
         }
 
         var targetFragment = fragments.FirstOrDefault(fragment =>
-            System.IO.Path.GetFileNameWithoutExtension(fragment.FragmentPath)
+            Path.GetFileNameWithoutExtension(fragment.FragmentPath)
                 .Equals(scope, StringComparison.OrdinalIgnoreCase));
 
         if (string.IsNullOrEmpty(targetFragment.FragmentPath))
@@ -155,11 +155,7 @@ internal static class PrototypeDomSearchHelper
             return null;
         }
 
-        var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
-        var document = await browsingContext.OpenAsync(
-            response => response.Content(targetFragment.Content), cancellationToken);
-
-        return (targetFragment.FragmentPath, document);
+        return (targetFragment.FragmentPath, targetFragment.Content);
     }
 
     internal static bool DoesDirectTextContainQuery(IElement element, string query)
@@ -221,7 +217,7 @@ internal static class PrototypeDomSearchHelper
         // This forces callers to target the specific child element for clean values.
         var directText = string.Concat(
             element.ChildNodes
-                .OfType<AngleSharp.Dom.IText>()
+                .OfType<IText>()
                 .Select(textNode => textNode.Data))
             .Trim();
 
@@ -247,7 +243,7 @@ internal static class PrototypeDomSearchHelper
                 var firstChildText = element.Children
                     .OfType<IElement>()
                     .Select(child => DeriveFromTextContentStrategy.CleanTextSnippet(
-                        string.Concat(child.ChildNodes.OfType<AngleSharp.Dom.IText>().Select(textNode => textNode.Data)).Trim()))
+                        string.Concat(child.ChildNodes.OfType<IText>().Select(textNode => textNode.Data)).Trim()))
                     .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? string.Empty;
                 trimmedTextContent = firstChildText;
             }
@@ -304,7 +300,9 @@ internal static class PrototypeDomSearchHelper
     /// <summary>
     /// Returns the single class shared by every match that carries a class, or null when the
     /// matches do not collapse to exactly one shared class. Elements with no class are ignored
-    /// so structural containers do not dilute detection. Pure and domain-agnostic.
+    /// so structural containers do not dilute detection. Note: elements with multiple classes can
+    /// still overmatch when one class is broadly reused; this is acceptable as a guidance
+    /// heuristic for LLM retry suggestions, not a guarantee of exact targeting.
     /// </summary>
     internal static string? FindSingleSharedClass(IReadOnlyList<PrototypeDomSearchMatch> matches)
     {

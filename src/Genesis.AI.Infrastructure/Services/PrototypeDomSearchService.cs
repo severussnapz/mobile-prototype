@@ -9,6 +9,13 @@ namespace Genesis.AI.Infrastructure.Services;
 
 public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
 {
+    private sealed record SearchCandidate(
+        PrototypeDomSearchMatch Match,
+        bool IsLeaf,
+        bool DirectTextContainsQuery,
+        int ChildElementCount,
+        int TextLength);
+
     private static readonly HashSet<string> ExcludedTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "html", "head", "body", "script", "style", "meta", "link", "title"
@@ -49,50 +56,79 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
             return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
         }
 
-        var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
+        using var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
         var query = request.Query.Trim();
-        var matchedElements = new List<(string FragmentPath, IElement Element)>();
+        var matchedCandidates = new List<SearchCandidate>();
 
         foreach (var (fragmentPath, fragmentHtml) in prototypeFragments)
         {
-            var document = await browsingContext.OpenAsync(
+            using var document = await browsingContext.OpenAsync(
                 response => response.Content(fragmentHtml), cancellationToken);
             var cssMatches = QueryWithSelectorVariants(document, query);
             if (cssMatches.Count > 0)
             {
-                matchedElements.AddRange(cssMatches.Select(element => (fragmentPath, element)));
+                matchedCandidates.AddRange(cssMatches.Select(element => CreateSearchCandidate(fragmentPath, element, query)));
             }
         }
 
-        if (matchedElements.Count == 0)
+        if (matchedCandidates.Count == 0)
         {
-            var classTokenMatches = await PrototypeDomSearchHelper.SearchByClassTokensAsync(
-                browsingContext, prototypeFragments, query, ExcludedTags, cancellationToken);
-            matchedElements.AddRange(classTokenMatches);
+            var tokens = PrototypeDomSearchHelper.TokeniseQuery(query);
+            if (tokens.Count > 0)
+            {
+                foreach (var (fragmentPath, fragmentHtml) in prototypeFragments)
+                {
+                    using var document = await browsingContext.OpenAsync(
+                        response => response.Content(fragmentHtml), cancellationToken);
+
+                    var matchingClasses = PrototypeDomSearchHelper.CollectClassNames(document, ExcludedTags)
+                        .Where(className => PrototypeDomSearchHelper.ClassMatchesAllTokens(className, tokens));
+
+                    foreach (var className in matchingClasses)
+                    {
+                        var elements = document.QuerySelectorAll($".{className}")
+                            .OfType<IElement>()
+                            .Where(element => !ExcludedTags.Contains(element.TagName));
+                        matchedCandidates.AddRange(elements.Select(element => CreateSearchCandidate(fragmentPath, element, query)));
+                    }
+                }
+            }
         }
 
-        if (matchedElements.Count == 0)
+        if (matchedCandidates.Count == 0)
         {
-            var fallbackMatches = await SearchByTextContentAsync(
-                browsingContext, prototypeFragments, query, cancellationToken);
-            matchedElements.AddRange(fallbackMatches);
+            foreach (var (fragmentPath, fragmentHtml) in prototypeFragments)
+            {
+                using var document = await browsingContext.OpenAsync(
+                    response => response.Content(fragmentHtml), cancellationToken);
+
+                var textMatches = document.All
+                    .OfType<IElement>()
+                    .Where(element =>
+                        !ExcludedTags.Contains(element.TagName) &&
+                        HasSearchableDirectText(element) &&
+                        PrototypeDomSearchHelper.GetAllSearchableText(element)
+                            .Contains(query, StringComparison.OrdinalIgnoreCase));
+
+                matchedCandidates.AddRange(textMatches.Select(element => CreateSearchCandidate(fragmentPath, element, query)));
+            }
         }
 
-        return BuildRankedResult(matchedElements, query, request.ProjectId);
+        return BuildRankedResult(matchedCandidates, request.ProjectId, query);
     }
 
     private PrototypeDomSearchResult BuildRankedResult(
-        IReadOnlyList<(string FragmentPath, IElement Element)> matchedElements,
-        string query,
-        Guid projectId)
+        IReadOnlyList<SearchCandidate> matchedCandidates,
+        Guid projectId,
+        string query)
     {
-        var projectedMatches = matchedElements
-            .OrderByDescending(match => match.Element.ChildElementCount == 0)
-            .ThenByDescending(match => PrototypeDomSearchHelper.DoesDirectTextContainQuery(match.Element, query))
-            .ThenBy(match => match.Element.ChildElementCount)
-            .ThenBy(match => match.Element.TextContent.Trim().Length)
-            .Select(match => PrototypeDomSearchHelper.BuildSearchMatch(match.FragmentPath, match.Element))
-            .DistinctBy(match => match.NodeKey)
+        var projectedMatches = matchedCandidates
+            .OrderByDescending(candidate => candidate.IsLeaf)
+            .ThenByDescending(candidate => candidate.DirectTextContainsQuery)
+            .ThenBy(candidate => candidate.ChildElementCount)
+            .ThenBy(candidate => candidate.TextLength)
+            .Select(candidate => candidate.Match)
+            .DistinctBy(candidate => candidate.NodeKey)
             .ToList();
 
         var totalMatches = projectedMatches.Count;
@@ -120,14 +156,17 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         }
 
         var prototypeFragments = await LoadPrototypeFragmentsAsync(request.ProjectId, cancellationToken);
-        var resolved = await PrototypeDomSearchHelper.OpenFragmentByScopeAsync(
-            prototypeFragments, request.Scope, cancellationToken);
+        var resolved = PrototypeDomSearchHelper.OpenFragmentByScope(
+            prototypeFragments, request.Scope);
         if (resolved is null)
         {
             return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
         }
 
-        var (fragmentPath, document) = resolved.Value;
+        var (fragmentPath, fragmentHtml) = resolved.Value;
+        using var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
+        using var document = await browsingContext.OpenAsync(
+            response => response.Content(fragmentHtml), cancellationToken);
 
         List<PrototypeDomSearchMatch> allMatches;
         try
@@ -180,31 +219,14 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         return loadedFragments;
     }
 
-    private static async Task<IReadOnlyList<(string FragmentPath, IElement Element)>> SearchByTextContentAsync(
-        IBrowsingContext browsingContext,
-        IReadOnlyList<(string FragmentPath, string Content)> fragments,
-        string query,
-        CancellationToken cancellationToken)
+    private static SearchCandidate CreateSearchCandidate(string fragmentPath, IElement element, string query)
     {
-        var fallbackMatches = new List<(string FragmentPath, IElement Element)>();
-        foreach (var (fragmentPath, fragmentHtml) in fragments)
-        {
-            var document = await browsingContext.OpenAsync(
-                response => response.Content(fragmentHtml), cancellationToken);
-
-            var textMatches = document.All
-                .OfType<IElement>()
-                .Where(element =>
-                    !ExcludedTags.Contains(element.TagName) &&
-                    HasSearchableDirectText(element) &&
-                    PrototypeDomSearchHelper.GetAllSearchableText(element)
-                        .Contains(query, StringComparison.OrdinalIgnoreCase))
-                .Select(element => (fragmentPath, element));
-
-            fallbackMatches.AddRange(textMatches);
-        }
-
-        return fallbackMatches;
+        return new SearchCandidate(
+            Match: PrototypeDomSearchHelper.BuildSearchMatch(fragmentPath, element),
+            IsLeaf: element.ChildElementCount == 0,
+            DirectTextContainsQuery: PrototypeDomSearchHelper.DoesDirectTextContainQuery(element, query),
+            ChildElementCount: element.ChildElementCount,
+            TextLength: element.TextContent.Trim().Length);
     }
 
     private static bool HasSearchableDirectText(IElement element)
@@ -250,13 +272,13 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
         return [];
     }
 
-    private async Task<(string FragmentPath, IDocument Document)?> OpenScopeFragmentAsync(
+    private async Task<(string FragmentPath, string Content)?> OpenScopeFragmentAsync(
         Guid projectId,
         string scope,
         CancellationToken cancellationToken)
     {
         var prototypeFragments = await LoadPrototypeFragmentsAsync(projectId, cancellationToken);
-        return await PrototypeDomSearchHelper.OpenFragmentByScopeAsync(prototypeFragments, scope, cancellationToken);
+        return PrototypeDomSearchHelper.OpenFragmentByScope(prototypeFragments, scope);
     }
 
     public async Task<PrototypeDomSearchResult> ListAllInScopeAsync(
@@ -270,7 +292,10 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
             return new PrototypeDomSearchResult(Matches: [], Truncated: false, TotalMatches: 0);
         }
 
-        var (fragmentPath, document) = resolved.Value;
+        var (fragmentPath, fragmentHtml) = resolved.Value;
+        using var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
+        using var document = await browsingContext.OpenAsync(
+            response => response.Content(fragmentHtml), cancellationToken);
         var elements = PrototypeDomSearchHelper.BuildScopeMatches(document, fragmentPath, ExcludedTags, MaxResultCount);
 
         _logger.LogInformation(
@@ -293,7 +318,11 @@ public sealed class PrototypeDomSearchService : IPrototypeDomSearchService
             return [];
         }
 
-        var classNames = PrototypeDomSearchHelper.CollectClassNames(resolved.Value.Document, ExcludedTags);
+        var (_, fragmentHtml) = resolved.Value;
+        using var browsingContext = BrowsingContext.New(AngleSharp.Configuration.Default);
+        using var document = await browsingContext.OpenAsync(
+            response => response.Content(fragmentHtml), cancellationToken);
+        var classNames = PrototypeDomSearchHelper.CollectClassNames(document, ExcludedTags);
         _logger.LogInformation("GetClassNamesInScopeAsync: scope={Scope} classCount={Count}", scope, classNames.Count);
         return classNames;
     }

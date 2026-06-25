@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -399,15 +400,15 @@ public class ConversationStreamController : ControllerBase
             var filesReadThisRequest = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             // Track total search_in_artefact calls per turn. After 5 searches without a mutation,
             // hard-stop the agent to prevent context window exhaustion from search loops.
-            var searchCountThisTurn = new int[1];
+            var searchCountThisTurn = new StrongBox<int>(0);
 
             // Post-search read block: after DOM search returns matches, prevent re-reads and REQ reads
             // until a mutation (apply_to_scope or save_artefact) succeeds. Blocks budget-burning thrashing.
-            var postSearchReadBlocked = new bool[1];
+            var postSearchReadBlocked = new StrongBox<bool>(false);
 
             // Zero-match hard block: once DOM search returns zero matches, block all subsequent
             // tool calls for this request to force a user clarification instead of tool thrashing.
-            var zeroMatchToolBlocked = new bool[1];
+            var zeroMatchToolBlocked = new StrongBox<bool>(false);
 
             // Read budget: cap get_artefact calls on non-prototype files per request.
             // Prevents the LLM reading all 13 REQ files before writing anything.
@@ -973,9 +974,9 @@ public class ConversationStreamController : ControllerBase
         StageType? stageType,
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
-        int[] searchCountThisTurn,
-        bool[] postSearchReadBlocked,
-        bool[] zeroMatchToolBlocked,
+        StrongBox<int> searchCountThisTurn,
+        StrongBox<bool> postSearchReadBlocked,
+        StrongBox<bool> zeroMatchToolBlocked,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -1032,9 +1033,9 @@ public class ConversationStreamController : ControllerBase
         StageType? stageType,
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
-        int[] searchCountThisTurn,
-        bool[] postSearchReadBlocked,
-        bool[] zeroMatchToolBlocked,
+        StrongBox<int> searchCountThisTurn,
+        StrongBox<bool> postSearchReadBlocked,
+        StrongBox<bool> zeroMatchToolBlocked,
         CancellationToken cancellationToken)
     {
         const int maxSearchesPerTurn = 5;
@@ -1042,12 +1043,12 @@ public class ConversationStreamController : ControllerBase
 
         _logger.LogInformation(
             "Tool guard check: zeroMatchToolBlocked={ZeroMatchToolBlocked}, tool={ToolName}",
-            zeroMatchToolBlocked[0],
+            zeroMatchToolBlocked.Value,
             toolCall.ToolName);
 
         // Zero-match hard block: after a DOM zero-match result, block apply_to_scope calls.
         // Other tools are allowed to pass through.
-        if (zeroMatchToolBlocked[0] && toolCall.ToolName == PipelineToolDefinitions.ApplyToScope)
+        if (zeroMatchToolBlocked.Value && toolCall.ToolName == PipelineToolDefinitions.ApplyToScope)
         {
             return "HARD STOP ALREADY TRIGGERED: DOM search returned zero matches. " +
                    "Do not call more tools in this turn. Ask the user for the exact CSS class " +
@@ -1152,10 +1153,10 @@ public class ConversationStreamController : ControllerBase
                     "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
                     filePath, nextVersion, content.Length, contentType);
 
-                searchCountThisTurn[0] = 0; // Reset after successful mutation
+                searchCountThisTurn.Value = 0; // Reset after successful mutation
                 // Clear post-search read block after successful save (a form of mutation)
-                postSearchReadBlocked[0] = false;
-                zeroMatchToolBlocked[0] = false;
+                postSearchReadBlocked.Value = false;
+                zeroMatchToolBlocked.Value = false;
 
                 return $"Saved {filePath} (version {nextVersion}, {content.Length} chars, {contentType})";
             }
@@ -1320,7 +1321,7 @@ public class ConversationStreamController : ControllerBase
                 // Post-search read block: after DOM search found matches, prevent re-reading fragments
                 // and REQ files until a mutation succeeds. This stops the agent from burning budget
                 // on reads it shouldn't be making.
-                if (postSearchReadBlocked[0])
+                if (postSearchReadBlocked.Value)
                 {
                     var isFragmentOrReq = filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase) ||
                                          filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase);
@@ -1495,7 +1496,7 @@ public class ConversationStreamController : ControllerBase
 
                     if (domResult.Matches.Count == 0)
                     {
-                        zeroMatchToolBlocked[0] = true;
+                        zeroMatchToolBlocked.Value = true;
                         return $"No elements found matching '{query}' in prototype fragments. " +
                                "STOP — do not guess a selector or retry with variations. Tell the user you " +
                                "could not find a matching element, and ask them to provide the exact CSS class " +
@@ -1506,7 +1507,7 @@ public class ConversationStreamController : ControllerBase
 
                     // Post-search read block: set flag after successful search with matches
                     // This prevents re-reads and REQ reads until a mutation completes
-                    postSearchReadBlocked[0] = true;
+                    postSearchReadBlocked.Value = true;
 
                     if (domResult.Matches.Count == 1)
                     {
@@ -1536,9 +1537,9 @@ public class ConversationStreamController : ControllerBase
 
                 // Enforce non-DOM search limit — after 5 non-DOM searches without a mutation,
                 // return a hard stop to force the agent to act rather than keep searching.
-                searchCountThisTurn[0]++;
-                if (searchCountThisTurn[0] > maxSearchesPerTurn)
-                    return $"HARD STOP: You have called search_in_artefact {searchCountThisTurn[0]} non-DOM times in this turn without making an edit. " +
+                searchCountThisTurn.Value++;
+                if (searchCountThisTurn.Value > maxSearchesPerTurn)
+                    return $"HARD STOP: You have called search_in_artefact {searchCountThisTurn.Value} non-DOM times in this turn without making an edit. " +
                            "Stop searching. You already have the anchor text you need. " +
                            "Call edit_artefact or save_artefact now. Do not search again.";
 
@@ -1701,7 +1702,7 @@ public class ConversationStreamController : ControllerBase
                     await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
                 }
 
-                searchCountThisTurn[0] = 0; // Reset after successful mutation
+                searchCountThisTurn.Value = 0; // Reset after successful mutation
 
                 return $"Edited {filePath} (version {nextVersion}, {bytesChanged} bytes changed, total {System.Text.Encoding.UTF8.GetByteCount(updatedContent)} bytes)";
             }
@@ -1746,8 +1747,11 @@ public class ConversationStreamController : ControllerBase
 
                     // If the scope's elements collapse to one shared class, name it as the confirmed
                     // selector — the agent must retry with exactly this, never its own guess.
-                    var confirmedSelector = await _prototypeDomSearchService.ResolveConfirmedSelectorForScope(
-                        projectId, scope, cancellationToken);
+                    // Heuristic note: the single shared class may also appear on sibling or nested
+                    // elements when nodes carry multiple classes. This is acceptable for LLM guidance,
+                    // but not a guarantee of one-to-one targeting.
+                    var confirmedSelector = _prototypeDomSearchService.ResolveConfirmedSelectorFromMatches(
+                        actualElements.Matches);
                     if (confirmedSelector is not null)
                     {
                         return $"NOTHING WAS WRITTEN. selector='{selector}' matched 0 elements in scope='{scope}'. " +
@@ -1840,9 +1844,9 @@ public class ConversationStreamController : ControllerBase
 
                 if (batchResult.SuccessfulMutations == batchResult.TotalMutations)
                 {
-                    searchCountThisTurn[0] = 0; // Reset after successful mutation
-                    postSearchReadBlocked[0] = false; // Clear post-search read block after mutation completes
-                    zeroMatchToolBlocked[0] = false;
+                    searchCountThisTurn.Value = 0; // Reset after successful mutation
+                    postSearchReadBlocked.Value = false; // Clear post-search read block after mutation completes
+                    zeroMatchToolBlocked.Value = false;
                     return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
                 }
 

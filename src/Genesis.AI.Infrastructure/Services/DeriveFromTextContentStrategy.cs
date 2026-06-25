@@ -1,9 +1,13 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Genesis.AI.Domain.Interfaces;
 
 namespace Genesis.AI.Infrastructure.Services;
 
 public sealed class DeriveFromTextContentStrategy : IApplyToScopeStrategy
 {
+    private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly string[] ArrowPrefixes =
     [
         "◀", "▶", "►", "◄", "▲", "▼", "→", "←", "↑", "↓",
@@ -33,8 +37,8 @@ public sealed class DeriveFromTextContentStrategy : IApplyToScopeStrategy
         // Normalise whitespace — replace newlines and multiple spaces with a single space.
         // Regression fix: elements with child spans produce text content with newlines between spans
         // e.g. "All documents\n27" which breaks HTML attribute values.
-        var cleaned = System.Text.RegularExpressions.Regex
-            .Replace(text.Trim(), @"\s+", " ")
+        var cleaned = WhitespaceRegex
+            .Replace(text.Trim(), " ")
             .Trim();
 
         // Strip leading emoji (Unicode ranges)
@@ -58,7 +62,7 @@ public sealed class DeriveFromTextContentStrategy : IApplyToScopeStrategy
 
     private static string StripLeadingEmoji(string text)
     {
-        var enumerator = System.Globalization.StringInfo.GetTextElementEnumerator(text);
+        var enumerator = StringInfo.GetTextElementEnumerator(text);
         var firstElement = string.Empty;
 
         if (enumerator.MoveNext())
