@@ -52,3 +52,81 @@ env:
     value: "REPLACE_WITH_DEV_IDENTITY_AUTHORITY"
   - name: Authentication__Audience
     value: "REPLACE_WITH_DEV_AUDIENCE"
+
+# --- Database migrations (EKS golden path) ----------------------------------
+# Flyway runs as an Argo CD PreSync hook (Helm pre-install,pre-upgrade) BEFORE
+# the Deployment rolls out, applying db/migrations against the Aurora cluster.
+# This is the EKS replacement for the legacy ECS migration task — no ECS task
+# definition, no db-migrations-* security group, no genesis run-flyway workflow.
+#
+# The migration image is built/pushed by .github/workflows/build-flyway.yml as
+# `:flyway-latest` (db/migrations baked in).
+#
+# Credentials: the initial schema — including V13, which grants `rds_iam` to
+# genesis_ai_app — must run as the Aurora MASTER user, because IAM database auth
+# is not usable until V13 has been applied. The cluster master username is
+# genesis_ai_app with an RDS-managed password held in Secrets Manager
+# (ApplicationStack status `rdsMasterUserSecretArn`, JSON {username,password}).
+# The CSI Secrets Store driver mounts that secret using the pod's EKS Pod
+# Identity; the job reads the password from the mounted file at start (avoiding
+# any Kubernetes Secret sync race).
+#
+# NOTE (platform follow-up, same class as the enableRDS / RDS_HOST TODOs): the
+# workload Pod Identity role must be granted `secretsmanager:GetSecretValue`
+# (+ `kms:Decrypt`) on the master secret. The ApplicationStack composite does
+# not yet grant the workload role access to its own master secret — that grant
+# must land before this PreSync job can read the credential.
+job:
+  enabled: true
+  name: flyway-migration
+  image:
+    repository: 442042551704.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api
+    tag: flyway-latest
+    pullPolicy: Always
+  # Read the master password from the CSI-mounted file, then run Flyway. Reading
+  # the file (rather than a secretKeyRef env) avoids the secret-sync race where
+  # the synced Kubernetes Secret may not exist yet at container start.
+  command:
+    - /bin/sh
+    - -c
+  args:
+    - 'export FLYWAY_PASSWORD="$(cat /mnt/db-secret/db-password)"; exec flyway migrate'
+  env:
+    # Aurora writer endpoint (ApplicationStack status `rdsClusterEndpoint`).
+    # TODO: set once feat/kro-rds-definition merges and the stack provisions.
+    - name: FLYWAY_URL
+      value: "jdbc:postgresql://REPLACE_WITH_RDS_CLUSTER_ENDPOINT:5432/genesis_ai_requirements"
+    - name: FLYWAY_USER
+      value: genesis_ai_app
+    # Aurora can briefly refuse connections immediately after provisioning/sync.
+    - name: FLYWAY_CONNECT_RETRIES
+      value: "10"
+  # Mounting the CSI volume is what drives the Secrets Store driver to fetch the
+  # master secret and write the jmesPath aliases as files under the mount path.
+  volumes:
+    - name: db-master-secret
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: genesis-ai-requirements-api-db-master-spc
+  volumeMounts:
+    - name: db-master-secret
+      mountPath: /mnt/db-secret
+      readOnly: true
+  # CSI SecretProviderClass for the RDS-managed master secret. Created as its own
+  # PreSync hook (weight -10) so it exists before the job pod (weight -5) mounts.
+  secretProviderClass:
+    enabled: true
+    name: genesis-ai-requirements-api-db-master-spc
+    hookWeight: "-10"
+    objects:
+      # ARN of the RDS-managed master secret (ApplicationStack status
+      # `rdsMasterUserSecretArn`). TODO: set once the stack provisions.
+      - objectName: "REPLACE_WITH_RDS_MASTER_USER_SECRET_ARN"
+        objectType: secretsmanager
+        jmesPath:
+          - path: username
+            objectAlias: db-username
+          - path: password
+            objectAlias: db-password

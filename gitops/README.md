@@ -28,6 +28,18 @@ Only `dev` is onboarded at this stage.
 > `ConnectionStrings:DefaultConnection`. The DB login role `genesis_ai_app` and
 > its `rds_iam` grant are created by Flyway migration `V13`.
 
+> **Schema migrations (EKS).** Flyway runs as an **Argo CD PreSync hook** — the
+> shared chart's `flyway-migration` Job (Helm `pre-install,pre-upgrade`) applies
+> `db/migrations` to Aurora *before* the Deployment rolls. This replaces the
+> legacy Genesis v1 ECS migration task (`db-migration-*` task definition +
+> `run-flyway-migration.yml`) — there is no ECS task on the EKS path. The job
+> image (`:flyway-latest`) is built by [`build-flyway.yml`](../.github/workflows/build-flyway.yml)
+> from [`db/Dockerfile`](../db/Dockerfile). Because IAM auth is not
+> usable until `V13` has run, the initial migration connects as the Aurora
+> **master** user (`genesis_ai_app`, RDS-managed password), mounted from Secrets
+> Manager via the CSI driver using Pod Identity. The `job` block lives in
+> [overlays/dev/values.yaml](overlays/dev/values.yaml).
+
 ## What lives where
 
 - **Workload** — the shared Helm chart `centraluk.jfrog.io/genesis-helm-rel-loc/emisx-service`,
@@ -36,6 +48,9 @@ Only `dev` is onboarded at this stage.
   ([base/manifests/application-stack.yaml](base/manifests/application-stack.yaml)):
   S3 artefact bucket, Aurora PostgreSQL Serverless v2, a scoped Bedrock invoke
   policy, the ECR repository, and the pod-identity IAM role.
+- **Schema migrations** — the chart's `flyway-migration` Job (configured in
+  [overlays/dev/values.yaml](overlays/dev/values.yaml)), run by Argo as a
+  PreSync hook from the `:flyway-latest` image built by `build-flyway.yml`.
 - **Platform side (separate PR into `emisgroup/genesis`)** — the `AppProject`,
   the governed namespace `genesis-ai-requirements-api-ns`, and the gitops-token
   repository registration.
@@ -47,6 +62,10 @@ templates in `emisgroup/emisx-platform-engineering`.
 
 - **`build.yml`** — on push to `main` under `src/**`, builds the production
   image and pushes it to ECR as `:latest` for dev (OIDC → ECR, arm64).
+- **`build-flyway.yml`** — on push to `main` under `db/**`, builds the Flyway
+  migration image (from [`db/Dockerfile`](../db/Dockerfile)) and pushes it to
+  ECR as `:flyway-latest`. Run this before the first dev Argo sync, otherwise the
+  PreSync migration hook cannot pull its image.
 - **`gitops-deploy-dev.yaml`** — on push to `main` under `gitops/**`, reconciles
   the dev Argo CD Application.
 - **`gitops.yaml`** — manual `workflow_dispatch` escape hatch (reconcile / drift
@@ -76,18 +95,27 @@ These must be resolved before the stack syncs cleanly:
 3. **Dev OIDC config.** `Authentication__Authority` / `Authentication__Audience`
    in [overlays/dev/values.yaml](overlays/dev/values.yaml) are placeholders.
 
-4. **S3 bucket name.** `S3__ArtefactBucketName` in [base/values.yaml](base/values.yaml)
+4. **Migration secret access (blocking the PreSync job).** The `flyway-migration`
+   job reads the RDS-managed master secret via the CSI driver under the workload
+   Pod Identity. The `ApplicationStack` composite does **not** currently grant
+   the workload role `secretsmanager:GetSecretValue` (+ `kms:Decrypt`) on its own
+   master secret — that grant must be added (platform RGD) before the job can
+   start. Also set the two `REPLACE_WITH_...` placeholders in the `job` block:
+   `FLYWAY_URL` (Aurora writer endpoint) and the master secret ARN
+   (`rdsMasterUserSecretArn` output).
+
+5. **S3 bucket name.** `S3__ArtefactBucketName` in [base/values.yaml](base/values.yaml)
    assumes the composite derives the bucket name from the stack `instance`
    (`genesis-ai-requirements-api`). Confirm the actual provisioned bucket name.
 
-5. **Owning AD group.** The `AppProject` `developer` role currently grants
+6. **Owning AD group.** The `AppProject` `developer` role currently grants
    `emisgroup:emisx-platform-engineering`; add the owning team's AD group once
    confirmed.
 
-6. **Chart value validation.** Validate the value keys in `base/values.yaml`
+7. **Chart value validation.** Validate the value keys in `base/values.yaml`
    against the pinned `emisx-service` chart `0.3.6`.
 
-7. **ApplicationStack `apiVersion`.** This manifest uses `genesis.io/v1alpha1`,
+8. **ApplicationStack `apiVersion`.** This manifest uses `genesis.io/v1alpha1`,
    but the `genesis-hello-world` `feat/kro` reference branch uses
    `kro.run/v1alpha1`. Confirm which group the **published** RGD serves before
    the stack will pass admission.
