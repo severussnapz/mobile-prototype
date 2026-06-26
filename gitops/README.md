@@ -115,18 +115,12 @@ These must be resolved before the stack syncs cleanly:
 7. **Chart value validation.** Validate the value keys in `base/values.yaml`
    against the pinned `emisx-service` chart `0.3.6`.
 
-8. **ApplicationStack `apiVersion` + RDS/Bedrock schema conflict (blocking).**
-   The platform RGD is mid-migration and the two relevant branches conflict —
-   **neither alone serves the schema this service needs** (RDS *and* Bedrock):
-   - `main` (published): schema group `genesis.io/v1alpha1`, has `enableBedrock`,
-     **no** `enableRDS`.
-   - `feat/kro-rds-definition`: schema group `kro.run/v1alpha1` (`genesis.io`
-     commented out), has `enableRDS`, **no** `enableBedrock`.
-
-   So the stack cannot pass admission today regardless of apiVersion. The merged
-   RGD must (a) combine `enableRDS` + `enableBedrock` and (b) settle on one schema
-   group. Direction of travel is `kro.run/v1alpha1`; the manifest is left at the
-   currently-published `genesis.io/v1alpha1` with a TODO until platform confirms.
-   Track with `emisx-platform-engineering`.
+8. **ApplicationStack RGD must be published (blocking).** The schema group is
+   confirmed by `emisx-platform-engineering`: instances are served under
+   `kro.run/v1alpha1` (migrated off the old `genesis.io` group) — the manifest
+   uses this. The remaining dependency is delivery: the reconciled RGD that
+   serves `kro.run/v1alpha1` **and** carries both `enableRDS` and `enableBedrock`
+   must be merged to platform `main` and published to the cluster before the
+   stack passes admission. Track with `emisx-platform-engineering`.
 
 [golive]: https://github.com/emisgroup/emisx-engineering/blob/main/docs/03_internal-developer-platforms/01_genesis/04_golive.mdx

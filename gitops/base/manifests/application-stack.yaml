@@ -7,26 +7,16 @@
 #   - ECR repository       (derived from repositoryName)
 #   - Pod Identity IAM role (workload AWS access, scoped to githubRepoPattern)
 #
-# IMPORTANT — the RGD is mid-migration and the two relevant branches CONFLICT.
-# Neither branch alone serves the schema this instance needs (RDS *and* Bedrock):
+# Schema group confirmed by emisx-platform-engineering: ApplicationStack
+# instances are served under `kro.run/v1alpha1` (the RGD has migrated off the
+# old `genesis.io` group — see the platform PR that renames the schema group).
+# Bedrock, S3, RDS etc. are all `spec` blocks on this single instance — there is
+# no separate apiVersion per resource.
 #
-#   emisx-platform-engineering / kro-ResourceGraphDefinition/application-stack.yaml
-#   ┌────────────────────────┬──────────────────────┬──────────┬──────┐
-#   │ branch                 │ schema group         │ Bedrock  │ RDS  │
-#   ├────────────────────────┼──────────────────────┼──────────┼──────┤
-#   │ main (published)       │ genesis.io/v1alpha1  │ yes      │ NO   │
-#   │ feat/kro-rds-definition│ kro.run/v1alpha1 *   │ NO       │ yes  │
-#   └────────────────────────┴──────────────────────┴──────────┴──────┘
-#   * that branch flips the schema group to `kro.run` and comments out
-#     `genesis.io`, so once it merges as-is, `genesis.io/v1alpha1` instances
-#     stop being served and the `bedrock` block is rejected at admission.
-#
-# BLOCKING platform follow-up (confirm with emisx-platform-engineering before
-# first sync): the merged RGD must (a) combine `enableRDS` + `enableBedrock`,
-# and (b) settle on ONE schema group. The apiVersion below MUST match whatever
-# group the merged RGD serves — the direction of travel is `kro.run/v1alpha1`,
-# but it is NOT yet on main, so this is left at the currently-published value.
-apiVersion: genesis.io/v1alpha1 # TODO: -> kro.run/v1alpha1 once the merged RGD settles the group (see above)
+# DEPENDENCY (platform side): the reconciled RGD that serves `kro.run/v1alpha1`
+# AND carries both `enableRDS` and `enableBedrock` must be merged to platform
+# `main` and published to the cluster before this stack passes admission.
+apiVersion: kro.run/v1alpha1
 kind: ApplicationStack
 metadata:
   name: genesis-ai-requirements-api
