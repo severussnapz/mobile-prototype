@@ -24,6 +24,11 @@ public class ArtefactEntityTypeConfiguration : IEntityTypeConfiguration<Artefact
             .HasColumnName("version")
             .IsRequired();
 
+        builder.Property(artefact => artefact.IsPublished)
+            .HasColumnName("is_published")
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(artefact => artefact.FilePath)
             .HasColumnName("file_path")
             .HasMaxLength(500)

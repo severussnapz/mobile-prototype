@@ -288,7 +288,7 @@ public sealed class SplitPlanningTasksCommandHandler
             projectId, filePath, 1, payload, JsonContentType, cancellationToken);
 
         var artefact = Artefact.CreateS3Artefact(
-            projectId, 1, filePath, newStorageKey, JsonContentType, payload.Length, userId, _timeProvider);
+            projectId, 1, filePath, newStorageKey, JsonContentType, payload.Length, userId, _timeProvider, true);
 
         await _artefactRepository.AddAsync(artefact, cancellationToken);
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

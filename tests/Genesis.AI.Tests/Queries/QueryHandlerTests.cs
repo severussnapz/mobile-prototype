@@ -101,7 +101,7 @@ public class GetArtefactByIdQueryHandlerTests
     public async Task Handle_ArtefactFound_ReturnsArtefact()
     {
         var artefact = Artefact.CreateS3Artefact(
-            Guid.NewGuid(), 1, "manifest.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider);
+            Guid.NewGuid(), 1, "manifest.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider, true);
         _artefactRepositoryMock
             .Setup(repository => repository.GetByIdAsync(artefact.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(artefact);
@@ -125,7 +125,7 @@ public class GetArtefactsByStageQueryHandlerTests
     {
         var projectId = Guid.NewGuid();
         var artefact = Artefact.CreateS3Artefact(
-            projectId, 1, "manifest.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider);
+            projectId, 1, "manifest.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider, true);
         _artefactRepositoryMock
             .Setup(repository => repository.GetByProjectIdAsync(projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([artefact]);

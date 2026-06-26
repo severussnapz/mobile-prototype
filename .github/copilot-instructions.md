@@ -98,6 +98,14 @@ src/
     │                            # ActiveSkillsService, PhaseSkillMap, ArtefactToolBuilder
     ├── Skills/                  # Embedded skill content (.md files) injected into AI context
     ├── Prompts/                 # Stage-specific system prompts (embedded resources)
+    ├── Resources/               # Static assets embedded as project resources
+    │   ├── emis-x-base.css      # EMIS-X compiled design token CSS (base.css from application-frame).
+    │   │                        # Injected into prototype demo <head> so the iframe renders correctly.
+    │   └── emis-x-ui-kit.md     # EMIS-X design system reference — tokens, component APIs, guardrails
+    │                            # (DS-001, DS-002, DS-004). Injected into prototype generation context
+    │                            # to anchor output to the EMIS-X design language.
+    │                            # NHS Blue: --token-colour-brand-primary: #005EB8
+    │                            # All colours via var(--token-*) tokens only — no hardcoded hex.
     └── Configuration/           # Token optimisation options (TokenOptimisationOptions)
 ```
 
@@ -458,13 +466,13 @@ Artefact content lives in S3; the `artefacts` table stores metadata and the S3 k
 - **Service:** `BedrockAiService` implements `IAiService` — handles multi-turn tool loop with `IAsyncEnumerable<AiStreamEvent>`
 - **Prompt caching:** Cache checkpoint placed after the system prompt block to avoid re-processing the large system prompt on every tool loop turn (90% cost reduction on cached tokens)
 - **Split system prompt:** `AiSystemPrompt` (record with `StablePart` / `MutablePart`, factory `FromFullPrompt`) splits the prompt around the Bedrock cache point. The stable part holds the base stage prompt + Category A foundation artefacts; the mutable part holds session state, the artefact manifest and staleness notices
-- **Foundation prefix:** `FoundationService` (implements `IFoundationService`) builds the stable "Category A" foundation content \u2014 upstream artefacts loaded in full and placed *before* the cache point so they are cached across turns (~10\u00d7 cheaper cached tokens). `StageFoundationMap` maps each P3\u2013P8 stage to its foundation path prefixes and exposes `IsFoundationArtefact`
+- **Foundation prefix:** `FoundationService` (implements `IFoundationService`) builds the stable "Category A" foundation content — upstream artefacts loaded in full and placed *before* the cache point so they are cached across turns (~10× cheaper cached tokens). `StageFoundationMap` maps each P3–P8 stage to its foundation path prefixes and exposes `IsFoundationArtefact`
 - **Per-requirement windowing:** Conversations can be scoped to a single `RequirementId`, giving each a bounded message window; the AI moves between requirements via the `advance_requirement` tool (gated by a completion check)
-- **Orchestration modes:** `OrchestrationMode` is either `forward_sweep` (default, windowed) or `cross_check` (non-windowed holistic pass for P6\u2013P8). Switched explicitly via the `set_orchestration_mode` tool \u2014 never inferred
-- **Feature toggles:** the `TokenOptimisation` config section gates these behaviours \u2014 `FoundationPrefixEnabled`, `RequirementWindowingEnabled`, `NonWindowedCrossCheckEnabled`
+- **Orchestration modes:** `OrchestrationMode` is either `forward_sweep` (default, windowed) or `cross_check` (non-windowed holistic pass for P6–P8). Switched explicitly via the `set_orchestration_mode` tool — never inferred
+- **Feature toggles:** the `TokenOptimisation` config section gates these behaviours — `FoundationPrefixEnabled`, `RequirementWindowingEnabled`, `NonWindowedCrossCheckEnabled`
 - **Prompts:** `EmbeddedPromptService` — system prompts per stage type stored as embedded `.md` resources in `Infrastructure/Prompts/`
   - `Pipeline01RequirementsDiscovery.md` — Structured requirements interview (13 phases)
-  - `Pipeline02Prototype.md` — Generates single-file HTML prototypes for requirements validation
+  - `Pipeline02Prototype.md` — Generates clickable single-page HTML demo prototypes for requirements validation. Generation is anchored on: (1) `emis-x-ui-kit.md` injected as context so the model composes from the EMIS-X design system, (2) a PNG style reference uploaded by the user fed as vision input, (3) the project requirements. Output is a self-contained HTML page rendered in a sandboxed Blob-URL iframe (chat-left, preview-right layout). Edits are targeted — model returns a minimal diff, not a full regenerate. Changes flow into the Plan 3d requirement feedback loop.
   - `Pipeline03Architecture.md` — BDAT analysis, ADRs, failure modes
   - `Pipeline04Design.md` — API contracts, database schema, component interfaces
   - `Pipeline05Pxd.md` — Product experience design review
@@ -474,6 +482,7 @@ Artefact content lives in S3; the `artefacts` table stores metadata and the S3 k
   - `Pipeline09Normalisation.md` — Cross-cutting extraction and normalisation
   - `Pipeline10Planning.md` — Task generation and dependency ordering
 - **Skills:** `SkillContentService` — loads guardrail/steer skill content from `Infrastructure/Skills/` for injection into AI context
+- **UI kit resources:** `Infrastructure/Resources/emis-x-base.css` and `Infrastructure/Resources/emis-x-ui-kit.md` are injected into the prototype stage to anchor generation to the EMIS-X design system. `emis-x-base.css` is included in the generated HTML `<head>`; `emis-x-ui-kit.md` is injected into the generation context. NHS Blue: `--token-colour-brand-primary: #005EB8`. All colours via `var(--token-*)` tokens only.
 - **Tool definitions:** `PipelineToolDefinitions` — defines AI tools (save_artefact, advance_phase, update_progress, add_parking_lot_item, resolve_parking_lot_item, list_artefacts, get_artefact, get_guardrail_details, advance_requirement, set_orchestration_mode)
 - **Artefact editing tools:** `ArtefactToolBuilder` — defines `search_in_artefact` (search for lines in an artefact) and `edit_artefact` (surgical edit by replacing exact anchor string). Gated by `TokenOptimisationOptions.EditArtefactEnabled` (defaults to `false`). `edit_artefact` is blocked until `search_in_artefact` has read the file on a prior turn.
 - **Active skill injection:** `ActiveSkillsService` — concatenates universal, stage-specific, and phase-specific skill documents into the system prompt before the cache breakpoint (~90% cost savings). When enabled and the stage has skills, `get_guardrail_details` is removed from the tool list. Toggled via `TokenOptimisation:ActiveSkillInjectionEnabled`. Maps stages to skills via `PhaseSkillMap`.
@@ -535,7 +544,7 @@ When a user returns to a stage after other stages have modified artefacts:
 The `/api/v1/conversations/{id}/stream` endpoint sends real-time events:
 
 | Event | Trigger | Payload |
-|-------|---------|--------|
+|-------|---------|---------|
 | `data: {"text": "..."}` | AI text chunk | Incremental text content |
 | `event: tool_start` | Before each tool executes | `{tool, description}` — human-readable status (e.g. "Saving prototype/index.html...") |
 | `event: progress` | `update_progress` or `advance_phase` tool | `{currentPhase, phaseName, totalPhases, questionsAsked, estimatedTotalQuestions, requirementsCaptured}` |
@@ -583,3 +592,4 @@ Suppressions are documented in `.guardrail-suppressions.yaml` with justification
 17. **Parking lot closure decisions** — `ParkingLotItem.Resolve()` and `.Defer()` accept a `closureDecision` parameter to capture the rationale
 18. **Conversation continuation** — `Conversation.ContinuedFromConversationId` links to a predecessor conversation for handover context injection
 19. **Project timesheet code** — `Project.TimesheetCode` is a tracked property on the project aggregate
+20. **Prototype UI kit** — `Infrastructure/Resources/emis-x-base.css` and `Infrastructure/Resources/emis-x-ui-kit.md` are the authoritative EMIS-X design system assets. Always reference these when building or modifying the prototype stage. Do not hardcode hex colours — use `var(--token-*)` tokens. Do not use native HTML elements where an `@emisgroup/ui-*` component exists (DS-001).

@@ -58,7 +58,7 @@ public class GenerateDpiaReportCommandHandlerTests
             "application/json",
             100,
             "user-1",
-            _timeProvider);
+            _timeProvider, true);
     }
 
     [Fact]

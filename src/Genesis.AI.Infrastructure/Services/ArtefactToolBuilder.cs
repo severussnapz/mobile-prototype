@@ -72,9 +72,10 @@ internal static class ArtefactToolBuilder
         return new AiToolDefinition(
             Name: PipelineToolDefinitions.EditArtefact,
             Description: "Make a surgical edit to an existing artefact by replacing an exact anchor string with new content. " +
-                         "Use this for changes affecting less than ~30% of a file — far cheaper than regenerating the whole file. " +
+                         "Use this for REQ file changes affecting less than ~30% of the file — far cheaper than regenerating the whole file. " +
                          "IMPORTANT: Before calling this, use search_in_artefact to find the exact text to anchor against — do NOT guess or reconstruct from memory. " +
-                         "On ANCHOR_NOT_FOUND or ANCHOR_AMBIGUOUS errors, search_in_artefact again and retry (maximum 2 retries).",
+                         "On ANCHOR_NOT_FOUND or ANCHOR_AMBIGUOUS, search_in_artefact again with a different keyword and retry (maximum 2 retries). " +
+                         "NOT for use on Prototype HTML — use edit_artefact_by_graph_node on prototype/index.html instead.",
             InputSchema: JsonDocument.Parse("""
             {
                 "type": "object",
@@ -103,9 +104,6 @@ internal static class ArtefactToolBuilder
             Name: PipelineToolDefinitions.SearchInArtefact,
             Description: "Search for lines in an artefact file that contain a given query string. " +
                          "Returns up to 5 matching regions with ±5 lines of surrounding context each. " +
-                         "If the exact phrase is not found on any single line, the search falls back to " +
-                         "word-overlap matching and returns the lines that contain the most query words — " +
-                         "so natural phrases like 'thumbs up feedback' still locate 'class=\"feedback-thumbs\"'. " +
                          "Use this BEFORE edit_artefact to find the exact verbatim anchor string to pass as old_str — " +
                          "copy the anchor directly from the search results, never from memory.",
             InputSchema: JsonDocument.Parse("""
@@ -118,11 +116,43 @@ internal static class ArtefactToolBuilder
                     },
                     "query": {
                         "type": "string",
-                        "description": "A keyword or short phrase to search for (case-insensitive). A distinctive single word works best (e.g. 'nav', 'background', 'header'), but multi-word phrases also work — unmatched phrases fall back to word-overlap matching."
+                        "description": "A keyword or short phrase to search for (case-insensitive). Use a distinctive word from the content you want to change, e.g. 'nav', 'background', 'header'."
                     }
                 },
                 "required": ["file_path", "query"]
             }
             """));
     }
+
+    internal static AiToolDefinition BuildEditArtefactByGraphNodeTool()
+    {
+        return new AiToolDefinition(
+            Name: PipelineToolDefinitions.EditArtefactByGraphNode,
+            Description: "Edit an HTML artefact by graph node reference. Use this when a prototype graph node_id is known. " +
+                         "The runtime resolves the exact anchor snippet from the graph and applies a single surgical replacement. " +
+                         "CRITICAL: new_str must be a surgical modification of the EXISTING element — do NOT wrap it in new containers or change its outer structure. " +
+                         "The replacement must preserve the element's id attribute exactly as-is (e.g. id=\"<node_id>\"). " +
+                         "To add a tooltip: add a title attribute or a sibling tooltip element INSIDE the existing element — do not replace the element itself.",
+            InputSchema: JsonDocument.Parse("""
+            {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The relative file path of the HTML artefact to edit."
+                    },
+                    "node_id": {
+                        "type": "string",
+                        "description": "Stable graph node ID from the prototype graph index."
+                    },
+                    "new_str": {
+                        "type": "string",
+                        "description": "Replacement HTML for the referenced node. Must preserve the element's id attribute exactly (id=\"<node_id>\"). Make surgical changes only — do not rewrap the element in new containers."
+                    }
+                },
+                "required": ["file_path", "node_id", "new_str"]
+            }
+            """));
+    }
+
 }
