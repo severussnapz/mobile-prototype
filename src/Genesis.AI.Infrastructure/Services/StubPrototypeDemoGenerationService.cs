@@ -63,6 +63,22 @@ public sealed class StubPrototypeDemoGenerationService : IPrototypeDemoGeneratio
             """;
     }
 
+    /// <summary>
+    /// Stub implementation: yields two raw HTML chunks (no CSS injection) so the
+    /// streaming controller can accumulate them and call
+    /// <see cref="PrototypeDocumentAssembler.Assemble"/> for the <c>done</c> event.
+    /// Satisfies the at-least-one-chunk-before-done ordering contract.
+    /// </summary>
+    public async IAsyncEnumerable<string> StreamRawAsync(
+        Guid projectId,
+        string projectName,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.CompletedTask;
+        yield return $"<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\" /><title>{projectName} — Prototype Demo</title></head>";
+        yield return $"<body><div>⚠ PROTOTYPE ONLY — not for clinical use.</div></body></html>";
+    }
+
     private static string LoadEmbeddedCss()
     {
         var assembly = Assembly.GetExecutingAssembly();

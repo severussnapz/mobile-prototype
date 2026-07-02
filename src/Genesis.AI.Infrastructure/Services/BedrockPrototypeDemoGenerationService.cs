@@ -4,7 +4,6 @@ using System.Text;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
-
 namespace Genesis.AI.Infrastructure.Services;
 
 /// <summary>
@@ -20,27 +19,29 @@ namespace Genesis.AI.Infrastructure.Services;
 /// </summary>
 public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenerationService
 {
+    private static readonly TimeSpan StreamChunkTimeout = TimeSpan.FromSeconds(60);
+
     private const string PromptResourceName =
         "Genesis.AI.Infrastructure.Prompts.PrototypeDemoGeneration.md";
 
     private const string UiKitResourceName =
         "Genesis.AI.Infrastructure.Resources.emis-x-ui-kit.md";
 
-    private const string BaseCssResourceName =
-        "Genesis.AI.Infrastructure.Resources.emis-x-base.css";
-
     private readonly IAiService _aiService;
     private readonly IArtefactRepository _artefactRepository;
     private readonly IArtefactStorageService _storageService;
+    private readonly IPrototypeDocumentAssembler _assembler;
 
     public BedrockPrototypeDemoGenerationService(
         IAiService aiService,
         IArtefactRepository artefactRepository,
-        IArtefactStorageService storageService)
+        IArtefactStorageService storageService,
+        IPrototypeDocumentAssembler assembler)
     {
         _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
+        _assembler = assembler ?? throw new ArgumentNullException(nameof(assembler));
     }
 
     public async IAsyncEnumerable<string> GenerateAsync(
@@ -50,7 +51,6 @@ public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenera
     {
         var prompt = LoadEmbeddedText(PromptResourceName);
         var uiKit = LoadEmbeddedText(UiKitResourceName);
-        var css = LoadEmbeddedText(BaseCssResourceName);
 
         var requirements = await LoadRequirementsAsync(projectId, cancellationToken);
 
@@ -65,12 +65,80 @@ public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenera
         // ponytail: single-chunk yield; upgrading to head-first streaming requires a prompt
         // change instructing the model to emit body-only content.
         var buffer = new StringBuilder();
-        await foreach (var chunk in _aiService.StreamResponseAsync(systemPrompt, [userMessage], cancellationToken))
+        await using var streamEnumerator = _aiService
+            .StreamResponseAsync(systemPrompt, [userMessage], cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        while (true)
         {
-            buffer.Append(chunk);
+            bool hasNext;
+            try
+            {
+                hasNext = await streamEnumerator
+                    .MoveNextAsync()
+                    .AsTask()
+                    .WaitAsync(StreamChunkTimeout, cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(
+                    $"Bedrock stream produced no chunks for {StreamChunkTimeout.TotalSeconds:0} seconds.");
+            }
+
+            if (!hasNext)
+            {
+                break;
+            }
+
+            buffer.Append(streamEnumerator.Current);
         }
 
-        yield return InjectCssIntoHead(buffer.ToString(), css);
+        yield return _assembler.Assemble(buffer.ToString());
+    }
+
+    public async IAsyncEnumerable<string> StreamRawAsync(
+        Guid projectId,
+        string projectName,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var prompt = LoadEmbeddedText(PromptResourceName);
+        var uiKit = LoadEmbeddedText(UiKitResourceName);
+
+        var requirements = await LoadRequirementsAsync(projectId, cancellationToken);
+
+        var systemPrompt = new AiSystemPrompt(
+            StablePart: BuildStablePart(prompt, uiKit),
+            MutablePart: BuildMutablePart(requirements, projectName));
+
+        var userMessage = new AiMessage(MessageRole.User, $"Generate a prototype demo for project: {projectName}");
+
+        await using var streamEnumerator = _aiService
+            .StreamResponseAsync(systemPrompt, [userMessage], cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        while (true)
+        {
+            bool hasNext;
+            try
+            {
+                hasNext = await streamEnumerator
+                    .MoveNextAsync()
+                    .AsTask()
+                    .WaitAsync(StreamChunkTimeout, cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(
+                    $"Bedrock stream produced no chunks for {StreamChunkTimeout.TotalSeconds:0} seconds.");
+            }
+
+            if (!hasNext)
+            {
+                break;
+            }
+
+            yield return streamEnumerator.Current;
+        }
     }
 
     private async Task<string> LoadRequirementsAsync(Guid projectId, CancellationToken cancellationToken)
@@ -93,6 +161,12 @@ public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenera
             }
         }
 
+        if (requirementArtefacts.Count > 0 && builder.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"No requirement artefact content is available in S3 for project '{projectId}'.");
+        }
+
         return builder.ToString();
     }
 
@@ -107,20 +181,6 @@ public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenera
 
             {requirements}
             """;
-    }
-
-    private static string InjectCssIntoHead(string html, string css)
-    {
-        const string closingHead = "</head>";
-        var index = html.IndexOf(closingHead, StringComparison.OrdinalIgnoreCase);
-        if (index < 0)
-        {
-            // ponytail: malformed model output — no </head> found; return as-is so the
-            // controller still surfaces the model's content rather than throwing.
-            return html;
-        }
-
-        return html.Insert(index, $"<style>\n{css}\n</style>\n");
     }
 
     private static string LoadEmbeddedText(string resourceName)
