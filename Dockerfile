@@ -1,6 +1,9 @@
 FROM centraluk.jfrog.io/glb-docker-vir/dotnet/aspnet:10.0.7-noble AS base
 WORKDIR /app
 EXPOSE 8080
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 libkrb5-3 \
+    && rm -rf /var/lib/apt/lists/*
 
 FROM centraluk.jfrog.io/glb-docker-vir/dotnet/sdk:10.0.203-noble AS build
 WORKDIR /src

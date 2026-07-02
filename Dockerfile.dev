@@ -24,5 +24,8 @@ RUN dotnet publish "src/Genesis.AI.Api/Genesis.AI.Api.csproj" -c Release -o /app
 
 FROM centraluk.jfrog.io/glb-docker-vir/dotnet/aspnet:10.0.7-noble AS final
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 libkrb5-3 \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Genesis.AI.Api.dll"]

@@ -80,7 +80,7 @@ public sealed class BedrockPrototypeDemoGenerationServiceTests
         storage.Setup(store => store.GetContentAsync(RequirementS3Key, It.IsAny<CancellationToken>()))
                .ReturnsAsync(RequirementMarker);
 
-        var service = new BedrockPrototypeDemoGenerationService(ai.Object, artefacts.Object, storage.Object);
+        var service = new BedrockPrototypeDemoGenerationService(ai.Object, artefacts.Object, storage.Object, new PrototypeDocumentAssembler());
         return new Harness(service, ai, artefacts, storage);
     }
 

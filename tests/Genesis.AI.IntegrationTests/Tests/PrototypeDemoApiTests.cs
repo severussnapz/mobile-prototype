@@ -70,6 +70,20 @@ public class PrototypeDemoApiTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GeneratePrototypeDemo_WhenProjectMissingAndAcceptsHtml_ReturnsNotFoundJsonNot406()
+    {
+        var client = _factory.CreateWriteClient();
+        client.DefaultRequestHeaders.Accept.Clear();
+        client.DefaultRequestHeaders.Accept.ParseAdd("text/html");
+
+        var response = await client.PostAsync(
+            $"/api/v1/projects/{Guid.NewGuid()}/prototype-demo", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+    }
+
     private static async IAsyncEnumerable<string> MinimalHtmlStream()
     {
         await Task.CompletedTask;
