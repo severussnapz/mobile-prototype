@@ -14,9 +14,9 @@ namespace Genesis.AI.Infrastructure.Services;
 /// <see cref="IAiService.StreamResponseAsync"/>, then inlines <c>emis-x-base.css</c>
 /// into the model's <c>&lt;head&gt;</c> before yielding the final HTML document.
 ///
-/// Prompt cache split (Decision A):
-///   Stable  = base generation prompt + emis-x-ui-kit.md (identical on every emis-x call — cached ~10× cheaper)
-///   Mutable = project requirements only (per-project, always fresh)
+/// Prompt cache split (Decision C):
+///   Stable  = base generation prompt (small, shared across every project)
+///   Mutable = EMIS-X UI kit + project requirements (per-project, always fresh)
 /// </summary>
 public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenerationService
 {
@@ -54,11 +54,10 @@ public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenera
 
         var requirements = await LoadRequirementsAsync(projectId, cancellationToken);
 
-        // Cache split A: stable = prompt + emis-x-ui-kit.md (shared across every emis-x call, cached ~10× cheaper);
-        // mutable = requirements only (per-project, always fresh).
+        // Cache split C: stable = prompt only (shared, small); mutable = ui-kit + requirements (per-project).
         var systemPrompt = new AiSystemPrompt(
-            StablePart: BuildStablePart(prompt, uiKit),
-            MutablePart: BuildMutablePart(requirements, projectName));
+            StablePart: prompt,
+            MutablePart: BuildMutablePart(uiKit, requirements, projectName));
 
         var userMessage = new AiMessage(MessageRole.User, $"Generate a prototype demo for project: {projectName}");
 
@@ -97,20 +96,13 @@ public sealed class BedrockPrototypeDemoGenerationService : IPrototypeDemoGenera
         return builder.ToString();
     }
 
-    private static string BuildStablePart(string prompt, string uiKit)
+    private static string BuildMutablePart(string uiKit, string requirements, string projectName)
     {
         return $"""
-            {prompt}
-
             ## EMIS-X Design System Reference
 
             {uiKit}
-            """;
-    }
 
-    private static string BuildMutablePart(string requirements, string projectName)
-    {
-        return $"""
             ## Project Requirements — {projectName}
 
             {requirements}

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Genesis.AI.Domain.Interfaces;
+using Moq;
 
 namespace Genesis.AI.IntegrationTests.Tests;
 
@@ -40,6 +42,13 @@ public class PrototypeDemoApiTests : IDisposable
     [Fact]
     public async Task GeneratePrototypeDemo_WithWriteScope_ReturnsOkWithHtmlContentType()
     {
+        _factory.AiServiceMock
+            .Setup(service => service.StreamResponseAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(MinimalHtmlStream());
+
         var client = _factory.CreateAdminClient();
         var projectId = await CreateProjectAsync(client);
 
@@ -59,5 +68,11 @@ public class PrototypeDemoApiTests : IDisposable
             $"/api/v1/projects/{Guid.NewGuid()}/prototype-demo", content: null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    private static async IAsyncEnumerable<string> MinimalHtmlStream()
+    {
+        await Task.CompletedTask;
+        yield return "<!DOCTYPE html><html lang=\"en\"><head></head><body>PROTOTYPE ONLY</body></html>";
     }
 }

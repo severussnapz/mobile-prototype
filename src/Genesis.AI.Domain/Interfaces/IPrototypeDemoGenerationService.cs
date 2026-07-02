@@ -7,5 +7,5 @@ namespace Genesis.AI.Domain.Interfaces;
 /// </summary>
 public interface IPrototypeDemoGenerationService
 {
-    IAsyncEnumerable<string> GenerateAsync(string projectName, CancellationToken cancellationToken);
+    IAsyncEnumerable<string> GenerateAsync(Guid projectId, string projectName, CancellationToken cancellationToken);
 }

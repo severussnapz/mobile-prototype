@@ -24,6 +24,7 @@ public sealed class StubPrototypeDemoGenerationService : IPrototypeDemoGeneratio
         "Genesis.AI.Infrastructure.Resources.emis-x-base.css";
 
     public async IAsyncEnumerable<string> GenerateAsync(
+        Guid projectId,
         string projectName,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {

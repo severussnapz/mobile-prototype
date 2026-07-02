@@ -15,7 +15,7 @@ public class StubPrototypeDemoGenerationServiceTests
     {
         var service = new StubPrototypeDemoGenerationService();
         return await PrototypeDemoHtmlAssertions.CollectAsync(
-            service.GenerateAsync("Demo Project", CancellationToken.None));
+            service.GenerateAsync(Guid.Empty, "Demo Project", CancellationToken.None));
     }
 
     [Fact]

@@ -42,7 +42,7 @@ public class GeneratePrototypeDemoCommandTests
 
         var generationServiceMock = new Mock<IPrototypeDemoGenerationService>();
         generationServiceMock
-            .Setup(service => service.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(service => service.GenerateAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(PrototypeDemoHtmlAssertions.AsAsyncStream(
                 "<!DOCTYPE html><html>", "<body>PROTOTYPE ONLY</body>", "</html>"));
 
@@ -78,7 +78,7 @@ public class GeneratePrototypeDemoCommandTests
 
         Assert.Equal(GeneratePrototypeDemoStatus.ProjectNotFound, result.Status);
         generationServiceMock.Verify(
-            service => service.GenerateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            service => service.GenerateAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

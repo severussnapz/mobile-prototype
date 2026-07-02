@@ -85,4 +85,72 @@ internal static class PrototypeDemoHtmlAssertions
         var css = reader.ReadToEnd();
         return css.Substring(50, 120);
     }
+
+    // ---- Day 2 additions (Bedrock-backed generator) ----
+
+    private const string EmisXUiKitResourceName =
+        "Genesis.AI.Infrastructure.Resources.emis-x-ui-kit.md";
+
+    // The exact banner wording pinned by the draft v0.1 generation prompt.
+    public const string ExactPrototypeBanner =
+        "PROTOTYPE ONLY — Requirements validation artefact. Not for production use.";
+
+    public static void AssertContainsExactPrototypeBanner(string html)
+    {
+        Assert.Contains(ExactPrototypeBanner, html, StringComparison.Ordinal);
+    }
+
+    // Refines AssertNoFormatValidNhsNumbers: the prompt sanctions two obvious-fake
+    // placeholders (000 000 0000 / 999 999 9999) which the raw 3-3-4 pattern would
+    // otherwise trip. Every 3-3-4 number in the output must be one of those two;
+    // anything else is a format-plausible number and a clinical-safety violation.
+    public static void AssertNoPlausibleNhsNumbers(string html)
+    {
+        foreach (System.Text.RegularExpressions.Match match in Regex.Matches(html, NhsNumberPattern))
+        {
+            var digits = new string(match.Value.Where(char.IsDigit).ToArray());
+            Assert.True(
+                digits is "0000000000" or "9999999999",
+                $"Output contains a format-plausible NHS number: '{match.Value}'.");
+        }
+    }
+
+    // emis-x mode is fully self-contained — external stylesheet/script files
+    // (CDN links) are only permitted in bootstrap/tailwind modes.
+    public static void AssertNoExternalCdnReferences(string html)
+    {
+        Assert.DoesNotMatch(new Regex(@"<link[^>]+href\s*=\s*[""']https?:", RegexOptions.IgnoreCase), html);
+        Assert.DoesNotMatch(new Regex(@"<script[^>]+src\s*=\s*[""']https?:", RegexOptions.IgnoreCase), html);
+    }
+
+    // The prompt's OUTPUT CONTRACT caps primary screens at 5 (extras listed in a
+    // comment). Screens are counted via the data-screen marker so the bound is
+    // machine-checkable.
+    // NOTE: draft v0.1 of the prompt does not yet mandate the data-screen marker —
+    // flagged for prompt review. The golden fixture uses it so this check is
+    // deterministic until the prompt contract adopts it.
+    public static void AssertScreenCountWithinBound(string html)
+    {
+        var screenCount = Regex.Count(html, @"data-screen\b", RegexOptions.IgnoreCase);
+        Assert.True(screenCount <= 5, $"Expected at most 5 primary screens, found {screenCount}.");
+    }
+
+    // Asserts the assembled system prompt carries both the project requirements
+    // and the EMIS-X UI kit — agnostic to the stable/mutable cache split, which
+    // is a Day 3 implementation choice.
+    public static void AssertSystemPromptContains(string systemPrompt, string requirementMarker)
+    {
+        Assert.Contains(requirementMarker, systemPrompt, StringComparison.Ordinal);
+        Assert.Contains(LoadEmbeddedUiKitMarker(), systemPrompt, StringComparison.Ordinal);
+    }
+
+    private static string LoadEmbeddedUiKitMarker()
+    {
+        var assembly = typeof(StubPrototypeDemoGenerationService).Assembly;
+        using var stream = assembly.GetManifestResourceStream(EmisXUiKitResourceName)
+            ?? throw new InvalidOperationException($"Embedded resource not found: {EmisXUiKitResourceName}");
+        using var reader = new StreamReader(stream);
+        var uiKit = reader.ReadToEnd();
+        return uiKit.Substring(50, 120);
+    }
 }

@@ -41,7 +41,7 @@ public sealed class GeneratePrototypeDemoCommandHandler
         }
 
         var builder = new StringBuilder();
-        await foreach (var chunk in _generationService.GenerateAsync(project.Name, cancellationToken))
+        await foreach (var chunk in _generationService.GenerateAsync(request.ProjectId, project.Name, cancellationToken))
         {
             builder.Append(chunk);
         }
