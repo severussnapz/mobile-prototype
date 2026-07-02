@@ -3,5 +3,7 @@ namespace Genesis.AI.Domain.Commands.GeneratePrototypeDemo;
 public enum GeneratePrototypeDemoStatus
 {
     Success,
-    ProjectNotFound
+    ProjectNotFound,
+    TimedOut,
+    GenerationFailed
 }

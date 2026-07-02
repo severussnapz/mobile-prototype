@@ -17,13 +17,16 @@ public sealed class GeneratePrototypeDemoCommandHandler
 {
     private readonly IProjectRepository _projectRepository;
     private readonly IPrototypeDemoGenerationService _generationService;
+    private readonly IPrototypeDemoSettings _prototypeDemoSettings;
 
     public GeneratePrototypeDemoCommandHandler(
         IProjectRepository projectRepository,
-        IPrototypeDemoGenerationService generationService)
+        IPrototypeDemoGenerationService generationService,
+        IPrototypeDemoSettings prototypeDemoSettings)
     {
         _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
         _generationService = generationService ?? throw new ArgumentNullException(nameof(generationService));
+        _prototypeDemoSettings = prototypeDemoSettings ?? throw new ArgumentNullException(nameof(prototypeDemoSettings));
     }
 
     public async Task<GeneratePrototypeDemoResult> Handle(
@@ -41,9 +44,34 @@ public sealed class GeneratePrototypeDemoCommandHandler
         }
 
         var builder = new StringBuilder();
-        await foreach (var chunk in _generationService.GenerateAsync(request.ProjectId, project.Name, cancellationToken))
+        var generationTimeout = _prototypeDemoSettings.GenerationTimeout;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(generationTimeout);
+
+        try
         {
-            builder.Append(chunk);
+            await foreach (var chunk in _generationService.GenerateAsync(request.ProjectId, project.Name, timeoutCts.Token))
+            {
+                builder.Append(chunk);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
+        {
+            return GeneratePrototypeDemoResult.Failure(
+                GeneratePrototypeDemoStatus.TimedOut,
+                $"Prototype generation timed out after {generationTimeout.TotalMinutes:0} minutes. Please try again.");
+        }
+        catch (TimeoutException exception)
+        {
+            return GeneratePrototypeDemoResult.Failure(
+                GeneratePrototypeDemoStatus.TimedOut,
+                exception.Message);
+        }
+        catch (Exception exception)
+        {
+            return GeneratePrototypeDemoResult.Failure(
+                GeneratePrototypeDemoStatus.GenerationFailed,
+                $"Prototype generation failed: {exception.Message}");
         }
 
         return GeneratePrototypeDemoResult.Succeeded(builder.ToString());
