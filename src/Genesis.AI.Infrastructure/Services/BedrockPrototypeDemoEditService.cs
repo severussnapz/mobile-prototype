@@ -69,20 +69,36 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
 
     private static PrototypeElementEditResult Validate(string modelOutput, string originalOuterHtml)
     {
-        // Mode 3: EDIT_OUT_OF_SCOPE — check before prose check because the marker
-        // is a well-formed comment and the element is intentionally unchanged.
+        // Mode 3: EDIT_OUT_OF_SCOPE — check before the prose-check (IsSingleRootElement) because
+        // the model is expected to prepend a single marker comment and nothing else. However, the
+        // response must still be well-formed: trailing prose after the marker+element is a contract
+        // violation and is rejected so the ordering is meaningful, not a blanket bypass.
         if (modelOutput.Contains(OutOfScopeMarker, StringComparison.Ordinal))
         {
+            var elementAfterScope = ExtractElementAfterMarker(modelOutput, originalOuterHtml);
+            if (!IsSingleRootElement(elementAfterScope))
+            {
+                return PrototypeElementEditResult.Rejected(
+                    "EDIT_OUT_OF_SCOPE response contains trailing prose after the element.");
+            }
+
             return PrototypeElementEditResult.OutOfScope(
-                ExtractElementAfterMarker(modelOutput, originalOuterHtml),
+                elementAfterScope,
                 reason: ExtractMarkerReason(modelOutput, OutOfScopeMarker));
         }
 
-        // Mode 6: EDIT_NEEDS_CLARIFICATION — same pattern.
+        // Mode 6: EDIT_NEEDS_CLARIFICATION — same pattern, same well-formedness gate.
         if (modelOutput.Contains(ClarificationMarker, StringComparison.Ordinal))
         {
+            var elementAfterClarification = ExtractElementAfterMarker(modelOutput, originalOuterHtml);
+            if (!IsSingleRootElement(elementAfterClarification))
+            {
+                return PrototypeElementEditResult.Rejected(
+                    "EDIT_NEEDS_CLARIFICATION response contains trailing prose after the element.");
+            }
+
             return PrototypeElementEditResult.NeedsClarification(
-                ExtractElementAfterMarker(modelOutput, originalOuterHtml),
+                elementAfterClarification,
                 reason: ExtractMarkerReason(modelOutput, ClarificationMarker));
         }
 
@@ -164,12 +180,16 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         return !string.Equals(originalText, updatedText, StringComparison.OrdinalIgnoreCase);
     }
 
-    // Mode 4 (Option A): extract all class tokens from the root element's class attribute.
-    // Reject if the updated element carries any class absent from the original.
+    // Mode 4 (Option A, full-tree): extract ALL class tokens anywhere in the HTML, not
+    // just the root element. A class injected onto any child is equally invalid.
+    // Tradeoff: cannot identify which element gained the class — only that an unauthorised
+    // class exists somewhere in the tree. Consistent with the regex-based heuristic approach
+    // used throughout this file (ponytail: upgrade to HtmlAgilityPack for per-element
+    // attribution if a specific rejection message is needed).
     private static bool UnrequestedClassAdded(string original, string updated)
     {
-        var originalClasses = ExtractRootClasses(original);
-        var updatedClasses = ExtractRootClasses(updated);
+        var originalClasses = ExtractAllClasses(original);
+        var updatedClasses = ExtractAllClasses(updated);
 
         foreach (var cls in updatedClasses)
         {
@@ -260,17 +280,26 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         return Regex.Replace(html, @"<[^>]+>", string.Empty).Trim();
     }
 
-    private static HashSet<string> ExtractRootClasses(string html)
+    // Scans the entire HTML string for all class="..." occurrences and returns the
+    // union of all class tokens. Used by UnrequestedClassAdded for full-tree coverage
+    // (a class injected onto any child is equally invalid, not just the root element).
+    // ponytail: cannot identify which element gained the class — only that an unauthorised
+    // class exists somewhere in the tree. Upgrade to HtmlAgilityPack for per-element
+    // attribution if a specific rejection message is needed.
+    private static HashSet<string> ExtractAllClasses(string html)
     {
-        var rootTag = ExtractRootTag(html);
-        var match = System.Text.RegularExpressions.Regex.Match(
-            rootTag, @"class=""([^""]*)""|class='([^']*)'");
+        var classes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+            html, @"class=""([^""]*)""|class='([^']*)'" ))
+        {
+            var raw = m.Groups[1].Value.Length > 0 ? m.Groups[1].Value : m.Groups[2].Value;
+            foreach (var cls in raw.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                classes.Add(cls);
+            }
+        }
 
-        var raw = match.Success
-            ? (match.Groups[1].Value.Length > 0 ? match.Groups[1].Value : match.Groups[2].Value)
-            : string.Empty;
-
-        return raw.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
+        return classes;
     }
 
     private static HashSet<string> ExtractTrackedAttributes(string html)

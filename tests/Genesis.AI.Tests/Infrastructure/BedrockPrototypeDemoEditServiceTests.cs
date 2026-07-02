@@ -172,4 +172,60 @@ public sealed class BedrockPrototypeDemoEditServiceTests
         Assert.Equal(PrototypeElementEditStatus.NeedsClarification, result.Status);
         Assert.Contains(selected, result.UpdatedOuterHtml, StringComparison.Ordinal);
     }
+
+    // Gap 1 — Mode 2 text-only mutation: the model returns the same number of children
+    // but silently rewrites an untargeted child's text. Child count matches so a
+    // count-only check would miss this; the inner-text diff must catch it.
+    [Fact]
+    public async Task EditElementAsync_WhenModelSilentlyChangesUntargetedChildText_RejectsResponse()
+    {
+        const string selected =
+            "<ul id=\"allergies\"><li>Alpha</li><li>Beta</li><li>Gamma</li></ul>";
+        // Instruction targets first item; model also changes "Beta" → "Changed" silently.
+        const string modelOutput =
+            "<ul id=\"allergies\"><li>First</li><li>Changed</li><li>Gamma</li></ul>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change the first item to say First");
+
+        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+    }
+
+    // Gap 2 — Mode 4 child-level class injection (proves code fix: full-tree class scan).
+    // The root element is unchanged but an inner <span> gains class="text-red". A
+    // root-only class check would miss this; the full-tree ExtractAllClasses must catch it.
+    [Fact]
+    public async Task EditElementAsync_WhenModelAddsUnrequestedClassOnChildElement_RejectsResponse()
+    {
+        const string selected =
+            "<div id=\"panel\"><span>Total</span></div>";
+        const string modelOutput =
+            "<div id=\"panel\"><span class=\"text-red\">Total</span></div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "make the total stand out");
+
+        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+    }
+
+    // Gap 3 — Mode 3/6 ordering: marker present AND trailing prose after the element.
+    // Decision: trailing prose after a valid marker+element is a contract violation
+    // (the spec says "return element UNCHANGED and prepend a single line — nothing else").
+    // The marker check fires first (ordering is intentional) but the extracted element
+    // must still pass the well-formedness gate — if it doesn't, the result is Rejected,
+    // not OutOfScope. This proves the ordering is load-bearing and not a blanket bypass.
+    [Fact]
+    public async Task EditElementAsync_WhenOutOfScopeMarkerHasTrailingProse_RejectsResponse()
+    {
+        const string selected = "<span>Total cost</span>";
+        const string modelOutput =
+            "<!-- " + OutOfScopeMarker + ": background is set by a parent class -->\n"
+            + selected + "\n"
+            + "Hope that helps!";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "make the header background blue");
+
+        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+    }
 }
