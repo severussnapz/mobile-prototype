@@ -313,7 +313,7 @@ Requires `.env` file with `IDENTITY_URL`, `AUDIENCE`, and credentials (`JFROG_US
 ## Testing
 
 ```bash
-# Unit tests (605 tests)
+# Unit tests (720 tests)
 dotnet test tests/Genesis.AI.Tests/
 
 # Integration tests (WebApplicationFactory + InMemory database + mock IArtefactStorageService)
