@@ -17,15 +17,18 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
     private readonly MockTokenGenerator _tokenGenerator;
     private readonly string _databaseName;
     private readonly Mock<IAiService> _aiServiceMock;
+    private readonly Mock<IPrototypeDemoEditService> _prototypeDemoEditServiceMock;
 
     public MockTokenGenerator TokenGenerator => _tokenGenerator;
     public Mock<IAiService> AiServiceMock => _aiServiceMock;
+    public Mock<IPrototypeDemoEditService> PrototypeDemoEditServiceMock => _prototypeDemoEditServiceMock;
 
     public TestWebApplicationFactory()
     {
         _tokenGenerator = new MockTokenGenerator();
         _databaseName = $"TestDb_{Guid.NewGuid()}";
         _aiServiceMock = new Mock<IAiService>();
+        _prototypeDemoEditServiceMock = new Mock<IPrototypeDemoEditService>();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -71,6 +74,9 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
             // Mock IAiService — integration tests don't call AWS Bedrock
             services.AddSingleton(_aiServiceMock.Object);
 
+            // Mock IPrototypeDemoEditService — the edit controller's HTTP/auth/serialisation
+            // contract is exercised here; the service's internal validation is covered by its
+            // own Day 2b unit tests. Last registration wins, overriding the scoped Bedrock impl.
             // Fake IArtefactStorageService — integration tests don't call S3/LocalStack.
             // Keeps content in memory so save/read round-trips work.
             var storageMock = new Mock<IArtefactStorageService>();
@@ -127,6 +133,10 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
                     ClockSkew = TimeSpan.FromMinutes(5)
                 };
             });
+
+            // Mock IPrototypeDemoEditService — must run after Infrastructure.AddInfrastructure()
+            // so this singleton registration wins over the scoped Bedrock implementation.
+            services.AddSingleton(_prototypeDemoEditServiceMock.Object);
         });
 
         builder.UseEnvironment("Testing");
