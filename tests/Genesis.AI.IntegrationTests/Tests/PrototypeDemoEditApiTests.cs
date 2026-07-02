@@ -86,7 +86,7 @@ public class PrototypeDemoEditApiTests : IDisposable
     public async Task EditElement_WithWriteScope_ReturnsOk()
     {
         SetupEditResult(PrototypeElementEditResult.Applied("<button id=\"save\">Submit</button>"));
-        var client = _factory.CreateAdminClient();
+        var client = _factory.CreateWriteClient();
 
         var response = await client.PostAsync(
             $"/api/v1/projects/{Guid.NewGuid()}/prototype-demo/edit", EditBody());

@@ -49,7 +49,7 @@ public class PrototypeDemoApiTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .Returns(MinimalHtmlStream());
 
-        var client = _factory.CreateAdminClient();
+        var client = _factory.CreateWriteClient();
         var projectId = await CreateProjectAsync(client);
 
         var response = await client.PostAsync(
