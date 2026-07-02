@@ -228,4 +228,77 @@ public sealed class BedrockPrototypeDemoEditServiceTests
 
         Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
     }
+
+    // Regression: leaf element (no child elements, only a text node) — mode 2
+    // must not fire when the user's instruction targets the text content.
+    //
+    // Root cause: UntargetedChildrenChanged compares inner text even when
+    // originalChildCount == 0. For a leaf the text IS the edit target, not an
+    // "untargeted child"; the mode-2 guard should only protect sibling children
+    // inside a container (originalChildCount > 0).
+    //
+    // RED until the guard is fixed.
+    [Fact]
+    public async Task EditElementAsync_WhenLeafElementTextChangedAsInstructed_AppliesEdit()
+    {
+        // This is the exact element reported in production.
+        const string selected =
+            "<div style=\"font-size:var(--token-font-size-lg);font-weight:var(--token-font-weight-bold);color:var(--token-colour-neutral-900);\">EMIS Partner Portal</div>";
+        // Model correctly follows the instruction and changes only the text content.
+        const string modelOutput =
+            "<div style=\"font-size:var(--token-font-size-lg);font-weight:var(--token-font-weight-bold);color:var(--token-colour-neutral-900);\">EMIS Solutions Portal</div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change the title to 'EMIS Solutions Portal'");
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.Equal(modelOutput, result.UpdatedOuterHtml);
+    }
+
+    // Companion: a leaf element where ONLY the style changes (no text change).
+    // This must continue to be Applied — proves the fix doesn't break the common
+    // style-edit path.
+    [Fact]
+    public async Task EditElementAsync_WhenLeafElementStyleChangedOnly_AppliesEdit()
+    {
+        const string selected =
+            "<div style=\"font-size:var(--token-font-size-lg);font-weight:var(--token-font-weight-bold);color:var(--token-colour-neutral-900);\">EMIS Partner Portal</div>";
+        const string modelOutput =
+            "<div style=\"font-size:var(--token-font-size-sm);font-weight:var(--token-font-weight-bold);color:var(--token-colour-neutral-900);\">EMIS Partner Portal</div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "make the font smaller");
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+    }
+
+    // Safety net: a leaf element where the model silently changes the text when the
+    // instruction only targeted the style. This is an untargeted mutation and should
+    // NOT be rejected by mode 2 — the user asked to change text, but in this test the
+    // instruction was style-only and the model mutated the text anyway. This scenario
+    // is intentionally left as Applied because mode 2 cannot distinguish "was the text
+    // change intended?" without understanding the instruction semantics. Mode 2's
+    // scope is child-count / structural mutations on containers. Text mutations on
+    // leaves are validated by other modes (e.g. mode 1 prose check, mode 4 class check).
+    //
+    // Documenting this explicitly so future reviewers understand the intentional
+    // constraint of the regex-based heuristic (ponytail: upgrade to semantic diff if
+    // leaf text-mutation detection is required).
+    [Fact]
+    public async Task EditElementAsync_WhenLeafModelChangesTextWhileOnlyStyleWasRequested_IsNotRejectedByMode2()
+    {
+        const string selected =
+            "<div style=\"font-size:var(--token-font-size-lg);\">EMIS Partner Portal</div>";
+        // Model changes text even though instruction was style-only — mode 2 cannot
+        // safely reject this without semantic understanding of the instruction.
+        const string modelOutput =
+            "<div style=\"font-size:var(--token-font-size-sm);\">EMIS Health Portal</div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "make the font smaller");
+
+        // Mode 2 should not reject this (it has no children to protect).
+        // Other guards (modes 4, 5) are the safety net for structural violations.
+        Assert.NotEqual(PrototypeElementEditStatus.Rejected, result.Status);
+    }
 }

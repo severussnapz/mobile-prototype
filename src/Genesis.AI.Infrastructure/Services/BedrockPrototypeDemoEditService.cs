@@ -172,8 +172,16 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
             return true;
         }
 
-        // If child count is the same, compare normalised inner text to catch silent
-        // text substitutions on unmentioned children.
+        // Leaf element (no child elements, only a text node): the text IS the edit
+        // target, not an untargeted child. Mode 2 exists to protect sibling children
+        // inside a container from silent mutation — it has no role on a leaf.
+        if (originalChildCount == 0)
+        {
+            return false;
+        }
+
+        // Container: compare normalised inner text to catch silent text substitutions
+        // on unmentioned children.
         var originalText = ExtractInnerText(original);
         var updatedText = ExtractInnerText(updated);
 
