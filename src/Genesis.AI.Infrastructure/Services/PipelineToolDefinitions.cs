@@ -45,6 +45,14 @@ public static class PipelineToolDefinitions
     /// </summary>
     public static IReadOnlyList<AiToolDefinition> GetTools(TokenOptimisationOptions options, Domain.Enums.StageType? stageType = null)
     {
+        // Single-file prototype mode: fixed tool set, gated by the same flag as prompt selection
+        // (ConversationStreamController) so prompt and tools can never drift. Excludes all
+        // fragment/DOM tools; the model saves and surgically edits a single prototype/index.html.
+        if (options.PrototypeSingleFileEnabled && stageType == Domain.Enums.StageType.Prototype)
+        {
+            return PipelineToolDefinitionFactory.BuildPrototypeSingleFileTools();
+        }
+
         var base_ = new List<AiToolDefinition>(All);
 
         // Remove get_guardrail_details for stages where active skills are pre-injected.

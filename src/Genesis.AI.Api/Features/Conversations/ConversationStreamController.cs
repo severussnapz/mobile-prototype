@@ -173,10 +173,16 @@ public class ConversationStreamController : ControllerBase
         Response.Headers.CacheControl = "no-cache";
         Response.Headers.Connection = "keep-alive";
 
-        // Resolve the system prompt from the stage type (stageType already loaded for auth check above)
-        var basePrompt = stageType is not null
-            ? _promptService.GetSystemPrompt(stageType.Value)
-            : GetFallbackPrompt();
+        // Resolve the system prompt from the stage type (stageType already loaded for auth check above).
+        // Single-file prototype mode (flag + Prototype stage) swaps in the PrototypeDemoGeneration.md
+        // prompt (with EMIS-X UI kit) instead of the fragment-pipeline Pipeline02Prototype.md.
+        var prototypeSingleFile = _tokenOptimisationOptions.PrototypeSingleFileEnabled
+            && stageType == StageType.Prototype;
+        var basePrompt = prototypeSingleFile
+            ? _promptService.GetPrototypeSingleFilePrompt()
+            : stageType is not null
+                ? _promptService.GetSystemPrompt(stageType.Value)
+                : GetFallbackPrompt();
 
         // Inject current API-managed state into the system prompt
         var conversationWithParkingLot = await _conversationRepository.GetByIdWithParkingLotAsync(id, cancellationToken);
@@ -199,7 +205,8 @@ public class ConversationStreamController : ControllerBase
         // Prototype fragment migration — runs before LLM initialises, fully awaited (no race condition).
         // Detection: prototype/fragments/_shell.html exists → skip. Monolith present → split into fragments.
         // Pure C#, no LLM call, deterministic. Safe to call on every Prototype conversation.
-        if (stageType == StageType.Prototype)
+        // Skipped entirely in single-file mode — that path never produces fragments.
+        if (stageType == StageType.Prototype && !prototypeSingleFile)
         {
             await _prototypeFragmentMigrationService.MigrateIfNeededAsync(
                 projectId, initiatedBy: User.GetUserErn() ?? "system", cancellationToken);
