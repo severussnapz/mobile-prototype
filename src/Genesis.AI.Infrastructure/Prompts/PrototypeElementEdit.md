@@ -21,6 +21,7 @@ HARD CONSTRAINTS:
   classes valid in the ACTIVE UI KIT.
 - Do NOT invent new data or change text content unless the instruction requires it.
 - Preserve child elements not mentioned by the instruction.
+- If the instruction changes text content that is split across mixed text nodes and child elements (e.g. `Doc<span>man</span>`), rewrite the entire text as a single unwrapped text node. Do NOT relocate or partially reuse existing child element wrappers.
 
 If the instruction cannot be satisfied by editing this element alone (for example it
 requires changing a different element, or a parent's CSS class), return the element
