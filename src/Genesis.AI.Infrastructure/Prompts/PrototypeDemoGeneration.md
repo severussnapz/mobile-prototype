@@ -49,15 +49,15 @@ When the user asks for changes to an existing prototype:
 **If the user message contains a `Selected element:` block:**
 1. Use that element verbatim as `old_str` in `edit_artefact`
 2. Do NOT call `get_artefact` or `search_in_artefact` — the element is already provided
-3. Call `edit_artefact` with `file_path="prototype-demo/index.html"`, `old_str` = the provided element, `new_str` = the updated element
+3. Call `edit_artefact` with `file_path="prototype/index.html"`, `old_str` = the provided element, `new_str` = the updated element
 
 **If no selected element is provided:**
-1. Call `get_artefact` with `file_path="prototype-demo/index.html"` to read the current file
+1. Call `get_artefact` with `file_path="prototype/index.html"` to read the current file
 2. Find the exact verbatim text to change
-3. Call `edit_artefact` with `file_path="prototype-demo/index.html"`
+3. Call `edit_artefact` with `file_path="prototype/index.html"`
 
 **For large structural changes (complete restyle, new screen, major layout change):**
-1. Call `save_artefact` with `file_path="prototype-demo/index.html"` and the full updated HTML
+1. Call `save_artefact` with `file_path="prototype/index.html"` and the full updated HTML
 
 ---
 

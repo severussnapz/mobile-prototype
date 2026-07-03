@@ -200,7 +200,11 @@ public class ConversationStreamController : ControllerBase
         // Build lightweight artefact manifest (file paths + versions only — LLM uses tools to read content)
         var artefactManifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
         var artefactManifestSection = BuildArtefactManifest(artefactManifest);
-        var prototypeIntentDirective = BuildPrototypeIntentRoutingDirective(stageType, request.Content, artefactManifest);
+        var prototypeIntentDirective = BuildPrototypeIntentRoutingDirective(
+            stageType,
+            request.Content,
+            artefactManifest,
+            prototypeSingleFile);
 
         // Prototype fragment migration — runs before LLM initialises, fully awaited (no race condition).
         // Detection: prototype/fragments/_shell.html exists → skip. Monolith present → split into fragments.
@@ -529,7 +533,7 @@ public class ConversationStreamController : ControllerBase
                             ? fpProp.GetString() ?? string.Empty
                             : string.Empty;
                         var isPrototypePath = requestedPath.StartsWith("prototype/", StringComparison.OrdinalIgnoreCase);
-                        if (!isPrototypePath)
+                        if (!isPrototypePath && !prototypeSingleFile)
                         {
                             if (readBudgetUsed >= maxReadBudget)
                             {
@@ -565,6 +569,7 @@ public class ConversationStreamController : ControllerBase
                             searchCountThisTurn,
                             postSearchReadBlocked,
                             zeroMatchToolBlocked,
+                            prototypeSingleFile,
                             cancellationToken);
                     }
                     catch (ToolExecutionFailedException exception)
@@ -984,6 +989,7 @@ public class ConversationStreamController : ControllerBase
         StrongBox<int> searchCountThisTurn,
         StrongBox<bool> postSearchReadBlocked,
         StrongBox<bool> zeroMatchToolBlocked,
+        bool prototypeSingleFile,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -1004,6 +1010,7 @@ public class ConversationStreamController : ControllerBase
                     searchCountThisTurn,
                     postSearchReadBlocked,
                     zeroMatchToolBlocked,
+                    prototypeSingleFile,
                     cancellationToken);
             }
             catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
@@ -1043,6 +1050,7 @@ public class ConversationStreamController : ControllerBase
         StrongBox<int> searchCountThisTurn,
         StrongBox<bool> postSearchReadBlocked,
         StrongBox<bool> zeroMatchToolBlocked,
+        bool prototypeSingleFile,
         CancellationToken cancellationToken)
     {
         const int maxSearchesPerTurn = 5;
@@ -1093,7 +1101,12 @@ public class ConversationStreamController : ControllerBase
                         var existingSizeBytes = existingPrototype.SizeBytes ?? 0;
                         var contentIsLargeForEditing = existingSizeBytes > 50_000 || content.Length > 50_000;
 
-                        if (!contentIsLargeForEditing)
+                        if (ShouldBlockPrototypeRegenerationSave(
+                                stageType,
+                                filePath,
+                                prototypeSingleFile,
+                                prototypeAlreadyExists: true,
+                                contentIsLargeForEditing))
                         {
                             _logger.LogWarning(
                                 "Tool save_artefact rejected for existing prototype HTML regeneration: {FilePath}",
@@ -1103,14 +1116,17 @@ public class ConversationStreamController : ControllerBase
                                    "Only the initial prototype creation may use save_artefact for prototype/index.html.";
                         }
 
-                        _logger.LogInformation(
-                            "Tool save_artefact: allowing full regeneration of prototype/index.html " +
-                            "(existing size: {ExistingBytes} bytes — too large for targeted edit_artefact)",
-                            existingSizeBytes);
+                        if (!prototypeSingleFile && contentIsLargeForEditing)
+                        {
+                            _logger.LogInformation(
+                                "Tool save_artefact: allowing full regeneration of prototype/index.html " +
+                                "(existing size: {ExistingBytes} bytes — too large for targeted edit_artefact)",
+                                existingSizeBytes);
+                        }
                     }
                 }
 
-                if (stageType == StageType.Prototype)
+                if (stageType == StageType.Prototype && !prototypeSingleFile)
                 {
                     var validation = ValidatePipeline02SaveContract(filePath, content);
                     if (!validation.IsValid)
@@ -1345,8 +1361,7 @@ public class ConversationStreamController : ControllerBase
 
                 // Block direct reads of the assembled prototype — it is the output, not a fragment to edit.
                 // The LLM should only read/edit fragment files (prototype/fragments/*).
-                if (stageType == StageType.Prototype &&
-                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
+                if (ShouldBlockPrototypeRegenerationRead(stageType, filePath, prototypeSingleFile))
                 {
                     _logger.LogWarning("Tool get_artefact: blocked read of assembled prototype/index.html — redirect to fragments");
                     return "Error: prototype/index.html is the assembled output and cannot be read directly. " +
@@ -1358,12 +1373,16 @@ public class ConversationStreamController : ControllerBase
                 // during a Prototype edit. _shell.html mirrors the migration step's own build
                 // detection — an edit works on the fragments, never the requirements.
                 if (stageType == StageType.Prototype &&
+                    !prototypeSingleFile &&
                     filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase))
                 {
                     var shellFragment = await _artefactRepository.GetByProjectAndFilePathAsync(
                         projectId, "prototype/fragments/_shell.html", cancellationToken);
                     var readGuardError = PrototypeReadGuard.ValidateGetArtefact(
-                        stageType, filePath, prototypeAlreadyBuilt: shellFragment is not null);
+                        stageType,
+                        filePath,
+                        prototypeAlreadyBuilt: shellFragment is not null,
+                        prototypeSingleFile: prototypeSingleFile);
                     if (readGuardError is not null)
                     {
                         _logger.LogWarning(
@@ -1589,14 +1608,14 @@ public class ConversationStreamController : ControllerBase
 
                 // Require get_artefact to be called first this request so Claude anchors against
                 // the real file content, not memory or a previous cached version.
-                if (!filesReadThisRequest.Contains(filePath))
+                if (!filesReadThisRequest.Contains(filePath) &&
+                    !(prototypeSingleFile && !string.IsNullOrEmpty(oldStr)))
                 {
                     _logger.LogWarning(
                         "Tool edit_artefact blocked: {FilePath} not read this request — forcing get_artefact first",
                         filePath);
                     return $"Error: FILE_NOT_READ: You must call get_artefact on '{filePath}' before editing it. " +
-                           "For large files this returns a structural outline of all CSS selectors and HTML sections — " +
-                           "use that to find your anchor, then call search_in_artefact if you need the exact surrounding lines.";
+                           "Read the file first to anchor your edit against the real content, then call edit_artefact.";
                 }
 
                 // Block edits where get_artefact was called in the same turn — the file content
@@ -2033,12 +2052,15 @@ public class ConversationStreamController : ControllerBase
         return sb.ToString();
     }
 
-    private static string BuildPrototypeIntentRoutingDirective(
+    internal static string BuildPrototypeIntentRoutingDirective(
         StageType? stageType,
         string? latestUserMessage,
-        IReadOnlyList<Artefact> artefactManifest)
+        IReadOnlyList<Artefact> artefactManifest,
+        bool prototypeSingleFile)
     {
-        if (stageType != StageType.Prototype || string.IsNullOrWhiteSpace(latestUserMessage))
+        if (stageType != StageType.Prototype ||
+            prototypeSingleFile ||
+            string.IsNullOrWhiteSpace(latestUserMessage))
         {
             return string.Empty;
         }
@@ -2214,6 +2236,30 @@ public class ConversationStreamController : ControllerBase
         }
 
         return "text/markdown";
+    }
+
+    internal static bool ShouldBlockPrototypeRegenerationRead(
+        StageType? stageType,
+        string filePath,
+        bool prototypeSingleFile)
+    {
+        return stageType == StageType.Prototype &&
+               !prototypeSingleFile &&
+               filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool ShouldBlockPrototypeRegenerationSave(
+        StageType? stageType,
+        string filePath,
+        bool prototypeSingleFile,
+        bool prototypeAlreadyExists,
+        bool contentIsLargeForEditing)
+    {
+        return stageType == StageType.Prototype &&
+               !prototypeSingleFile &&
+               filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+               prototypeAlreadyExists &&
+               !contentIsLargeForEditing;
     }
 
     private static string ToNfc(string text)
