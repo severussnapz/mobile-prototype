@@ -20,6 +20,9 @@ public sealed class PrototypeElementEditResponse
     [JsonPropertyName("updatedOuterHtml")]
     public string UpdatedOuterHtml { get; init; } = string.Empty;
 
+    [JsonPropertyName("updatedFullHtml")]
+    public string? UpdatedFullHtml { get; init; }
+
     [JsonPropertyName("rejectionReason")]
     public string? RejectionReason { get; init; }
 }

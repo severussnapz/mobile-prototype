@@ -59,13 +59,15 @@ public class PrototypeDemoEditApiTests : IDisposable
     private static StringContent EditBody(
         string selectedOuterHtml = "<button id=\"save\">Save</button>",
         string instruction = "make it say Submit",
-        string activeUiKit = "emis-x")
+        string activeUiKit = "emis-x",
+        string currentHtml = "<!DOCTYPE html><html><body><button id=\"save\">Save</button></body></html>")
     {
         var json = JsonSerializer.Serialize(new
         {
             selectedOuterHtml,
             instruction,
-            activeUiKit
+            activeUiKit,
+            currentHtml
         });
         return new StringContent(json, Encoding.UTF8, "application/json");
     }
@@ -121,6 +123,23 @@ public class PrototypeDemoEditApiTests : IDisposable
         Assert.Equal("Applied", data.GetProperty("status").GetString());
         Assert.Equal("<button id=\"save\">Submit</button>", data.GetProperty("updatedOuterHtml").GetString());
         Assert.Equal(JsonValueKind.Null, data.GetProperty("rejectionReason").ValueKind);
+    }
+
+    [Fact]
+    public async Task EditElement_WhenServiceReturnsUpdatedFullHtml_SerialisesUpdatedFullHtml()
+    {
+        SetupEditResult(PrototypeElementEditResult.Applied("<button id=\"save\">Submit</button>")
+            with { UpdatedFullHtml = "<!DOCTYPE html><html><body><button id=\"save\">Submit</button></body></html>" });
+        var client = _factory.CreateAdminClient();
+
+        var response = await client.PostAsync(
+            $"/api/v1/projects/{Guid.NewGuid()}/prototype-demo/edit", EditBody());
+        var data = await ReadDataAsync(response);
+
+        Assert.Equal("Applied", data.GetProperty("status").GetString());
+        Assert.Equal(
+            "<!DOCTYPE html><html><body><button id=\"save\">Submit</button></body></html>",
+            data.GetProperty("updatedFullHtml").GetString());
     }
 
     [Fact]
@@ -198,6 +217,9 @@ public class PrototypeDemoEditApiTests : IDisposable
         Assert.Equal("<span class=\"label\">Total</span>", captured!.SelectedOuterHtml);
         Assert.Equal("make it bold", captured.Instruction);
         Assert.Equal("emis-x", captured.ActiveUiKit);
+        Assert.Equal(
+            "<!DOCTYPE html><html><body><button id=\"save\">Save</button></body></html>",
+            captured.CurrentHtml);
     }
 
     // --- Empty/whitespace selectedOuterHtml is NOT guarded away: it reaches the service and

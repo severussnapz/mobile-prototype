@@ -31,6 +31,15 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
     private const string OutOfScopeMarker = "EDIT_OUT_OF_SCOPE";
     private const string ClarificationMarker = "EDIT_NEEDS_CLARIFICATION";
 
+    private static readonly HashSet<string> DepthNeutralElementNames = new(
+        [
+            // HTML void elements
+            "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
+            // Common SVG elements frequently emitted as leaf nodes
+            "path", "circle", "ellipse", "line", "polygon", "polyline", "rect", "stop", "use", "image"
+        ],
+        StringComparer.OrdinalIgnoreCase);
+
     private readonly IAiService _aiService;
 
     public BedrockPrototypeDemoEditService(IAiService aiService)
@@ -62,7 +71,24 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
             buffer.Append(chunk);
         }
 
-        return Validate(buffer.ToString().Trim(), request.SelectedOuterHtml);
+        var result = Validate(buffer.ToString().Trim(), request.SelectedOuterHtml);
+        if (result.Status != PrototypeElementEditStatus.Applied)
+        {
+            return result;
+        }
+
+        // Applied: perform the element replacement server-side against the full document so
+        // the client renders the returned document directly. Locate the element by a
+        // serialisation-independent fingerprint (self-closing SVG tags etc. defeat a raw match).
+        var updatedFullHtml = await PrototypeElementReplacer.ReplaceElementAsync(
+            request.CurrentHtml, request.SelectedOuterHtml, result.UpdatedOuterHtml, cancellationToken);
+        if (updatedFullHtml is null)
+        {
+            return PrototypeElementEditResult.Rejected(
+                "Selected element could not be located in the current prototype document.");
+        }
+
+        return result with { UpdatedFullHtml = updatedFullHtml };
     }
 
     // --- Deterministic post-generation validation (failure modes 1–6) ---
@@ -180,10 +206,14 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
             return false;
         }
 
-        // Container: compare normalised inner text to catch silent text substitutions
-        // on unmentioned children.
-        var originalText = ExtractInnerText(original);
-        var updatedText = ExtractInnerText(updated);
+        // Container: compare text inside child elements only. Root direct-text is
+        // the primary edit target for this regression and must not be treated as an
+        // untargeted child mutation.
+        // ponytail: mode 2 still intentionally rejects edits to child-element text
+        // (for example <li>Alpha</li>) even when user intent may be that child.
+        // This fix does not add semantic intent parsing.
+        var originalText = ExtractChildElementsText(original);
+        var updatedText = ExtractChildElementsText(updated);
 
         return !string.Equals(originalText, updatedText, StringComparison.OrdinalIgnoreCase);
     }
@@ -283,9 +313,85 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         return html[(firstClose + 1)..lastOpen];
     }
 
-    private static string ExtractInnerText(string html)
+    private static string ExtractChildElementsText(string html)
     {
-        return Regex.Replace(html, @"<[^>]+>", string.Empty).Trim();
+        var inner = ExtractInnerHtml(html);
+        if (string.IsNullOrWhiteSpace(inner))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(inner.Length);
+        var depth = 0;
+
+        for (var index = 0; index < inner.Length; index++)
+        {
+            if (inner[index] != '<')
+            {
+                if (depth >= 1)
+                {
+                    builder.Append(inner[index]);
+                }
+
+                continue;
+            }
+
+            var closeIndex = inner.IndexOf('>', index + 1);
+            if (closeIndex < 0)
+            {
+                break;
+            }
+
+            var rawTag = inner[(index + 1)..closeIndex].Trim();
+            var isClosing = rawTag.Length > 0 && rawTag[0] == '/';
+            var isSelfClosing = rawTag.Length > 0 && rawTag[^1] == '/';
+            var tagName = ExtractTagName(rawTag);
+            var isDepthNeutral = isSelfClosing || DepthNeutralElementNames.Contains(tagName);
+
+            if (isClosing)
+            {
+                depth = Math.Max(0, depth - 1);
+            }
+            else if (!isDepthNeutral)
+            {
+                depth++;
+            }
+
+            // Skip to the end of the current tag.
+            index = closeIndex;
+        }
+
+        // ponytail: comments and CDATA are treated as generic tags here; if they
+        // become common in model output, upgrade to a parser-backed implementation.
+        return builder.ToString().Trim();
+    }
+
+    private static string ExtractTagName(string rawTag)
+    {
+        if (string.IsNullOrWhiteSpace(rawTag))
+        {
+            return string.Empty;
+        }
+
+        var start = rawTag[0] == '/' ? 1 : 0;
+        if (start >= rawTag.Length)
+        {
+            return string.Empty;
+        }
+
+        var end = start;
+        while (end < rawTag.Length)
+        {
+            var value = rawTag[end];
+            if (char.IsWhiteSpace(value) || value == '/' || value == '>')
+            {
+                break;
+            }
+
+            end++;
+        }
+
+        return rawTag[start..end];
     }
 
     // Scans the entire HTML string for all class="..." occurrences and returns the

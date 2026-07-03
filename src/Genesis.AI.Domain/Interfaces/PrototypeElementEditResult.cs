@@ -17,6 +17,14 @@ public sealed record PrototypeElementEditResult
     /// </summary>
     public string? RejectionReason { get; init; }
 
+    /// <summary>
+    /// The full prototype document with the selected element replaced. Populated only when
+    /// <see cref="Status"/> is <see cref="PrototypeElementEditStatus.Applied"/> and the element was
+    /// located in the supplied CurrentHtml; <c>null</c> for every other status. The client renders
+    /// this directly, avoiding a browser-vs-source serialisation mismatch on string replacement.
+    /// </summary>
+    public string? UpdatedFullHtml { get; init; }
+
     public static PrototypeElementEditResult Applied(string updatedOuterHtml)
     {
         return new PrototypeElementEditResult

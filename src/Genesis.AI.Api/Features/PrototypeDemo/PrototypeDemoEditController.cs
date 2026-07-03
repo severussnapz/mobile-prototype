@@ -32,7 +32,8 @@ public sealed class PrototypeDemoEditController : ControllerBase
             new PrototypeElementEditRequest(
                 request.SelectedOuterHtml,
                 request.Instruction,
-                request.ActiveUiKit),
+                request.ActiveUiKit,
+                request.CurrentHtml),
             cancellationToken);
 
         return Ok(new ApiResponse<PrototypeElementEditResponse>
@@ -41,6 +42,7 @@ public sealed class PrototypeDemoEditController : ControllerBase
             {
                 Status = result.Status.ToString(),
                 UpdatedOuterHtml = result.UpdatedOuterHtml,
+                UpdatedFullHtml = result.UpdatedFullHtml,
                 RejectionReason = result.RejectionReason
             }
         });

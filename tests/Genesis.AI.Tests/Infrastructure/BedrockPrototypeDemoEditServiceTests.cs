@@ -55,11 +55,12 @@ public sealed class BedrockPrototypeDemoEditServiceTests
     }
 
     private static Task<PrototypeElementEditResult> EditAsync(
-        Harness harness, string selectedOuterHtml, string instruction)
+        Harness harness, string selectedOuterHtml, string instruction, string? currentHtml = null)
     {
         return harness.Service.EditElementAsync(
             ProjectId,
-            new PrototypeElementEditRequest(selectedOuterHtml, instruction, ActiveUiKit),
+            new PrototypeElementEditRequest(
+                selectedOuterHtml, instruction, ActiveUiKit, currentHtml ?? selectedOuterHtml),
             CancellationToken.None);
     }
 
@@ -300,5 +301,143 @@ public sealed class BedrockPrototypeDemoEditServiceTests
         // Mode 2 should not reject this (it has no children to protect).
         // Other guards (modes 4, 5) are the safety net for structural violations.
         Assert.NotEqual(PrototypeElementEditStatus.Rejected, result.Status);
+    }
+
+    // Regression (container + direct text): a container root with an SVG child and
+    // direct text target should be editable when the instruction targets that root
+    // text. This was previously rejected because mode 2 compared flattened subtree
+    // text and treated root direct-text edits as untargeted child mutations.
+    [Fact]
+    public async Task EditElementAsync_WhenContainerWithSvgChildChangesRootDirectTextAsInstructed_AppliesEdit()
+    {
+        const string selected =
+            "<div><svg viewBox=\"0 0 10 10\"><path d=\"M1 1L9 9\" /></svg>Overview</div>";
+        const string modelOutput =
+            "<div><svg viewBox=\"0 0 10 10\"><path d=\"M1 1L9 9\" /></svg>Highlight</div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change Overview to Highlight");
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.Equal(modelOutput, result.UpdatedOuterHtml);
+    }
+
+    // Regression (container safety): if a child element's text is silently changed,
+    // the edit must be rejected even when root direct-text is adjusted so flattened
+    // subtree text appears unchanged.
+    [Fact]
+    public async Task EditElementAsync_WhenChildElementTextMutatesButFlattenedTextMatches_RejectsResponse()
+    {
+        const string selected =
+            "<div><span>AB</span>Overview</div>";
+        const string modelOutput =
+            "<div><span>A</span>BOverview</div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change Overview to BOverview");
+
+        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+    }
+
+    // Regression (self-closing handling): direct-text edits on a container with a
+    // self-closing child element are valid and should apply.
+    [Fact]
+    public async Task EditElementAsync_WhenContainerWithSelfClosingChildChangesRootDirectText_AppliesEdit()
+    {
+        const string selected =
+            "<div><img src=\"x.png\" alt=\"icon\" />Overview</div>";
+        const string modelOutput =
+            "<div><img src=\"x.png\" alt=\"icon\" />Summary</div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change Overview to Summary");
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.Equal(modelOutput, result.UpdatedOuterHtml);
+    }
+
+    // --- Server-side full-document replacement (fingerprint match) ---
+
+    // THE regression this feature exists to fix. The selection bridge sends the
+    // browser-serialised outerHTML — an SVG <rect> comes back with an explicit
+    // close tag (</rect>), while the source document uses self-closing syntax (/>).
+    // A raw string match (client-side current.replace) fails at the first
+    // divergent character. The server must locate the element by a
+    // serialisation-independent fingerprint (tag + attribute map + text) and
+    // return the whole updated document in UpdatedFullHtml.
+    [Fact]
+    public async Task EditElementAsync_WhenSvgElementSelfClosingInSource_ReturnsUpdatedFullHtmlWithReplacement()
+    {
+        const string currentHtml =
+            "<!DOCTYPE html><html><body><svg viewBox=\"0 0 10 10\">"
+            + "<rect x=\"1\" y=\"2\" fill=\"red\"/></svg></body></html>";
+        // Browser-serialised form of the same <rect> — explicit close tag, not self-closing.
+        const string selected = "<rect x=\"1\" y=\"2\" fill=\"red\"></rect>";
+        const string modelOutput = "<rect x=\"1\" y=\"2\" fill=\"blue\"></rect>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change the fill to blue", currentHtml);
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.NotNull(result.UpdatedFullHtml);
+        Assert.Contains("fill=\"blue\"", result.UpdatedFullHtml!, StringComparison.Ordinal);
+        Assert.DoesNotContain("fill=\"red\"", result.UpdatedFullHtml!, StringComparison.Ordinal);
+        // The rest of the document survives.
+        Assert.Contains("viewBox=\"0 0 10 10\"", result.UpdatedFullHtml!, StringComparison.Ordinal);
+    }
+
+    // Plain-element happy path: the returned full document carries the new element
+    // and preserves the surrounding markup.
+    [Fact]
+    public async Task EditElementAsync_WhenAppliedToPlainElement_ReturnsUpdatedFullHtml()
+    {
+        const string currentHtml =
+            "<!DOCTYPE html><html><body><header><button id=\"save\">Save</button></header></body></html>";
+        const string selected = "<button id=\"save\">Save</button>";
+        const string modelOutput = "<button id=\"save\">Submit</button>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change the label to Submit", currentHtml);
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.NotNull(result.UpdatedFullHtml);
+        Assert.Contains(">Submit<", result.UpdatedFullHtml!, StringComparison.Ordinal);
+        Assert.Contains("<header>", result.UpdatedFullHtml!, StringComparison.Ordinal);
+    }
+
+    // No-match: the selected element is not present in CurrentHtml (stale document,
+    // wrong project, etc.). The edit must downgrade to Rejected with a null
+    // UpdatedFullHtml rather than throwing or returning a half-applied document.
+    [Fact]
+    public async Task EditElementAsync_WhenSelectedElementNotFoundInCurrentHtml_DowngradesToRejectedWithNullFullHtml()
+    {
+        const string currentHtml =
+            "<!DOCTYPE html><html><body><p>Nothing to see here</p></body></html>";
+        const string selected = "<button id=\"save\">Save</button>";
+        const string modelOutput = "<button id=\"save\">Submit</button>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change the label to Submit", currentHtml);
+
+        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+        Assert.Null(result.UpdatedFullHtml);
+    }
+
+    // Non-Applied statuses never carry a full document, even when CurrentHtml is supplied.
+    [Fact]
+    public async Task EditElementAsync_WhenOutOfScope_LeavesUpdatedFullHtmlNull()
+    {
+        const string selected = "<span>Total cost</span>";
+        const string currentHtml =
+            "<!DOCTYPE html><html><body><span>Total cost</span></body></html>";
+        const string modelOutput =
+            "<!-- " + OutOfScopeMarker + ": background is set by a parent container class -->\n"
+            + selected;
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "make the header background blue", currentHtml);
+
+        Assert.Equal(PrototypeElementEditStatus.OutOfScope, result.Status);
+        Assert.Null(result.UpdatedFullHtml);
     }
 }
