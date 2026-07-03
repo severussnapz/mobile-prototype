@@ -131,4 +131,84 @@ public class PipelineToolDefinitionsTests
         Assert.Contains("derive_from_text_content", tool.Description, StringComparison.Ordinal);
         Assert.Contains("generate_from_context", tool.Description, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void GetTools_PrototypeSingleFileEnabled_ReturnsExactlySingleFileToolSet()
+    {
+        var options = new TokenOptimisationOptions
+        {
+            PrototypeSingleFileEnabled = true,
+            EditArtefactEnabled = true,
+            ActiveSkillInjectionEnabled = false
+        };
+
+        var tools = PipelineToolDefinitions.GetTools(options, StageType.Prototype);
+        var names = tools.Select(tool => tool.Name).ToArray();
+
+        string[] expected =
+        [
+            PipelineToolDefinitions.SaveArtefact,
+            PipelineToolDefinitions.EditArtefact,
+            PipelineToolDefinitions.SearchInArtefact,
+            PipelineToolDefinitions.GetArtefact,
+            PipelineToolDefinitions.ListArtefacts,
+            PipelineToolDefinitions.AddParkingLotItem,
+            PipelineToolDefinitions.ResolveParkingLotItem,
+            PipelineToolDefinitions.ProposeRequirementChange,
+            PipelineToolDefinitions.UpdateProgress
+        ];
+
+        Assert.Equal(expected.OrderBy(name => name), names.OrderBy(name => name));
+    }
+
+    [Fact]
+    public void GetTools_PrototypeSingleFileEnabled_ExcludesFragmentAndWindowingTools()
+    {
+        var options = new TokenOptimisationOptions
+        {
+            PrototypeSingleFileEnabled = true,
+            EditArtefactEnabled = true,
+            PrototypeDomModeEnabled = true,
+            ActiveSkillInjectionEnabled = false
+        };
+
+        var tools = PipelineToolDefinitions.GetTools(options, StageType.Prototype);
+
+        Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.ApplyToScope);
+        Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.AdvanceRequirement);
+        Assert.DoesNotContain(tools, tool => tool.Name == PipelineToolDefinitions.SetOrchestrationMode);
+    }
+
+    [Fact]
+    public void GetTools_PrototypeSingleFileDisabled_KeepsWindowingTools()
+    {
+        // Regression: with the flag off the Prototype stage keeps the existing base tool set.
+        var options = new TokenOptimisationOptions
+        {
+            PrototypeSingleFileEnabled = false,
+            EditArtefactEnabled = true,
+            ActiveSkillInjectionEnabled = false
+        };
+
+        var tools = PipelineToolDefinitions.GetTools(options, StageType.Prototype);
+
+        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.AdvanceRequirement);
+        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.SetOrchestrationMode);
+    }
+
+    [Fact]
+    public void GetTools_PrototypeSingleFileEnabledOnNonPrototypeStage_DoesNotApplySingleFileSet()
+    {
+        // The single-file set is scoped to the Prototype stage only.
+        var options = new TokenOptimisationOptions
+        {
+            PrototypeSingleFileEnabled = true,
+            EditArtefactEnabled = true,
+            ActiveSkillInjectionEnabled = false
+        };
+
+        var tools = PipelineToolDefinitions.GetTools(options, StageType.Design);
+
+        Assert.Contains(tools, tool => tool.Name == PipelineToolDefinitions.AdvanceRequirement);
+    }
 }
