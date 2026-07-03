@@ -206,24 +206,15 @@ public class ToolCallWiringTests
     }
 
     [Fact]
-    public void EditArtefact_SingleFileMode_AllowsPrototypeIndexWhenPrototypeDemoPathWasRead()
+    public void EditArtefact_UsesDirectFilePathReadGuard()
     {
-        // Single-file mode compatibility: if get_artefact read prototype-demo/index.html,
-        // edit_artefact on prototype/index.html should satisfy FILE_NOT_READ via effectiveReadPath.
+        // The read guard should use the requested file path directly with no prototype-demo alias.
         var controllerSource = File.ReadAllText(
             Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
                 "Features", "Conversations", "ConversationStreamController.cs"));
 
         Assert.Contains(
-            "var effectiveReadPath = prototypeSingleFile",
-            controllerSource,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "filesReadThisRequest.Contains(\"prototype-demo/index.html\")",
-            controllerSource,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "if (!filesReadThisRequest.Contains(effectiveReadPath) &&",
+            "if (!filesReadThisRequest.Contains(filePath) &&",
             controllerSource,
             StringComparison.Ordinal);
     }
