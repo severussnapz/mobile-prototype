@@ -39,16 +39,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
         IReadOnlyList<AiMessage> messages,
         CancellationToken cancellationToken)
     {
-        return await GenerateResponseAsync(systemPrompt, messages, cancellationToken, 32768);
-    }
-
-    public async Task<AiResponse> GenerateResponseAsync(
-        AiSystemPrompt systemPrompt,
-        IReadOnlyList<AiMessage> messages,
-        CancellationToken cancellationToken,
-        int maxTokens = 32768)
-    {
-        var request = BuildConverseRequest(systemPrompt, messages, maxTokens);
+        var request = BuildConverseRequest(systemPrompt, messages);
 
         _logger.LogInformation("Sending Bedrock request with {MessageCount} messages", messages.Count);
 
@@ -62,9 +53,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
         return new AiResponse(
             content,
             (int)response.Usage.InputTokens,
-            (int)response.Usage.OutputTokens,
-            (int)response.Usage.CacheReadInputTokens,
-            (int)response.Usage.CacheWriteInputTokens);
+            (int)response.Usage.OutputTokens);
     }
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
@@ -72,19 +61,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
         IReadOnlyList<AiMessage> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (var chunk in StreamResponseAsync(systemPrompt, messages, cancellationToken, 32768))
-        {
-            yield return chunk;
-        }
-    }
-
-    public async IAsyncEnumerable<string> StreamResponseAsync(
-        AiSystemPrompt systemPrompt,
-        IReadOnlyList<AiMessage> messages,
-        [EnumeratorCancellation] CancellationToken cancellationToken,
-        int maxTokens = 32768)
-    {
-        var request = BuildConverseStreamRequest(systemPrompt, messages, maxTokens);
+        var request = BuildConverseStreamRequest(systemPrompt, messages);
 
         _logger.LogInformation("Starting Bedrock stream with {MessageCount} messages", messages.Count);
 
@@ -105,10 +82,9 @@ public sealed class BedrockAiService : IAiService, IDisposable
         AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         IReadOnlyList<AiToolDefinition> tools,
-        [EnumeratorCancellation] CancellationToken cancellationToken,
-        int maxTokens = 32768)
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var request = BuildConverseStreamRequest(systemPrompt, messages, maxTokens);
+        var request = BuildConverseStreamRequest(systemPrompt, messages);
 
         // Add tool configuration
         request.ToolConfig = new ToolConfiguration
@@ -252,10 +228,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
         }
     }
 
-    private ConverseRequest BuildConverseRequest(
-        AiSystemPrompt systemPrompt,
-        IReadOnlyList<AiMessage> messages,
-        int maxTokens)
+    private ConverseRequest BuildConverseRequest(AiSystemPrompt systemPrompt, IReadOnlyList<AiMessage> messages)
     {
         return new ConverseRequest
         {
@@ -268,17 +241,14 @@ public sealed class BedrockAiService : IAiService, IDisposable
             }).ToList(),
             InferenceConfig = new InferenceConfiguration
             {
-                MaxTokens = maxTokens,
+                MaxTokens = 64000,
                 Temperature = _thinkingBudget > 0 ? 1.0f : 0.7f
             },
             AdditionalModelRequestFields = BuildThinkingConfig()
         };
     }
 
-    private ConverseStreamRequest BuildConverseStreamRequest(
-        AiSystemPrompt systemPrompt,
-        IReadOnlyList<AiMessage> messages,
-        int maxTokens)
+    private ConverseStreamRequest BuildConverseStreamRequest(AiSystemPrompt systemPrompt, IReadOnlyList<AiMessage> messages)
     {
         return new ConverseStreamRequest
         {
@@ -287,7 +257,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
             Messages = messages.Select(BuildMessage).ToList(),
             InferenceConfig = new InferenceConfiguration
             {
-                MaxTokens = maxTokens,
+                MaxTokens = 64000,
                 Temperature = _thinkingBudget > 0 ? 1.0f : 0.7f
             },
             AdditionalModelRequestFields = BuildThinkingConfig()
