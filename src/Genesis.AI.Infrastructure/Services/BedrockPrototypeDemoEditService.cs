@@ -193,8 +193,9 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         var originalChildCount = CountDirectChildren(original);
         var updatedChildCount = CountDirectChildren(updated);
 
-        if (originalChildCount != updatedChildCount)
+        if (updatedChildCount > originalChildCount)
         {
+            // Model added child elements — unrequested structural change.
             return true;
         }
 
@@ -202,6 +203,11 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         // target, not an untargeted child. Mode 2 exists to protect sibling children
         // inside a container from silent mutation — it has no role on a leaf.
         if (originalChildCount == 0)
+        {
+            return false;
+        }
+
+        if (updatedChildCount < originalChildCount)
         {
             return false;
         }
@@ -229,15 +235,9 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         var originalClasses = ExtractAllClasses(original);
         var updatedClasses = ExtractAllClasses(updated);
 
-        foreach (var cls in updatedClasses)
-        {
-            if (!originalClasses.Contains(cls))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        // Allow class replacement (e.g. btn-primary → btn-danger) but reject
+        // class addition (more classes than original indicates unrequested structure).
+        return updatedClasses.Count > originalClasses.Count;
     }
 
     // Mode 5: every id, on*, data-* attribute on the original root must appear on the updated root.

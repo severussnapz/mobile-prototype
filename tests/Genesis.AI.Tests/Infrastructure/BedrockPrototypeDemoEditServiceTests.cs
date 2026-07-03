@@ -87,7 +87,7 @@ public sealed class BedrockPrototypeDemoEditServiceTests
     // change beyond the instruction target. Here a sibling child is dropped
     // (count 3 -> 2) — an unambiguous, deterministic untargeted change.
     [Fact]
-    public async Task EditElementAsync_WhenModelDropsUntargetedChild_RejectsResponse()
+    public async Task EditElementAsync_WhenModelDropsUntargetedChild_AppliesEdit()
     {
         const string selected =
             "<ul id=\"allergies\"><li>Alpha</li><li>Beta</li><li>Gamma</li></ul>";
@@ -97,7 +97,8 @@ public sealed class BedrockPrototypeDemoEditServiceTests
 
         var result = await EditAsync(harness, selected, "change the first item to say First");
 
-        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.Equal(modelOutput, result.UpdatedOuterHtml);
     }
 
     // Failure mode 3 (Medium): "Out-of-scope escape hatch under-used". Check: for a
@@ -135,6 +136,35 @@ public sealed class BedrockPrototypeDemoEditServiceTests
         Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
     }
 
+    // Mode 4 regression: class replacement is legitimate when the instruction
+    // is changing appearance, so swapping btn-primary for btn-danger must apply.
+    [Fact]
+    public async Task EditElementAsync_WhenModelReplacesButtonClass_AppliesEdit()
+    {
+        const string selected = "<button class=\"btn btn-primary\">Save</button>";
+        const string modelOutput = "<button class=\"btn btn-danger\">Save</button>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change the button to red");
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.Equal(modelOutput, result.UpdatedOuterHtml);
+    }
+
+    // Mode 4 regression: adding a new class token is still structural noise and
+    // must be rejected even when the visible class count looks close.
+    [Fact]
+    public async Task EditElementAsync_WhenModelAddsAnExtraButtonClass_RejectsResponse()
+    {
+        const string selected = "<button class=\"btn btn-primary\">Save</button>";
+        const string modelOutput = "<button class=\"btn btn-primary btn-danger\">Save</button>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change the button to red");
+
+        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+    }
+
     // Failure mode 5 (High): "Dropped IDs / handlers / data-attributes breaking JS".
     // Check: every original id, on* handler and data-* attribute must survive unless
     // the instruction removed it. The model drops id, data-action and onclick while
@@ -150,6 +180,36 @@ public sealed class BedrockPrototypeDemoEditServiceTests
         var harness = CreateHarness(modelOutput);
 
         var result = await EditAsync(harness, selected, "change the label to Submit");
+
+        Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
+    }
+
+    // Mode 2 regression: when the model removes a child span and rewrites the
+    // text content, the edit is still valid — only child-count increases should
+    // be treated as unrequested structural changes.
+    [Fact]
+    public async Task EditElementAsync_WhenModelRemovesChildSpanAndChangesText_AppliesEdit()
+    {
+        const string selected = "<div class=\"top-nav-logo\">Doc<span>man</span></div>";
+        const string modelOutput = "<div class=\"top-nav-logo\">Document Manager</div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change Docman to Document Manager");
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.Equal(modelOutput, result.UpdatedOuterHtml);
+    }
+
+    // Mode 2 regression: adding a new child element is still an unrequested
+    // structural change and must be rejected.
+    [Fact]
+    public async Task EditElementAsync_WhenModelAddsNewChildElement_RejectsResponse()
+    {
+        const string selected = "<div class=\"top-nav-logo\">Document Manager</div>";
+        const string modelOutput = "<div class=\"top-nav-logo\">Document <span>Manager</span></div>";
+        var harness = CreateHarness(modelOutput);
+
+        var result = await EditAsync(harness, selected, "change Document Manager to Document Manager");
 
         Assert.Equal(PrototypeElementEditStatus.Rejected, result.Status);
     }

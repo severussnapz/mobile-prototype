@@ -241,7 +241,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
             }).ToList(),
             InferenceConfig = new InferenceConfiguration
             {
-                MaxTokens = 32768,
+                MaxTokens = 64000,
                 Temperature = _thinkingBudget > 0 ? 1.0f : 0.7f
             },
             AdditionalModelRequestFields = BuildThinkingConfig()
@@ -257,7 +257,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
             Messages = messages.Select(BuildMessage).ToList(),
             InferenceConfig = new InferenceConfiguration
             {
-                MaxTokens = 32768,
+                MaxTokens = 64000,
                 Temperature = _thinkingBudget > 0 ? 1.0f : 0.7f
             },
             AdditionalModelRequestFields = BuildThinkingConfig()
