@@ -31,7 +31,7 @@ public class ConversationStreamController : ControllerBase
     private const int Pipeline02CompletionPhaseNumber = 6;
     private const string PrototypeHtmlArtefactPath = "prototype/index.html";
     private const string PrototypeNotesArtefactPath = "prototype/PROTOTYPE_NOTES.md";
-    private static readonly Regex InjectedSectionHeadingRegex = new(
+    private static readonly Regex _injectedSectionHeadingRegex = new(
         @"^## (?<heading>.+ \(Added by [^)]+\))$",
         RegexOptions.Multiline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
@@ -2364,7 +2364,7 @@ public class ConversationStreamController : ControllerBase
     {
         var headingCounts = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        foreach (Match match in InjectedSectionHeadingRegex.Matches(content))
+        foreach (Match match in _injectedSectionHeadingRegex.Matches(content))
         {
             var heading = match.Groups["heading"].Value;
             if (!headingCounts.TryAdd(heading, 1))
