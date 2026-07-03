@@ -223,7 +223,22 @@ public class ToolCallWiringTests
             controllerSource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "if (!filesReadThisRequest.Contains(effectiveReadPath))",
+            "if (!filesReadThisRequest.Contains(effectiveReadPath) &&",
+            controllerSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EditArtefact_SingleFileMode_BypassesReadGuardWhenOldStrProvided()
+    {
+        // Single-file mode should allow edit_artefact without get_artefact when
+        // old_str already provides a non-empty verbatim anchor.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        Assert.Contains(
+            "!(prototypeSingleFile && !string.IsNullOrEmpty(oldStr))",
             controllerSource,
             StringComparison.Ordinal);
     }
