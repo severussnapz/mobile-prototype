@@ -65,65 +65,104 @@ public sealed class PrototypeDemoStreamController : ControllerBase
         var project = await _projectRepository.GetByIdAsync(projectId, cancellationToken);
         if (project is null)
         {
-            Response.StatusCode = StatusCodes.Status404NotFound;
-            await Response.WriteAsJsonAsync(
-                ApiErrorResponse.Create("404", "Project not found", $"No project found with ID '{projectId}'."),
-                cancellationToken);
+            await WriteProjectNotFoundAsync(projectId, cancellationToken);
             return;
         }
 
-        Response.ContentType = "text/event-stream";
-        Response.Headers.CacheControl = "no-cache";
-        Response.Headers.Connection = "keep-alive";
+        ConfigureSseResponse();
 
-        await WriteStatusEventAsync("started", cancellationToken);
-        await WriteStatusEventAsync("loading_requirements", cancellationToken);
+        await WriteInitialStatusEventsAsync(cancellationToken);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(_settings.GenerationTimeout);
 
-        var rawHtml = new StringBuilder();
-        var firstChunk = true;
-
         try
         {
-            await foreach (var chunk in _generationService.StreamRawAsync(projectId, project.Name, timeoutCts.Token))
-            {
-                if (firstChunk)
-                {
-                    firstChunk = false;
-                    await WriteStatusEventAsync("generating", cancellationToken);
-                }
-
-                rawHtml.Append(chunk);
-                var chunkData = JsonSerializer.Serialize(new { text = chunk });
-                await Response.WriteAsync($"event: chunk\ndata: {chunkData}\n\n", cancellationToken);
-                await Response.Body.FlushAsync(cancellationToken);
-            }
-
-            var assembled = _assembler.Assemble(rawHtml.ToString());
-            var doneData = JsonSerializer.Serialize(new { html = assembled });
-            await Response.WriteAsync($"event: done\ndata: {doneData}\n\n", cancellationToken);
-            await Response.Body.FlushAsync(cancellationToken);
+            await StreamGenerationEventsAsync(projectId, project.Name, timeoutCts.Token, cancellationToken);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
         {
-            var errorData = JsonSerializer.Serialize(new
-            {
-                code = "timeout",
-                message = $"Prototype generation timed out after {_settings.GenerationTimeout.TotalMinutes:0} minutes."
-            });
-            await Response.WriteAsync($"event: error\ndata: {errorData}\n\n", cancellationToken);
-            await Response.Body.FlushAsync(cancellationToken);
+            await WriteTimeoutErrorEventAsync(cancellationToken);
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Prototype demo generation failed for project {ProjectId}", projectId);
-            var errorData = JsonSerializer.Serialize(new { code = "generation_failed", message = "Prototype generation failed. Please try again." });
-            await Response.WriteAsync($"event: error\ndata: {errorData}\n\n", cancellationToken);
-            await Response.Body.FlushAsync(cancellationToken);
+            await WriteGenerationFailedEventAsync(projectId, exception, cancellationToken);
         }
 
+        await WriteDoneSentinelAsync();
+    }
+
+    private async Task WriteProjectNotFoundAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        Response.StatusCode = StatusCodes.Status404NotFound;
+        await Response.WriteAsJsonAsync(
+            ApiErrorResponse.Create("404", "Project not found", $"No project found with ID '{projectId}'."),
+            cancellationToken);
+    }
+
+    private void ConfigureSseResponse()
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers.CacheControl = "no-cache";
+        Response.Headers.Connection = "keep-alive";
+    }
+
+    private async Task WriteInitialStatusEventsAsync(CancellationToken cancellationToken)
+    {
+        await WriteStatusEventAsync("started", cancellationToken);
+        await WriteStatusEventAsync("loading_requirements", cancellationToken);
+    }
+
+    private async Task StreamGenerationEventsAsync(
+        Guid projectId,
+        string projectName,
+        CancellationToken generationCancellationToken,
+        CancellationToken responseCancellationToken)
+    {
+        var rawHtml = new StringBuilder();
+        var firstChunk = true;
+
+        await foreach (var chunk in _generationService.StreamRawAsync(projectId, projectName, generationCancellationToken))
+        {
+            if (firstChunk)
+            {
+                firstChunk = false;
+                await WriteStatusEventAsync("generating", responseCancellationToken);
+            }
+
+            rawHtml.Append(chunk);
+            var chunkData = JsonSerializer.Serialize(new { text = chunk });
+            await Response.WriteAsync($"event: chunk\ndata: {chunkData}\n\n", responseCancellationToken);
+            await Response.Body.FlushAsync(responseCancellationToken);
+        }
+
+        var assembled = _assembler.Assemble(rawHtml.ToString());
+        var doneData = JsonSerializer.Serialize(new { html = assembled });
+        await Response.WriteAsync($"event: done\ndata: {doneData}\n\n", responseCancellationToken);
+        await Response.Body.FlushAsync(responseCancellationToken);
+    }
+
+    private async Task WriteTimeoutErrorEventAsync(CancellationToken cancellationToken)
+    {
+        var errorData = JsonSerializer.Serialize(new
+        {
+            code = "timeout",
+            message = $"Prototype generation timed out after {_settings.GenerationTimeout.TotalMinutes:0} minutes."
+        });
+        await Response.WriteAsync($"event: error\ndata: {errorData}\n\n", cancellationToken);
+        await Response.Body.FlushAsync(cancellationToken);
+    }
+
+    private async Task WriteGenerationFailedEventAsync(Guid projectId, Exception exception, CancellationToken cancellationToken)
+    {
+        _logger.LogError(exception, "Prototype demo generation failed for project {ProjectId}", projectId);
+        var errorData = JsonSerializer.Serialize(new { code = "generation_failed", message = "Prototype generation failed. Please try again." });
+        await Response.WriteAsync($"event: error\ndata: {errorData}\n\n", cancellationToken);
+        await Response.Body.FlushAsync(cancellationToken);
+    }
+
+    private async Task WriteDoneSentinelAsync()
+    {
         await Response.WriteAsync("data: [DONE]\n\n", CancellationToken.None);
         await Response.Body.FlushAsync(CancellationToken.None);
     }

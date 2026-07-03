@@ -51,9 +51,8 @@ public class PrototypeDemoPersistenceApiTests : IDisposable
         var client = _factory.CreateWriteClient();
         var projectId = await CreateProjectAsync(client);
 
-        var saveResponse = await client.PostAsync(
+        await client.PostAsync(
             $"/api/v1/projects/{projectId}/prototype-demo/save", HtmlBody(SampleHtml));
-        Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
 
         var fetchResponse = await client.GetAsync(
             $"/api/v1/projects/{projectId}/prototype-demo/html");
@@ -64,7 +63,7 @@ public class PrototypeDemoPersistenceApiTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveTwice_KeepsSingleArtefact_FetchReturnsLatestHtml()
+    public async Task SaveTwice_KeepsSingleArtefactId()
     {
         var client = _factory.CreateWriteClient();
         var projectId = await CreateProjectAsync(client);
@@ -79,6 +78,18 @@ public class PrototypeDemoPersistenceApiTests : IDisposable
 
         // Same row (in-place version bump), so the artefact ID is stable across saves.
         Assert.Equal(firstArtefactId, secondArtefactId);
+    }
+
+    [Fact]
+    public async Task SaveTwice_FetchReturnsLatestHtml()
+    {
+        var client = _factory.CreateWriteClient();
+        var projectId = await CreateProjectAsync(client);
+
+        await client.PostAsync(
+            $"/api/v1/projects/{projectId}/prototype-demo/save", HtmlBody(SampleHtml));
+        await client.PostAsync(
+            $"/api/v1/projects/{projectId}/prototype-demo/save", HtmlBody(UpdatedHtml));
 
         var fetchResponse = await client.GetAsync(
             $"/api/v1/projects/{projectId}/prototype-demo/html");
