@@ -192,6 +192,20 @@ public class ToolCallWiringTests
     }
 
     [Fact]
+    public void SaveArtefact_Pipeline02ContractGuard_IsBypassedInPrototypeSingleFileMode()
+    {
+        // Single-file prototype mode should not run the fragment-pipeline save contract gate.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        Assert.Contains(
+            "if (stageType == StageType.Prototype && !prototypeSingleFile)",
+            controllerSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SearchInArtefact_NoMatch_ReturnsAskUserForHtml()
     {
         // Plan 3f: when search_in_artefact finds no elements,
