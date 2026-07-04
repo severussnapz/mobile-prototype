@@ -1077,6 +1077,22 @@ public class ConversationStreamController : ControllerBase
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var content = root.GetProperty("content").GetString()!;
 
+                // Single-file prototype corruption guard: reject saves of prototype/index.html
+                // that are not complete valid HTML documents. Prevents context-truncation from
+                // writing partial content (e.g. 40 bytes) that corrupts the prototype.
+                if (prototypeSingleFile &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+                    (!content.TrimStart().StartsWith("<!DOCTYPE html>", StringComparison.OrdinalIgnoreCase) ||
+                     !content.TrimEnd().EndsWith("</html>", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected: prototype/index.html is not a complete HTML document ({Length} chars)",
+                        content.Length);
+                    return "Error: INVALID_PROTOTYPE_HTML: The content must be a complete HTML document — " +
+                           "starting with <!DOCTYPE html> and ending with </html>. " +
+                           "Your response was truncated. Do not save partial HTML — regenerate the complete prototype.";
+                }
+
                 var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
                 if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
                     duplicateInjectedHeading is not null)
