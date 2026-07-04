@@ -1431,7 +1431,7 @@ public class ConversationStreamController : ControllerBase
                 const int largeFileThreshold = 50_000;
                 var alreadyReadThisRequest = filesReadThisRequest.Contains(filePath);
                 var getArtefactResult = BuildGetArtefactResult(
-                    filePath, artefactContent, artefact.Version, alreadyReadThisRequest, largeFileThreshold);
+                    filePath, artefactContent, artefact.Version, alreadyReadThisRequest, largeFileThreshold, prototypeSingleFile);
                 filesReadThisRequest.Add(filePath);
 
                 _logger.LogInformation(
@@ -1624,19 +1624,13 @@ public class ConversationStreamController : ControllerBase
 
                 // Require get_artefact to be called first this request so Claude anchors against
                 // the real file content, not memory or a previous cached version.
-                var effectiveReadPath = prototypeSingleFile &&
-                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
-                    filesReadThisRequest.Contains("prototype-demo/index.html")
-                    ? "prototype-demo/index.html"
-                    : filePath;
-
-                if (!filesReadThisRequest.Contains(effectiveReadPath) &&
+                if (!filesReadThisRequest.Contains(filePath) &&
                     !(prototypeSingleFile && !string.IsNullOrEmpty(oldStr)))
                 {
                     _logger.LogWarning(
                         "Tool edit_artefact blocked: {FilePath} not read this request — forcing get_artefact first",
                         filePath);
-                    return $"Error: FILE_NOT_READ: You must call get_artefact on '{effectiveReadPath}' before editing it. " +
+                    return $"Error: FILE_NOT_READ: You must call get_artefact on '{filePath}' before editing it. " +
                            "Read the file first to anchor your edit against the real content, then call edit_artefact.";
                 }
 
@@ -2303,11 +2297,13 @@ public class ConversationStreamController : ControllerBase
         string artefactContent,
         int version,
         bool alreadyReadThisRequest,
-        int largeFileThreshold)
+        int largeFileThreshold,
+        bool prototypeSingleFile = false)
     {
         var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
         var isPrototypeHtmlFragment =
-            filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase)
+            (filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase)
+             || (prototypeSingleFile && filePath.Equals("prototype/index.html", StringComparison.OrdinalIgnoreCase)))
             && extension is ".html" or ".htm";
 
         if (isPrototypeHtmlFragment && alreadyReadThisRequest)

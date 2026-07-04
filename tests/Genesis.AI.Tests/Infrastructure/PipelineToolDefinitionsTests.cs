@@ -149,7 +149,6 @@ public class PipelineToolDefinitionsTests
         [
             PipelineToolDefinitions.SaveArtefact,
             PipelineToolDefinitions.EditArtefact,
-            PipelineToolDefinitions.SearchInArtefact,
             PipelineToolDefinitions.GetArtefact,
             PipelineToolDefinitions.ListArtefacts,
             PipelineToolDefinitions.AddParkingLotItem,

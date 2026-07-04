@@ -81,7 +81,6 @@ internal static class PipelineToolDefinitionFactory
         {
             ArtefactToolBuilder.BuildSaveArtefactTool(),
             BuildEditArtefactTool(),
-            BuildSearchInArtefactTool(),
             ArtefactToolBuilder.BuildGetArtefactTool(),
             ArtefactToolBuilder.BuildListArtefactsTool(),
             ParkingLotToolBuilder.BuildAddParkingLotItemTool(),
