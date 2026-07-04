@@ -21,6 +21,12 @@ public class ArtefactRepository : IArtefactRepository
         await _context.Artefacts.AddAsync(artefact, cancellationToken);
     }
 
+    public Task UpdateAsync(Artefact artefact, CancellationToken cancellationToken)
+    {
+        _context.Artefacts.Update(artefact);
+        return Task.CompletedTask;
+    }
+
     public async Task DeleteByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         var tracked = await _context.Artefacts.FirstOrDefaultAsync(artefact => artefact.Id == id, cancellationToken);
