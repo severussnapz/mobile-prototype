@@ -64,6 +64,7 @@ public class ConversationFeedbackController : ControllerBase
         {
             Data = new MessageFeedbackResponse
             {
+                ConversationId = conversationId,
                 MessageId = feedback.MessageId,
                 StageType = ToSnakeCase(feedback.StageType.ToString()),
                 IsHelpful = feedback.IsHelpful,
