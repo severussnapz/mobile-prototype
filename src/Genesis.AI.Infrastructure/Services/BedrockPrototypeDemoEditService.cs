@@ -133,7 +133,6 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
                 existingArtefact.ReplaceContent(
                     nextVersion, newStorageKey, PrototypeHtmlContentType,
                     sizeBytes, "system", _timeProvider);
-                await _artefactRepository.UpdateAsync(existingArtefact, cancellationToken);
             }
             else
             {
