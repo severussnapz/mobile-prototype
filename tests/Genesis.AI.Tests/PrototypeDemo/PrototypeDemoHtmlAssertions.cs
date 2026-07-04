@@ -78,7 +78,7 @@ internal static class PrototypeDemoHtmlAssertions
     // leading @import line (offset 50) which could legitimately be stripped.
     private static string LoadEmbeddedCssMarker()
     {
-        var assembly = typeof(StubPrototypeDemoGenerationService).Assembly;
+        var assembly = typeof(BedrockPrototypeDemoEditService).Assembly;
         using var stream = assembly.GetManifestResourceStream(EmisXBaseCssResourceName)
             ?? throw new InvalidOperationException($"Embedded resource not found: {EmisXBaseCssResourceName}");
         using var reader = new StreamReader(stream);
@@ -146,7 +146,7 @@ internal static class PrototypeDemoHtmlAssertions
 
     private static string LoadEmbeddedUiKitMarker()
     {
-        var assembly = typeof(StubPrototypeDemoGenerationService).Assembly;
+        var assembly = typeof(BedrockPrototypeDemoEditService).Assembly;
         using var stream = assembly.GetManifestResourceStream(EmisXUiKitResourceName)
             ?? throw new InvalidOperationException($"Embedded resource not found: {EmisXUiKitResourceName}");
         using var reader = new StreamReader(stream);

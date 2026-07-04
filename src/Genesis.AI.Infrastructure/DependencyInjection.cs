@@ -36,7 +36,7 @@ public static class DependencyInjection
         AddRepositories(services);
         AddPipelineServices(services);
         AddDocumentBuilders(services);
-        AddWorkflowServices(services, configuration);
+        AddWorkflowServices(services);
 
         services.Configure<TokenOptimisationOptions>(
             configuration.GetSection(TokenOptimisationOptions.SectionName));
@@ -76,29 +76,13 @@ public static class DependencyInjection
         services.AddSingleton<ISecurityReviewReportBuilder, SecurityReviewReportBuilder>();
     }
 
-    private static void AddWorkflowServices(IServiceCollection services, IConfiguration configuration)
+    private static void AddWorkflowServices(IServiceCollection services)
     {
-        var prototypeDemoOptions = new PrototypeDemoOptions
-        {
-            GenerationTimeoutMinutes = configuration.GetValue<int?>($"{PrototypeDemoOptions.SectionName}:GenerationTimeoutMinutes") ?? 3,
-            UseStubGeneration = configuration.GetValue<bool>($"{PrototypeDemoOptions.SectionName}:UseStubGeneration")
-        };
-
-        services.AddSingleton<IPrototypeDemoSettings>(prototypeDemoOptions);
-        services.AddSingleton<IPrototypeDocumentAssembler, PrototypeDocumentAssembler>();
         services.AddScoped<INormalisationGateService, NormalisationGateService>();
         services.AddScoped<IPlanningGateService, PlanningGateService>();
         services.AddScoped<IFoundationService, FoundationService>();
         services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
         services.AddScoped<IPrototypeDomSearchService, PrototypeDomSearchService>();
-        if (prototypeDemoOptions.UseStubGeneration)
-        {
-            services.AddScoped<IPrototypeDemoGenerationService, StubPrototypeDemoGenerationService>();
-        }
-        else
-        {
-            services.AddScoped<IPrototypeDemoGenerationService, BedrockPrototypeDemoGenerationService>();
-        }
         services.AddScoped<IPrototypeDemoEditService, BedrockPrototypeDemoEditService>();
         services.AddScoped<IPrototypeDomMutationService, PrototypeDomMutationService>();
         services.AddScoped<StructuralEditDraftService>();
