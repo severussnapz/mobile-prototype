@@ -52,7 +52,7 @@ public class ArtefactVersionController : ControllerBase
             return BadRequest("filePath query parameter is required.");
 
         var result = await _mediator.Send(new GetArtefactVersionsQuery(projectId, filePath), cancellationToken);
-        if (result.Versions.Count == 0 || filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
+        if (result.Versions.Count == 0)
             return Ok(await BuildS3FallbackVersionsAsync(projectId, filePath, pagination, cancellationToken));
 
         var page = Math.Max(1, pagination.Page);
@@ -90,7 +90,7 @@ public class ArtefactVersionController : ControllerBase
             return BadRequest("filePath query parameter is required.");
 
         var result = await _mediator.Send(new GetArtefactVersionsQuery(projectId, filePath), cancellationToken);
-        if (result.Versions.Count == 0 || filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
+        if (result.Versions.Count == 0)
             return Ok(await BuildS3FallbackVersionsAsync(projectId, filePath, pagination, cancellationToken));
 
         var page = Math.Max(1, pagination.Page);

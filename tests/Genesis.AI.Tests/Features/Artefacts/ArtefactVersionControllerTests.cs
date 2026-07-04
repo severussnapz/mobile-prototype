@@ -41,29 +41,18 @@ public class ArtefactVersionControllerTests
     }
 
     [Fact]
-    public async Task GetVersionsByFilePath_WhenDatabaseHasSinglePrototypeRow_ReturnsS3History()
+    public async Task GetVersionsByFilePath_WhenDatabaseEmptyForPrototype_FallsBackToS3()
     {
         var projectId = Guid.NewGuid();
-        var dbArtefact = Artefact.CreateS3Artefact(
-            projectId,
-            22,
-            PrototypePath,
-            $"projects/{projectId}/artefacts/{PrototypePath}/v22",
-            "text/html",
-            123,
-            "db-user",
-            _timeProvider,
-            true);
         _mediatorMock
             .Setup(mediator => mediator.Send(It.IsAny<GetArtefactVersionsQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new GetArtefactVersionsResult([dbArtefact]));
+            .ReturnsAsync(new GetArtefactVersionsResult([]));
         _artefactStorageServiceMock
             .Setup(storage => storage.ListVersionsAsync(projectId, PrototypePath, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<(int, long, DateTimeOffset)>
             {
-                (22, 2220, DateTimeOffset.UtcNow),
-                (21, 2110, DateTimeOffset.UtcNow),
-                (20, 2000, DateTimeOffset.UtcNow)
+                (2, 200, DateTimeOffset.UtcNow),
+                (1, 100, DateTimeOffset.UtcNow)
             });
         var controller = CreateController();
 
@@ -72,10 +61,8 @@ public class ArtefactVersionControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var versions = Assert.IsAssignableFrom<IReadOnlyList<ArtefactVersionResponse>>(ok.Value);
-        Assert.Equal(3, versions.Count);
-        Assert.Equal(22, versions[0].Version);
-        Assert.Equal(21, versions[1].Version);
-        Assert.Equal(20, versions[2].Version);
+        Assert.Equal(2, versions.Count);
+        Assert.Equal(2, versions[0].Version);
         Assert.Equal("system", versions[0].CreatedBy);
         Assert.Equal("text/html", versions[0].ContentType);
     }
