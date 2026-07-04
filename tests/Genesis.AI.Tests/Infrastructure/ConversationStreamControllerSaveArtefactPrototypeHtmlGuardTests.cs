@@ -47,7 +47,7 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         var controller = CreateController(prototypeSingleFileEnabled: true, out var artefactRepositoryMock, out var artefactStorageServiceMock);
         var toolCall = BuildSaveArtefactToolCall(
             "prototype/index.html",
-            "<!DOCTYPE html><html><head><title>Prototype</title></head><body><h1>OK</h1></body></html>");
+            "<!DOCTYPE html><html><head><title>Prototype</title></head><body><div>PROTOTYPE ONLY</div><h1>OK</h1></body></html>");
 
         artefactRepositoryMock
             .Setup(repository => repository.GetByProjectAndFilePathAsync(
@@ -94,6 +94,75 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         var result = await InvokeExecuteToolCallAsync(controller, toolCall, StageType.Prototype, prototypeSingleFile: true);
 
         Assert.DoesNotContain("INVALID_PROTOTYPE_HTML", result, StringComparison.Ordinal);
+        Assert.Contains("Saved prototype/index.html (version 1", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteToolCallAsync_SaveArtefactSingleFilePrototypeWithCompleteHtmlAndNoPrototypeOnlyBanner_ReturnsMissingPrototypeBanner()
+    {
+        var controller = CreateController(prototypeSingleFileEnabled: true, out _, out _);
+        var toolCall = BuildSaveArtefactToolCall(
+            "prototype/index.html",
+            "<!DOCTYPE html><html><head><title>Prototype</title></head><body><h1>OK</h1></body></html>");
+
+        var result = await InvokeExecuteToolCallAsync(controller, toolCall, StageType.Prototype, prototypeSingleFile: true);
+
+        Assert.StartsWith("Error: MISSING_PROTOTYPE_BANNER", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteToolCallAsync_SaveArtefactSingleFilePrototypeWithPrototypeOnlyBanner_IsNotRejectedByPrototypeOnlyGuard()
+    {
+        var controller = CreateController(prototypeSingleFileEnabled: true, out var artefactRepositoryMock, out var artefactStorageServiceMock);
+        var toolCall = BuildSaveArtefactToolCall(
+            "prototype/index.html",
+            "<!DOCTYPE html><html><head><title>Prototype</title></head><body><div>prototype only</div><h1>OK</h1></body></html>");
+
+        artefactRepositoryMock
+            .Setup(repository => repository.GetByProjectAndFilePathAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Artefact?)null);
+        artefactRepositoryMock
+            .Setup(repository => repository.GetNextVersionForFileAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var unitOfWorkMock = new Mock<IUnitOfWork>();
+        unitOfWorkMock
+            .Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        artefactRepositoryMock
+            .SetupGet(repository => repository.UnitOfWork)
+            .Returns(unitOfWorkMock.Object);
+
+        artefactRepositoryMock
+            .Setup(repository => repository.AddAsync(It.IsAny<Artefact>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        artefactRepositoryMock
+            .Setup(repository => repository.DeletePreviousVersionsAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        artefactStorageServiceMock
+            .Setup(storageService => storageService.SaveContentAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("projects/test/artefacts/prototype/index.html/v1");
+
+        var result = await InvokeExecuteToolCallAsync(controller, toolCall, StageType.Prototype, prototypeSingleFile: true);
+
+        Assert.DoesNotContain("MISSING_PROTOTYPE_BANNER", result, StringComparison.Ordinal);
         Assert.Contains("Saved prototype/index.html (version 1", result, StringComparison.Ordinal);
     }
 

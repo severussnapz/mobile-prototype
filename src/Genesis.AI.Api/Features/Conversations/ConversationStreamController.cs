@@ -1093,6 +1093,21 @@ public class ConversationStreamController : ControllerBase
                            "Your response was truncated. Do not save partial HTML — regenerate the complete prototype.";
                 }
 
+                // Single-file prototype banner guard: reject saves of prototype/index.html
+                // that are missing the required PROTOTYPE ONLY safety banner.
+                // The banner identifies the artefact as a throwaway prototype, not production UI.
+                if (prototypeSingleFile &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+                    !content.Contains("PROTOTYPE ONLY", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected: prototype/index.html is missing the PROTOTYPE ONLY banner ({Length} chars)",
+                        content.Length);
+                    return "Error: MISSING_PROTOTYPE_BANNER: The prototype HTML must include a visible 'PROTOTYPE ONLY' banner. " +
+                           "Add an amber full-width banner at the very top of <body> containing the text 'PROTOTYPE ONLY'. " +
+                           "This is a mandatory safety marker that identifies the artefact as a throwaway prototype.";
+                }
+
                 var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
                 if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
                     duplicateInjectedHeading is not null)
