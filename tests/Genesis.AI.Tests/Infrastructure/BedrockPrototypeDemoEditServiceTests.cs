@@ -1,5 +1,7 @@
 using Genesis.AI.Core.Data;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
+using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
+using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Services;
 using Genesis.AI.Tests.PrototypeDemo;
@@ -46,16 +48,17 @@ public sealed class BedrockPrototypeDemoEditServiceTests
         Mock<IAiService> Ai,
         Mock<IArtefactRepository> Repository,
         Mock<IArtefactStorageService> Storage,
-        Mock<IUnitOfWork> UnitOfWork);
+        Mock<IUnitOfWork> UnitOfWork,
+        Mock<IConversationRepository> ConversationRepository);
 
     private static Harness CreateHarness(string modelOutput)
     {
         var ai = new Mock<IAiService>();
-        ai.Setup(service => service.StreamResponseAsync(
+        ai.Setup(service => service.GenerateResponseAsync(
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<CancellationToken>()))
-          .Returns(PrototypeDemoHtmlAssertions.AsAsyncStream(modelOutput));
+          .ReturnsAsync(new AiResponse(modelOutput, 100, 50, 10, 5));
 
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork
@@ -76,14 +79,17 @@ public sealed class BedrockPrototypeDemoEditServiceTests
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("projects/test/artefacts/prototype/index.html/v1");
 
+        var conversationRepository = new Mock<IConversationRepository>();
+
         var service = new BedrockPrototypeDemoEditService(
             ai.Object,
             repository.Object,
             storage.Object,
             TimeProvider.System,
-            NullLogger<BedrockPrototypeDemoEditService>.Instance);
+            NullLogger<BedrockPrototypeDemoEditService>.Instance,
+            conversationRepository.Object);
 
-        return new Harness(service, ai, repository, storage, unitOfWork);
+        return new Harness(service, ai, repository, storage, unitOfWork, conversationRepository);
     }
 
     private static Task<PrototypeElementEditResult> EditAsync(
@@ -573,5 +579,57 @@ public sealed class BedrockPrototypeDemoEditServiceTests
 
         Assert.Equal(PrototypeElementEditStatus.OutOfScope, result.Status);
         Assert.Null(result.UpdatedFullHtml);
+    }
+
+    [Fact]
+    public async Task EditElementAsync_WithConversationId_WhenEditApplied_RecordsTokenUsage()
+    {
+        const string selected = "<button>Save</button>";
+        const string modelOutput = "<button>Submit</button>";
+        var harness = CreateHarness(modelOutput);
+
+        var conversationId = Guid.NewGuid();
+        var conversation = new Conversation(Guid.NewGuid(), 5, TimeProvider.System);
+        harness.ConversationRepository
+            .Setup(repo => repo.GetByIdAsync(conversationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(conversation);
+
+        var unitOfWork = new Mock<IUnitOfWork>();
+        unitOfWork
+            .Setup(work => work.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        harness.ConversationRepository
+            .SetupGet(repo => repo.UnitOfWork)
+            .Returns(unitOfWork.Object);
+
+        var initialRecordCount = conversation.TokenUsageRecords.Count;
+
+        await harness.Service.EditElementAsync(
+            ProjectId,
+            new PrototypeElementEditRequest(selected, "change label to Submit", ActiveUiKit, selected, conversationId),
+            CancellationToken.None);
+
+        Assert.Equal(initialRecordCount + 1, conversation.TokenUsageRecords.Count);
+        var record = conversation.TokenUsageRecords.Last();
+        Assert.Equal(100, record.InputTokens);
+        Assert.Equal(50, record.OutputTokens);
+        Assert.Equal(10, record.CacheReadInputTokens);
+        Assert.Equal(5, record.CacheWriteInputTokens);
+    }
+
+    [Fact]
+    public async Task EditElementAsync_WithNullConversationId_WhenEditApplied_SkipsTokenRecording()
+    {
+        const string selected = "<button>Save</button>";
+        const string modelOutput = "<button>Submit</button>";
+        var harness = CreateHarness(modelOutput);
+
+        await harness.Service.EditElementAsync(
+            ProjectId,
+            new PrototypeElementEditRequest(selected, "change label to Submit", ActiveUiKit, selected, null),
+            CancellationToken.None);
+
+        harness.ConversationRepository.Verify(
+            repo => repo.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

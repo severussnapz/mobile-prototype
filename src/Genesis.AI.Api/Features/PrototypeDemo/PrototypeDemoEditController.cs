@@ -33,7 +33,8 @@ public sealed class PrototypeDemoEditController : ControllerBase
                 request.SelectedOuterHtml,
                 request.Instruction,
                 request.ActiveUiKit,
-                request.CurrentHtml),
+                request.CurrentHtml,
+                request.ConversationId),
             cancellationToken);
 
         return Ok(new ApiResponse<PrototypeElementEditResponse>

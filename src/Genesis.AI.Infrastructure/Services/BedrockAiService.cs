@@ -53,7 +53,9 @@ public sealed class BedrockAiService : IAiService, IDisposable
         return new AiResponse(
             content,
             (int)response.Usage.InputTokens,
-            (int)response.Usage.OutputTokens);
+            (int)response.Usage.OutputTokens,
+            (int)response.Usage.CacheReadInputTokens,
+            (int)response.Usage.CacheWriteInputTokens);
     }
 
     public async IAsyncEnumerable<string> StreamResponseAsync(

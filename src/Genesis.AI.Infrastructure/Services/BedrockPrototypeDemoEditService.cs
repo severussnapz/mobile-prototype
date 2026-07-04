@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
@@ -43,19 +44,22 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
     private readonly IArtefactStorageService _artefactStorageService;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<BedrockPrototypeDemoEditService> _logger;
+    private readonly IConversationRepository _conversationRepository;
 
     public BedrockPrototypeDemoEditService(
         IAiService aiService,
         IArtefactRepository artefactRepository,
         IArtefactStorageService artefactStorageService,
         TimeProvider timeProvider,
-        ILogger<BedrockPrototypeDemoEditService> logger)
+        ILogger<BedrockPrototypeDemoEditService> logger,
+        IConversationRepository conversationRepository)
     {
         _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
         _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
     }
 
     public async Task<PrototypeElementEditResult> EditElementAsync(
@@ -76,13 +80,8 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
             MessageRole.User,
             $"Edit the selected element as instructed. Return only the updated outerHTML.");
 
-        var buffer = new StringBuilder();
-        await foreach (var chunk in _aiService.StreamResponseAsync(systemPrompt, [userMessage], cancellationToken))
-        {
-            buffer.Append(chunk);
-        }
-
-        var result = Validate(buffer.ToString().Trim(), request.SelectedOuterHtml);
+        var aiResponse = await _aiService.GenerateResponseAsync(systemPrompt, [userMessage], cancellationToken);
+        var result = Validate(aiResponse.Content.Trim(), request.SelectedOuterHtml);
         if (result.Status != PrototypeElementEditStatus.Applied)
         {
             return result;
@@ -102,6 +101,17 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         // Persistence is best-effort: the edit already succeeded and the client renders
         // updatedFullHtml directly. A save failure must not fail the edit — log and carry on.
         await PersistUpdatedPrototypeAsync(projectId, updatedFullHtml, cancellationToken);
+
+        if (request.ConversationId.HasValue)
+        {
+            await RecordSurgicalEditTokenUsageAsync(
+                request.ConversationId.Value,
+                aiResponse.InputTokens,
+                aiResponse.OutputTokens,
+                aiResponse.CacheReadInputTokens,
+                aiResponse.CacheWriteInputTokens,
+                cancellationToken);
+        }
 
         return result with { UpdatedFullHtml = updatedFullHtml };
     }
@@ -441,5 +451,35 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
             ?? throw new InvalidOperationException($"Embedded resource not found: {resourceName}");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
+    }
+
+    private async Task RecordSurgicalEditTokenUsageAsync(
+        Guid conversationId,
+        int inputTokens,
+        int outputTokens,
+        int cacheReadInputTokens,
+        int cacheWriteInputTokens,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var conversation = await _conversationRepository.GetByIdAsync(conversationId, cancellationToken);
+            if (conversation is null)
+            {
+                _logger.LogWarning(
+                    "Surgical edit token usage: conversation {ConversationId} not found — skipping.",
+                    conversationId);
+                return;
+            }
+            conversation.RecordTokenUsage(
+                inputTokens, outputTokens, cacheReadInputTokens, cacheWriteInputTokens, _timeProvider);
+            await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Surgical edit token usage: failed to record for conversation {ConversationId} — edit already succeeded.",
+                conversationId);
+        }
     }
 }

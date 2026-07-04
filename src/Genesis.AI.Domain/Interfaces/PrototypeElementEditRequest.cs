@@ -14,8 +14,13 @@ namespace Genesis.AI.Domain.Interfaces;
 /// document (fingerprint match) and performs the element replacement server-side, so the client
 /// never has to string-replace browser-serialised <c>outerHTML</c> against the raw source HTML.
 /// </param>
+/// <param name="ConversationId">
+/// The conversation ID to record surgical edit token usage against.
+/// When null, token recording is skipped.
+/// </param>
 public sealed record PrototypeElementEditRequest(
     string SelectedOuterHtml,
     string Instruction,
     string ActiveUiKit,
-    string CurrentHtml);
+    string CurrentHtml,
+    Guid? ConversationId = null);

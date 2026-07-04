@@ -16,4 +16,6 @@ public sealed class EditPrototypeElementRequest
     /// document and replaces it server-side, avoiding a client-side serialisation mismatch.
     /// </summary>
     public string CurrentHtml { get; init; } = string.Empty;
+
+    public Guid? ConversationId { get; init; }
 }
