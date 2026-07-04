@@ -526,6 +526,9 @@ public sealed class BedrockPrototypeDemoEditServiceTests
 
         Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
         Assert.Equal(2, existingArtefact.Version);
+        harness.Repository.Verify(
+            repo => repo.UpdateAsync(existingArtefact, It.IsAny<CancellationToken>()),
+            Times.Once);
         harness.Storage.Verify(
             store => store.SaveContentAsync(
                 ProjectId, "prototype/index.html", 2, result.UpdatedFullHtml!,
