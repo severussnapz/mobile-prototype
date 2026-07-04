@@ -48,4 +48,15 @@ public interface IArtefactStorageService
     /// No-op if the object does not exist.
     /// </summary>
     Task DeleteContentAsync(string storageKey, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists every stored version of an artefact file directly from object storage,
+    /// ordered newest version first. This is the source of truth for recovery when
+    /// the database no longer tracks historical versions. Returns an empty list if
+    /// no versions exist and never throws.
+    /// </summary>
+    Task<IReadOnlyList<(int Version, long SizeBytes, DateTimeOffset LastModified)>> ListVersionsAsync(
+        Guid projectId,
+        string filePath,
+        CancellationToken cancellationToken);
 }

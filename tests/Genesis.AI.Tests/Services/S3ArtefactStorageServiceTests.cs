@@ -159,4 +159,65 @@ public class S3ArtefactStorageServiceTests
             client => client.DeleteObjectAsync(BucketName, "key-to-delete", It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task ListVersionsAsync_WhenObjectsExist_ReturnsVersionsParsedFromKeysNewestFirst()
+    {
+        var projectId = Guid.Parse("03735ad1-8759-414e-a93f-ce8cc7bfc1fc");
+        var prefix = $"projects/{projectId}/artefacts/prototype/index.html/";
+        var lastModified = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        _s3ClientMock
+            .Setup(client => client.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.Prefix == prefix),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ListObjectsV2Response
+            {
+                IsTruncated = false,
+                S3Objects =
+                [
+                    new S3Object { Key = $"{prefix}v1", Size = 100, LastModified = lastModified },
+                    new S3Object { Key = $"{prefix}v2", Size = 200, LastModified = lastModified },
+                    new S3Object { Key = $"{prefix}v10", Size = 300, LastModified = lastModified }
+                ]
+            });
+        var service = CreateService();
+
+        var versions = await service.ListVersionsAsync(projectId, "prototype/index.html", CancellationToken.None);
+
+        Assert.Equal(3, versions.Count);
+        Assert.Equal(10, versions[0].Version);
+        Assert.Equal(2, versions[1].Version);
+        Assert.Equal(1, versions[2].Version);
+        Assert.Equal(300, versions[0].SizeBytes);
+    }
+
+    [Fact]
+    public async Task ListVersionsAsync_WhenNoObjectsExist_ReturnsEmptyList()
+    {
+        var projectId = Guid.NewGuid();
+        _s3ClientMock
+            .Setup(client => client.ListObjectsV2Async(
+                It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ListObjectsV2Response { IsTruncated = false, S3Objects = [] });
+        var service = CreateService();
+
+        var versions = await service.ListVersionsAsync(projectId, "prototype/index.html", CancellationToken.None);
+
+        Assert.Empty(versions);
+    }
+
+    [Fact]
+    public async Task ListVersionsAsync_WhenS3Throws_ReturnsEmptyListWithoutThrowing()
+    {
+        var projectId = Guid.NewGuid();
+        _s3ClientMock
+            .Setup(client => client.ListObjectsV2Async(
+                It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("boom"));
+        var service = CreateService();
+
+        var versions = await service.ListVersionsAsync(projectId, "prototype/index.html", CancellationToken.None);
+
+        Assert.Empty(versions);
+    }
 }
