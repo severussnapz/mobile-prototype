@@ -1,8 +1,10 @@
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace Genesis.AI.Infrastructure.Services;
 
@@ -16,9 +18,10 @@ namespace Genesis.AI.Infrastructure.Services;
 ///   Stable  = base edit prompt + emis-x-ui-kit.md (shared across every emis-x edit — cached ~10× cheaper)
 ///   Mutable = selected element outerHTML + instruction + active UI kit (per-request, always fresh)
 ///
-/// No artefact repository or storage service is required — v1 is stateless; the
-/// postMessage bridge applies the returned element client-side and nothing is
-/// persisted by this service.
+/// After a successful edit the updated full document is persisted best-effort to
+/// S3 (versioned) and the prototype/index.html artefact row is updated, so version
+/// history and cross-stage reads see surgical edits. A persistence failure is logged
+/// but never fails the edit — the client already has the returned document.
 /// </summary>
 public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
 {
@@ -31,11 +34,28 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
     private const string OutOfScopeMarker = "EDIT_OUT_OF_SCOPE";
     private const string ClarificationMarker = "EDIT_NEEDS_CLARIFICATION";
 
-    private readonly IAiService _aiService;
+    // Surgical edits only ever apply to the single-file prototype artefact.
+    private const string PrototypeHtmlFilePath = "prototype/index.html";
+    private const string PrototypeHtmlContentType = "text/html";
 
-    public BedrockPrototypeDemoEditService(IAiService aiService)
+    private readonly IAiService _aiService;
+    private readonly IArtefactRepository _artefactRepository;
+    private readonly IArtefactStorageService _artefactStorageService;
+    private readonly TimeProvider _timeProvider;
+    private readonly ILogger<BedrockPrototypeDemoEditService> _logger;
+
+    public BedrockPrototypeDemoEditService(
+        IAiService aiService,
+        IArtefactRepository artefactRepository,
+        IArtefactStorageService artefactStorageService,
+        TimeProvider timeProvider,
+        ILogger<BedrockPrototypeDemoEditService> logger)
     {
         _aiService = aiService ?? throw new ArgumentNullException(nameof(aiService));
+        _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
+        _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<PrototypeElementEditResult> EditElementAsync(
@@ -79,7 +99,58 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
                 "Selected element could not be located in the current prototype document.");
         }
 
+        // Persistence is best-effort: the edit already succeeded and the client renders
+        // updatedFullHtml directly. A save failure must not fail the edit — log and carry on.
+        await PersistUpdatedPrototypeAsync(projectId, updatedFullHtml, cancellationToken);
+
         return result with { UpdatedFullHtml = updatedFullHtml };
+    }
+
+    // Persist the updated prototype to S3 and update the DB row (or create it if missing).
+    // createdBy is "system" — the edit service has no user context, consistent with S3
+    // fallback versions.
+    private async Task PersistUpdatedPrototypeAsync(
+        Guid projectId,
+        string updatedFullHtml,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+                projectId, PrototypeHtmlFilePath, cancellationToken);
+
+            var newStorageKey = await _artefactStorageService.SaveContentAsync(
+                projectId, PrototypeHtmlFilePath, nextVersion, updatedFullHtml,
+                PrototypeHtmlContentType, cancellationToken);
+
+            var sizeBytes = Encoding.UTF8.GetByteCount(updatedFullHtml);
+
+            var existingArtefact = await _artefactRepository.GetByProjectAndFilePathAsync(
+                projectId, PrototypeHtmlFilePath, cancellationToken);
+
+            if (existingArtefact is not null)
+            {
+                existingArtefact.ReplaceContent(
+                    nextVersion, newStorageKey, PrototypeHtmlContentType,
+                    sizeBytes, "system", _timeProvider);
+            }
+            else
+            {
+                var newArtefact = Artefact.CreateS3Artefact(
+                    projectId, nextVersion, PrototypeHtmlFilePath, newStorageKey,
+                    PrototypeHtmlContentType, sizeBytes, "system", _timeProvider, true);
+                await _artefactRepository.AddAsync(newArtefact, cancellationToken);
+            }
+
+            await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to persist surgical prototype edit for project {ProjectId}; the edit was returned to the client but not saved.",
+                projectId);
+        }
     }
 
     // --- Deterministic post-generation validation (failure modes 1–6) ---

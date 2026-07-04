@@ -1,6 +1,9 @@
+using Genesis.AI.Core.Data;
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Services;
 using Genesis.AI.Tests.PrototypeDemo;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Genesis.AI.Tests.Infrastructure;
 
@@ -40,7 +43,10 @@ public sealed class BedrockPrototypeDemoEditServiceTests
 
     private sealed record Harness(
         BedrockPrototypeDemoEditService Service,
-        Mock<IAiService> Ai);
+        Mock<IAiService> Ai,
+        Mock<IArtefactRepository> Repository,
+        Mock<IArtefactStorageService> Storage,
+        Mock<IUnitOfWork> UnitOfWork);
 
     private static Harness CreateHarness(string modelOutput)
     {
@@ -51,7 +57,33 @@ public sealed class BedrockPrototypeDemoEditServiceTests
                 It.IsAny<CancellationToken>()))
           .Returns(PrototypeDemoHtmlAssertions.AsAsyncStream(modelOutput));
 
-        return new Harness(new BedrockPrototypeDemoEditService(ai.Object), ai);
+        var unitOfWork = new Mock<IUnitOfWork>();
+        unitOfWork
+            .Setup(work => work.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var repository = new Mock<IArtefactRepository>();
+        repository.SetupGet(repo => repo.UnitOfWork).Returns(unitOfWork.Object);
+        repository
+            .Setup(repo => repo.GetNextVersionForFileAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var storage = new Mock<IArtefactStorageService>();
+        storage
+            .Setup(store => store.SaveContentAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("projects/test/artefacts/prototype/index.html/v1");
+
+        var service = new BedrockPrototypeDemoEditService(
+            ai.Object,
+            repository.Object,
+            storage.Object,
+            TimeProvider.System,
+            NullLogger<BedrockPrototypeDemoEditService>.Instance);
+
+        return new Harness(service, ai, repository, storage, unitOfWork);
     }
 
     private static Task<PrototypeElementEditResult> EditAsync(
@@ -463,6 +495,45 @@ public sealed class BedrockPrototypeDemoEditServiceTests
         Assert.NotNull(result.UpdatedFullHtml);
         Assert.Contains(">Submit<", result.UpdatedFullHtml!, StringComparison.Ordinal);
         Assert.Contains("<header>", result.UpdatedFullHtml!, StringComparison.Ordinal);
+    }
+
+    // Persistence: an applied edit writes the updated document to S3 under the next
+    // version and replaces the existing prototype/index.html artefact row in place
+    // (version bumped, save committed). Proves surgical edits reach version history.
+    [Fact]
+    public async Task EditElementAsync_WhenAppliedAndArtefactExists_PersistsNewVersionToStorageAndDatabase()
+    {
+        const string currentHtml =
+            "<!DOCTYPE html><html><body><header><button id=\"save\">Save</button></header></body></html>";
+        const string selected = "<button id=\"save\">Save</button>";
+        const string modelOutput = "<button id=\"save\">Submit</button>";
+        var harness = CreateHarness(modelOutput);
+
+        var existingArtefact = Artefact.CreateS3Artefact(
+            ProjectId, 1, "prototype/index.html",
+            "projects/test/artefacts/prototype/index.html/v1", "text/html",
+            42, "system", TimeProvider.System, true);
+        harness.Repository
+            .Setup(repo => repo.GetNextVersionForFileAsync(
+                ProjectId, "prototype/index.html", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+        harness.Repository
+            .Setup(repo => repo.GetByProjectAndFilePathAsync(
+                ProjectId, "prototype/index.html", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingArtefact);
+
+        var result = await EditAsync(harness, selected, "change the label to Submit", currentHtml);
+
+        Assert.Equal(PrototypeElementEditStatus.Applied, result.Status);
+        Assert.Equal(2, existingArtefact.Version);
+        harness.Storage.Verify(
+            store => store.SaveContentAsync(
+                ProjectId, "prototype/index.html", 2, result.UpdatedFullHtml!,
+                "text/html", It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.UnitOfWork.Verify(
+            work => work.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     // No-match: the selected element is not present in CurrentHtml (stale document,
