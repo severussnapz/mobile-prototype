@@ -9,7 +9,7 @@ namespace Genesis.AI.Api.Features.Artefacts;
 /// Handles artefact version restoration logic including DB-tracked versions
 /// and S3 fallback for historical prototype versions no longer in the DB.
 /// </summary>
-internal sealed class ArtefactRestorationService
+internal sealed class ArtefactRestorationService : IArtefactRestorationService
 {
     private const string PrototypeHtmlArtefactPath = "prototype/index.html";
     private const string PrototypeHtmlContentType = "text/html";
@@ -17,24 +17,22 @@ internal sealed class ArtefactRestorationService
     private readonly IArtefactRepository _artefactRepository;
     private readonly IArtefactStorageService _artefactStorageService;
     private readonly TimeProvider _timeProvider;
-    private readonly Func<string?> _getUserIdFunc;
 
     public ArtefactRestorationService(
         IArtefactRepository artefactRepository,
         IArtefactStorageService artefactStorageService,
-        TimeProvider timeProvider,
-        Func<string?> getUserIdFunc)
+        TimeProvider timeProvider)
     {
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
         _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-        _getUserIdFunc = getUserIdFunc ?? throw new ArgumentNullException(nameof(getUserIdFunc));
     }
 
     public async Task<Artefact?> RestoreArtefactVersionAsync(
         Guid projectId,
         string filePath,
         int version,
+        string? userId,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(filePath))
@@ -47,7 +45,7 @@ internal sealed class ArtefactRestorationService
         if (sourceVersion is null)
         {
             // Try S3 fallback for prototype versions
-            return await RestorePrototypeVersionFromS3Async(projectId, normalisedFilePath, version, cancellationToken);
+            return await RestorePrototypeVersionFromS3Async(projectId, normalisedFilePath, version, userId, cancellationToken);
         }
 
         var latestVersion = versions.Max(artefact => artefact.Version);
@@ -73,7 +71,7 @@ internal sealed class ArtefactRestorationService
             restoredContentType,
             cancellationToken);
 
-        var userId = _getUserIdFunc() ?? "system";
+        var userId_actual = userId ?? "system";
         var restoredArtefact = Artefact.CreateS3Artefact(
             projectId,
             nextVersion,
@@ -81,7 +79,7 @@ internal sealed class ArtefactRestorationService
             newStorageKey,
             restoredContentType,
             Encoding.UTF8.GetByteCount(sourceContent),
-            userId,
+            userId_actual,
             _timeProvider,
             true);
 
@@ -95,6 +93,7 @@ internal sealed class ArtefactRestorationService
         Guid projectId,
         string normalisedFilePath,
         int version,
+        string? userId,
         CancellationToken cancellationToken)
     {
         // S3 is the source of truth for prototype history when the database no longer tracks the version.
@@ -116,7 +115,7 @@ internal sealed class ArtefactRestorationService
             PrototypeHtmlContentType,
             cancellationToken);
 
-        var userId = _getUserIdFunc() ?? "system";
+        var actualUserId = userId ?? "system";
         var restoredArtefact = Artefact.CreateS3Artefact(
             projectId,
             nextVersion,
@@ -124,7 +123,7 @@ internal sealed class ArtefactRestorationService
             newStorageKey,
             PrototypeHtmlContentType,
             Encoding.UTF8.GetByteCount(sourceContent),
-            userId,
+            actualUserId,
             _timeProvider,
             true);
 

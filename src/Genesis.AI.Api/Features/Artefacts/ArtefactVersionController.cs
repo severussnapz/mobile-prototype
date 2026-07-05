@@ -17,20 +17,14 @@ namespace Genesis.AI.Api.Features.Artefacts;
 public class ArtefactVersionController : ControllerBase
 {
     private readonly IMediator _mediator;
-    private readonly ArtefactRestorationService _restorationService;
+    private readonly IArtefactRestorationService _restorationService;
 
     public ArtefactVersionController(
         IMediator mediator,
-        IArtefactRepository artefactRepository,
-        IArtefactStorageService artefactStorageService,
-        TimeProvider timeProvider)
+        IArtefactRestorationService restorationService)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-        _restorationService = new ArtefactRestorationService(
-            artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository)),
-            artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService)),
-            timeProvider ?? throw new ArgumentNullException(nameof(timeProvider)),
-            () => User.GetUserErn() ?? User.FindFirstValue("sub"));
+        _restorationService = restorationService ?? throw new ArgumentNullException(nameof(restorationService));
     }
 
     [HttpGet("versions")]
@@ -109,7 +103,7 @@ public class ArtefactVersionController : ControllerBase
 
     [HttpPost("restore")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ArtefactSummaryResponse>> RestoreByBody(
@@ -121,14 +115,21 @@ public class ArtefactVersionController : ControllerBase
             return BadRequest("version must be greater than 0.");
 
         var restored = await _restorationService.RestoreArtefactVersionAsync(
-            projectId, request.FilePath, request.Version, cancellationToken);
+            projectId, request.FilePath, request.Version, 
+            User.GetUserErn() ?? User.FindFirstValue("sub"), 
+            cancellationToken);
         
-        return restored is null ? NotFound() : Ok(MapSummary(restored));
+        if (restored is null)
+            return NotFound();
+
+        var summary = MapSummary(restored);
+        return CreatedAtAction(nameof(GetVersionsByFilePath), 
+            new { projectId, filePath = restored.FilePath }, summary);
     }
 
     [HttpPost("versions/{version:int}/restore")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ArtefactSummaryResponse>> RestoreByRoute(
@@ -141,9 +142,16 @@ public class ArtefactVersionController : ControllerBase
             return BadRequest("version must be greater than 0.");
 
         var restored = await _restorationService.RestoreArtefactVersionAsync(
-            projectId, request.FilePath, version, cancellationToken);
+            projectId, request.FilePath, version, 
+            User.GetUserErn() ?? User.FindFirstValue("sub"), 
+            cancellationToken);
         
-        return restored is null ? NotFound() : Ok(MapSummary(restored));
+        if (restored is null)
+            return NotFound();
+
+        var summary = MapSummary(restored);
+        return CreatedAtAction(nameof(GetVersionsByFilePath), 
+            new { projectId, filePath = restored.FilePath }, summary);
     }
 
     private static ArtefactSummaryResponse MapSummary(Artefact artefact)
