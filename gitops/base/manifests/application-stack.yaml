@@ -28,7 +28,8 @@ spec:
   instance: genesis-ai-requirements-api
   repositoryName: genesis-ai-requirements-api
   description: "Genesis AI Requirements API"
-  githubRepoPattern: "repo:emisgroup/genesis-ai-requirements-api:*"
+  # OIDC subject pattern for the CI role trust policy (schema field: githubOIDC).
+  githubOIDC: "repo:emisgroup/genesis-ai-requirements-api:*"
 
   # --- S3: artefact storage -------------------------------------------------
   enableS3Bucket: true
@@ -46,9 +47,9 @@ spec:
   rds:
     databaseName: genesis_ai_requirements
     username: genesis_ai_app
+    # vpcId / vpcCidr are sourced from the genesis-cluster-config ConfigMap by
+    # the RGD — they are not fields on the rds spec block.
     databaseSubnetGroupName: genesis-net-vpc
-    vpcId: vpc-0fbc6b9fe9caf4982
-    vpcCidr: 100.69.64.0/18
     ingressSecurityGroupIds: []
     engineVersion: "16.9"
     instanceType: "db.serverless"
@@ -66,6 +67,7 @@ spec:
     modelId: anthropic.claude-sonnet-4-6
 
   # --- Required tags --------------------------------------------------------
-  application: emisx-genesis-ai-requirements-api
-  service: genesis-ai-requirements-api
-  repo: "emisgroup/genesis-ai-requirements-api"
+  tags:
+    application: emisx-genesis-ai-requirements-api
+    service: genesis-ai-requirements-api
+    repo: "emisgroup/genesis-ai-requirements-api"
