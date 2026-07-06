@@ -122,7 +122,12 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
             ? string.Join("\n\n", projectChunks.Select(chunk => chunk.Content))
             : "No project context available.";
 
-        return $"You are the Genesis AI help assistant. Answer questions about the Genesis AI pipeline and this project's approved artefacts. Be direct and concise.\n\n## Genesis AI Knowledge\n{toolContent}\n\n## Project Context\n{projectContent}";
+        var hasProjectContext = projectChunks.Count > 0;
+        var contextInstruction = hasProjectContext
+            ? "You have access to this project\'s approved artefacts. When answering questions about this project (its requirements, decisions, hazards, architecture, or status), answer from the Project Context below. Only use Genesis AI Knowledge to answer questions about how the Genesis AI tool itself works."
+            : "Answer questions about the Genesis AI pipeline and how it works. Be direct and concise.";
+
+        return $"You are the Genesis AI help assistant. {contextInstruction}\n\n## Project Context\n{projectContent}\n\n## Genesis AI Knowledge\n{toolContent}";
     }
 
     private static bool TryReadStringProperty(object source, string propertyName, out string value)
