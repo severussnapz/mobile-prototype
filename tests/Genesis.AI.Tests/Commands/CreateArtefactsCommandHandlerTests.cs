@@ -24,7 +24,10 @@ public class CreateArtefactsCommandHandlerTests
         _artefactRepositoryMock.Setup(repository => repository.UnitOfWork).Returns(_unitOfWorkMock.Object);
         _unitOfWorkMock.Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _artefactRepositoryMock
-            .Setup(repository => repository.GetNextVersionAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(repository => repository.GetNextVersionForFileAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
         _artefactStorageServiceMock
             .Setup(storage => storage.SaveContentAsync(
@@ -102,5 +105,46 @@ public class CreateArtefactsCommandHandlerTests
 
         Assert.Empty(result);
         _unitOfWorkMock.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_MultipleFiles_UsesFileScopedVersions()
+    {
+        var projectId = Guid.NewGuid();
+        var versionsByPath = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["requirements/REQ-001.md"] = 2,
+            ["manifest.md"] = 2
+        };
+
+        _artefactRepositoryMock
+            .Setup(repository => repository.GetNextVersionForFileAsync(
+                projectId,
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid _, string filePath, CancellationToken _) => versionsByPath[filePath]);
+
+        var command = new CreateArtefactsCommand(projectId, "user-1",
+        [
+            new CreateArtefactItem("requirements/REQ-001.md", "# Requirement", "text/markdown"),
+            new CreateArtefactItem("manifest.md", "# Manifest", "text/markdown")
+        ]);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+        Assert.All(result, artefact => Assert.Equal(2, artefact.Version));
+        _artefactRepositoryMock.Verify(
+            repository => repository.GetNextVersionForFileAsync(
+                projectId,
+                "requirements/REQ-001.md",
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        _artefactRepositoryMock.Verify(
+            repository => repository.GetNextVersionForFileAsync(
+                projectId,
+                "manifest.md",
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
