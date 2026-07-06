@@ -12,6 +12,7 @@ using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.SecurityReviewReport;
 using Genesis.AI.Infrastructure.Configuration;
+using Genesis.AI.Infrastructure.Interceptors;
 using Genesis.AI.Infrastructure.Repositories;
 using Genesis.AI.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -109,6 +110,9 @@ public static class DependencyInjection
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
     {
+        // Register ArtefactPublishedInterceptor as singleton BEFORE AddDbContext
+        services.AddSingleton<ArtefactPublishedInterceptor>();
+
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
@@ -119,7 +123,8 @@ public static class DependencyInjection
         MapEnums(dataSourceBuilder);
         var dataSource = dataSourceBuilder.Build();
 
-        services.AddDbContext<GenesisAiDbContext>(options =>
+        services.AddDbContext<GenesisAiDbContext>((sp, options) =>
+        {
             options.UseNpgsql(dataSource, npgsqlOptions =>
             {
                 npgsqlOptions.MapEnum<ComplianceDomain>("compliance_domain");
@@ -133,8 +138,11 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<OrchestrationMode>("orchestration_mode");
                 npgsqlOptions.MapEnum<RequirementImpact>("requirement_impact");
                 npgsqlOptions.MapEnum<KnowledgeNamespace>("knowledge_namespace");
-            npgsqlOptions.UseVector();
-            }));
+                npgsqlOptions.UseVector();
+            });
+            // Register interceptor
+            options.AddInterceptors(sp.GetRequiredService<ArtefactPublishedInterceptor>());
+        });
     }
 
     private static void MapEnums(NpgsqlDataSourceBuilder dataSourceBuilder)
