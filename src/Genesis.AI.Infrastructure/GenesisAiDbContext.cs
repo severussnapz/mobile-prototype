@@ -37,7 +37,10 @@ public sealed class GenesisAiDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         RegisterPostgresEnums(modelBuilder);
-        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        
+        var isInMemory = Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+        
+        if (isInMemory)
         {
             modelBuilder.Ignore<KnowledgeDocument>();
         }
@@ -47,7 +50,8 @@ public sealed class GenesisAiDbContext(
                 .Property(k => k.Embedding)
                 .HasColumnType("vector(1024)");
         }
-        ApplyEntityConfigurations(modelBuilder);
+        
+        ApplyEntityConfigurations(modelBuilder, isInMemory);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -70,7 +74,7 @@ public sealed class GenesisAiDbContext(
         }
     }
 
-    private static void ApplyEntityConfigurations(ModelBuilder modelBuilder)
+    private static void ApplyEntityConfigurations(ModelBuilder modelBuilder, bool isInMemory)
     {
         modelBuilder.ApplyConfiguration(new ProjectEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PipelineStageEntityTypeConfiguration());
@@ -85,5 +89,11 @@ public sealed class GenesisAiDbContext(
         modelBuilder.ApplyConfiguration(new UiDeltaEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PrototypeLockEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new RequirementChangeEntityTypeConfiguration());
+        
+        // KnowledgeDocument is ignored for InMemory (integration tests) but configured for PostgreSQL
+        if (!isInMemory)
+        {
+            modelBuilder.ApplyConfiguration(new KnowledgeDocumentEntityTypeConfiguration());
+        }
     }
 }
