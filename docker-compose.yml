@@ -55,6 +55,7 @@ services:
     volumes:
       - ./localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
       - ./db/seed-artefacts:/etc/localstack/seed-artefacts:ro
+      - localstack_data:/var/lib/localstack
     healthcheck:
       test: ["CMD-SHELL", "awslocal s3 ls s3://genesis-ai-artefacts/projects/ --recursive | grep -q manifest.md"]
       interval: 5s
@@ -96,6 +97,7 @@ services:
 
 volumes:
   postgres_data:
+  localstack_data:
 
 secrets:
   JF_USER:
