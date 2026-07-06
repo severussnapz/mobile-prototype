@@ -68,7 +68,8 @@ public sealed class HelpChatController : ControllerBase
 
         await foreach (var chunk in _helpChatStreamService.StreamAsync(request, cancellationToken))
         {
-            await Response.WriteAsync($"data: {chunk}\n\n", cancellationToken);
+            var sseChunk = chunk.Replace("\n", "\\n");
+            await Response.WriteAsync($"data: {sseChunk}\n\n", cancellationToken);
             await Response.Body.FlushAsync(cancellationToken);
         }
 
