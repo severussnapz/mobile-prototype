@@ -183,6 +183,15 @@ public static class PhaseSkillMap
             [6] = ["security-check-authoring", "confirmation-write-p08"],
             [7] = ["reviewer-pass-p08", "handoff-iteration-report-p08", "iteration-report"],
         },
+        [StageType.Prototype] = new()
+        {
+            [0] = ["prototype-state-detection"],
+            [1] = ["prototype-state-detection", "prototype-build-discipline"],
+            [2] = ["prototype-edit-discipline"],
+            [3] = ["prototype-edit-discipline"],
+            [4] = ["prototype-edit-discipline"],
+            [5] = ["prototype-edit-discipline"],
+        },
     };
 
     /// <summary>

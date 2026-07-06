@@ -1,4 +1,11 @@
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
+using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
+using Genesis.AI.Domain.Commands.ApproveRequirementChange;
+using Genesis.AI.Domain.Commands.ProposeRequirementChange;
+using Genesis.AI.Domain.Commands.RecordDomainReview;
+using Genesis.AI.Domain.Commands.RejectRequirementChange;
+using Genesis.AI.Domain.Commands.ReopenStageForAmendment;
+using Genesis.AI.Domain.Commands.UndoApproveRequirementChange;
 using Genesis.AI.Domain.Dpia;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.HazardLog;
@@ -45,9 +52,13 @@ public static class DependencyInjection
     {
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IMessageFeedbackRepository, MessageFeedbackRepository>();
         services.AddScoped<IArtefactRepository, ArtefactRepository>();
         services.AddScoped<IProjectNoteRepository, ProjectNoteRepository>();
         services.AddScoped<IProjectDecisionRepository, ProjectDecisionRepository>();
+        services.AddScoped<IUiDeltaRepository, UiDeltaRepository>();
+        services.AddScoped<IPrototypeLockRepository, PrototypeLockRepository>();
+        services.AddScoped<IRequirementChangeRepository, RequirementChangeRepository>();
     }
 
     private static void AddPipelineServices(IServiceCollection services)
@@ -73,6 +84,24 @@ public static class DependencyInjection
         services.AddScoped<IPlanningGateService, PlanningGateService>();
         services.AddScoped<IFoundationService, FoundationService>();
         services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
+        services.AddScoped<IPrototypeDomSearchService, PrototypeDomSearchService>();
+        services.AddScoped<IPrototypeDomMutationService, PrototypeDomMutationService>();
+        services.AddScoped<StructuralEditDraftService>();
+        services.AddScoped<IStructuralEditReorderService, StructuralEditReorderService>();
+        services.AddScoped<IStructuralEditMutationService, StructuralEditMutationService>();
+        services.AddScoped<IStructuralEditService, StructuralEditService>();
+        services.AddScoped<IRequirementImpactClassifier, RequirementImpactClassifier>();
+        services.AddScoped<IRequirementsFeedbackLoopService, RequirementsFeedbackLoopService>();
+        services.AddScoped<IChangeFileWriterService, ChangeFileWriterService>();
+        services.AddScoped<IContractValidationService, ContractValidationService>();
+        services.AddScoped<IPipelineReadinessService, PipelineReadinessService>();
+        services.AddScoped<ProposeRequirementChangeCommandHandler>();
+        services.AddScoped<IPrototypeFragmentMigrationService, PrototypeFragmentMigrationService>();
+        services.AddScoped<ApproveRequirementChangeCommandHandler>();
+        services.AddScoped<UndoApproveRequirementChangeCommandHandler>();
+        services.AddScoped<RejectRequirementChangeCommandHandler>();
+        services.AddScoped<RecordDomainReviewCommandHandler>();
+        services.AddScoped<ReopenStageForAmendmentCommandHandler>();
     }
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
@@ -121,6 +150,7 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<ParkingLotStatus>("parking_lot_status");
                 npgsqlOptions.MapEnum<MessageRole>("message_role");
                 npgsqlOptions.MapEnum<OrchestrationMode>("orchestration_mode");
+                npgsqlOptions.MapEnum<RequirementImpact>("requirement_impact");
             }));
     }
 
@@ -154,6 +184,7 @@ public static class DependencyInjection
         dataSourceBuilder.MapEnum<ParkingLotStatus>("parking_lot_status");
         dataSourceBuilder.MapEnum<MessageRole>("message_role");
         dataSourceBuilder.MapEnum<OrchestrationMode>("orchestration_mode");
+        dataSourceBuilder.MapEnum<RequirementImpact>("requirement_impact");
     }
 
     private static void AddS3(IServiceCollection services, IConfiguration configuration)

@@ -65,4 +65,17 @@ public sealed class TokenOptimisationOptions
     /// Defaults to <c>false</c> until skill content has been validated against all stages.
     /// </summary>
     public bool ActiveSkillInjectionEnabled { get; set; }
+
+    /// <summary>
+    /// Phase 0 flag for Plan 4 DOM migration.
+    /// When enabled, prototype search and mutation paths can use the new AngleSharp DOM
+    /// services instead of the graph pipeline. Default is <c>false</c> until cutover.
+    /// </summary>
+    public bool PrototypeDomModeEnabled { get; set; }
+    /// <summary>
+    /// When enabled, the propose_requirement_change tool is registered and available
+    /// in all pipeline stage conversations. Allows any pipeline to propose AC additions,
+    /// clarifications, or contradiction flags back to requirement files.
+    /// </summary>
+    public bool RequirementFeedbackEnabled { get; set; }
 }

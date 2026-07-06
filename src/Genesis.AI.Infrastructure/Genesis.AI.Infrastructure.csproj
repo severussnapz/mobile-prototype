@@ -10,9 +10,12 @@
     <EmbeddedResource Include="Resources\*.xlsx" />
     <EmbeddedResource Include="Resources\*.docx" />
     <EmbeddedResource Include="Resources\*.json" />
+    <EmbeddedResource Include="Resources\emis-x-base.css" />
+    <EmbeddedResource Include="Resources\emis-x-ui-kit.md" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="AWSSDK.BedrockRuntime" />
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="AWSSDK.RDS" />

@@ -89,7 +89,7 @@ public class BypassNormalisationPlanningGateCommandHandlerTests
     {
         var project = CreateProject();
         var existing = Artefact.CreateS3Artefact(
-            project.Id, 1, BypassAuditFilePath, "s3-existing", "application/json", 10, "user-1", _timeProvider);
+            project.Id, 1, BypassAuditFilePath, "s3-existing", "application/json", 10, "user-1", _timeProvider, true);
 
         _projectRepositoryMock
             .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))

@@ -48,8 +48,7 @@ public class CreateArtefactsCommandHandler : IRequestHandler<CreateArtefactsComm
                 storageKey,
                 contentType,
                 System.Text.Encoding.UTF8.GetByteCount(item.Content),
-                request.UserId,
-                _timeProvider);
+                request.UserId, _timeProvider, true);
 
             await _artefactRepository.AddAsync(artefact, cancellationToken);
             results.Add(artefact);

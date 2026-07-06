@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -8,6 +9,7 @@ using Genesis.AI.Api.Http;
 using Genesis.AI.Core.Extensions;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
+using Genesis.AI.Domain.Commands.ProposeRequirementChange;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Configuration;
@@ -42,11 +44,16 @@ public class ConversationStreamController : ControllerBase
     private readonly IActiveSkillsService _activeSkillsService;
     private readonly IFoundationService _foundationService;
     private readonly IPrototypeAssemblyService _prototypeAssemblyService;
+    private readonly IPrototypeFragmentMigrationService _prototypeFragmentMigrationService;
+    private readonly IPrototypeDomSearchService? _prototypeDomSearchService;
+    private readonly IPrototypeDomMutationService? _prototypeDomMutationService;
     private readonly TokenOptimisationOptions _tokenOptimisationOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ConversationStreamController> _logger;
+    private readonly ProposeRequirementChangeCommandHandler _proposeRequirementChangeHandler;
 
     public ConversationStreamController(
+        ProposeRequirementChangeCommandHandler proposeRequirementChangeHandler,
         IConversationRepository conversationRepository,
         IArtefactRepository artefactRepository,
         IArtefactStorageService artefactStorageService,
@@ -56,9 +63,12 @@ public class ConversationStreamController : ControllerBase
         IActiveSkillsService activeSkillsService,
         IFoundationService foundationService,
         IPrototypeAssemblyService prototypeAssemblyService,
+        IPrototypeFragmentMigrationService prototypeFragmentMigrationService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
         TimeProvider timeProvider,
-        ILogger<ConversationStreamController> logger)
+        ILogger<ConversationStreamController> logger,
+        IPrototypeDomSearchService? prototypeDomSearchService = null,
+        IPrototypeDomMutationService? prototypeDomMutationService = null)
     {
         _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
@@ -69,9 +79,13 @@ public class ConversationStreamController : ControllerBase
         _activeSkillsService = activeSkillsService ?? throw new ArgumentNullException(nameof(activeSkillsService));
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
         _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
+        _prototypeFragmentMigrationService = prototypeFragmentMigrationService ?? throw new ArgumentNullException(nameof(prototypeFragmentMigrationService));
+        _prototypeDomSearchService = prototypeDomSearchService;
+        _prototypeDomMutationService = prototypeDomMutationService;
         _tokenOptimisationOptions = tokenOptimisationOptions?.Value ?? throw new ArgumentNullException(nameof(tokenOptimisationOptions));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _proposeRequirementChangeHandler = proposeRequirementChangeHandler ?? throw new ArgumentNullException(nameof(proposeRequirementChangeHandler));
     }
 
     /// <summary>
@@ -181,6 +195,19 @@ public class ConversationStreamController : ControllerBase
         var artefactManifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
         var artefactManifestSection = BuildArtefactManifest(artefactManifest);
         var prototypeIntentDirective = BuildPrototypeIntentRoutingDirective(stageType, request.Content, artefactManifest);
+
+        // Prototype fragment migration — runs before LLM initialises, fully awaited (no race condition).
+        // Detection: prototype/fragments/_shell.html exists → skip. Monolith present → split into fragments.
+        // Pure C#, no LLM call, deterministic. Safe to call on every Prototype conversation.
+        if (stageType == StageType.Prototype)
+        {
+            await _prototypeFragmentMigrationService.MigrateIfNeededAsync(
+                projectId, initiatedBy: User.GetUserErn() ?? "system", cancellationToken);
+
+            // Refresh manifest so LLM sees the newly created fragment artefacts
+            artefactManifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
+            artefactManifestSection = BuildArtefactManifest(artefactManifest);
+        }
 
         // Build handover block if this conversation continues from a previous one that hit the tool limit.
         // Injected into the mutable system prompt so the AI knows where the previous session left off.
@@ -371,6 +398,17 @@ public class ConversationStreamController : ControllerBase
             // edit_artefact is blocked until the target file has been read, ensuring Claude
             // always anchors against the real file content rather than memory.
             var filesReadThisRequest = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Track total search_in_artefact calls per turn. After 5 searches without a mutation,
+            // hard-stop the agent to prevent context window exhaustion from search loops.
+            var searchCountThisTurn = new StrongBox<int>(0);
+
+            // Post-search read block: after DOM search returns matches, prevent re-reads and REQ reads
+            // until a mutation (apply_to_scope or save_artefact) succeeds. Blocks budget-burning thrashing.
+            var postSearchReadBlocked = new StrongBox<bool>(false);
+
+            // Zero-match hard block: once DOM search returns zero matches, block all subsequent
+            // tool calls for this request to force a user clarification instead of tool thrashing.
+            var zeroMatchToolBlocked = new StrongBox<bool>(false);
 
             // Read budget: cap get_artefact calls on non-prototype files per request.
             // Prevents the LLM reading all 13 REQ files before writing anything.
@@ -517,6 +555,9 @@ public class ConversationStreamController : ControllerBase
                             stageType,
                             filesReadThisRequest,
                             filesReadThisTurn,
+                            searchCountThisTurn,
+                            postSearchReadBlocked,
+                            zeroMatchToolBlocked,
                             cancellationToken);
                     }
                     catch (ToolExecutionFailedException exception)
@@ -780,6 +821,24 @@ public class ConversationStreamController : ControllerBase
             """;
     }
 
+    private static string GetStageTypePgName(Domain.Enums.StageType stageType)
+    {
+        var field = stageType.GetType().GetField(stageType.ToString());
+        var attr = field?.GetCustomAttributes(typeof(NpgsqlTypes.PgNameAttribute), false)
+            .FirstOrDefault() as NpgsqlTypes.PgNameAttribute;
+        return attr?.PgName ?? stageType.ToString().ToLowerInvariant();
+    }
+
+    private static Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel ParseImpactLevel(string? value)
+    {
+        return value?.ToLowerInvariant() switch
+        {
+            "possible" => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.Possible,
+            "definite" => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.Definite,
+            _ => Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None,
+        };
+    }
+
     private async Task SendToolStartSseEventAsync(AiToolCall toolCall, CancellationToken cancellationToken)
     {
         var description = toolCall.ToolName switch
@@ -915,6 +974,9 @@ public class ConversationStreamController : ControllerBase
         StageType? stageType,
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
+        StrongBox<int> searchCountThisTurn,
+        StrongBox<bool> postSearchReadBlocked,
+        StrongBox<bool> zeroMatchToolBlocked,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -932,6 +994,9 @@ public class ConversationStreamController : ControllerBase
                     stageType,
                     filesReadThisRequest,
                     filesReadThisTurn,
+                    searchCountThisTurn,
+                    postSearchReadBlocked,
+                    zeroMatchToolBlocked,
                     cancellationToken);
             }
             catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
@@ -968,9 +1033,27 @@ public class ConversationStreamController : ControllerBase
         StageType? stageType,
         HashSet<string> filesReadThisRequest,
         HashSet<string> filesReadThisTurn,
+        StrongBox<int> searchCountThisTurn,
+        StrongBox<bool> postSearchReadBlocked,
+        StrongBox<bool> zeroMatchToolBlocked,
         CancellationToken cancellationToken)
     {
+        const int maxSearchesPerTurn = 5;
         var root = toolCall.Input.RootElement;
+
+        _logger.LogInformation(
+            "Tool guard check: zeroMatchToolBlocked={ZeroMatchToolBlocked}, tool={ToolName}",
+            zeroMatchToolBlocked.Value,
+            toolCall.ToolName);
+
+        // Zero-match hard block: after a DOM zero-match result, block apply_to_scope calls.
+        // Other tools are allowed to pass through.
+        if (zeroMatchToolBlocked.Value && toolCall.ToolName == PipelineToolDefinitions.ApplyToScope)
+        {
+            return "HARD STOP ALREADY TRIGGERED: DOM search returned zero matches. " +
+                   "Do not call more tools in this turn. Ask the user for the exact CSS class " +
+                   "name or pasted HTML from browser inspector, then retry from that input.";
+        }
 
         switch (toolCall.ToolName)
         {
@@ -1048,7 +1131,8 @@ public class ConversationStreamController : ControllerBase
                     contentType,
                     System.Text.Encoding.UTF8.GetByteCount(content),
                     createdBy,
-                    _timeProvider);
+                    _timeProvider,
+                    true);
 
                 // Save new version first, then delete old ones
                 await _artefactRepository.AddAsync(artefact, cancellationToken);
@@ -1068,6 +1152,12 @@ public class ConversationStreamController : ControllerBase
                 _logger.LogInformation(
                     "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
                     filePath, nextVersion, content.Length, contentType);
+
+                searchCountThisTurn.Value = 0; // Reset after successful mutation
+                // Clear post-search read block after successful save (a form of mutation)
+                postSearchReadBlocked.Value = false;
+                zeroMatchToolBlocked.Value = false;
+
                 return $"Saved {filePath} (version {nextVersion}, {content.Length} chars, {contentType})";
             }
 
@@ -1228,6 +1318,24 @@ public class ConversationStreamController : ControllerBase
             {
                 var filePath = root.GetProperty("file_path").GetString()!;
 
+                // Post-search read block: after DOM search found matches, prevent re-reading fragments
+                // and REQ files until a mutation succeeds. This stops the agent from burning budget
+                // on reads it shouldn't be making.
+                if (postSearchReadBlocked.Value)
+                {
+                    var isFragmentOrReq = filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase) ||
+                                         filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase);
+                    if (isFragmentOrReq)
+                    {
+                        _logger.LogWarning(
+                            "Tool get_artefact blocked: post-search read attempted after DOM search found matches — {FilePath}",
+                            filePath);
+                        return "BLOCKED: You have a search result with matches. Call apply_to_scope immediately to write the mutation. " +
+                               "Do not read more files until the mutation completes. Proceeding otherwise burns your read budget. " +
+                               "Use the selector from your search result and call apply_to_scope now.";
+                    }
+                }
+
                 // Block direct reads of the assembled prototype — it is the output, not a fragment to edit.
                 // The LLM should only read/edit fragment files (prototype/fragments/*).
                 if (stageType == StageType.Prototype &&
@@ -1237,6 +1345,24 @@ public class ConversationStreamController : ControllerBase
                     return "Error: prototype/index.html is the assembled output and cannot be read directly. " +
                            "To edit the prototype, read and modify the fragment files under prototype/fragments/ instead. " +
                            "Use list_artefacts to see all fragments.";
+                }
+
+                // Structural guard: once the prototype is built, requirements/* are unreadable
+                // during a Prototype edit. _shell.html mirrors the migration step's own build
+                // detection — an edit works on the fragments, never the requirements.
+                if (stageType == StageType.Prototype &&
+                    filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase))
+                {
+                    var shellFragment = await _artefactRepository.GetByProjectAndFilePathAsync(
+                        projectId, "prototype/fragments/_shell.html", cancellationToken);
+                    var readGuardError = PrototypeReadGuard.ValidateGetArtefact(
+                        stageType, filePath, prototypeAlreadyBuilt: shellFragment is not null);
+                    if (readGuardError is not null)
+                    {
+                        _logger.LogWarning(
+                            "Tool get_artefact blocked: requirements read during built-prototype edit — {FilePath}", filePath);
+                        return readGuardError;
+                    }
                 }
 
                 var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, filePath, cancellationToken);
@@ -1254,42 +1380,22 @@ public class ConversationStreamController : ControllerBase
                     return $"Artefact '{filePath}' content could not be retrieved.";
                 }
 
-                // For large files, return a structural outline instead of raw content.
-                // This orients the LLM in one call (CSS selectors, HTML section headers)
-                // rather than forcing 20+ individual search_in_artefact probes.
+                // Build the result. Large non-prototype HTML/CSS files return a structural
+                // outline; prototype HTML fragments are always returned in full (the outline is
+                // a CSS digest that misreads markup-heavy fragments as near-empty stubs, and a
+                // faithful full rewrite needs the complete current markup). Prototype fragments
+                // are exempt from the read budget, so a repeated full read within one request is
+                // replaced by a pointer back to the agent's existing context.
                 const int largeFileThreshold = 50_000;
-                const int regenerateThreshold = 50_000;
-                if (artefactContent.Length > largeFileThreshold)
-                {
-                    _logger.LogWarning(
-                        "Tool get_artefact: large file {FilePath} ({Length} chars) — returning structural outline",
-                        filePath, artefactContent.Length);
-
-                    if (artefactContent.Length > regenerateThreshold && filePath.StartsWith("prototype/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // File is too large for targeted edit_artefact — exact old_str matching is not feasible.
-                        // Instruct the LLM to do a full regeneration via save_artefact (which is permitted for large files).
-                        filesReadThisRequest.Add(filePath);
-                        return $"## {filePath} (v{artefact.Version}) — TOO LARGE TO EDIT\n\n" +
-                               $"File is {artefactContent.Length:N0} chars — too large for targeted edit_artefact (requires exact anchor strings).\n\n" +
-                               $"**Action required**: Use save_artefact to produce a complete replacement. " +
-                               $"Full regeneration is explicitly permitted for prototype/index.html files above 100KB. " +
-                               $"Do NOT attempt further search_in_artefact calls — regenerate the full file directly.";
-                    }
-
-                    var outline = BuildFileOutline(artefactContent, filePath);
-                    filesReadThisRequest.Add(filePath);
-                    return $"## {filePath} (v{artefact.Version}) — STRUCTURAL OUTLINE\n\n" +
-                           $"File is {artefactContent.Length:N0} chars (too large to return in full). " +
-                           $"Use search_in_artefact to retrieve specific sections, or edit_artefact directly using selectors from this outline.\n\n" +
-                           outline;
-                }
+                var alreadyReadThisRequest = filesReadThisRequest.Contains(filePath);
+                var getArtefactResult = BuildGetArtefactResult(
+                    filePath, artefactContent, artefact.Version, alreadyReadThisRequest, largeFileThreshold);
+                filesReadThisRequest.Add(filePath);
 
                 _logger.LogInformation(
-                    "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars)",
-                    filePath, artefact.Version, artefactContent.Length);
-                filesReadThisRequest.Add(filePath);
-                return $"## {filePath} (v{artefact.Version})\n\n{artefactContent}";
+                    "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars, alreadyRead={AlreadyRead})",
+                    filePath, artefact.Version, artefactContent.Length, alreadyReadThisRequest);
+                return getArtefactResult;
             }
 
             case PipelineToolDefinitions.AdvanceRequirement:
@@ -1372,6 +1478,71 @@ public class ConversationStreamController : ControllerBase
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var query = root.GetProperty("query").GetString()!;
 
+                // Plan 3f: serve searches of HTML prototype artefacts from the structured DOM
+                // search, which returns elements with their real ClassList — so the agent receives
+                // an authoritative selector instead of mining class names out of raw HTML lines
+                // (where a neighbouring element's class can be lifted and mangled). Non-HTML
+                // fragments (_styles.css, _app.js, data.js) keep the text search.
+                if (PrototypeSearchRouter.ShouldRouteToDomSearch(filePath, _tokenOptimisationOptions.PrototypeDomModeEnabled)
+                    && _prototypeDomSearchService is not null)
+                {
+                    var domResult = await _prototypeDomSearchService.SearchAsync(
+                        new PrototypeDomSearchRequest(projectId, filePath, query, createdBy),
+                        cancellationToken);
+
+                    _logger.LogInformation(
+                        "Tool search_in_artefact: DOM search across fragments for '{Query}' — {Count} matches",
+                        query, domResult.Matches.Count);
+
+                    if (domResult.Matches.Count == 0)
+                    {
+                        zeroMatchToolBlocked.Value = true;
+                        return $"No elements found matching '{query}' in prototype fragments. " +
+                               "STOP — do not guess a selector or retry with variations. Tell the user you " +
+                               "could not find a matching element, and ask them to provide the exact CSS class " +
+                               "name (e.g. \".urgency-arrow\") or paste the HTML element from the browser " +
+                               "inspector (right-click element → Inspect → copy the element) so you can " +
+                               "identify the exact selector.";
+                    }
+
+                    // Post-search read block: set flag after successful search with matches
+                    // This prevents re-reads and REQ reads until a mutation completes
+                    postSearchReadBlocked.Value = true;
+
+                    if (domResult.Matches.Count == 1)
+                    {
+                        var match = domResult.Matches[0];
+                        var scope = System.IO.Path.GetFileNameWithoutExtension(match.FragmentPath);
+                        var selector = match.ClassList.Count > 0
+                            ? $".{match.ClassList[0]}"
+                            : (match.CssSelector ?? $"#{match.NodeKey.Split('|').Last()}");
+                        return $"Found 1 match for '{query}':\n" +
+                               $"  node_id: {match.NodeKey}\n" +
+                               $"  tag: {match.TagName} | text: {match.TextSnippet} | fragment: {match.FragmentPath}\n\n" +
+                               $"Ready to apply. Use this exact call:\n" +
+                               $"  apply_to_scope(scope=\"{scope}\", selector=\"{selector}\", ...)\n\n" +
+                               "Replace ... with operation, attribute, strategy as needed.";
+                    }
+
+                    var candidateMatches = domResult.Matches;
+                    var singleFragment = candidateMatches
+                        .Select(match => match.FragmentPath)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Count() == 1;
+                    var confirmedSelector = singleFragment
+                        ? _prototypeDomSearchService.ResolveConfirmedSelectorFromMatches(candidateMatches)
+                        : null;
+                    return BuildDomSearchMultiMatchResult(query, candidateMatches, confirmedSelector);
+                }
+
+                // Enforce non-DOM search limit — after 5 non-DOM searches without a mutation,
+                // return a hard stop to force the agent to act rather than keep searching.
+                searchCountThisTurn.Value++;
+                if (searchCountThisTurn.Value > maxSearchesPerTurn)
+                    return $"HARD STOP: You have called search_in_artefact {searchCountThisTurn.Value} non-DOM times in this turn without making an edit. " +
+                           "Stop searching. You already have the anchor text you need. " +
+                           "Call edit_artefact or save_artefact now. Do not search again.";
+
                 var artefact = await _artefactRepository.GetByProjectAndFilePathAsync(projectId, filePath, cancellationToken);
                 if (artefact is null)
                     return $"Artefact '{filePath}' not found. Use list_artefacts to see available files.";
@@ -1386,6 +1557,10 @@ public class ConversationStreamController : ControllerBase
                 _logger.LogInformation(
                     "Tool search_in_artefact: searched {FilePath} v{Version} for '{Query}' ({Length} chars file)",
                     filePath, artefact.Version, query, content.Length);
+
+                _logger.LogInformation(
+                    "Tool search_in_artefact: result preview = {Preview}",
+                    searchResult.Length > 300 ? searchResult[..300] : searchResult);
 
                 // Unblock edit_artefact for this file — the result contains real verbatim snippets
                 filesReadThisRequest.Add(filePath);
@@ -1506,7 +1681,8 @@ public class ConversationStreamController : ControllerBase
                     contentType,
                     System.Text.Encoding.UTF8.GetByteCount(updatedContent),
                     createdBy,
-                    _timeProvider);
+                    _timeProvider,
+                    true);
 
                 await _artefactRepository.AddAsync(editedArtefact, cancellationToken);
                 await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
@@ -1526,7 +1702,212 @@ public class ConversationStreamController : ControllerBase
                     await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
                 }
 
+                searchCountThisTurn.Value = 0; // Reset after successful mutation
+
                 return $"Edited {filePath} (version {nextVersion}, {bytesChanged} bytes changed, total {System.Text.Encoding.UTF8.GetByteCount(updatedContent)} bytes)";
+            }
+
+
+            case PipelineToolDefinitions.ApplyToScope:
+            {
+                if (!_tokenOptimisationOptions.PrototypeDomModeEnabled || _prototypeDomSearchService is null || _prototypeDomMutationService is null)
+                    return "Error: apply_to_scope is only available when PrototypeDomModeEnabled is enabled.";
+
+                var scope = root.TryGetProperty("scope", out var scopeProp) ? scopeProp.GetString() : null;
+                var selector = root.TryGetProperty("selector", out var selectorProp) ? selectorProp.GetString() : null;
+                var operation = root.TryGetProperty("operation", out var operationProp) ? operationProp.GetString() : null;
+                var strategy = root.TryGetProperty("strategy", out var strategyProp) ? strategyProp.GetString() : null;
+                var value = root.TryGetProperty("value", out var valueProp) ? valueProp.GetString() : null;
+                var attribute = root.TryGetProperty("attribute", out var attrProp) ? attrProp.GetString() : null;
+
+                if (string.IsNullOrWhiteSpace(scope) || string.IsNullOrWhiteSpace(selector) ||
+                    string.IsNullOrWhiteSpace(operation) || string.IsNullOrWhiteSpace(strategy))
+                    return "Error: apply_to_scope requires scope, selector, operation, and strategy.";
+
+                // Scope is a fragment filename. Resolve it directly against the loaded fragment
+                // set (filename match) — never a content search, which after Phase 4 returns no
+                // node for a filename and silently degraded the listing to every fragment.
+                var listResult = await _prototypeDomSearchService.ListAllAsync(
+                    new PrototypeDomListRequest(projectId, selector, scope, createdBy),
+                    cancellationToken);
+
+                if (listResult.Matches.Count == 0)
+                {
+                    _logger.LogWarning("apply_to_scope: no elements matched selector='{Selector}' scope='{Scope}'", selector, scope);
+
+                    // Plan 3f enforcement: refuse to write. Return the elements ACTUALLY present in the
+                    // scope so the correct selector is discoverable. A wrong selector can never be
+                    // silently written, and the agent cannot narrate false success.
+                    var actualElements = await _prototypeDomSearchService.ListAllInScopeAsync(
+                        projectId, scope, cancellationToken);
+
+                    if (actualElements.Matches.Count == 0)
+                        return $"apply_to_scope: no elements matched selector='{selector}' and scope='{scope}' contains no editable elements. " +
+                               "Verify the scope is a real fragment name (filename without extension). Ask the user to paste the HTML element from the browser inspector.";
+
+                    // If the scope's elements collapse to one shared class, name it as the confirmed
+                    // selector — the agent must retry with exactly this, never its own guess.
+                    // Heuristic note: the single shared class may also appear on sibling or nested
+                    // elements when nodes carry multiple classes. This is acceptable for LLM guidance,
+                    // but not a guarantee of one-to-one targeting.
+                    var confirmedSelector = _prototypeDomSearchService.ResolveConfirmedSelectorFromMatches(
+                        actualElements.Matches);
+                    if (confirmedSelector is not null)
+                    {
+                        return $"NOTHING WAS WRITTEN. selector='{selector}' matched 0 elements in scope='{scope}'. " +
+                               $"The confirmed selector for this scope is '{confirmedSelector}'. " +
+                               $"Retry apply_to_scope now with selector='{confirmedSelector}' and the same operation/attribute/strategy. " +
+                               "Do not respond to the user until a write succeeds.";
+                    }
+
+                    var present = actualElements.Matches.Take(10).Select(match =>
+                    {
+                        var cls = match.ClassList.Count > 0 ? "." + string.Join(".", match.ClassList) : "(no class)";
+                        return $"  {match.TagName} {cls} — \"{match.TextSnippet}\"";
+                    });
+                    return $"NOTHING WAS WRITTEN. selector='{selector}' matched 0 elements in scope='{scope}'. " +
+                           $"Do NOT claim success. The elements actually present in this scope are:\n" +
+                           string.Join("\n", present) + "\n\n" +
+                           "Use a selector taken from the list above (do not invent one), or ask the user to paste the exact HTML element.";
+                }
+
+                // Structural guard (Phase 2): invented classes are physically unwritable and
+                // CSS authoring is rejected. Class existence is a set-membership test, so the full
+                // uncapped class set for the scope is used (not the capped element listing).
+                var existingScopeClasses = await _prototypeDomSearchService.GetClassNamesInScopeAsync(
+                    projectId, scope, cancellationToken);
+                var guardError = PrototypeApplyToScopeGuard.Validate(
+                    scope, selector, operation, value, existingScopeClasses);
+                if (guardError is not null)
+                {
+                    _logger.LogWarning("apply_to_scope guard rejected: {GuardError}", guardError);
+                    return guardError;
+                }
+
+                // Reject invalid strategy/operation combinations
+                if (operation.Equals("insert_adjacent_html", StringComparison.OrdinalIgnoreCase) &&
+                    strategy.Equals("generate_from_context", StringComparison.OrdinalIgnoreCase))
+                {
+                    const string insertAdjacentHtmlError = "Error: insert_adjacent_html requires strategy=literal. generate_from_context generates text values and cannot produce HTML to insert. Provide the HTML to insert as the value parameter and use strategy=literal.";
+                    return insertAdjacentHtmlError;
+                }
+
+                // Derive values using the selected strategy
+                IReadOnlyList<ApplyToScopeValueResult> valueResults;
+                switch (strategy)
+                {
+                    case "literal":
+                        if (string.IsNullOrWhiteSpace(value))
+                            return "Error: apply_to_scope with strategy=literal requires a value parameter.";
+                        valueResults = await new LiteralStrategy().DeriveValuesAsync(listResult.Matches, value, cancellationToken);
+                        break;
+                    case "derive_from_text_content":
+                        valueResults = await new DeriveFromTextContentStrategy().DeriveValuesAsync(listResult.Matches, null, cancellationToken);
+                        break;
+                    case "generate_from_context":
+                        valueResults = await new GenerateFromContextStrategy(_aiService).DeriveValuesAsync(listResult.Matches, null, cancellationToken);
+                        break;
+                    default:
+                        return $"Error: apply_to_scope strategy='{strategy}' is not valid. Use literal, derive_from_text_content, or generate_from_context.";
+                }
+
+                // Parse operation
+                if (!Enum.TryParse<PrototypeDomMutationOperation>(
+                    string.Concat(operation.Split('_').Select(word => char.ToUpperInvariant(word[0]) + word[1..])),
+                    out var mutationOperation))
+                {
+                    return $"Error: apply_to_scope operation='{operation}' is not valid.";
+                }
+
+                // Apply mutations
+                var requests = valueResults.Select(valueResult => new PrototypeDomMutationRequest(
+                    ProjectId: projectId,
+                    FragmentPath: valueResult.FragmentPath,
+                    NodeKey: valueResult.NodeKey,
+                    Operation: mutationOperation,
+                    Attribute: attribute,
+                    Value: valueResult.Value,
+                    CreatedBy: createdBy)).ToList();
+
+                var batchResult = await _prototypeDomMutationService.ApplyBatchMutationAsync(requests, cancellationToken);
+
+                _logger.LogInformation(
+                    "apply_to_scope: scope='{Scope}' selector='{Selector}' operation='{Operation}' strategy='{Strategy}' — applied {Success}/{Total}",
+                    scope, selector, operation, strategy, batchResult.SuccessfulMutations, batchResult.TotalMutations);
+
+                // Trigger assembly after successful DOM mutations so index.html stays current.
+                // Regression fix: apply_to_scope was completing mutations without reassembling.
+                if (batchResult.SuccessfulMutations > 0 && _tokenOptimisationOptions.PrototypeFragmentsEnabled)
+                {
+                    await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
+                }
+
+                if (batchResult.SuccessfulMutations == batchResult.TotalMutations)
+                {
+                    searchCountThisTurn.Value = 0; // Reset after successful mutation
+                    postSearchReadBlocked.Value = false; // Clear post-search read block after mutation completes
+                    zeroMatchToolBlocked.Value = false;
+                    return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
+                }
+
+                // Log failures for debugging
+                foreach (var failedResult in batchResult.Results.Where(result => !result.Success))
+                    _logger.LogWarning("apply_to_scope failure: node={NodeKey} message={Message}", failedResult.NodeKey, failedResult.Message);
+
+                var failures = batchResult.Results
+                    .Where(result => !result.Success)
+                    .Select(result => $"{result.NodeKey}: {result.Message}")
+                    .Take(5)
+                    .ToList();
+                return $"PARTIAL FAILURE: applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations}. Failures: {string.Join("; ", failures)}. " +
+                    "Consider using save_artefact to fully rebuild this fragment instead of surgical edits.";
+            }
+
+            case PipelineToolDefinitions.ProposeRequirementChange:
+            {
+                var reqId = root.GetProperty("req_id").GetString()!;
+                var changeTypeStr = root.GetProperty("change_type").GetString()!;
+                var rationale = root.GetProperty("rationale").GetString()!;
+                var proposedAcText = root.TryGetProperty("proposed_ac_text", out var acProp)
+                    ? acProp.GetString() : null;
+
+                var changeType = changeTypeStr.ToLowerInvariant() switch
+                {
+                    "gap" => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Gap,
+                    "clarification" => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Clarification,
+                    "contradiction" => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Contradiction,
+                    _ => Domain.AggregatesModel.RequirementChangeAggregate.ChangeType.Gap
+                };
+
+                var raisingPipeline = stageType.HasValue
+                    ? $"pipeline_{(int)stageType.Value + 1:D2}_{GetStageTypePgName(stageType.Value)}"
+                    : "pipeline_unknown";
+
+                var csImpact = root.TryGetProperty("clinical_safety_impact", out var csProp)
+                    ? ParseImpactLevel(csProp.GetString()) : Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None;
+                var igImpact = root.TryGetProperty("ig_impact", out var igProp)
+                    ? ParseImpactLevel(igProp.GetString()) : Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None;
+                var secImpact = root.TryGetProperty("security_impact", out var secProp)
+                    ? ParseImpactLevel(secProp.GetString()) : Domain.AggregatesModel.RequirementChangeAggregate.ImpactLevel.None;
+
+                var command = new ProposeRequirementChangeCommand(
+                    ProjectId: projectId,
+                    ReqId: reqId,
+                    ChangeType: changeType,
+                    RaisingPipeline: raisingPipeline,
+                    RaisingPipelineConversationId: conversation.Id,
+                    ProposedAcText: proposedAcText,
+                    Rationale: rationale,
+                    CreatedBy: createdBy,
+                    ClinicalSafetyImpact: csImpact,
+                    IgImpact: igImpact,
+                    SecurityImpact: secImpact);
+
+                var result = await _proposeRequirementChangeHandler.Handle(command, cancellationToken);
+
+                return $"CHANGE_PROPOSED: change_id={result.ChangeId}\n" +
+                       "Your proposed change is pending human approval in the UI.\n" +
+                       "Do not apply this change yourself. Continue your current pipeline work.";
             }
 
             default:
@@ -1833,6 +2214,78 @@ public class ConversationStreamController : ControllerBase
         return text.ToNfc();
     }
 
+    /// <summary>
+    /// Builds the get_artefact tool result. Large non-prototype HTML/CSS files return a
+    /// compact structural outline; prototype HTML fragments are always returned in full —
+    /// the outline is a CSS digest that misreads markup-heavy fragments as near-empty stubs,
+    /// and a faithful full rewrite needs the complete current markup. Because prototype
+    /// fragments are exempt from the read budget, a repeated full read of the same fragment
+    /// within one request is replaced by a pointer back to the agent's existing context to
+    /// avoid re-dumping tens of thousands of tokens across the tool loop.
+    /// </summary>
+    internal static string BuildGetArtefactResult(
+        string filePath,
+        string artefactContent,
+        int version,
+        bool alreadyReadThisRequest,
+        int largeFileThreshold)
+    {
+        var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+        var isPrototypeHtmlFragment =
+            filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase)
+            && extension is ".html" or ".htm";
+
+        if (isPrototypeHtmlFragment && alreadyReadThisRequest)
+        {
+            return $"## {filePath} (v{version}) — ALREADY READ\n\n" +
+                   "You have already read this fragment in full earlier in this turn. " +
+                   "Its full content is in your context above. Do not read it again — " +
+                   "make your edit or save the rewritten fragment now.";
+        }
+
+        if (artefactContent.Length > largeFileThreshold && !isPrototypeHtmlFragment)
+        {
+            var outline = BuildFileOutline(artefactContent, filePath);
+            return $"## {filePath} (v{version}) — STRUCTURAL OUTLINE\n\n" +
+                   $"File is {artefactContent.Length:N0} chars (too large to return in full). " +
+                   $"Use search_in_artefact to retrieve specific sections, or edit_artefact directly using selectors from this outline.\n\n" +
+                   outline;
+        }
+
+        return $"## {filePath} (v{version})\n\n{artefactContent}";
+    }
+
+    /// <summary>
+    /// Builds the search_in_artefact result for the multi-match case. When every match is in
+    /// one fragment and the matches collapse to a single confirmed selector, this returns a
+    /// ready-to-run apply_to_scope call so the agent acts immediately. The "ask the user / paste
+    /// the HTML" instruction is emitted only when matches span multiple fragments OR no confirmed
+    /// selector can be derived — never when scope and selector are determinable from the matches.
+    /// </summary>
+    internal static string BuildDomSearchMultiMatchResult(
+        string query,
+        IReadOnlyList<PrototypeDomSearchMatch> matches,
+        string? confirmedSelector)
+    {
+        var candidateLines = matches.Take(5).Select((match, index) =>
+            $"  [{index + 1}] node_id: {match.NodeKey} | tag: {match.TagName} | text: {match.TextSnippet}");
+        var header = $"Found {matches.Count} multiple/ambiguous matches for '{query}':\n" +
+                     string.Join("\n", candidateLines) + "\n\n";
+
+        if (confirmedSelector is not null)
+        {
+            var scope = System.IO.Path.GetFileNameWithoutExtension(matches[0].FragmentPath);
+            return header +
+                   $"All {matches.Count} matches are in fragment \"{scope}\" and share one selector. " +
+                   "Ready to apply. Use this exact call:\n" +
+                   $"  apply_to_scope(scope=\"{scope}\", selector=\"{confirmedSelector}\", ...)\n\n" +
+                   "Replace ... with operation, attribute, strategy as needed.";
+        }
+
+        return header +
+               "Ask the user which element they mean, or ask them to paste the HTML element " +
+               "from the browser inspector so you can identify the exact selector.";
+    }
     internal static int CountOccurrences(string source, string target)
     {
         if (string.IsNullOrEmpty(target))
@@ -1887,20 +2340,63 @@ public class ConversationStreamController : ControllerBase
             return "Error: query must not be empty.";
 
         var lines = fileContent.Split('\n');
-        var matchedIndices = new List<int>();
 
+        // Primary match: the query appears as an exact contiguous substring on a single line.
+        var exactIndices = new List<int>();
         for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
             if (lines[lineIndex].Contains(query, StringComparison.OrdinalIgnoreCase))
-                matchedIndices.Add(lineIndex);
+                exactIndices.Add(lineIndex);
         }
 
-        if (matchedIndices.Count == 0)
-            return $"SEARCH_NOT_FOUND: No lines in '{filePath}' contain '{query}'. Try a different keyword.";
+        var fuzzy = false;
+        List<int> matchedIndices;
+
+        if (exactIndices.Count > 0)
+        {
+            matchedIndices = exactIndices;
+        }
+        else
+        {
+            // Fallback: rank lines by how many distinct query words they contain. This rescues
+            // natural-language queries (e.g. "thumbs up feedback") that never appear verbatim
+            // on a line but whose words do — making the search far less brittle on prototypes.
+            var queryWords = ExtractSearchTokens(query);
+            if (queryWords.Length == 0)
+                return $"SEARCH_NOT_FOUND: No lines in '{filePath}' contain '{query}'. Try a different keyword.";
+
+            var scored = new List<(int LineIndex, int Score)>();
+            for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+            {
+                var line = lines[lineIndex];
+                var score = queryWords.Count(word => line.Contains(word, StringComparison.OrdinalIgnoreCase));
+                if (score > 0)
+                    scored.Add((lineIndex, score));
+            }
+
+            if (scored.Count == 0)
+                return $"SEARCH_NOT_FOUND: No lines in '{filePath}' contain '{query}' or any of its words " +
+                       $"({string.Join(", ", queryWords)}). Try a different keyword.";
+
+            // Keep the strongest matches (highest word overlap, earliest on ties), then present
+            // them in file order so the overlapping-region merge below behaves correctly.
+            matchedIndices = scored
+                .OrderByDescending(entry => entry.Score)
+                .ThenBy(entry => entry.LineIndex)
+                .Take(maxRegions)
+                .Select(entry => entry.LineIndex)
+                .OrderBy(lineIndex => lineIndex)
+                .ToList();
+            fuzzy = true;
+        }
+
+        var matchDescriptor = fuzzy
+            ? $"{matchedIndices.Count} fuzzy match(es) — no exact phrase found, showing closest lines by word overlap"
+            : $"{matchedIndices.Count} match(es)";
 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine(System.Globalization.CultureInfo.InvariantCulture,
-            $"## search_in_artefact: '{query}' in {filePath} v{version} ({matchedIndices.Count} match(es))\n");
+            $"## search_in_artefact: '{query}' in {filePath} v{version} ({matchDescriptor})\n");
         sb.AppendLine("Copy a unique verbatim substring from below as old_str for edit_artefact.\n");
 
         var regionsShown = 0;
@@ -1939,6 +2435,23 @@ public class ConversationStreamController : ControllerBase
             result = string.Concat(result.AsSpan(0, maxResultChars), "\n...(truncated — use a more specific query)");
 
         return result;
+    }
+
+    /// <summary>
+    /// Splits a search query into distinct, meaningful tokens (≥3 characters, punctuation and
+    /// markup stripped) used for the fuzzy fallback in <see cref="BuildSearchResult"/>. Returns
+    /// at most 8 tokens, preserving first-seen order.
+    /// </summary>
+    internal static string[] ExtractSearchTokens(string query)
+    {
+        return query
+            .Split(
+                [' ', '\n', '\r', '\t', '<', '>', '"', '\'', '=', '{', '}', ';', ':', ',', '(', ')', '.', '/', '\\', '-', '_'],
+                StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => word.Length >= 3)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
     }
 
     /// <summary>
@@ -2089,7 +2602,8 @@ public class ConversationStreamController : ControllerBase
             contentType,
             Encoding.UTF8.GetByteCount(content),
             createdBy,
-            _timeProvider);
+            _timeProvider,
+            true);
 
         await _artefactRepository.AddAsync(artefact, cancellationToken);
         await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

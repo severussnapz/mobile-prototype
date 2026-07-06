@@ -109,6 +109,12 @@ dotnet_naming_rule.interface_should_be_begins_with_i.severity = warning
 dotnet_naming_rule.interface_should_be_begins_with_i.symbols = interface
 dotnet_naming_rule.interface_should_be_begins_with_i.style = begins_with_i
 
+# Constants are PascalCase (must precede the private_fields rule — Roslyn uses first-match-wins,
+# so const fields are classified here and exempt from the underscore-prefix rule below).
+dotnet_naming_rule.constants_should_be_pascal_case.severity = warning
+dotnet_naming_rule.constants_should_be_pascal_case.symbols = constants
+dotnet_naming_rule.constants_should_be_pascal_case.style = pascal_case
+
 dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.severity = warning
 dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.symbols = private_fields
 dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.style = camel_case_with_underscore
@@ -116,11 +122,17 @@ dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.style = c
 dotnet_naming_symbols.interface.applicable_kinds = interface
 dotnet_naming_symbols.interface.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
 
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers = const
+
 dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 
 dotnet_naming_style.begins_with_i.required_prefix = I
 dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
 
 dotnet_naming_style.camel_case_with_underscore.required_prefix = _
 dotnet_naming_style.camel_case_with_underscore.capitalization = camel_case

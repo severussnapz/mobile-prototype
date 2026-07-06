@@ -90,7 +90,7 @@ public class FoundationServiceTests
             contentType: "text/markdown",
             sizeBytes: 100,
             createdBy: "test",
-            timeProvider: Time);
+            timeProvider: Time, true);
 
         _artefactRepositoryMock
             .Setup(repo => repo.GetProjectArtefactManifestAsync(ProjectId, It.IsAny<CancellationToken>()))
@@ -112,8 +112,8 @@ public class FoundationServiceTests
     [Fact]
     public async Task BuildFoundationContentAsync_WhenMultipleFoundationArtefactsExist_SortsAlphabeticallyByFilePath()
     {
-        var artefactB = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-002.md", "key-b", "text/markdown", 50, "test", Time);
-        var artefactA = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-a", "text/markdown", 50, "test", Time);
+        var artefactB = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-002.md", "key-b", "text/markdown", 50, "test", Time, true);
+        var artefactA = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-a", "text/markdown", 50, "test", Time, true);
 
         _artefactRepositoryMock
             .Setup(repo => repo.GetProjectArtefactManifestAsync(ProjectId, It.IsAny<CancellationToken>()))
@@ -140,8 +140,8 @@ public class FoundationServiceTests
     [Fact]
     public async Task BuildFoundationContentAsync_WhenArtefactNotFoundInStorage_SkipsArtefactAndStillReturnsContent()
     {
-        var missingArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-missing", "text/markdown", 50, "test", Time);
-        var presentArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-002.md", "key-present", "text/markdown", 50, "test", Time);
+        var missingArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-missing", "text/markdown", 50, "test", Time, true);
+        var presentArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-002.md", "key-present", "text/markdown", 50, "test", Time, true);
 
         _artefactRepositoryMock
             .Setup(repo => repo.GetProjectArtefactManifestAsync(ProjectId, It.IsAny<CancellationToken>()))
@@ -166,7 +166,7 @@ public class FoundationServiceTests
     [Fact]
     public async Task BuildFoundationContentAsync_WhenAllArtefactsNotFoundInStorage_ReturnsFoundationHeaderOnly()
     {
-        var artefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-missing", "text/markdown", 50, "test", Time);
+        var artefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-missing", "text/markdown", 50, "test", Time, true);
 
         _artefactRepositoryMock
             .Setup(repo => repo.GetProjectArtefactManifestAsync(ProjectId, It.IsAny<CancellationToken>()))
@@ -191,8 +191,8 @@ public class FoundationServiceTests
     public async Task BuildFoundationContentAsync_WhenManifestContainsMixedArtefacts_IncludesOnlyFoundationArtefacts()
     {
         // Architecture stage: only "requirements/" prefix is in scope
-        var reqArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-req", "text/markdown", 50, "test", Time);
-        var archArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "architecture/ARCH-001.md", "key-arch", "text/markdown", 50, "test", Time);
+        var reqArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-req", "text/markdown", 50, "test", Time, true);
+        var archArtefact = Artefact.CreateS3Artefact(ProjectId, 1, "architecture/ARCH-001.md", "key-arch", "text/markdown", 50, "test", Time, true);
 
         _artefactRepositoryMock
             .Setup(repo => repo.GetProjectArtefactManifestAsync(ProjectId, It.IsAny<CancellationToken>()))
@@ -218,7 +218,7 @@ public class FoundationServiceTests
     [Fact]
     public async Task BuildFoundationContentAsync_WhenCancelled_ThrowsOperationCancelledException()
     {
-        var artefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-1", "text/markdown", 50, "test", Time);
+        var artefact = Artefact.CreateS3Artefact(ProjectId, 1, "requirements/REQ-001.md", "key-1", "text/markdown", 50, "test", Time, true);
 
         _artefactRepositoryMock
             .Setup(repo => repo.GetProjectArtefactManifestAsync(ProjectId, It.IsAny<CancellationToken>()))

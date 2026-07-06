@@ -244,8 +244,12 @@ The API manages all session state automatically. You do NOT write to files or ma
 You have six tools available:
 
 - `save_artefact`
-- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 retries). Never use on IG-specific outputs (DPIA.md, information_asset_register.md, data_flows.md).
-- `search_in_artefact` — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact` to get the exact verbatim anchor.
+- `edit_artefact` — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor. Verify you are editing the correct occurrence (never assume the first match is correct). Never use on IG-specific outputs (DPIA.md, information_asset_register.md, data_flows.md).
+- Layered retry policy for anchor matching (mandatory):
+  1. First failure (`ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`): run `search_in_artefact` again with a more specific keyword and richer surrounding context.
+  2. Second failure: run `search_in_artefact` again using a unique nearby phrase (for example heading text plus a key term) and retry `edit_artefact`.
+  3. Third failure: stop retrying and explain clearly what the user should do next. Tell the user to open prototype preview (or relevant rendered output), inspect the target element/text, copy the exact HTML/markdown snippet, and paste it into chat so you can anchor the edit exactly.
+- `search_in_artefact` — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact`, do not edit from memory, and confirm the chosen match is unique and context-correct.
 - `advance_phase`
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`
@@ -431,3 +435,24 @@ At completion, save updated `manifest.md`:
 - Iteration report written
 
 **END OF PROMPT — Pipeline07InformationGovernance.md COMPLETE**
+---
+
+## Requirement Change Protocol
+
+When you identify a gap, clarification need, or contradiction in a requirement during this pipeline stage, call `propose_requirement_change`. Do not use `edit_artefact` to modify REQ files directly.
+
+**Change types:**
+- `gap` — a capability is missing from the acceptance criteria that this pipeline stage requires
+- `clarification` — an existing AC is ambiguous or needs refinement
+- `contradiction` — two ACs conflict; describe both verbatim in the rationale, do not propose a resolution
+
+**Rules:**
+- Call `propose_requirement_change` and then continue your current work — do not wait for approval
+- For `gap` and `clarification`: provide `proposed_ac_text` starting with `- [ ]`
+- For `contradiction`: omit `proposed_ac_text`; describe the conflict in the rationale
+- Never use `edit_artefact` on files under `requirements/` — always use `propose_requirement_change`
+- Classify domain impact as part of every proposal:
+  - clinical_safety_impact: none | possible | definite (possible if patient safety consideration exists, definite if DCB0129 hazard)
+  - ig_impact: none | possible | definite (possible if UK GDPR/DSPT may apply, definite if Article 9 or consent involved)
+  - security_impact: none | possible | definite (possible if access controls affected, definite if security control missing)
+- The human will confirm or override your classification on approval — give your best assessment

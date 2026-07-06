@@ -49,7 +49,7 @@ public class ApproveEmReviewCommandHandlerTests
     private Artefact CreateArtefact(Guid projectId, string filePath, int version)
     {
         return Artefact.CreateS3Artefact(
-            projectId, version, filePath, $"s3-{filePath}", "application/json", 10, "user-1", _timeProvider);
+            projectId, version, filePath, $"s3-{filePath}", "application/json", 10, "user-1", _timeProvider, true);
     }
 
     [Fact]

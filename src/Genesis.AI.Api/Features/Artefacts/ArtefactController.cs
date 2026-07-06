@@ -19,7 +19,9 @@ public class ArtefactController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IArtefactStorageService _artefactStorageService;
 
-    public ArtefactController(IMediator mediator, IArtefactStorageService artefactStorageService)
+    public ArtefactController(
+        IMediator mediator,
+        IArtefactStorageService artefactStorageService)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
@@ -32,6 +34,7 @@ public class ArtefactController : ControllerBase
     [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
     public async Task<ActionResult<IReadOnlyList<ArtefactSummaryResponse>>> GetByProject(
         Guid projectId,
+        [Microsoft.AspNetCore.Mvc.FromQuery] string? prefix,
         CancellationToken cancellationToken)
     {
         var artefacts = await _mediator.Send(new GetArtefactsByStageQuery(projectId), cancellationToken);
@@ -47,6 +50,13 @@ public class ArtefactController : ControllerBase
             CreatedBy = artefact.CreatedBy,
             CreatedAt = artefact.CreatedAt
         });
+
+        if (!string.IsNullOrEmpty(prefix))
+        {
+            dtos = dtos
+                .Where(artefact => artefact.FilePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
 
         return Ok(dtos);
     }
@@ -147,4 +157,5 @@ public class ArtefactController : ControllerBase
 
         return Created(string.Empty, dtos);
     }
+
 }

@@ -26,13 +26,22 @@ public static class PipelineToolDefinitions
     public const string SetOrchestrationMode = "set_orchestration_mode";
     public const string AdvanceRequirement = "advance_requirement";
     public const string EditArtefact = "edit_artefact";
+    public const string EditArtefactByGraphNode = "edit_artefact_by_graph_node";
     public const string SearchInArtefact = "search_in_artefact";
+    public const string SetNodeAttribute = "set_node_attribute";
+    public const string SetNodeText = "set_node_text";
+    public const string AddNodeClass = "add_node_class";
+    public const string RemoveNodeClass = "remove_node_class";
+    public const string InsertAdjacentHtml = "insert_adjacent_html";
+    public const string RemoveElement = "remove_element";
+    public const string ApplyToScope = "apply_to_scope";
+    public const string ProposeRequirementChange = "propose_requirement_change";
 
     /// <summary>
     /// Returns the tool list conditioned on <paramref name="options"/> and <paramref name="stageType"/>.
-    /// Includes <c>edit_artefact</c> when <see cref="TokenOptimisationOptions.EditArtefactEnabled"/> is true.
-    /// Excludes <c>get_guardrail_details</c> when the stage already has skills injected via active skill injection
-    /// — Claude has everything it needs in the system prompt and should not burn tool turns fetching skills.
+    /// <c>edit_artefact</c> is registered for all non-Prototype stages when <see cref="TokenOptimisationOptions.EditArtefactEnabled"/> is true.
+    /// Prototype stage uses <c>apply_to_scope</c> for DOM edits when DOM mode is enabled.
+    /// Excludes <c>get_guardrail_details</c> when the stage already has skills injected via active skill injection.
     /// </summary>
     public static IReadOnlyList<AiToolDefinition> GetTools(TokenOptimisationOptions options, Domain.Enums.StageType? stageType = null)
     {
@@ -47,11 +56,29 @@ public static class PipelineToolDefinitions
             base_.RemoveAll(tool => tool.Name == GetGuardrailDetails);
         }
 
+        if (options.RequirementFeedbackEnabled)
+        {
+            base_.Add(FeedbackToolBuilder.BuildProposeRequirementChangeTool());
+        }
+
         if (!options.EditArtefactEnabled)
             return base_.AsReadOnly();
 
-        base_.Add(PipelineToolDefinitionFactory.BuildEditArtefactTool());
+        // Prototype stage uses scope-targeted editing via apply_to_scope.
+        if (stageType == Domain.Enums.StageType.Prototype)
+        {
+            if (options.PrototypeDomModeEnabled)
+            {
+                base_.Add(PipelineToolDefinitionFactory.BuildApplyToScopeTool());
+            }
+        }
+        else
+        {
+            base_.Add(PipelineToolDefinitionFactory.BuildEditArtefactTool());
+        }
+
         base_.Add(PipelineToolDefinitionFactory.BuildSearchInArtefactTool());
+
         return base_.AsReadOnly();
     }
 }

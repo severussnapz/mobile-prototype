@@ -5,6 +5,18 @@ public sealed class StreamMessageRequest
     public string Content { get; init; } = null!;
 
     /// <summary>
+    /// Optional browser-provided preview blob URL for diagnostics.
+    /// The API does not fetch this URL directly; it is browser-local.
+    /// </summary>
+    public string? PreviewBlobUrl { get; init; }
+
+    /// <summary>
+    /// Optional browser-provided preview HTML content.
+    /// Used as a fallback only when stored prototype/index.html appears stub-like.
+    /// </summary>
+    public string? PreviewHtml { get; init; }
+
+    /// <summary>
     /// When true, re-runs the AI on existing conversation history without adding a new user message.
     /// Used when the previous AI response failed mid-stream and the user wants to retry.
     /// </summary>
