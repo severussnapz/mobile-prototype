@@ -132,7 +132,7 @@ public sealed class KnowledgeSeederService : BackgroundService
                 var exists = await dbContext.KnowledgeDocument
                     .AnyAsync(k => k.Namespace == KnowledgeNamespace.GenesisTool
                         && k.SourcePath == sourcePath
-                        && k.Metadata["contentHash"] == hash, cancellationToken);
+                        && k.ChunkIndex == 0, cancellationToken);
 
                 if (exists)
                 {
