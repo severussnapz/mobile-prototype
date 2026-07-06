@@ -11,15 +11,80 @@ using Xunit;
 
 namespace Genesis.AI.IntegrationTests.Tests;
 
-public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
+/// <summary>
+/// Minimal IMediator stub for testing — no actual MediatR logic needed.
+/// </summary>
+#pragma warning disable CA1822
+internal sealed class NullMediator : MediatR.IMediator
+{
+    // IPublisher members
+    public Task Publish(MediatR.INotification notification, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task PublishAsync(MediatR.INotification notification, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task Publish(object notification, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    // IMediator.Send<TResponse> (IRequest<TResponse>)
+    public Task<TResponse> Send<TResponse>(MediatR.IRequest<TResponse> request, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    // IMediator.Send<TRequest, TResponse> (TRequest : IRequest<TResponse>)
+    public Task<TResponse> Send<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken = default)
+        where TRequest : MediatR.IRequest<TResponse>
+        => throw new NotImplementedException();
+
+    // ISender.Send<TRequest> (TRequest : IRequest)
+    public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
+        where TRequest : MediatR.IRequest
+        => throw new NotImplementedException();
+
+    // ISender.Send(object)
+    public Task<object?> Send(object request, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    // IMediator.Send(IBaseRequest) — legacy interface
+    public Task<object?> Send(MediatR.IBaseRequest request, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    // ISender.CreateStream<TResponse>
+    public IAsyncEnumerable<TResponse> CreateStream<TResponse>(MediatR.IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    // ISender.CreateStream(object)
+    public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    // ISender.Publish<TNotification>
+    public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
+        where TNotification : MediatR.INotification
+        => Task.CompletedTask;
+}
+#pragma warning restore CA1822
+
+/// <summary>
+/// Shared container lifecycle for all KnowledgeRepositoryIntegrationTests.
+/// Starts PostgreSQL once, shared across all 4 tests, torn down after all 4 complete.
+/// </summary>
+public class KnowledgeRepositoryFixture : IAsyncLifetime
 {
     private PostgreSqlContainer? _container;
     private GenesisAiDbContext? _context;
+    private string? _connectionString;
     private readonly CancellationToken _cancellationToken = CancellationToken.None;
     private bool _dockerAvailable = true;
 
+    public bool DockerAvailable => _dockerAvailable;
+    public GenesisAiDbContext? Context => _context;
+
     public async ValueTask InitializeAsync()
     {
+        // Disable Ryuk resource reaper — known incompatibility with Colima on macOS
+        // Ryuk tries to bind-mount Docker socket which fails on Colima
+        Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+        
         try
         {
             _container = new PostgreSqlBuilder()
@@ -32,6 +97,7 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
             await _container.StartAsync();
 
             var connectionString = _container.GetConnectionString();
+            _connectionString = connectionString;
 
             // Build NpgsqlDataSource with pgvector support
             var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
@@ -124,9 +190,47 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// Creates a fresh GenesisAiDbContext instance using the fixture's connection string.
+    /// Used for concurrent operations that cannot share a single DbContext.
+    /// </summary>
+    public GenesisAiDbContext CreateDbContext()
+    {
+        if (_connectionString == null)
+        {
+            throw new InvalidOperationException("Connection string not initialized. Container may not have started.");
+        }
+
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(_connectionString);
+        dataSourceBuilder.UseVector();
+        dataSourceBuilder.MapEnum<KnowledgeNamespace>("knowledge_namespace");
+        var dataSource = dataSourceBuilder.Build();
+
+        var options = new DbContextOptionsBuilder<GenesisAiDbContext>()
+            .UseNpgsql(dataSource, npgsqlOptions =>
+            {
+                npgsqlOptions.UseVector();
+                npgsqlOptions.MapEnum<KnowledgeNamespace>("knowledge_namespace");
+            })
+            .Options;
+
+        return new GenesisAiDbContext(options, new NullMediator());
+    }
+}
+
+public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeRepositoryFixture>
+{
+    private readonly KnowledgeRepositoryFixture _fixture;
+    private readonly CancellationToken _cancellationToken = CancellationToken.None;
+
+    public KnowledgeRepositoryIntegrationTests(KnowledgeRepositoryFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
 #pragma warning disable CA1859
     private IKnowledgeRepository CreateRepository() =>
-        new KnowledgeRepository(_context!);
+        new KnowledgeRepository(_fixture.Context!);
 #pragma warning restore CA1859
 
     /// <summary>
@@ -148,7 +252,7 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
     [Trait("Category", "RequiresDocker")]
     public async Task IndexAsync_DeletesExistingChunks_BeforeInsertingNew()
     {
-        if (!_dockerAvailable)
+        if (!_fixture.DockerAvailable)
         {
             Assert.Skip("Docker is not available on this machine.");
         }
@@ -175,7 +279,7 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
 
         await repo.IndexAsync(new[] { chunk1, chunk2 }, namespace_, projectId, sourcePath, _cancellationToken);
 
-        var countAfterFirstIndex = await _context!.KnowledgeDocuments
+        var countAfterFirstIndex = await _fixture.Context!.KnowledgeDocuments
             .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
         Assert.Equal(2, countAfterFirstIndex);
 
@@ -190,11 +294,11 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
         await repo.IndexAsync(new[] { newChunk }, namespace_, projectId, sourcePath, _cancellationToken);
 
         // Assert: Only 1 chunk exists for that sourcePath
-        var finalCount = await _context!.KnowledgeDocuments
+        var finalCount = await _fixture.Context!.KnowledgeDocuments
             .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
         Assert.Equal(1, finalCount);
 
-        var finalChunks = await _context!.KnowledgeDocuments
+        var finalChunks = await _fixture.Context!.KnowledgeDocuments
             .Where(k => k.SourcePath == sourcePath && k.ProjectId == projectId)
             .ToListAsync(_cancellationToken);
         Assert.Single(finalChunks);
@@ -205,75 +309,72 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
     [Trait("Category", "RequiresDocker")]
     public async Task IndexAsync_IsAtomic_WhenCalledTwiceConcurrently_NoOrphanedChunks()
     {
-        if (!_dockerAvailable || _context == null)
+        if (!_fixture.DockerAvailable || _fixture.Context == null)
         {
             Assert.Skip("Docker is not available on this machine.");
         }
         
-        try
-        {
-            // Setup: Two concurrent IndexAsync calls for the same sourcePath with different content
-            var repo = CreateRepository();
-            var projectId = Guid.NewGuid();
-            var sourcePath = "requirements/CONCURRENT.md";
-            var namespace_ = KnowledgeNamespace.ProjectArtefact;
+        // Setup: Two concurrent IndexAsync calls for the same sourcePath with different content
+        // Use separate DbContext instances to avoid "connection is already in a transaction" errors
+        await using var context1 = _fixture.CreateDbContext();
+        await using var context2 = _fixture.CreateDbContext();
+        var repo1 = new KnowledgeRepository(context1);
+        var repo2 = new KnowledgeRepository(context2);
 
-            var chunk1A = KnowledgeDocument.Create(
-                namespace_, projectId, sourcePath, 0,
-                "First call - chunk 1",
-                CreateEmbedding(1),
-                new Dictionary<string, string> { ["chunkIndex"] = "0" },
-                TimeProvider.System);
+        var projectId = Guid.NewGuid();
+        var sourcePath = "requirements/CONCURRENT.md";
+        var namespace_ = KnowledgeNamespace.ProjectArtefact;
 
-            var chunk1B = KnowledgeDocument.Create(
-                namespace_, projectId, sourcePath, 1,
-                "First call - chunk 2",
-                CreateEmbedding(2),
-                new Dictionary<string, string> { ["chunkIndex"] = "1" },
-                TimeProvider.System);
+        var chunk1A = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 0,
+            "First call - chunk 1",
+            CreateEmbedding(1),
+            new Dictionary<string, string> { ["chunkIndex"] = "0" },
+            TimeProvider.System);
 
-            var chunk2A = KnowledgeDocument.Create(
-                namespace_, projectId, sourcePath, 0,
-                "Second call - single chunk",
-                CreateEmbedding(3),
-                new Dictionary<string, string> { ["chunkIndex"] = "0" },
-                TimeProvider.System);
+        var chunk1B = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 1,
+            "First call - chunk 2",
+            CreateEmbedding(2),
+            new Dictionary<string, string> { ["chunkIndex"] = "1" },
+            TimeProvider.System);
 
-            // Action: Run both concurrently
-            var task1 = repo.IndexAsync(new[] { chunk1A, chunk1B }, namespace_, projectId, sourcePath, _cancellationToken);
-            var task2 = repo.IndexAsync(new[] { chunk2A }, namespace_, projectId, sourcePath, _cancellationToken);
+        var chunk2A = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 0,
+            "Second call - single chunk",
+            CreateEmbedding(3),
+            new Dictionary<string, string> { ["chunkIndex"] = "0" },
+            TimeProvider.System);
 
-            await Task.WhenAll(task1, task2);
+        // Action: Run both concurrently with separate DbContext instances
+        var task1 = repo1.IndexAsync(new[] { chunk1A, chunk1B }, namespace_, projectId, sourcePath, _cancellationToken);
+        var task2 = repo2.IndexAsync(new[] { chunk2A }, namespace_, projectId, sourcePath, _cancellationToken);
 
-            // Assert: Only one set of chunks exists (no duplicates, no orphans)
-            // The final count should be either 2 (first call won) or 1 (second call won), but never mixed/orphaned
-            var finalCount = await _context!.KnowledgeDocuments
-                .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
+        await Task.WhenAll(task1, task2);
 
-            Assert.True(finalCount == 1 || finalCount == 2,
-                $"Expected 1 or 2 chunks after concurrent calls, but got {finalCount}");
+        // Assert: Use a fresh context to verify the final state
+        await using var verificationContext = _fixture.CreateDbContext();
+        var finalCount = await verificationContext.KnowledgeDocuments
+            .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
 
-            // Verify no chunk_index collisions within the same source path
-            var chunks = await _context!.KnowledgeDocuments
-                .Where(k => k.SourcePath == sourcePath && k.ProjectId == projectId)
-                .OrderBy(k => k.ChunkIndex)
-                .ToListAsync(_cancellationToken);
+        Assert.True(finalCount == 1 || finalCount == 2,
+            $"Expected 1 or 2 chunks after concurrent calls, but got {finalCount}");
 
-            var chunkIndices = chunks.Select(c => c.ChunkIndex).ToList();
-            Assert.Equal(chunkIndices.Distinct().Count(), chunkIndices.Count);
-        }
-        catch (Exception ex) when (ex.InnerException?.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) == true ||
-                                   ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase))
-        {
-            Assert.Skip("Docker connection lost during test execution.");
-        }
+        // Verify no chunk_index collisions within the same source path
+        var chunks = await verificationContext.KnowledgeDocuments
+            .Where(k => k.SourcePath == sourcePath && k.ProjectId == projectId)
+            .OrderBy(k => k.ChunkIndex)
+            .ToListAsync(_cancellationToken);
+
+        var chunkIndices = chunks.Select(c => c.ChunkIndex).ToList();
+        Assert.Equal(chunkIndices.Distinct().Count(), chunkIndices.Count);
     }
 
     [Fact]
     [Trait("Category", "RequiresDocker")]
     public async Task QuerySimilarAsync_ReturnsChunksOrderedBySimilarityDescending()
     {
-        if (!_dockerAvailable)
+        if (!_fixture.DockerAvailable)
         {
             Assert.Skip("Docker is not available on this machine.");
         }
@@ -335,7 +436,7 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
     [Trait("Category", "RequiresDocker")]
     public async Task DeleteBySourcePathAsync_RemovesAllChunksForSourcePath()
     {
-        if (!_dockerAvailable)
+        if (!_fixture.DockerAvailable)
         {
             Assert.Skip("Docker is not available on this machine.");
         }
@@ -369,7 +470,7 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
         await repo.IndexAsync(new[] { req001Chunk1, req001Chunk2 }, namespace_, projectId, "requirements/REQ-001.md", _cancellationToken);
         await repo.IndexAsync(new[] { req002Chunk1 }, namespace_, projectId, "requirements/REQ-002.md", _cancellationToken);
 
-        var countBefore = await _context!.KnowledgeDocuments
+        var countBefore = await _fixture.Context!.KnowledgeDocuments
             .CountAsync(k => k.ProjectId == projectId, _cancellationToken);
         Assert.Equal(3, countBefore);
 
@@ -377,65 +478,12 @@ public class KnowledgeRepositoryIntegrationTests : IAsyncLifetime
         await repo.DeleteBySourcePathAsync(namespace_, projectId, "requirements/REQ-001.md", _cancellationToken);
 
         // Assert: REQ-001 chunks = 0, REQ-002 chunks = 1
-        var req001Count = await _context!.KnowledgeDocuments
+        var req001Count = await _fixture.Context!.KnowledgeDocuments
             .CountAsync(k => k.SourcePath == "requirements/REQ-001.md" && k.ProjectId == projectId, _cancellationToken);
-        var req002Count = await _context!.KnowledgeDocuments
+        var req002Count = await _fixture.Context!.KnowledgeDocuments
             .CountAsync(k => k.SourcePath == "requirements/REQ-002.md" && k.ProjectId == projectId, _cancellationToken);
 
         Assert.Equal(0, req001Count);
         Assert.Equal(1, req002Count);
     }
 }
-
-/// <summary>
-/// Minimal IMediator stub for testing — no actual MediatR logic needed.
-/// </summary>
-#pragma warning disable CA1822
-internal sealed class NullMediator : MediatR.IMediator
-{
-    // IPublisher members
-    public Task Publish(MediatR.INotification notification, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
-
-    public Task PublishAsync(MediatR.INotification notification, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
-
-    public Task Publish(object notification, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
-
-    // IMediator.Send<TResponse> (IRequest<TResponse>)
-    public Task<TResponse> Send<TResponse>(MediatR.IRequest<TResponse> request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
-
-    // IMediator.Send<TRequest, TResponse> (TRequest : IRequest<TResponse>)
-    public Task<TResponse> Send<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken = default)
-        where TRequest : MediatR.IRequest<TResponse>
-        => throw new NotImplementedException();
-
-    // ISender.Send<TRequest> (TRequest : IRequest)
-    public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-        where TRequest : MediatR.IRequest
-        => throw new NotImplementedException();
-
-    // ISender.Send(object)
-    public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
-
-    // IMediator.Send(IBaseRequest) — legacy interface
-    public Task<object?> Send(MediatR.IBaseRequest request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
-
-    // ISender.CreateStream<TResponse>
-    public IAsyncEnumerable<TResponse> CreateStream<TResponse>(MediatR.IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
-
-    // ISender.CreateStream(object)
-    public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-        => throw new NotImplementedException();
-
-    // ISender.Publish<TNotification>
-    public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-        where TNotification : MediatR.INotification
-        => Task.CompletedTask;
-}
-#pragma warning restore CA1822
