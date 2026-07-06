@@ -1,9 +1,6 @@
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
-using Genesis.AI.Infrastructure;
 using Genesis.AI.Infrastructure.Services;
-using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -11,21 +8,15 @@ namespace Genesis.AI.Tests.Infrastructure;
 
 public class BedrockKnowledgeServiceTests
 {
-    private static GenesisAiDbContext CreateInMemoryContext() =>
-        new(new DbContextOptionsBuilder<GenesisAiDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options,
-            Mock.Of<IMediator>());
-
     // -----------------------------------------------------------------------
-    // Unit tests — no Postgres required
+    // Unit tests — no repository or database required
     // -----------------------------------------------------------------------
 
     [Fact]
     public void QueryAsync_ClampsTopNToMaximumOfTwenty()
     {
         // ClampTopN is internal static — verifies the clamping contract directly.
-        // Full QueryAsync behaviour (HNSW ordering, score mapping) needs Postgres.
+        // Full QueryAsync behaviour (HNSW ordering, score mapping) needs integration tests.
         Assert.Equal(20, BedrockKnowledgeService.ClampTopN(100));
         Assert.Equal(20, BedrockKnowledgeService.ClampTopN(20));
         Assert.Equal(5, BedrockKnowledgeService.ClampTopN(5));
@@ -35,10 +26,13 @@ public class BedrockKnowledgeServiceTests
     [Fact]
     public async Task IndexDocumentAsync_WhenContentIsWhitespace_LogsWarningAndReturns()
     {
+        var repositoryMock = new Mock<IKnowledgeRepository>();
         var embeddingMock = new Mock<IEmbeddingService>();
-        await using var context = CreateInMemoryContext();
+        
         var sut = new BedrockKnowledgeService(
-            context, embeddingMock.Object, TimeProvider.System,
+            repositoryMock.Object,
+            embeddingMock.Object,
+            TimeProvider.System,
             NullLogger<BedrockKnowledgeService>.Instance);
 
         await sut.IndexDocumentAsync(
@@ -48,28 +42,41 @@ public class BedrockKnowledgeServiceTests
         embeddingMock.Verify(
             e => e.EmbedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        repositoryMock.Verify(
+            r => r.IndexAsync(It.IsAny<IReadOnlyList<Genesis.AI.Domain.AggregatesModel.KnowledgeAggregate.KnowledgeDocument>>(),
+                It.IsAny<KnowledgeNamespace>(), It.IsAny<Guid?>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task IndexDocumentAsync_WhenEmbeddingFails_PropagatesExceptionAndSkipsTransaction()
+    public async Task IndexDocumentAsync_WhenEmbeddingFails_PropagatesExceptionAndSkipsRepository()
     {
-        // Embedding runs BEFORE BeginTransactionAsync — a Bedrock failure never
-        // reaches the DB write path; no delete is committed.
+        // Embedding runs BEFORE calling repository — a Bedrock failure never
+        // reaches the repository call.
         var content = string.Join(" ", Enumerable.Repeat("word", 400));
+        var repositoryMock = new Mock<IKnowledgeRepository>();
         var embeddingMock = new Mock<IEmbeddingService>();
         embeddingMock
             .Setup(e => e.EmbedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Bedrock unavailable"));
 
-        await using var context = CreateInMemoryContext();
         var sut = new BedrockKnowledgeService(
-            context, embeddingMock.Object, TimeProvider.System,
+            repositoryMock.Object,
+            embeddingMock.Object,
+            TimeProvider.System,
             NullLogger<BedrockKnowledgeService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             sut.IndexDocumentAsync(
                 KnowledgeNamespace.GenesisTool, null, "test/path.md",
                 content, [], CancellationToken.None));
+
+        repositoryMock.Verify(
+            r => r.IndexAsync(It.IsAny<IReadOnlyList<Genesis.AI.Domain.AggregatesModel.KnowledgeAggregate.KnowledgeDocument>>(),
+                It.IsAny<KnowledgeNamespace>(), It.IsAny<Guid?>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -96,38 +103,5 @@ public class BedrockKnowledgeServiceTests
         Assert.True(chunks.Count >= 2, $"Expected >= 2 chunks but got {chunks.Count}");
         Assert.All(chunks, chunk => Assert.True(chunk.Length <= 6000,
             $"Chunk exceeds 6000 chars: length={chunk.Length}"));
-    }
-
-    // -----------------------------------------------------------------------
-    // Integration tests — require a real Postgres + pgvector instance.
-    // Implement with Testcontainers.PostgreSql (already in Directory.Packages.props).
-    // -----------------------------------------------------------------------
-
-    [Fact(Skip = "Requires Postgres — implement with Testcontainers.PostgreSql")]
-    public async Task IndexDocumentAsync_ChunksContent_AndEmbedsEachChunk()
-    {
-        // Verify chunk count and that EmbedAsync was called once per produced chunk.
-        await Task.CompletedTask;
-    }
-
-    [Fact(Skip = "Requires Postgres — implement with Testcontainers.PostgreSql")]
-    public async Task IndexDocumentAsync_DeletesExistingChunks_BeforeInsertingNew()
-    {
-        // Index, then re-index the same sourcePath — old chunks must be replaced atomically.
-        await Task.CompletedTask;
-    }
-
-    [Fact(Skip = "Requires Postgres — implement with Testcontainers.PostgreSql")]
-    public async Task QueryAsync_ReturnsChunksOrderedBySimilarity()
-    {
-        // Verify score = 1 - cosineDistance and results are ordered descending by similarity.
-        await Task.CompletedTask;
-    }
-
-    [Fact(Skip = "Requires Postgres — implement with Testcontainers.PostgreSql")]
-    public async Task DeleteBySourcePathAsync_RemovesAllChunksForSourcePath()
-    {
-        // Insert chunks, delete by source path, verify the table is empty for that path.
-        await Task.CompletedTask;
     }
 }

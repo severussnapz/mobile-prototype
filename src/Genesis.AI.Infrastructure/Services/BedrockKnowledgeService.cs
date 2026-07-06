@@ -3,10 +3,8 @@ using System.Text;
 using Genesis.AI.Domain.AggregatesModel.KnowledgeAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Pgvector;
-using Pgvector.EntityFrameworkCore;
 
 namespace Genesis.AI.Infrastructure.Services;
 
@@ -16,18 +14,18 @@ public sealed class BedrockKnowledgeService : IKnowledgeService
     private const int TargetWordCount = 400;
     private const int HardCapChars = 6000;
 
-    private readonly GenesisAiDbContext _dbContext;
+    private readonly IKnowledgeRepository _knowledgeRepository;
     private readonly IEmbeddingService _embeddingService;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<BedrockKnowledgeService> _logger;
 
     public BedrockKnowledgeService(
-        GenesisAiDbContext dbContext,
+        IKnowledgeRepository knowledgeRepository,
         IEmbeddingService embeddingService,
         TimeProvider timeProvider,
         ILogger<BedrockKnowledgeService> logger)
     {
-        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _knowledgeRepository = knowledgeRepository ?? throw new ArgumentNullException(nameof(knowledgeRepository));
         _embeddingService = embeddingService ?? throw new ArgumentNullException(nameof(embeddingService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -61,49 +59,31 @@ public sealed class BedrockKnowledgeService : IKnowledgeService
             return;
         }
 
-        // Embed all chunks BEFORE opening the transaction — never hold a write lock
+        // Embed all chunks BEFORE passing to repository — never hold a write lock
         // across Bedrock network calls.
-        var embeddedChunks = new List<(string Chunk, float[] Embedding)>(chunks.Count);
-        foreach (var chunk in chunks)
+        var documents = new List<KnowledgeDocument>(chunks.Count);
+        foreach (var (chunk, index) in chunks.Select((c, i) => (c, i)))
         {
             var embedding = await _embeddingService.EmbedAsync(chunk, cancellationToken);
-            embeddedChunks.Add((chunk, embedding));
-        }
-
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            await _dbContext.KnowledgeDocuments
-                .Where(k => k.Namespace == knowledgeNamespace
-                    && k.SourcePath == sourcePath
-                    && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
-                .ExecuteDeleteAsync(cancellationToken);
-
-            for (var i = 0; i < embeddedChunks.Count; i++)
+            var chunkMetadata = new Dictionary<string, string>(metadata)
             {
-                var (chunk, embedding) = embeddedChunks[i];
-                var chunkMetadata = new Dictionary<string, string>(metadata) { ["chunkIndex"] = i.ToString(CultureInfo.InvariantCulture) };
-                var doc = KnowledgeDocument.Create(
-                    knowledgeNamespace,
-                    projectId,
-                    sourcePath,
-                    i,
-                    chunk,
-                    new Vector(embedding),
-                    chunkMetadata,
-                    _timeProvider);
+                ["chunkIndex"] = index.ToString(CultureInfo.InvariantCulture)
+            };
+            var doc = KnowledgeDocument.Create(
+                knowledgeNamespace,
+                projectId,
+                sourcePath,
+                index,
+                chunk,
+                new Vector(embedding),
+                chunkMetadata,
+                _timeProvider);
 
-                _dbContext.KnowledgeDocuments.Add(doc);
-            }
+            documents.Add(doc);
+        }
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+        await _knowledgeRepository.IndexAsync(
+            documents, knowledgeNamespace, projectId, sourcePath, cancellationToken);
     }
 
     public async Task<IReadOnlyList<KnowledgeChunk>> QueryAsync(
@@ -117,25 +97,8 @@ public sealed class BedrockKnowledgeService : IKnowledgeService
         var queryEmbedding = await _embeddingService.EmbedAsync(query, cancellationToken);
         var queryVector = new Vector(queryEmbedding);
 
-        // EF.Functions.CosineDistance translates to the pgvector <=> operator.
-        // OrderBy before Select ensures the HNSW index is used for the ORDER BY.
-        var results = await _dbContext.KnowledgeDocuments
-            .Where(k => k.Namespace == knowledgeNamespace
-                && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
-            .Select(k => new
-            {
-                k.Content,
-                k.SourcePath,
-                k.Metadata,
-                Distance = k.Embedding.CosineDistance(queryVector)
-            })
-            .OrderBy(x => x.Distance)
-            .Take(effectiveTopN)
-            .ToListAsync(cancellationToken);
-
-        return results
-            .Select(x => new KnowledgeChunk(x.Content, x.SourcePath, 1.0 - x.Distance, x.Metadata))
-            .ToList();
+        return await _knowledgeRepository.QuerySimilarAsync(
+            queryVector, knowledgeNamespace, projectId, effectiveTopN, cancellationToken);
     }
 
     public async Task DeleteBySourcePathAsync(
@@ -144,13 +107,8 @@ public sealed class BedrockKnowledgeService : IKnowledgeService
         string sourcePath,
         CancellationToken cancellationToken)
     {
-        // ponytail: ExecuteDeleteAsync executes directly as DELETE SQL, bypassing the
-        // change tracker. SaveChangesAsync after it would be a no-op — omitted intentionally.
-        await _dbContext.KnowledgeDocuments
-            .Where(k => k.Namespace == knowledgeNamespace
-                && k.SourcePath == sourcePath
-                && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
-            .ExecuteDeleteAsync(cancellationToken);
+        await _knowledgeRepository.DeleteBySourcePathAsync(
+            knowledgeNamespace, projectId, sourcePath, cancellationToken);
     }
 
     // internal for direct unit testing via InternalsVisibleTo
