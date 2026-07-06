@@ -30,6 +30,7 @@ spec:
   description: "Genesis AI Requirements API"
   # OIDC subject pattern for the CI role trust policy (schema field: githubOIDC).
   githubOIDC: "repo:emisgroup/genesis-ai-requirements-api:*"
+  enableECR: true
 
   # --- S3: artefact storage -------------------------------------------------
   enableS3Bucket: true
