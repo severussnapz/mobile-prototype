@@ -63,6 +63,8 @@ public static class DependencyInjection
     private static void AddPipelineServices(IServiceCollection services)
     {
         services.AddSingleton<IAiService, BedrockAiService>();
+        services.AddScoped<IEmbeddingService, BedrockEmbeddingService>();
+        services.AddScoped<IKnowledgeService, BedrockKnowledgeService>();
         services.AddSingleton<IPromptService, EmbeddedPromptService>();
         services.AddSingleton<ISkillContentService, SkillContentService>();
         services.AddSingleton<IActiveSkillsService, ActiveSkillsService>();
@@ -129,6 +131,7 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<MessageRole>("message_role");
                 npgsqlOptions.MapEnum<OrchestrationMode>("orchestration_mode");
                 npgsqlOptions.MapEnum<RequirementImpact>("requirement_impact");
+                npgsqlOptions.MapEnum<KnowledgeNamespace>("knowledge_namespace");
             npgsqlOptions.UseVector();
             }));
     }
