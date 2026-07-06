@@ -111,6 +111,10 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
                 .Returns((string key, CancellationToken _) =>
                     Task.FromResult(binaryStore.TryGetValue(key, out var stored) ? stored : null));
             services.AddSingleton(storageMock.Object);
+
+            // Mock IKnowledgeService — the ArtefactPublishedDomainEvent handler indexes published
+            // artefacts into pgvector via Bedrock embeddings; integration tests don't call AWS.
+            services.AddSingleton(new Mock<IKnowledgeService>().Object);
         });
 
         builder.ConfigureTestServices(services =>

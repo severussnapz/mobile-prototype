@@ -379,7 +379,7 @@ Every pipeline prompt file (P01–P10), every skill file (115 skills), every pol
 When a user asks "what does P06 do?" or "how should I handle a CONTRADICTION response?", the help chat retrieves the most relevant chunks from this namespace and answers from the actual pipeline documentation.
 
 **Layer 2 — Project artefacts (`project-artefact` namespace):**
-Every approved artefact — REQ files, ARCH documents, DCB0129 hazard logs, IG records, security reviews, prototypes — is indexed into pgvector at approval time via the `ArtefactPublishedInterceptor`. Tagged with `projectId` so queries are always scoped to the current project.
+Every approved artefact — REQ files, ARCH documents, DCB0129 hazard logs, IG records, security reviews, prototypes — is indexed into pgvector at approval time via the `ArtefactPublishedDomainEvent` (handled by `ArtefactPublishedDomainEventHandler`). Tagged with `projectId` so queries are always scoped to the current project.
 
 When a user asks "what requirements did we capture for patient matching?" or "what hazards have been identified?", the help chat retrieves the relevant chunks from the actual approved artefacts for this project.
 

@@ -1,3 +1,4 @@
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
 using Genesis.AI.Domain.Enums;
@@ -12,9 +13,10 @@ using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.SecurityReviewReport;
 using Genesis.AI.Infrastructure.Configuration;
-using Genesis.AI.Infrastructure.Interceptors;
+using Genesis.AI.Infrastructure.EventHandlers;
 using Genesis.AI.Infrastructure.Repositories;
 using Genesis.AI.Infrastructure.Services;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,6 +72,7 @@ public static class DependencyInjection
         services.AddSingleton<IAiService, BedrockAiService>();
         services.AddScoped<IEmbeddingService, BedrockEmbeddingService>();
         services.AddScoped<IKnowledgeService, BedrockKnowledgeService>();
+        services.AddScoped<INotificationHandler<ArtefactPublishedDomainEvent>, ArtefactPublishedDomainEventHandler>();
         services.AddSingleton<IPromptService, EmbeddedPromptService>();
         services.AddSingleton<ISkillContentService, SkillContentService>();
         services.AddSingleton<IActiveSkillsService, ActiveSkillsService>();
@@ -113,9 +116,6 @@ public static class DependencyInjection
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
     {
-        // Register ArtefactPublishedInterceptor as singleton BEFORE AddDbContext
-        services.AddSingleton<ArtefactPublishedInterceptor>();
-
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
@@ -126,7 +126,7 @@ public static class DependencyInjection
         MapEnums(dataSourceBuilder);
         var dataSource = dataSourceBuilder.Build();
 
-        services.AddDbContext<GenesisAiDbContext>((sp, options) =>
+        services.AddDbContext<GenesisAiDbContext>(options =>
         {
             options.UseNpgsql(dataSource, npgsqlOptions =>
             {
@@ -143,8 +143,6 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<KnowledgeNamespace>("knowledge_namespace");
                 npgsqlOptions.UseVector();
             });
-            // Register interceptor
-            options.AddInterceptors(sp.GetRequiredService<ArtefactPublishedInterceptor>());
         });
     }
 
