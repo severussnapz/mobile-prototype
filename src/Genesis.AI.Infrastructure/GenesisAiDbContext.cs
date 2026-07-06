@@ -92,6 +92,10 @@ public sealed class GenesisAiDbContext(
         modelBuilder.ApplyConfiguration(new UiDeltaEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PrototypeLockEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new RequirementChangeEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new HelpConversationEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new HelpMessageEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new HelpConversationEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new HelpMessageEntityTypeConfiguration());
         
         // KnowledgeDocument is ignored for InMemory (integration tests) but configured for PostgreSQL
         if (!isInMemory)

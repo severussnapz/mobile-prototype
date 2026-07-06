@@ -9,6 +9,8 @@ public class KnowledgeDocumentEntityTypeConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<KnowledgeDocument> builder)
     {
+        builder.ToTable("knowledge_document");
+
         builder.Property(doc => doc.Metadata)
             .HasColumnType("jsonb")
             .IsRequired();
