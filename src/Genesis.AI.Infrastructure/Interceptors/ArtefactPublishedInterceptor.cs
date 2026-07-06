@@ -167,7 +167,7 @@ public sealed class ArtefactPublishedInterceptor : ISaveChangesInterceptor
         return new ValueTask<InterceptionResult>(result);
     }
 
-    private async Task IndexPendingArtefactsAsync(
+    internal async Task IndexPendingArtefactsAsync(
         List<ArtefactIndexRequest> pendingList,
         IKnowledgeService knowledgeService,
         IArtefactStorageService storageService,
