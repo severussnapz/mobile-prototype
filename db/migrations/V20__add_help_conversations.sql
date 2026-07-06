@@ -1,6 +1,6 @@
 CREATE TABLE help_conversation (
     help_conversation_uuid UUID NOT NULL DEFAULT uuid_generate_v4(),
-    project_id UUID NULL REFERENCES projects(id) ON DELETE SET NULL,
+    project_id UUID NULL,
     user_ern VARCHAR(100) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
