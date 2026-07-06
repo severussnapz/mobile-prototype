@@ -129,10 +129,15 @@ public sealed class KnowledgeSeederService : BackgroundService
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
                 var sourcePath = BuildSourcePath(resourceName);
 
-                var exists = await dbContext.KnowledgeDocument
-                    .AnyAsync(k => k.Namespace == KnowledgeNamespace.GenesisTool
-                        && k.SourcePath == sourcePath
-                        && k.ChunkIndex == 0, cancellationToken);
+                var exists = await dbContext.Database
+                    .SqlQuery<int>($"""
+                        SELECT 1 FROM knowledge_document
+                        WHERE namespace = 'genesis_tool'::knowledge_namespace
+                        AND source_path = {sourcePath}
+                        AND chunk_index = 0
+                        LIMIT 1
+                        """)
+                    .AnyAsync(cancellationToken);
 
                 if (exists)
                 {
