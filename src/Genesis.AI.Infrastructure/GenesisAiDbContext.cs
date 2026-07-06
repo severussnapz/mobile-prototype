@@ -32,10 +32,10 @@ public sealed class GenesisAiDbContext(
     public DbSet<ProjectDecision> ProjectDecisions { get; set; }
     public DbSet<UiDelta> UiDeltas { get; set; }
     public DbSet<PrototypeLock> PrototypeLocks { get; set; }
-    public DbSet<KnowledgeDocument> KnowledgeDocuments { get; set; }
+    public DbSet<KnowledgeDocument> KnowledgeDocument { get; set; }
     public DbSet<RequirementChange> RequirementChanges => Set<RequirementChange>();
-    public DbSet<HelpConversation> HelpConversations { get; set; }
-    public DbSet<HelpMessage> HelpMessages { get; set; }
+    public DbSet<HelpConversation> HelpConversation { get; set; }
+    public DbSet<HelpMessage> HelpMessage { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

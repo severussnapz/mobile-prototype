@@ -129,7 +129,7 @@ public sealed class KnowledgeSeederService : BackgroundService
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
                 var sourcePath = BuildSourcePath(resourceName);
 
-                var exists = await dbContext.KnowledgeDocuments
+                var exists = await dbContext.KnowledgeDocument
                     .AnyAsync(k => k.Namespace == KnowledgeNamespace.GenesisTool
                         && k.SourcePath == sourcePath
                         && k.Metadata["contentHash"] == hash, cancellationToken);

@@ -30,14 +30,14 @@ public class KnowledgeRepository : IKnowledgeRepository
         try
         {
             // Delete existing chunks for this source path
-            await _context.KnowledgeDocuments
+            await _context.KnowledgeDocument
                 .Where(k => k.Namespace == knowledgeNamespace
                     && k.SourcePath == sourcePath
                     && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
                 .ExecuteDeleteAsync(cancellationToken);
 
             // Insert new chunks
-            _context.KnowledgeDocuments.AddRange(documents);
+            _context.KnowledgeDocument.AddRange(documents);
             await _context.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
@@ -59,7 +59,7 @@ public class KnowledgeRepository : IKnowledgeRepository
         // Use LINQ-to-Entities with the Pgvector Vector API for cosine similarity.
         // The Vector.CosineDistance instance method translates to the pgvector <=> operator.
         // OrderBy before Select ensures the HNSW index is used for the ORDER BY.
-        var results = await _context.KnowledgeDocuments
+        var results = await _context.KnowledgeDocument
             .Where(k => k.Namespace == knowledgeNamespace
                 && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
             .Select(k => new
@@ -86,7 +86,7 @@ public class KnowledgeRepository : IKnowledgeRepository
     {
         // ponytail: ExecuteDeleteAsync executes directly as DELETE SQL, bypassing the
         // change tracker. SaveChangesAsync after it would be a no-op — omitted intentionally.
-        await _context.KnowledgeDocuments
+        await _context.KnowledgeDocument
             .Where(k => k.Namespace == knowledgeNamespace
                 && k.SourcePath == sourcePath
                 && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))

@@ -18,12 +18,12 @@ public class HelpConversationRepository : IHelpConversationRepository
 
     public async Task AddAsync(HelpConversation conversation, CancellationToken cancellationToken)
     {
-        await _context.HelpConversations.AddAsync(conversation, cancellationToken);
+        await _context.HelpConversation.AddAsync(conversation, cancellationToken);
     }
 
     public async Task<HelpConversation?> GetByIdWithMessagesAsync(Guid id, CancellationToken cancellationToken)
     {
-        return await _context.HelpConversations
+        return await _context.HelpConversation
             .Include(conversation => conversation.Messages.OrderBy(m => m.CreatedAt))
             .FirstOrDefaultAsync(conversation => conversation.Id == id, cancellationToken);
     }
@@ -33,7 +33,7 @@ public class HelpConversationRepository : IHelpConversationRepository
         Guid? projectId,
         CancellationToken cancellationToken)
     {
-        return await _context.HelpConversations
+        return await _context.HelpConversation
             .Where(conversation => conversation.UserErn == userErn
                 && (projectId == null ? conversation.ProjectId == null : conversation.ProjectId == projectId))
             .OrderByDescending(conversation => conversation.CreatedAt)

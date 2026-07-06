@@ -279,7 +279,7 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
 
         await repo.IndexAsync(new[] { chunk1, chunk2 }, namespace_, projectId, sourcePath, _cancellationToken);
 
-        var countAfterFirstIndex = await _fixture.Context!.KnowledgeDocuments
+        var countAfterFirstIndex = await _fixture.Context!.KnowledgeDocument
             .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
         Assert.Equal(2, countAfterFirstIndex);
 
@@ -294,11 +294,11 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
         await repo.IndexAsync(new[] { newChunk }, namespace_, projectId, sourcePath, _cancellationToken);
 
         // Assert: Only 1 chunk exists for that sourcePath
-        var finalCount = await _fixture.Context!.KnowledgeDocuments
+        var finalCount = await _fixture.Context!.KnowledgeDocument
             .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
         Assert.Equal(1, finalCount);
 
-        var finalChunks = await _fixture.Context!.KnowledgeDocuments
+        var finalChunks = await _fixture.Context!.KnowledgeDocument
             .Where(k => k.SourcePath == sourcePath && k.ProjectId == projectId)
             .ToListAsync(_cancellationToken);
         Assert.Single(finalChunks);
@@ -354,14 +354,14 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
 
         // Assert: Use a fresh context to verify the final state
         await using var verificationContext = _fixture.CreateDbContext();
-        var finalCount = await verificationContext.KnowledgeDocuments
+        var finalCount = await verificationContext.KnowledgeDocument
             .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
 
         Assert.True(finalCount == 1 || finalCount == 2,
             $"Expected 1 or 2 chunks after concurrent calls, but got {finalCount}");
 
         // Verify no chunk_index collisions within the same source path
-        var chunks = await verificationContext.KnowledgeDocuments
+        var chunks = await verificationContext.KnowledgeDocument
             .Where(k => k.SourcePath == sourcePath && k.ProjectId == projectId)
             .OrderBy(k => k.ChunkIndex)
             .ToListAsync(_cancellationToken);
@@ -470,7 +470,7 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
         await repo.IndexAsync(new[] { req001Chunk1, req001Chunk2 }, namespace_, projectId, "requirements/REQ-001.md", _cancellationToken);
         await repo.IndexAsync(new[] { req002Chunk1 }, namespace_, projectId, "requirements/REQ-002.md", _cancellationToken);
 
-        var countBefore = await _fixture.Context!.KnowledgeDocuments
+        var countBefore = await _fixture.Context!.KnowledgeDocument
             .CountAsync(k => k.ProjectId == projectId, _cancellationToken);
         Assert.Equal(3, countBefore);
 
@@ -478,9 +478,9 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
         await repo.DeleteBySourcePathAsync(namespace_, projectId, "requirements/REQ-001.md", _cancellationToken);
 
         // Assert: REQ-001 chunks = 0, REQ-002 chunks = 1
-        var req001Count = await _fixture.Context!.KnowledgeDocuments
+        var req001Count = await _fixture.Context!.KnowledgeDocument
             .CountAsync(k => k.SourcePath == "requirements/REQ-001.md" && k.ProjectId == projectId, _cancellationToken);
-        var req002Count = await _fixture.Context!.KnowledgeDocuments
+        var req002Count = await _fixture.Context!.KnowledgeDocument
             .CountAsync(k => k.SourcePath == "requirements/REQ-002.md" && k.ProjectId == projectId, _cancellationToken);
 
         Assert.Equal(0, req001Count);
