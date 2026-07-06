@@ -44,7 +44,7 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
             && TryReadGuidProperty(requestObject, "ProjectId", out var projectId)
             && TryReadGuidProperty(requestObject, "HelpConversationId", out var helpConversationId))
         {
-            return StreamAsync(message, projectId, helpConversationId, string.Empty, cancellationToken);
+            return StreamAsync(message, projectId, helpConversationId, "anonymous", cancellationToken);
         }
 
         _logger.LogWarning("Unsupported help stream request type: {RequestType}", requestObject.GetType().FullName);

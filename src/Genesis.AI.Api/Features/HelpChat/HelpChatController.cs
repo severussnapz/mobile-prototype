@@ -32,7 +32,7 @@ public sealed class HelpChatController : ControllerBase
         CancellationToken cancellationToken)
     {
         var userErn = HttpContext?.User is { } principal
-            ? principal.GetUserErn() ?? string.Empty
+            ? principal.GetUserErn() ?? "anonymous"
             : string.Empty;
         var conversation = await _helpConversationRepository
             .GetMostRecentByUserAndProjectAsync(userErn, projectId, cancellationToken);
