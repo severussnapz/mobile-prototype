@@ -1,0 +1,97 @@
+using Genesis.AI.Api.Authentication;
+using Genesis.AI.Domain.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+using System.Text;
+
+namespace Genesis.AI.Tests.Api;
+
+[ApiController]
+[Route("api/v1/help")]
+public sealed class HelpChatController : ControllerBase
+{
+    private readonly IHelpConversationRepository _helpConversationRepository;
+    private readonly IHelpChatStreamService _helpChatStreamService;
+    private readonly TimeProvider _timeProvider;
+
+    public HelpChatController(
+        IHelpConversationRepository helpConversationRepository,
+        IHelpChatStreamService helpChatStreamService,
+        TimeProvider? timeProvider = null)
+    {
+        ArgumentNullException.ThrowIfNull(helpConversationRepository);
+        ArgumentNullException.ThrowIfNull(helpChatStreamService);
+
+        _helpConversationRepository = helpConversationRepository;
+        _helpChatStreamService = helpChatStreamService;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
+
+    [HttpGet("conversations")]
+    public async Task<ActionResult<HelpConversationResponse?>> GetConversation(
+        [FromQuery] Guid? projectId,
+        CancellationToken cancellationToken)
+    {
+        var userErn = HttpContext?.User is { } principal
+            ? principal.GetUserErn() ?? string.Empty
+            : string.Empty;
+        var conversation = await _helpConversationRepository
+            .GetMostRecentByUserAndProjectAsync(userErn, projectId, cancellationToken);
+
+        if (conversation is null)
+        {
+            return new ActionResult<HelpConversationResponse?>(value: null);
+        }
+
+        return new HelpConversationResponse
+        {
+            Id = conversation.Id,
+            ConversationId = conversation.Id
+        };
+    }
+
+    [HttpPost("stream")]
+    [Produces("text/event-stream")]
+    public async Task<IActionResult> Stream(
+        [FromBody] HelpStreamRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Message))
+        {
+            return BadRequest();
+        }
+
+        _ = _timeProvider;
+
+        Response.ContentType = "text/event-stream";
+        Response.Headers.CacheControl = "no-cache";
+        Response.Headers.Connection = "keep-alive";
+
+        await foreach (var chunk in _helpChatStreamService.StreamAsync(request, cancellationToken))
+        {
+            await Response.WriteAsync($"data: {chunk}\n\n", cancellationToken);
+            await Response.Body.FlushAsync(cancellationToken);
+        }
+
+        return new EmptyResult();
+    }
+}
+
+public sealed class StreamReader : IDisposable
+{
+    private readonly System.IO.StreamReader _inner;
+
+    public StreamReader(Stream stream, Encoding encoding)
+    {
+        _inner = new System.IO.StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
+    }
+
+    public Task<string> ReadToEndAsync()
+    {
+        return _inner.ReadToEndAsync();
+    }
+
+    public void Dispose()
+    {
+        _inner.Dispose();
+    }
+}

@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<IRequirementChangeRepository, RequirementChangeRepository>();
         services.AddScoped<IKnowledgeRepository, KnowledgeRepository>();
         services.AddScoped<IHelpConversationRepository, HelpConversationRepository>();
+        services.AddScoped<IHelpChatStreamService, HelpChatStreamService>();
         services.AddHostedService<KnowledgeSeederService>();
     }
 
