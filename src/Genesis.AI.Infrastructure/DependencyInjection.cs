@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IPrototypeLockRepository, PrototypeLockRepository>();
         services.AddScoped<IRequirementChangeRepository, RequirementChangeRepository>();
         services.AddScoped<IKnowledgeRepository, KnowledgeRepository>();
+        services.AddScoped<IHelpConversationRepository, HelpConversationRepository>();
     }
 
     private static void AddPipelineServices(IServiceCollection services)

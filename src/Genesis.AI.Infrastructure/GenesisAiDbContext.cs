@@ -8,6 +8,7 @@ using Genesis.AI.Domain.AggregatesModel.ProjectDecisionAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectNoteAggregate;
 using Genesis.AI.Domain.AggregatesModel.PrototypeLockAggregate;
 using Genesis.AI.Domain.AggregatesModel.UiDeltaAggregate;
+using Genesis.AI.Domain.AggregatesModel.HelpChatAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Infrastructure.EntityConfigurations;
 using MediatR;
@@ -33,6 +34,8 @@ public sealed class GenesisAiDbContext(
     public DbSet<PrototypeLock> PrototypeLocks { get; set; }
     public DbSet<KnowledgeDocument> KnowledgeDocuments { get; set; }
     public DbSet<RequirementChange> RequirementChanges => Set<RequirementChange>();
+    public DbSet<HelpConversation> HelpConversations { get; set; }
+    public DbSet<HelpMessage> HelpMessages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
