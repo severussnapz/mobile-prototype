@@ -1,5 +1,6 @@
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
+using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Commands.ApproveRequirementChange;
 using Genesis.AI.Domain.Commands.ProposeRequirementChange;
 using Genesis.AI.Domain.Commands.RecordDomainReview;
@@ -7,7 +8,6 @@ using Genesis.AI.Domain.Commands.RejectRequirementChange;
 using Genesis.AI.Domain.Commands.ReopenStageForAmendment;
 using Genesis.AI.Domain.Commands.UndoApproveRequirementChange;
 using Genesis.AI.Domain.Dpia;
-using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.SecurityReviewReport;
@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Pgvector;
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
@@ -111,6 +112,7 @@ public static class DependencyInjection
         // Build NpgsqlDataSource with native enum mappings
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
         dataSourceBuilder.EnableDynamicJson();
+        dataSourceBuilder.UseVector();
         MapEnums(dataSourceBuilder);
         var dataSource = dataSourceBuilder.Build();
 
@@ -127,6 +129,7 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<MessageRole>("message_role");
                 npgsqlOptions.MapEnum<OrchestrationMode>("orchestration_mode");
                 npgsqlOptions.MapEnum<RequirementImpact>("requirement_impact");
+            npgsqlOptions.UseVector();
             }));
     }
 
@@ -142,6 +145,7 @@ public static class DependencyInjection
         dataSourceBuilder.MapEnum<MessageRole>("message_role");
         dataSourceBuilder.MapEnum<OrchestrationMode>("orchestration_mode");
         dataSourceBuilder.MapEnum<RequirementImpact>("requirement_impact");
+        dataSourceBuilder.MapEnum<KnowledgeNamespace>("knowledge_namespace");
     }
 
     private static void AddS3(IServiceCollection services, IConfiguration configuration)

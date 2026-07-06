@@ -1,5 +1,6 @@
 using Genesis.AI.Core.Data;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
+using Genesis.AI.Domain.AggregatesModel.KnowledgeAggregate;
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectAggregate;
@@ -30,11 +31,22 @@ public sealed class GenesisAiDbContext(
     public DbSet<ProjectDecision> ProjectDecisions { get; set; }
     public DbSet<UiDelta> UiDeltas { get; set; }
     public DbSet<PrototypeLock> PrototypeLocks { get; set; }
+    public DbSet<KnowledgeDocument> KnowledgeDocuments { get; set; }
     public DbSet<RequirementChange> RequirementChanges => Set<RequirementChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         RegisterPostgresEnums(modelBuilder);
+        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            modelBuilder.Ignore<KnowledgeDocument>();
+        }
+        else
+        {
+            modelBuilder.Entity<KnowledgeDocument>()
+                .Property(k => k.Embedding)
+                .HasColumnType("vector(1024)");
+        }
         ApplyEntityConfigurations(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
@@ -54,6 +66,7 @@ public sealed class GenesisAiDbContext(
             modelBuilder.HasPostgresEnum<MessageRole>("message_role");
             modelBuilder.HasPostgresEnum<OrchestrationMode>("orchestration_mode");
             modelBuilder.HasPostgresEnum<RequirementImpact>("requirement_impact");
+            modelBuilder.HasPostgresEnum<KnowledgeNamespace>("knowledge_namespace");
         }
     }
 
