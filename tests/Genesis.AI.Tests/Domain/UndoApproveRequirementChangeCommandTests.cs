@@ -21,7 +21,7 @@ public class UndoApproveRequirementChangeCommandTests
         var artefactRepositoryMock = new Mock<IArtefactRepository>();
         var artefactStorageMock = new Mock<IArtefactStorageService>();
 
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -62,6 +62,7 @@ public class UndoApproveRequirementChangeCommandTests
             TimeProvider.System);
 
         var command = new UndoApproveRequirementChangeCommand(
+            ProjectId: projectId,
             ChangeId: changeId,
             UndoneBy: "idris.issa",
             UndoRationale: "Wrong wording");
@@ -77,13 +78,20 @@ public class UndoApproveRequirementChangeCommandTests
             projectId, "requirements/REQ-001.md", 3,
             "# REQ-001 previous content", "text/markdown",
             It.IsAny<CancellationToken>()), Times.Once);
+        artefactRepositoryMock.Verify(r => r.AddAsync(
+            It.Is<Artefact>(artefact =>
+                artefact.ProjectId == projectId &&
+                artefact.Version == 3 &&
+                artefact.FilePath == "requirements/REQ-001.md" &&
+                artefact.S3Key == "s3-key-v3"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Handle_WhenChangeNotFound_ThrowsInvalidOperationException()
     {
         var repositoryMock = new Mock<IRequirementChangeRepository>();
-        repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(),
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),
             It.IsAny<CancellationToken>()))
             .ReturnsAsync((RequirementChange?)null);
 
@@ -95,6 +103,7 @@ public class UndoApproveRequirementChangeCommandTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new UndoApproveRequirementChangeCommand(
+                ProjectId: Guid.NewGuid(),
                 ChangeId: Guid.NewGuid(),
                 UndoneBy: "idris.issa",
                 UndoRationale: null),
@@ -113,7 +122,7 @@ public class UndoApproveRequirementChangeCommandTests
         var artefactRepositoryMock = new Mock<IArtefactRepository>();
         var artefactStorageMock = new Mock<IArtefactStorageService>();
 
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -130,6 +139,7 @@ public class UndoApproveRequirementChangeCommandTests
             TimeProvider.System);
 
         await handler.Handle(new UndoApproveRequirementChangeCommand(
+            ProjectId: projectId,
             ChangeId: changeId,
             UndoneBy: "idris.issa",
             UndoRationale: null),

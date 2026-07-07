@@ -171,16 +171,17 @@ public sealed class BedrockAiService : IAiService, IDisposable
                     JsonDocument? parsedInput = null;
                     AiStreamError? parseError = null;
 
-                    try
-                    {
-                        parsedInput = JsonDocument.Parse(
-                            string.IsNullOrWhiteSpace(inputJson) ? "{}" : inputJson);
+                        try
+                        {
+                            parsedInput = JsonDocument.Parse(
+                                string.IsNullOrWhiteSpace(inputJson) ? "{}" : inputJson);
                     }
                     catch (JsonException ex)
                     {
-                        _logger.LogWarning(ex,
-                            "Failed to parse tool input JSON for {ToolName}: {Input}",
-                            currentToolName, inputJson);
+                            _logger.LogWarning(ex,
+                                "Failed to parse tool input JSON for {ToolName}. PayloadLength={PayloadLength}",
+                                currentToolName,
+                                inputJson?.Length ?? 0);
                         parseError = new AiStreamError(
                             "tool_parse_failure",
                             $"Failed to parse tool input for '{currentToolName}'. The AI response may have been truncated due to output token limits.");

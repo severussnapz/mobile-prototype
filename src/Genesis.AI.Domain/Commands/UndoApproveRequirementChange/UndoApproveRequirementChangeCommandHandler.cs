@@ -1,4 +1,5 @@
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Interfaces;
 
 namespace Genesis.AI.Domain.Commands.UndoApproveRequirementChange;
@@ -28,7 +29,10 @@ public sealed class UndoApproveRequirementChangeCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var change = await _repository.GetByIdAsync(command.ChangeId, cancellationToken)
+        var change = await _repository.GetByIdForProjectAsync(
+            command.ChangeId,
+            command.ProjectId,
+            cancellationToken)
             ?? throw new InvalidOperationException(
                 $"Requirement change '{command.ChangeId}' not found.");
 
@@ -37,13 +41,17 @@ public sealed class UndoApproveRequirementChangeCommandHandler
             rationale: command.UndoRationale,
             timeProvider: _timeProvider);
 
-        await RestorePreviousReqVersionAsync(change, cancellationToken);
+        await RestorePreviousReqVersionAsync(
+            change,
+            command.UndoneBy,
+            cancellationToken);
 
         await _repository.UnitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private async Task RestorePreviousReqVersionAsync(
         RequirementChange change,
+        string undoneBy,
         CancellationToken cancellationToken)
     {
         var reqFilePath = $"requirements/{change.ReqId}.md";
@@ -67,12 +75,25 @@ public sealed class UndoApproveRequirementChangeCommandHandler
         var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
             change.ProjectId, reqFilePath, cancellationToken);
 
-        await _artefactStorageService.SaveContentAsync(
+        var storageKey = await _artefactStorageService.SaveContentAsync(
             change.ProjectId,
             reqFilePath,
             nextVersion,
             previousContent,
             "text/markdown",
             cancellationToken);
+
+        var restoredArtefact = Artefact.CreateS3Artefact(
+            change.ProjectId,
+            nextVersion,
+            reqFilePath,
+            storageKey,
+            "text/markdown",
+            System.Text.Encoding.UTF8.GetByteCount(previousContent),
+            undoneBy,
+            _timeProvider,
+            true);
+
+        await _artefactRepository.AddAsync(restoredArtefact, cancellationToken);
     }
 }

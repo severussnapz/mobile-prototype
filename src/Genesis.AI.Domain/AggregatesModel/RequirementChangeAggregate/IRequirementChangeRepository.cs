@@ -10,6 +10,11 @@ public interface IRequirementChangeRepository
 
     Task<RequirementChange?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
+    Task<RequirementChange?> GetByIdForProjectAsync(
+        Guid id,
+        Guid projectId,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<RequirementChange>> GetByProjectIdAsync(
         Guid projectId,
         CancellationToken cancellationToken);
