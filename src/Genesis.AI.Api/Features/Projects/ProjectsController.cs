@@ -185,13 +185,13 @@ public class ProjectsController : ControllerBase
         }
         catch (NotFoundException ex)
         {
-            return NotFound(new { userMessage = ex.Message });
+            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update project details {ProjectId}", id);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Failed to save project details. Please try again." });
+                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save project details. Please try again."));
         }
     }
 
@@ -217,17 +217,17 @@ public class ProjectsController : ControllerBase
         try
         {
             var result = await _mediator.Send(command, ct);
-            return Ok(new { figmaPatPlaintext = result.FigmaPatPlaintext });
+            return Ok(new UpdateProjectGitHubResponse(result.FigmaPatPlaintext));
         }
         catch (NotFoundException ex)
         {
-            return NotFound(new { userMessage = ex.Message });
+            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update GitHub config {ProjectId}", id);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Failed to save GitHub configuration. Please try again." });
+                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save GitHub configuration. Please try again."));
         }
     }
 
@@ -260,13 +260,13 @@ public class ProjectsController : ControllerBase
         }
         catch (NotFoundException ex)
         {
-            return NotFound(new { userMessage = ex.Message });
+            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update P00 config {ProjectId}", id);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Failed to save project configuration. Please try again." });
+                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save project configuration. Please try again."));
         }
     }
 

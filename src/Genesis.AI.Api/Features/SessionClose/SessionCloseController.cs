@@ -24,7 +24,7 @@ public sealed class SessionCloseController : ControllerBase
     }
 
     [HttpPost("session-close")]
-    [ProducesResponseType(typeof(ApiResponse<SessionCloseResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<SessionCloseResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SessionClose(
         Guid projectId,
@@ -38,7 +38,9 @@ public sealed class SessionCloseController : ControllerBase
         try
         {
             var result = await _mediator.Send(command, cancellationToken);
-            return Ok(new ApiResponse<SessionCloseResponse>
+            return Created(
+                $"/api/v1/projects/{projectId}/artefacts/{result.ArtefactId}",
+                new ApiResponse<SessionCloseResponse>
             {
                 Data = new SessionCloseResponse(result.ArtefactId, result.FilePath, result.Version)
             });

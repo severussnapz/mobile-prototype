@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.Commands.CreateArtefacts;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.Queries.GetArtefactById;
@@ -87,7 +88,7 @@ public class ArtefactController : ControllerBase
         {
             _logger.LogError(ex, "Failed to read artefact content from S3 for artefact {ArtefactId}", artefactId);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Unable to load this artefact. Please try again." });
+                ApiErrorResponse.Create("503", "Service unavailable", "Unable to load this artefact. Please try again."));
         }
 
         return Ok(new ArtefactDetailResponse
@@ -132,7 +133,7 @@ public class ArtefactController : ControllerBase
         {
             _logger.LogError(ex, "Failed to read binary artefact from S3 for artefact {ArtefactId}", artefactId);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Unable to download this artefact. Please try again." });
+                ApiErrorResponse.Create("503", "Service unavailable", "Unable to download this artefact. Please try again."));
         }
 
         if (content is null || content.Length == 0)
@@ -174,7 +175,7 @@ public class ArtefactController : ControllerBase
         {
             _logger.LogError(ex, "Failed to save artefacts for project {ProjectId}", projectId);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Unable to save artefact. Please try again." });
+                ApiErrorResponse.Create("503", "Service unavailable", "Unable to save artefact. Please try again."));
         }
 
         var dtos = artefacts.ToList().ConvertAll(artefact => new ArtefactSummaryResponse
