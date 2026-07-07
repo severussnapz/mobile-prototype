@@ -3,34 +3,34 @@ using Genesis.AI.Domain.AggregatesModel.ProjectAggregate;
 using Genesis.AI.Domain.Commands.UpdateProject;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
-using NSubstitute;
+using Moq;
 
 namespace Genesis.AI.Tests.Application.UpdateProject;
 
 public sealed class UpdateProjectCommandHandlerTests
 {
-    private readonly IProjectRepository _projectRepository;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ISecretEncryptionService _secretEncryptionService;
-    private readonly IGenesisStructureScaffolder _scaffolder;
+    private readonly Mock<IProjectRepository> _projectRepository;
+    private readonly Mock<IUnitOfWork> _unitOfWork;
+    private readonly Mock<ISecretEncryptionService> _secretEncryptionService;
+    private readonly Mock<IGenesisStructureScaffolder> _scaffolder;
     private readonly TimeProvider _timeProvider;
     private readonly UpdateProjectCommandHandler _handler;
 
     public UpdateProjectCommandHandlerTests()
     {
-        _projectRepository = Substitute.For<IProjectRepository>();
-        _unitOfWork = Substitute.For<IUnitOfWork>();
-        _secretEncryptionService = Substitute.For<ISecretEncryptionService>();
-        _scaffolder = Substitute.For<IGenesisStructureScaffolder>();
+        _projectRepository = new Mock<IProjectRepository>();
+        _unitOfWork = new Mock<IUnitOfWork>();
+        _secretEncryptionService = new Mock<ISecretEncryptionService>();
+        _scaffolder = new Mock<IGenesisStructureScaffolder>();
         _timeProvider = TimeProvider.System;
 
-        _projectRepository.UnitOfWork.Returns(_unitOfWork);
-        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
+        _projectRepository.SetupGet(repository => repository.UnitOfWork).Returns(_unitOfWork.Object);
+        _unitOfWork.Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         _handler = new UpdateProjectCommandHandler(
-            _projectRepository,
-            _secretEncryptionService,
-            _scaffolder,
+            _projectRepository.Object,
+            _secretEncryptionService.Object,
+            _scaffolder.Object,
             _timeProvider);
     }
 
@@ -40,8 +40,8 @@ public sealed class UpdateProjectCommandHandlerTests
         var project = CreateProject();
         var command = CreateCommand(project.Id) with { FigmaPat = "plaintext-pat" };
 
-        _projectRepository.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
-        _secretEncryptionService.Encrypt("plaintext-pat").Returns("encrypted-value");
+        _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
+        _secretEncryptionService.Setup(service => service.Encrypt("plaintext-pat")).Returns("encrypted-value");
 
         await _handler.Handle(command, CancellationToken.None);
 
@@ -55,8 +55,8 @@ public sealed class UpdateProjectCommandHandlerTests
         var project = CreateProject();
         var command = CreateCommand(project.Id) with { FigmaPat = "plaintext-pat" };
 
-        _projectRepository.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
-        _secretEncryptionService.Encrypt("plaintext-pat").Returns("encrypted-value");
+        _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
+        _secretEncryptionService.Setup(service => service.Encrypt("plaintext-pat")).Returns("encrypted-value");
 
         var result = await _handler.Handle(command, CancellationToken.None);
 
@@ -69,11 +69,11 @@ public sealed class UpdateProjectCommandHandlerTests
         var project = CreateProject();
         var command = CreateCommand(project.Id) with { FigmaPat = null };
 
-        _projectRepository.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
+        _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
 
         await _handler.Handle(command, CancellationToken.None);
 
-        _secretEncryptionService.DidNotReceive().Encrypt(Arg.Any<string>());
+        _secretEncryptionService.Verify(service => service.Encrypt(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -89,11 +89,11 @@ public sealed class UpdateProjectCommandHandlerTests
             GitHubInstallationId = "12345678"
         };
 
-        _projectRepository.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
+        _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
 
         await _handler.Handle(command, CancellationToken.None);
 
-        await _scaffolder.Received(1).ScaffoldAsync(project.Id, command.UpdatedBy, Arg.Any<CancellationToken>());
+        _scaffolder.Verify(scaffolder => scaffolder.ScaffoldAsync(project.Id, command.UpdatedBy, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -117,11 +117,11 @@ public sealed class UpdateProjectCommandHandlerTests
             GitHubInstallationId = "different-id"
         };
 
-        _projectRepository.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
+        _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
 
         await _handler.Handle(command, CancellationToken.None);
 
-        await _scaffolder.DidNotReceive().ScaffoldAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _scaffolder.Verify(scaffolder => scaffolder.ScaffoldAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -137,10 +137,10 @@ public sealed class UpdateProjectCommandHandlerTests
             GitHubInstallationId = "12345678"
         };
 
-        _projectRepository.GetByIdAsync(project.Id, Arg.Any<CancellationToken>()).Returns(project);
+        _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
         _scaffolder
-            .ScaffoldAsync(project.Id, command.UpdatedBy, Arg.Any<CancellationToken>())
-            .Returns(Task.FromException(new Exception("boom")));
+            .Setup(scaffolder => scaffolder.ScaffoldAsync(project.Id, command.UpdatedBy, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("boom"));
 
         var exception = await Record.ExceptionAsync(() => _handler.Handle(command, CancellationToken.None));
 

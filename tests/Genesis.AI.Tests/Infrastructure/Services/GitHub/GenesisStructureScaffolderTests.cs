@@ -3,59 +3,58 @@ using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.GitHub;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Services.GitHub;
+using Moq;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
-using NSubstitute.ExceptionExtensions;
 
 namespace Genesis.AI.Tests.Infrastructure.Services.GitHub;
 
 public sealed class GenesisStructureScaffolderTests
 {
-    private readonly IProjectRepository _projectRepository;
-    private readonly IGitHubTokenService _tokenService;
-    private readonly IGitHubContentsService _contentsService;
-    private readonly ICodeownersGenerator _codeownersGenerator;
-    private readonly IProjectMarkdownGenerator _markdownGenerator;
-    private readonly IAssemblyVersionProvider _versionProvider;
-    private readonly ILogger<GenesisStructureScaffolder> _logger;
+    private readonly Mock<IProjectRepository> _projectRepository;
+    private readonly Mock<IGitHubTokenService> _tokenService;
+    private readonly Mock<IGitHubContentsService> _contentsService;
+    private readonly Mock<ICodeownersGenerator> _codeownersGenerator;
+    private readonly Mock<IProjectMarkdownGenerator> _markdownGenerator;
+    private readonly Mock<IAssemblyVersionProvider> _versionProvider;
+    private readonly Mock<ILogger<GenesisStructureScaffolder>> _logger;
     private readonly GenesisStructureScaffolder _scaffolder;
 
     public GenesisStructureScaffolderTests()
     {
-        _projectRepository = Substitute.For<IProjectRepository>();
-        _tokenService = Substitute.For<IGitHubTokenService>();
-        _contentsService = Substitute.For<IGitHubContentsService>();
-        _codeownersGenerator = Substitute.For<ICodeownersGenerator>();
-        _markdownGenerator = Substitute.For<IProjectMarkdownGenerator>();
-        _versionProvider = Substitute.For<IAssemblyVersionProvider>();
-        _logger = Substitute.For<ILogger<GenesisStructureScaffolder>>();
+        _projectRepository = new Mock<IProjectRepository>();
+        _tokenService = new Mock<IGitHubTokenService>();
+        _contentsService = new Mock<IGitHubContentsService>();
+        _codeownersGenerator = new Mock<ICodeownersGenerator>();
+        _markdownGenerator = new Mock<IProjectMarkdownGenerator>();
+        _versionProvider = new Mock<IAssemblyVersionProvider>();
+        _logger = new Mock<ILogger<GenesisStructureScaffolder>>();
 
         _tokenService
-            .GetInstallationTokenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("token-abc");
-        _versionProvider.GetVersion().Returns("1.0.0.0");
-        _codeownersGenerator.Generate().Returns("# CODEOWNERS");
-        _markdownGenerator.Generate(Arg.Any<Project>()).Returns("# PROJECT");
+            .Setup(service => service.GetInstallationTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("token-abc");
+        _versionProvider.Setup(provider => provider.GetVersion()).Returns("1.0.0.0");
+        _codeownersGenerator.Setup(generator => generator.Generate()).Returns("# CODEOWNERS");
+        _markdownGenerator.Setup(generator => generator.Generate(It.IsAny<Project>())).Returns("# PROJECT");
         _contentsService
-            .PushFileAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new GitHubPushResult("sha123", "https://github.com/emisgroup/emis-x-docs/blob/main/.gitkeep"));
+            .Setup(service => service.PushFileAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitHubPushResult("sha123", "https://github.com/emisgroup/emis-x-docs/blob/main/.gitkeep"));
         _contentsService
-            .FileExistsAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns(false);
+            .Setup(service => service.FileExistsAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         _scaffolder = new GenesisStructureScaffolder(
-            _projectRepository,
-            _tokenService,
-            _contentsService,
-            _codeownersGenerator,
-            _markdownGenerator,
-            _versionProvider,
-            _logger);
+            _projectRepository.Object,
+            _tokenService.Object,
+            _contentsService.Object,
+            _codeownersGenerator.Object,
+            _markdownGenerator.Object,
+            _versionProvider.Object,
+            _logger.Object);
     }
 
     [Fact]
@@ -66,15 +65,15 @@ public sealed class GenesisStructureScaffolderTests
             ComplianceDomain.Generic, "creator", TimeProvider.System);
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
 
-        await _contentsService.DidNotReceive().PushFileAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(),
-            Arg.Any<CancellationToken>());
+        _contentsService.Verify(service => service.PushFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -82,21 +81,21 @@ public sealed class GenesisStructureScaffolderTests
     {
         var project = CreateProject();
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
         _contentsService
-            .FileExistsAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            .Setup(service => service.FileExistsAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 ".genesis/.gitkeep",
-                Arg.Any<CancellationToken>())
-            .Returns(true);
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
 
-        await _contentsService.DidNotReceive().PushFileAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(),
-            Arg.Any<CancellationToken>());
+        _contentsService.Verify(service => service.PushFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -104,15 +103,15 @@ public sealed class GenesisStructureScaffolderTests
     {
         var project = CreateProject();
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
 
         var pushedPaths = _contentsService
-            .ReceivedCalls()
-            .Where(call => call.GetMethodInfo().Name == nameof(IGitHubContentsService.PushFileAsync))
-            .Select(call => (string)call.GetArguments()[3]!)
+            .Invocations
+            .Where(call => call.Method.Name == nameof(IGitHubContentsService.PushFileAsync))
+            .Select(call => (string)call.Arguments[3]!)
             .ToList();
 
         Assert.Equal(11, pushedPaths.Count);
@@ -134,15 +133,15 @@ public sealed class GenesisStructureScaffolderTests
     {
         var project = CreateProject();
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
 
         var pushedPaths = _contentsService
-            .ReceivedCalls()
-            .Where(call => call.GetMethodInfo().Name == nameof(IGitHubContentsService.PushFileAsync))
-            .Select(call => (string)call.GetArguments()[3]!)
+            .Invocations
+            .Where(call => call.Method.Name == nameof(IGitHubContentsService.PushFileAsync))
+            .Select(call => (string)call.Arguments[3]!)
             .ToList();
 
         Assert.Equal(".genesis/.gitkeep", pushedPaths.Last());
@@ -153,15 +152,15 @@ public sealed class GenesisStructureScaffolderTests
     {
         var project = CreateProject();
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
 
         var commitMessage = _contentsService
-            .ReceivedCalls()
-            .Where(call => call.GetMethodInfo().Name == nameof(IGitHubContentsService.PushFileAsync))
-            .Select(call => (string)call.GetArguments()[5]!)
+            .Invocations
+            .Where(call => call.Method.Name == nameof(IGitHubContentsService.PushFileAsync))
+            .Select(call => (string)call.Arguments[5]!)
             .First();
 
         Assert.Contains("Provisioned-By: genesis-ai[bot]", commitMessage);
@@ -175,16 +174,16 @@ public sealed class GenesisStructureScaffolderTests
     {
         var project = CreateProject();
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         var callCount = 0;
         _contentsService
-            .PushFileAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
+            .Setup(service => service.PushFileAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
             {
                 callCount++;
                 if (callCount == 2)
@@ -205,8 +204,8 @@ public sealed class GenesisStructureScaffolderTests
     {
         var projectId = Guid.NewGuid();
         _projectRepository
-            .GetByIdAsync(projectId, Arg.Any<CancellationToken>())
-            .Returns((Project?)null);
+            .Setup(repository => repository.GetByIdAsync(projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Project?)null);
 
         var exception = await Record.ExceptionAsync(() =>
             _scaffolder.ScaffoldAsync(projectId, "test-user@emisgroup.com", CancellationToken.None));

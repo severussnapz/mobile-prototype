@@ -4,65 +4,64 @@ using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.GitHub;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Services.GitHub;
+using Moq;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
-using NSubstitute.ExceptionExtensions;
 
 namespace Genesis.AI.Tests.Infrastructure.Services.GitHub;
 
 public sealed class GitHubArtefactPushServiceTests
 {
-    private readonly IProjectRepository _projectRepository;
-    private readonly IArtefactStorageService _artefactStorageService;
-    private readonly IGitHubTokenService _tokenService;
-    private readonly IGitHubContentsService _contentsService;
-    private readonly IPushFailureLogRepository _pushFailureLogRepository;
-    private readonly IAssemblyVersionProvider _versionProvider;
+    private readonly Mock<IProjectRepository> _projectRepository;
+    private readonly Mock<IArtefactStorageService> _artefactStorageService;
+    private readonly Mock<IGitHubTokenService> _tokenService;
+    private readonly Mock<IGitHubContentsService> _contentsService;
+    private readonly Mock<IPushFailureLogRepository> _pushFailureLogRepository;
+    private readonly Mock<IAssemblyVersionProvider> _versionProvider;
     private readonly TimeProvider _timeProvider;
-    private readonly ILogger<GitHubArtefactPushService> _logger;
+    private readonly Mock<ILogger<GitHubArtefactPushService>> _logger;
     private readonly GitHubArtefactPushService _service;
 
     public GitHubArtefactPushServiceTests()
     {
-        _projectRepository = Substitute.For<IProjectRepository>();
-        _artefactStorageService = Substitute.For<IArtefactStorageService>();
-        _tokenService = Substitute.For<IGitHubTokenService>();
-        _contentsService = Substitute.For<IGitHubContentsService>();
-        _pushFailureLogRepository = Substitute.For<IPushFailureLogRepository>();
-        _versionProvider = Substitute.For<IAssemblyVersionProvider>();
+        _projectRepository = new Mock<IProjectRepository>();
+        _artefactStorageService = new Mock<IArtefactStorageService>();
+        _tokenService = new Mock<IGitHubTokenService>();
+        _contentsService = new Mock<IGitHubContentsService>();
+        _pushFailureLogRepository = new Mock<IPushFailureLogRepository>();
+        _versionProvider = new Mock<IAssemblyVersionProvider>();
         _timeProvider = TimeProvider.System;
-        _logger = Substitute.For<ILogger<GitHubArtefactPushService>>();
+        _logger = new Mock<ILogger<GitHubArtefactPushService>>();
 
         _tokenService
-            .GetInstallationTokenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("token-abc");
+            .Setup(service => service.GetInstallationTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("token-abc");
         _contentsService
-            .FileExistsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Setup(service => service.FileExistsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         _contentsService
-            .GetFileShaAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("abc123");
+            .Setup(service => service.GetFileShaAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("abc123");
         _contentsService
-            .PushFileAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(new GitHubPushResult("sha123", "https://github.com/emisgroup/emis-x-docs/blob/main/.gitkeep"));
-        _versionProvider.GetVersion().Returns("1.0.0.0");
+            .Setup(service => service.PushFileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitHubPushResult("sha123", "https://github.com/emisgroup/emis-x-docs/blob/main/.gitkeep"));
+        _versionProvider.Setup(provider => provider.GetVersion()).Returns("1.0.0.0");
         _artefactStorageService
-            .GetContentAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns("# REQ-001\nContent");
+            .Setup(service => service.GetContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("# REQ-001\nContent");
         _artefactStorageService
-            .GetBinaryContentAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new byte[] { 1, 2, 3 });
+            .Setup(service => service.GetBinaryContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new byte[] { 1, 2, 3 });
 
         _service = new GitHubArtefactPushService(
-            _projectRepository,
-            _artefactStorageService,
-            _tokenService,
-            _contentsService,
-            _pushFailureLogRepository,
-            _versionProvider,
+            _projectRepository.Object,
+            _artefactStorageService.Object,
+            _tokenService.Object,
+            _contentsService.Object,
+            _pushFailureLogRepository.Object,
+            _versionProvider.Object,
             _timeProvider,
-            _logger);
+            _logger.Object);
     }
 
     [Fact]
@@ -73,18 +72,18 @@ public sealed class GitHubArtefactPushServiceTests
             ComplianceDomain.Generic, "creator", _timeProvider);
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _service.PushAsync(
             project.Id, Guid.NewGuid(), "requirements/REQ-001.md", 1,
             "text/markdown", "s3key", "user@emisgroup.com", CancellationToken.None);
 
-        await _contentsService.DidNotReceive().PushFileAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await _pushFailureLogRepository.DidNotReceive().AddAsync(
-            Arg.Any<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(), Arg.Any<CancellationToken>());
+        _contentsService.Verify(service => service.PushFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _pushFailureLogRepository.Verify(repository => repository.AddAsync(
+            It.IsAny<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -92,18 +91,18 @@ public sealed class GitHubArtefactPushServiceTests
     {
         var project = CreateProjectWithGitHub();
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _service.PushAsync(
             project.Id, Guid.NewGuid(), "unknown/SOMETHING.md", 1,
             "text/markdown", "s3key", "user@emisgroup.com", CancellationToken.None);
 
-        await _contentsService.DidNotReceive().PushFileAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await _pushFailureLogRepository.DidNotReceive().AddAsync(
-            Arg.Any<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(), Arg.Any<CancellationToken>());
+        _contentsService.Verify(service => service.PushFileAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _pushFailureLogRepository.Verify(repository => repository.AddAsync(
+            It.IsAny<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -114,23 +113,22 @@ public sealed class GitHubArtefactPushServiceTests
         var s3Key = "projects/{id}/artefacts/requirements/REQ-001.md/v1";
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _service.PushAsync(
             project.Id, artefactId, "requirements/REQ-001.md", 1,
             "text/markdown", s3Key, "user@emisgroup.com", CancellationToken.None);
 
-        await _artefactStorageService.Received(1)
-            .GetContentAsync(s3Key, Arg.Any<CancellationToken>());
+        _artefactStorageService.Verify(service => service.GetContentAsync(s3Key, It.IsAny<CancellationToken>()), Times.Once);
 
-        var callArgs = _contentsService.ReceivedCalls()
-            .Where(c => c.GetMethodInfo().Name == nameof(IGitHubContentsService.PushFileAsync))
+        var callArgs = _contentsService.Invocations
+            .Where(c => c.Method.Name == nameof(IGitHubContentsService.PushFileAsync))
             .First();
-        var path = (string)callArgs.GetArguments()[3]!;
+        var path = (string)callArgs.Arguments[3]!;
         Assert.Equal(".genesis/requirements/REQ-001.md", path);
 
-        var content = (byte[])callArgs.GetArguments()[4]!;
+        var content = (byte[])callArgs.Arguments[4]!;
         Assert.Equal("# REQ-001\nContent", Encoding.UTF8.GetString(content));
     }
 
@@ -142,21 +140,20 @@ public sealed class GitHubArtefactPushServiceTests
         var s3Key = "projects/{id}/artefacts/clinical-safety/DCB0129-001.xlsx/v1";
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _service.PushAsync(
             project.Id, artefactId, "clinical-safety/DCB0129-001.xlsx", 1,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             s3Key, "user@emisgroup.com", CancellationToken.None);
 
-        await _artefactStorageService.Received(1)
-            .GetBinaryContentAsync(s3Key, Arg.Any<CancellationToken>());
+        _artefactStorageService.Verify(service => service.GetBinaryContentAsync(s3Key, It.IsAny<CancellationToken>()), Times.Once);
 
-        var callArgs = _contentsService.ReceivedCalls()
-            .Where(c => c.GetMethodInfo().Name == nameof(IGitHubContentsService.PushFileAsync))
+        var callArgs = _contentsService.Invocations
+            .Where(c => c.Method.Name == nameof(IGitHubContentsService.PushFileAsync))
             .First();
-        var path = (string)callArgs.GetArguments()[3]!;
+        var path = (string)callArgs.Arguments[3]!;
         Assert.Equal(".genesis/clinical-safety/DCB0129-001.xlsx", path);
     }
 
@@ -167,17 +164,17 @@ public sealed class GitHubArtefactPushServiceTests
         var artefactId = Guid.NewGuid();
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _service.PushAsync(
             project.Id, artefactId, "requirements/REQ-001.md", 3,
             "text/markdown", "s3key", "user@emisgroup.com", CancellationToken.None);
 
-        var callArgs = _contentsService.ReceivedCalls()
-            .Where(c => c.GetMethodInfo().Name == nameof(IGitHubContentsService.PushFileAsync))
+        var callArgs = _contentsService.Invocations
+            .Where(c => c.Method.Name == nameof(IGitHubContentsService.PushFileAsync))
             .First();
-        var commitMessage = (string)callArgs.GetArguments()[5]!;
+        var commitMessage = (string)callArgs.Arguments[5]!;
 
         Assert.Contains("Triggered-By: user@emisgroup.com", commitMessage);
         Assert.Contains("Approved-By: user@emisgroup.com", commitMessage);
@@ -193,17 +190,17 @@ public sealed class GitHubArtefactPushServiceTests
         var artefactId = Guid.NewGuid();
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
 
         await _service.PushAsync(
             project.Id, artefactId, "requirements/REQ-001.md", 1,
             "text/markdown", "s3key", "user@emisgroup.com", CancellationToken.None);
 
-        var callArgs = _contentsService.ReceivedCalls()
-            .Where(c => c.GetMethodInfo().Name == nameof(IGitHubContentsService.PushFileAsync))
+        var callArgs = _contentsService.Invocations
+            .Where(c => c.Method.Name == nameof(IGitHubContentsService.PushFileAsync))
             .First();
-        var existingSha = (string?)callArgs.GetArguments()[6];
+        var existingSha = (string?)callArgs.Arguments[6];
         Assert.Equal("abc123", existingSha);
     }
 
@@ -215,23 +212,22 @@ public sealed class GitHubArtefactPushServiceTests
         var filePath = "requirements/REQ-001.md";
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
         _contentsService
-            .PushFileAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Throws(new Exception("push failed"));
+            .Setup(service => service.PushFileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("push failed"));
 
         await _service.PushAsync(
             project.Id, artefactId, filePath, 1,
             "text/markdown", "s3key", "user@emisgroup.com", CancellationToken.None);
 
-        await _pushFailureLogRepository.Received(1)
-            .AddAsync(Arg.Is<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(
+        _pushFailureLogRepository.Verify(repository => repository.AddAsync(It.Is<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(
                 log => log.FilePath == filePath &&
                        log.ErrorMessage.Contains("push failed") &&
                        log.RetryCount == 0),
-                Arg.Any<CancellationToken>());
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -241,12 +237,12 @@ public sealed class GitHubArtefactPushServiceTests
         var artefactId = Guid.NewGuid();
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
         _contentsService
-            .PushFileAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Throws(new Exception("push failed"));
+            .Setup(service => service.PushFileAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("push failed"));
 
         var exception = await Record.ExceptionAsync(() =>
             _service.PushAsync(project.Id, artefactId, "requirements/REQ-001.md", 1,
@@ -263,20 +259,19 @@ public sealed class GitHubArtefactPushServiceTests
         var filePath = "requirements/REQ-001.md";
 
         _projectRepository
-            .GetByIdAsync(project.Id, Arg.Any<CancellationToken>())
-            .Returns(project);
+            .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
         _artefactStorageService
-            .GetContentAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((string?)null);
+            .Setup(service => service.GetContentAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
 
         await _service.PushAsync(
             project.Id, artefactId, filePath, 1,
             "text/markdown", "s3key", "user@emisgroup.com", CancellationToken.None);
 
-        await _pushFailureLogRepository.Received(1)
-            .AddAsync(Arg.Is<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(
+        _pushFailureLogRepository.Verify(repository => repository.AddAsync(It.Is<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(
                 log => log.FilePath == filePath),
-                Arg.Any<CancellationToken>());
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static Project CreateProjectWithGitHub()

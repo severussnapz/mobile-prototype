@@ -5,76 +5,84 @@ using Genesis.AI.Domain.Commands.GenerateSessionClose;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Interfaces;
+using Moq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
 
 namespace Genesis.AI.Tests.Domain.Commands.GenerateSessionClose;
 
 public sealed class GenerateSessionCloseCommandHandlerTests
 {
-    private readonly IConversationRepository _conversationRepository;
-    private readonly IArtefactRepository _artefactRepository;
-    private readonly IArtefactStorageService _artefactStorageService;
-    private readonly IAiService _aiService;
-    private readonly ISessionCloseSkillBuilder _sessionCloseSkillBuilder;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly Mock<IConversationRepository> _conversationRepository;
+    private readonly Mock<IArtefactRepository> _artefactRepository;
+    private readonly Mock<IArtefactStorageService> _artefactStorageService;
+    private readonly Mock<IAiService> _aiService;
+    private readonly Mock<ISessionCloseSkillBuilder> _sessionCloseSkillBuilder;
+    private readonly Mock<IUnitOfWork> _unitOfWork;
     private readonly FakeTimeProvider _timeProvider;
-    private readonly ILogger<GenerateSessionCloseCommandHandler> _logger;
+    private readonly Mock<ILogger<GenerateSessionCloseCommandHandler>> _logger;
     private readonly GenerateSessionCloseCommandHandler _handler;
 
     public GenerateSessionCloseCommandHandlerTests()
     {
-        _conversationRepository = Substitute.For<IConversationRepository>();
-        _artefactRepository = Substitute.For<IArtefactRepository>();
-        _artefactStorageService = Substitute.For<IArtefactStorageService>();
-        _aiService = Substitute.For<IAiService>();
-        _sessionCloseSkillBuilder = Substitute.For<ISessionCloseSkillBuilder>();
-        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _conversationRepository = new Mock<IConversationRepository>();
+        _artefactRepository = new Mock<IArtefactRepository>();
+        _artefactStorageService = new Mock<IArtefactStorageService>();
+        _aiService = new Mock<IAiService>();
+        _sessionCloseSkillBuilder = new Mock<ISessionCloseSkillBuilder>();
+        _unitOfWork = new Mock<IUnitOfWork>();
         _timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 07, 07, 9, 0, 0, TimeSpan.Zero));
-        _logger = Substitute.For<ILogger<GenerateSessionCloseCommandHandler>>();
+        _logger = new Mock<ILogger<GenerateSessionCloseCommandHandler>>();
 
-        _conversationRepository.GetByIdWithMessagesAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo => CreateConversation(callInfo.Arg<Guid>()));
-        _artefactRepository.GetByProjectAndFilePathAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((Artefact?)null);
-        _artefactRepository.GetNextVersionForFileAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(1);
-        _artefactStorageService.SaveContentAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<string>(),
-                Arg.Any<int>(),
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns("projects/p/session-close/v1");
-        _aiService.GenerateResponseAsync(
-                Arg.Any<AiSystemPrompt>(),
-                Arg.Any<IReadOnlyList<AiMessage>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new AiResponse("# Session Close\n\nSummary content", 1, 1, 0, 0));
-        _sessionCloseSkillBuilder.Build(Arg.Any<StageType>(), Arg.Any<string>())
+        _conversationRepository
+            .Setup(repository => repository.GetByIdWithMessagesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid conversationId, CancellationToken _) => CreateConversation(conversationId));
+        _artefactRepository
+            .Setup(repository => repository.GetByProjectAndFilePathAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Artefact?)null);
+        _artefactRepository
+            .Setup(repository => repository.GetNextVersionForFileAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _artefactStorageService
+            .Setup(service => service.SaveContentAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("projects/p/session-close/v1");
+        _aiService
+            .Setup(service => service.GenerateResponseAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AiResponse("# Session Close\n\nSummary content", 1, 1, 0, 0));
+        _sessionCloseSkillBuilder
+            .Setup(builder => builder.Build(It.IsAny<StageType>(), It.IsAny<string>()))
             .Returns("skill prompt");
-        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
-            .Returns(1);
+        _unitOfWork
+            .Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         _handler = new GenerateSessionCloseCommandHandler(
-            _conversationRepository,
-            _artefactRepository,
-            _artefactStorageService,
-            _aiService,
-            _sessionCloseSkillBuilder,
-            _unitOfWork,
+            _conversationRepository.Object,
+            _artefactRepository.Object,
+            _artefactStorageService.Object,
+            _aiService.Object,
+            _sessionCloseSkillBuilder.Object,
+            _unitOfWork.Object,
             _timeProvider,
-            _logger);
+            _logger.Object);
     }
 
     [Fact]
     public async Task Handle_ConversationNotFound_ThrowsNotFoundException()
     {
         var command = new GenerateSessionCloseCommand(Guid.NewGuid(), Guid.NewGuid(), StageType.RequirementsDiscovery, "user-1");
-        _conversationRepository.GetByIdWithMessagesAsync(command.ConversationId, Arg.Any<CancellationToken>())
-            .Returns((Conversation?)null);
+        _conversationRepository
+            .Setup(repository => repository.GetByIdWithMessagesAsync(command.ConversationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Conversation?)null);
 
         var action = async () => await _handler.Handle(command, CancellationToken.None);
 
@@ -89,8 +97,8 @@ public sealed class GenerateSessionCloseCommandHandlerTests
         var result = await _handler.Handle(command, CancellationToken.None);
 
         Assert.Equal(1, result.Version);
-        await _artefactRepository.Received(1).AddAsync(Arg.Any<Artefact>(), Arg.Any<CancellationToken>());
-        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        _artefactRepository.Verify(repository => repository.AddAsync(It.IsAny<Artefact>(), It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWork.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -108,15 +116,16 @@ public sealed class GenerateSessionCloseCommandHandlerTests
             _timeProvider,
             true);
 
-        _artefactRepository.GetByProjectAndFilePathAsync(command.ProjectId, "session-close/SESSION-CLOSE-P01.md", Arg.Any<CancellationToken>())
-            .Returns(existing);
+        _artefactRepository
+            .Setup(repository => repository.GetByProjectAndFilePathAsync(command.ProjectId, "session-close/SESSION-CLOSE-P01.md", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
 
         var result = await _handler.Handle(command, CancellationToken.None);
 
         Assert.Equal(3, result.Version);
-        await _artefactRepository.Received(1).UpdateAsync(existing, Arg.Any<CancellationToken>());
-        await _artefactRepository.DidNotReceive().AddAsync(Arg.Any<Artefact>(), Arg.Any<CancellationToken>());
-        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        _artefactRepository.Verify(repository => repository.UpdateAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
+        _artefactRepository.Verify(repository => repository.AddAsync(It.IsAny<Artefact>(), It.IsAny<CancellationToken>()), Times.Never);
+        _unitOfWork.Verify(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -136,13 +145,13 @@ public sealed class GenerateSessionCloseCommandHandlerTests
 
         await _handler.Handle(command, CancellationToken.None);
 
-        _sessionCloseSkillBuilder.Received(1).Build(
+        _sessionCloseSkillBuilder.Verify(builder => builder.Build(
             StageType.RequirementsDiscovery,
-            Arg.Is<string>(summary => summary.Contains("User message", StringComparison.Ordinal)));
-        await _aiService.Received(1).GenerateResponseAsync(
-            Arg.Is<AiSystemPrompt>(prompt => prompt.StablePart.Contains("skill prompt", StringComparison.Ordinal)),
-            Arg.Any<IReadOnlyList<AiMessage>>(),
-            Arg.Any<CancellationToken>());
+            It.Is<string>(summary => summary.Contains("User message", StringComparison.Ordinal))), Times.Once);
+        _aiService.Verify(service => service.GenerateResponseAsync(
+            It.Is<AiSystemPrompt>(prompt => prompt.StablePart.Contains("skill prompt", StringComparison.Ordinal)),
+            It.IsAny<IReadOnlyList<AiMessage>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -152,12 +161,12 @@ public sealed class GenerateSessionCloseCommandHandlerTests
         Artefact? savedArtefact = null;
 
         _artefactRepository
-            .AddAsync(Arg.Any<Artefact>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
+            .Setup(repository => repository.AddAsync(It.IsAny<Artefact>(), It.IsAny<CancellationToken>()))
+            .Callback<Artefact, CancellationToken>((artefact, _) =>
             {
-                savedArtefact = callInfo.Arg<Artefact>();
-                return Task.CompletedTask;
-            });
+                savedArtefact = artefact;
+            })
+            .Returns(Task.CompletedTask);
 
         await _handler.Handle(command, CancellationToken.None);
 
