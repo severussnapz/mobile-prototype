@@ -46,7 +46,10 @@ public sealed class KnowledgeSeederService : BackgroundService
         // Small delay to allow app to fully start before seeding
         await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
 
-        await SeedGenesisToolNamespaceAsync(stoppingToken);
+        // Use CancellationToken.None for seeding — the work must complete
+        // regardless of host shutdown signals. The delay above respects
+        // stoppingToken so the container can still shut down cleanly during startup.
+        await SeedGenesisToolNamespaceAsync(CancellationToken.None);
     }
 
     /// <summary>
