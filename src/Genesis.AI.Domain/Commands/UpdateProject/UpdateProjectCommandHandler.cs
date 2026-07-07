@@ -1,4 +1,5 @@
 using Genesis.AI.Core.Data;
+using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Interfaces;
 using MediatR;
@@ -54,26 +55,44 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
 
         var wasGitHubConfigured = project.HasGitHubConfig;
 
-        if (!string.IsNullOrWhiteSpace(request.Name)
-            && !string.IsNullOrWhiteSpace(request.TimeSheetCode))
+        // Parse ComplianceDomain string to enum, fall back to existing value.
+        var complianceDomain = project.ComplianceDomain;
+        if (!string.IsNullOrWhiteSpace(request.ComplianceDomain)
+            && Enum.TryParse<ComplianceDomain>(request.ComplianceDomain, ignoreCase: true, out var parsedDomain))
         {
-            project.UpdateDetails(
-                request.Name,
-                request.Description,
-                request.TimeSheetCode,
-                request.ComplianceDomain,
+            complianceDomain = parsedDomain;
+        }
+
+        // Always update details — fall back to existing values for omitted fields.
+        project.UpdateDetails(
+            !string.IsNullOrWhiteSpace(request.Name) ? request.Name : project.Name,
+            request.Description ?? project.Description,
+            !string.IsNullOrWhiteSpace(request.TimeSheetCode) ? request.TimeSheetCode : project.TimeSheetCode,
+            complianceDomain,
+            _timeProvider);
+
+        // Update GitHub config if any GitHub field is provided and installation id is valid.
+        var installationId = request.GitHubInstallationId ?? project.GitHubInstallationId;
+        var gitHubRepoOwner = request.GitHubRepoOwner ?? project.GitHubRepoOwner;
+        var gitHubRepoName = request.GitHubRepoName ?? project.GitHubRepoName;
+        if (!string.IsNullOrWhiteSpace(installationId)
+            && (request.GitHubApiRepoUrl is not null
+                || request.GitHubAppRepoUrl is not null
+                || request.GitHubInstallationId is not null))
+        {
+            project.SetGitHubConfig(
+                request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl ?? string.Empty,
+                request.GitHubAppRepoUrl ?? project.GitHubAppRepoUrl ?? string.Empty,
+            gitHubRepoOwner ?? string.Empty,
+            gitHubRepoName ?? string.Empty,
+                installationId,
                 _timeProvider);
         }
 
-        if (request.GitHubInstallationId is not null)
+        string? encryptedPat = null;
+        if (request.FigmaPat is not null)
         {
-            project.SetGitHubConfig(
-                request.GitHubApiRepoUrl ?? string.Empty,
-                request.GitHubAppRepoUrl ?? string.Empty,
-                request.GitHubRepoOwner ?? string.Empty,
-                request.GitHubRepoName ?? string.Empty,
-                request.GitHubInstallationId,
-                _timeProvider);
+            encryptedPat = _secretEncryptionService.Encrypt(request.FigmaPat);
         }
 
         project.UpdateP00Configuration(
@@ -85,24 +104,8 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
             request.SecurityReviewerAssigned,
             request.MedicalDeviceFlag,
             request.FigmaFileUrl,
-            null,
+            encryptedPat,
             _timeProvider);
-
-        if (request.FigmaPat is not null)
-        {
-            var encryptedPat = _secretEncryptionService.Encrypt(request.FigmaPat);
-            project.UpdateP00Configuration(
-                request.ReleaseType,
-                request.AssuranceRequired,
-                request.PilotDeploymentProcess,
-                request.CsoRoleAssigned,
-                request.IgOwnerRoleAssigned,
-                request.SecurityReviewerAssigned,
-                request.MedicalDeviceFlag,
-                request.FigmaFileUrl,
-                encryptedPat,
-                _timeProvider);
-        }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

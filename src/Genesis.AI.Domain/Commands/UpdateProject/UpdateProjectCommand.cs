@@ -1,5 +1,5 @@
-using Genesis.AI.Domain.Enums;
 using MediatR;
+using Genesis.AI.Domain.Enums;
 
 namespace Genesis.AI.Domain.Commands.UpdateProject;
 
@@ -8,7 +8,7 @@ public sealed record UpdateProjectCommand(
     string Name,
     string? Description,
     string TimeSheetCode,
-    ComplianceDomain ComplianceDomain,
+    string? ComplianceDomain,
     string? GitHubApiRepoUrl,
     string? GitHubAppRepoUrl,
     string? GitHubRepoOwner,
@@ -25,8 +25,6 @@ public sealed record UpdateProjectCommand(
     bool? MedicalDeviceFlag,
     string UpdatedBy) : IRequest<UpdateProjectResult>
 {
-    public string UserErn => UpdatedBy;
-
     public UpdateProjectCommand(
         Guid projectId,
         string userErn,
@@ -49,7 +47,7 @@ public sealed record UpdateProjectCommand(
             string.Empty,
             null,
             string.Empty,
-            default,
+            null,
             gitHubApiRepoUrl,
             gitHubAppRepoUrl,
             gitHubRepoOwner,
@@ -65,6 +63,95 @@ public sealed record UpdateProjectCommand(
             securityReviewerAssigned,
             medicalDeviceFlag,
             userErn)
+    {
+    }
+
+    public UpdateProjectCommand(
+        Guid projectId,
+        string name,
+        string? description,
+        string timeSheetCode,
+        string? complianceDomain,
+        string? gitHubApiRepoUrl,
+        string? gitHubAppRepoUrl,
+        string? gitHubRepoOwner,
+        string? gitHubRepoName,
+        string? gitHubInstallationId,
+        string? figmaFileUrl,
+        string? figmaPat,
+        string? releaseType,
+        bool? assuranceRequired,
+        string? pilotDeploymentProcess,
+        bool? csoRoleAssigned,
+        bool? igOwnerRoleAssigned,
+        bool? securityReviewerAssigned,
+        string updatedBy)
+        : this(
+            projectId,
+            name,
+            description,
+            timeSheetCode,
+            complianceDomain,
+            gitHubApiRepoUrl,
+            gitHubAppRepoUrl,
+            gitHubRepoOwner,
+            gitHubRepoName,
+            gitHubInstallationId,
+            figmaFileUrl,
+            figmaPat,
+            releaseType,
+            assuranceRequired,
+            pilotDeploymentProcess,
+            csoRoleAssigned,
+            igOwnerRoleAssigned,
+            securityReviewerAssigned,
+            null,
+            updatedBy)
+    {
+    }
+
+    public UpdateProjectCommand(
+        Guid projectId,
+        string name,
+        string? description,
+        string timeSheetCode,
+        ComplianceDomain complianceDomain,
+        string? gitHubApiRepoUrl,
+        string? gitHubAppRepoUrl,
+        string? gitHubRepoOwner,
+        string? gitHubRepoName,
+        string? gitHubInstallationId,
+        string? figmaFileUrl,
+        string? figmaPat,
+        string? releaseType,
+        bool? assuranceRequired,
+        string? pilotDeploymentProcess,
+        bool? csoRoleAssigned,
+        bool? igOwnerRoleAssigned,
+        bool? securityReviewerAssigned,
+        bool? medicalDeviceFlag,
+        string updatedBy)
+        : this(
+            projectId,
+            name,
+            description,
+            timeSheetCode,
+            complianceDomain.ToString(),
+            gitHubApiRepoUrl,
+            gitHubAppRepoUrl,
+            gitHubRepoOwner,
+            gitHubRepoName,
+            gitHubInstallationId,
+            figmaFileUrl,
+            figmaPat,
+            releaseType,
+            assuranceRequired,
+            pilotDeploymentProcess,
+            csoRoleAssigned,
+            igOwnerRoleAssigned,
+            securityReviewerAssigned,
+            medicalDeviceFlag,
+            updatedBy)
     {
     }
 

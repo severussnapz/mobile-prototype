@@ -189,7 +189,7 @@ public class ProjectsController : ControllerBase
             Name: request.Name ?? project.Name,
             Description: request.Description ?? project.Description,
             TimeSheetCode: request.TimeSheetCode ?? project.TimeSheetCode,
-            ComplianceDomain: complianceDomain,
+            ComplianceDomain: request.ComplianceDomain,
             GitHubApiRepoUrl: request.GitHubApiRepoUrl,
             GitHubAppRepoUrl: request.GitHubAppRepoUrl,
             GitHubRepoOwner: null,
