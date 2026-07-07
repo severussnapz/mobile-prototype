@@ -74,7 +74,10 @@ public sealed class AesSecretEncryptionService : ISecretEncryptionService
         return System.Text.Encoding.UTF8.GetString(plaintextBytes);
     }
 
-    public string Mask(string ciphertext) => "••••••••";
+    public string Mask(string ciphertext)
+    {
+        return "••••••••";
+    }
 
     public string MaskWithSuffix(string ciphertext, int suffixLength)
     {

@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: centraluk.jfrog.io/glb-docker-vir/library/postgres:17.4-alpine
+    platform: linux/arm64
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -33,7 +34,8 @@ services:
       - ./db/migrations:/flyway/sql
 
   seed:
-    image: centraluk.jfrog.io/glb-docker-vir/library/postgres:17.4-alpine
+    platform: linux/arm64
+    image: pgvector/pgvector:pg17
     depends_on:
       flyway:
         condition: service_completed_successfully
@@ -55,6 +57,7 @@ services:
     volumes:
       - ./localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
       - ./db/seed-artefacts:/etc/localstack/seed-artefacts:ro
+      - localstack_data:/var/lib/localstack
     healthcheck:
       test: ["CMD-SHELL", "awslocal s3 ls s3://genesis-ai-artefacts/projects/ --recursive | grep -q manifest.md"]
       interval: 5s
@@ -96,6 +99,7 @@ services:
 
 volumes:
   postgres_data:
+  localstack_data:
 
 secrets:
   JF_USER:

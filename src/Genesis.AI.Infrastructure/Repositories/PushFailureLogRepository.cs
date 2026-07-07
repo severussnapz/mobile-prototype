@@ -9,7 +9,9 @@ public sealed class PushFailureLogRepository : IPushFailureLogRepository
     private readonly GenesisAiDbContext _context;
 
     public PushFailureLogRepository(GenesisAiDbContext context)
-        => _context = context;
+    {
+        _context = context;
+    }
 
     public async Task AddAsync(PushFailureLog log, CancellationToken ct)
     {
@@ -18,6 +20,8 @@ public sealed class PushFailureLogRepository : IPushFailureLogRepository
     }
 
     public Task<int> GetUnresolvedCountAsync(Guid projectId, CancellationToken ct)
-        => _context.PushFailureLogs
-            .CountAsync(p => p.ProjectId == projectId && p.ResolvedAt == null, ct);
+    {
+        return _context.PushFailureLogs
+            .CountAsync(pushFailureLog => pushFailureLog.ProjectId == projectId && pushFailureLog.ResolvedAt == null, ct);
+    }
 }
