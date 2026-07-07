@@ -75,4 +75,14 @@ public sealed class AesSecretEncryptionService : ISecretEncryptionService
     }
 
     public string Mask(string ciphertext) => "••••••••";
+
+    public string MaskWithSuffix(string ciphertext, int suffixLength)
+    {
+        var plaintext = Decrypt(ciphertext);
+        var suffix = plaintext.Length <= suffixLength
+            ? plaintext
+            : plaintext[^suffixLength..];
+
+        return $"••••••••{suffix}";
+    }
 }

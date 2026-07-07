@@ -62,6 +62,44 @@ public sealed class AesSecretEncryptionServiceTests : IDisposable
     }
 
     [Fact]
+    public void MaskWithSuffix_ReturnsLastFourCharsWithBulletPrefix()
+    {
+        var service = new AesSecretEncryptionService();
+        var ciphertext = service.Encrypt("hello-world-secret-abc123xyz");
+
+        var masked = service.MaskWithSuffix(ciphertext, suffixLength: 4);
+        var plaintext = service.Decrypt(ciphertext);
+
+        Assert.EndsWith(plaintext[^4..], masked, StringComparison.Ordinal);
+        Assert.StartsWith("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", masked, StringComparison.Ordinal);
+        Assert.Equal(12, masked.Length);
+    }
+
+    [Fact]
+    public void MaskWithSuffix_DifferentSuffixLength_ReturnsCorrectLength()
+    {
+        var service = new AesSecretEncryptionService();
+        var ciphertext = service.Encrypt("abcdefghij");
+
+        var masked = service.MaskWithSuffix(ciphertext, suffixLength: 6);
+
+        Assert.Equal(14, masked.Length);
+    }
+
+    [Fact]
+    public void MaskWithSuffix_TamperedCiphertext_ThrowsCryptographicException()
+    {
+        var service = new AesSecretEncryptionService();
+        var ciphertext = service.Encrypt("test-value");
+
+        var bytes = Convert.FromBase64String(ciphertext);
+        bytes[bytes.Length / 2] ^= 0x01;
+        var tamperedCiphertext = Convert.ToBase64String(bytes);
+
+        Assert.Throws<CryptographicException>(() => service.MaskWithSuffix(tamperedCiphertext, suffixLength: 4));
+    }
+
+    [Fact]
     public void Constructor_MissingEnvironmentVariable_ThrowsInvalidOperationException()
     {
         Environment.SetEnvironmentVariable("SECRET_ENCRYPTION_KEY", null);

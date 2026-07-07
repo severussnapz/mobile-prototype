@@ -7,4 +7,6 @@ public interface ISecretEncryptionService
     string Decrypt(string ciphertext);
 
     string Mask(string ciphertext);
+
+    string MaskWithSuffix(string ciphertext, int suffixLength);
 }
