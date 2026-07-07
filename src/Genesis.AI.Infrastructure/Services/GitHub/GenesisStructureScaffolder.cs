@@ -32,7 +32,7 @@ public sealed class GenesisStructureScaffolder : IGenesisStructureScaffolder
         _logger = logger;
     }
 
-    public async Task ScaffoldAsync(Guid projectId, string userErn, CancellationToken ct)
+    public async Task ScaffoldAsync(Guid projectId, string triggeredBy, CancellationToken ct)
     {
         var project = await _projectRepository.GetByIdAsync(projectId, ct).ConfigureAwait(false);
         if (project is null)
@@ -63,7 +63,7 @@ public sealed class GenesisStructureScaffolder : IGenesisStructureScaffolder
         var commitMessage =
             $"chore(genesis): scaffold .genesis/ structure\n\n" +
             $"Provisioned-By: genesis-ai[bot]\n" +
-            $"Triggered-By: {userErn}\n" +
+            $"Triggered-By: {triggeredBy}\n" +
             $"Project-ID: {projectId}\n" +
             $"Genesis-AI-Version: {version}";
 

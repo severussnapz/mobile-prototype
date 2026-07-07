@@ -4,7 +4,9 @@ using Genesis.AI.Api.Features.Conversations;
 using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.Commands.CreateProject;
 using Genesis.AI.Domain.Commands.DeleteProject;
-using Genesis.AI.Domain.Commands.UpdateProject;
+using Genesis.AI.Domain.Commands.UpdateProjectDetails;
+using Genesis.AI.Domain.Commands.UpdateProjectGitHub;
+using Genesis.AI.Domain.Commands.UpdateProjectP00;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Queries.GetProjectById;
@@ -157,59 +159,29 @@ public class ProjectsController : ControllerBase
         return NoContent();
     }
 
-    [HttpPatch("{id:guid}")]
+    [HttpPatch("{id:guid}/details")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(UpdateProjectResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Update(
+    public async Task<IActionResult> UpdateDetails(
         Guid id,
-        [FromBody] UpdateProjectRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] UpdateProjectDetailsRequest request,
+        CancellationToken ct)
     {
-        var userErn = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "system";
+        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
 
-        var project = await _mediator.Send(new GetProjectByIdQuery(id), cancellationToken);
-        if (project is null)
-        {
-            return NotFound(new { userMessage = $"Project with ID '{id}' was not found." });
-        }
-
-        var complianceDomain = project.ComplianceDomain;
-        if (!string.IsNullOrWhiteSpace(request.ComplianceDomain)
-            && !Enum.TryParse<ComplianceDomain>(request.ComplianceDomain, ignoreCase: true, out complianceDomain))
-        {
-            return BadRequest(new
-            {
-                userMessage = $"'{request.ComplianceDomain}' is not a valid compliance domain. Valid values are: ClinicalUk, Generic, Finance."
-            });
-        }
-
-        var command = new UpdateProjectCommand(
-            ProjectId: id,
-            Name: request.Name ?? project.Name,
-            Description: request.Description ?? project.Description,
-            TimeSheetCode: request.TimeSheetCode ?? project.TimeSheetCode,
-            ComplianceDomain: request.ComplianceDomain,
-            GitHubApiRepoUrl: request.GitHubApiRepoUrl,
-            GitHubAppRepoUrl: request.GitHubAppRepoUrl,
-            GitHubRepoOwner: null,
-            GitHubRepoName: null,
-            GitHubInstallationId: request.GitHubInstallationId,
-            FigmaFileUrl: request.FigmaFileUrl,
-            FigmaPat: request.FigmaPat,
-            ReleaseType: request.ReleaseType,
-            AssuranceRequired: request.AssuranceRequired,
-            PilotDeploymentProcess: request.PilotDeploymentProcess,
-            CsoRoleAssigned: request.CsoRoleAssigned,
-            IgOwnerRoleAssigned: request.IgOwnerRoleAssigned,
-            SecurityReviewerAssigned: request.SecurityReviewerAssigned,
-            MedicalDeviceFlag: request.MedicalDeviceFlag,
-            UpdatedBy: userErn);
+        var command = new UpdateProjectDetailsCommand(
+            id,
+            triggeredBy,
+            request.Name,
+            request.Description,
+            request.TimeSheetCode,
+            request.ComplianceDomain);
 
         try
         {
-            var result = await _mediator.Send(command, cancellationToken);
-            return Ok(new UpdateProjectResponse(result.ProjectId, result.FigmaPatPlaintext));
+            await _mediator.Send(command, ct);
+            return Ok();
         }
         catch (NotFoundException ex)
         {
@@ -217,9 +189,84 @@ public class ProjectsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update project {ProjectId}", id);
+            _logger.LogError(ex, "Failed to update project details {ProjectId}", id);
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Failed to save project settings. Please try again." });
+                new { userMessage = "Failed to save project details. Please try again." });
+        }
+    }
+
+    [HttpPatch("{id:guid}/github")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateGitHub(
+        Guid id,
+        [FromBody] UpdateProjectGitHubRequest request,
+        CancellationToken ct)
+    {
+        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
+
+        var command = new UpdateProjectGitHubCommand(
+            id,
+            triggeredBy,
+            request.GitHubApiRepoUrl,
+            request.GitHubAppRepoUrl,
+            request.FigmaFileUrl,
+            request.FigmaPat);
+
+        try
+        {
+            var result = await _mediator.Send(command, ct);
+            return Ok(new { figmaPatPlaintext = result.FigmaPatPlaintext });
+        }
+        catch (NotFoundException ex)
+        {
+            return NotFound(new { userMessage = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update GitHub config {ProjectId}", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { userMessage = "Failed to save GitHub configuration. Please try again." });
+        }
+    }
+
+    [HttpPatch("{id:guid}/p00")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateP00(
+        Guid id,
+        [FromBody] UpdateProjectP00Request request,
+        CancellationToken ct)
+    {
+        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
+
+        var command = new UpdateProjectP00Command(
+            id,
+            triggeredBy,
+            request.ReleaseType,
+            request.AssuranceRequired,
+            request.PilotDeploymentProcess,
+            request.CsoRoleAssigned,
+            request.IgOwnerRoleAssigned,
+            request.SecurityReviewerAssigned,
+            request.MedicalDeviceFlag);
+
+        try
+        {
+            await _mediator.Send(command, ct);
+            return Ok();
+        }
+        catch (NotFoundException ex)
+        {
+            return NotFound(new { userMessage = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update P00 config {ProjectId}", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { userMessage = "Failed to save project configuration. Please try again." });
         }
     }
 

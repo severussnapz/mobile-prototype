@@ -51,7 +51,7 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
 
     public async Task PushAsync(
         Guid projectId, Guid artefactId, string filePath, int version,
-        string contentType, string s3Key, string publishedByErn,
+        string contentType, string s3Key, string triggeredBy,
         CancellationToken ct)
     {
         try
@@ -121,8 +121,8 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
             var appVersion = _versionProvider.GetVersion();
             var commitMessage =
                 $"feat(artefacts): publish {filePath} v{version}\n\n" +
-                $"Triggered-By: {publishedByErn}\n" +
-                $"Approved-By: {publishedByErn}\n" +
+                $"Triggered-By: {triggeredBy}\n" +
+                $"Approved-By: {triggeredBy}\n" +
                 $"Project-ID: {projectId}\n" +
                 $"Artefact-ID: {artefactId}\n" +
                 $"Genesis-AI-Version: {appVersion}";

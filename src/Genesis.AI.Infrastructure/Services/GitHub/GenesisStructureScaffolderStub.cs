@@ -4,6 +4,6 @@ namespace Genesis.AI.Infrastructure.Services.GitHub;
 
 internal sealed class GenesisStructureScaffolderStub : IGenesisStructureScaffolder
 {
-    public Task ScaffoldAsync(Guid projectId, string userErn, CancellationToken ct)
+    public Task ScaffoldAsync(Guid projectId, string triggeredBy, CancellationToken ct)
         => Task.CompletedTask;
 }

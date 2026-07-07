@@ -98,6 +98,20 @@ public class Project : Entity, IAggregateRoot
         UpdatedAt = timeProvider.GetUtcNow();
     }
 
+    public void UpdateGitHubUrls(
+        string? apiRepoUrl,
+        string? appRepoUrl,
+        string? figmaFileUrl,
+        TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        GitHubApiRepoUrl = apiRepoUrl ?? GitHubApiRepoUrl;
+        GitHubAppRepoUrl = appRepoUrl ?? GitHubAppRepoUrl;
+        FigmaFileUrl = figmaFileUrl ?? FigmaFileUrl;
+        UpdatedAt = timeProvider.GetUtcNow();
+    }
+
     public void UpdateDetails(
         string name,
         string? description,

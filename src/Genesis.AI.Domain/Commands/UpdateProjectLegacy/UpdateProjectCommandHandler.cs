@@ -55,7 +55,6 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
 
         var wasGitHubConfigured = project.HasGitHubConfig;
 
-        // Parse ComplianceDomain string to enum, fall back to existing value.
         var complianceDomain = project.ComplianceDomain;
         if (!string.IsNullOrWhiteSpace(request.ComplianceDomain)
             && Enum.TryParse<ComplianceDomain>(request.ComplianceDomain, ignoreCase: true, out var parsedDomain))
@@ -63,7 +62,6 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
             complianceDomain = parsedDomain;
         }
 
-        // Always update details — fall back to existing values for omitted fields.
         project.UpdateDetails(
             !string.IsNullOrWhiteSpace(request.Name) ? request.Name : project.Name,
             request.Description ?? project.Description,
@@ -71,7 +69,6 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
             complianceDomain,
             _timeProvider);
 
-        // Update GitHub config if any GitHub field is provided and installation id is valid.
         var installationId = request.GitHubInstallationId ?? project.GitHubInstallationId;
         var gitHubRepoOwner = request.GitHubRepoOwner ?? project.GitHubRepoOwner;
         var gitHubRepoName = request.GitHubRepoName ?? project.GitHubRepoName;
@@ -83,8 +80,8 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
             project.SetGitHubConfig(
                 request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl ?? string.Empty,
                 request.GitHubAppRepoUrl ?? project.GitHubAppRepoUrl ?? string.Empty,
-            gitHubRepoOwner ?? string.Empty,
-            gitHubRepoName ?? string.Empty,
+                gitHubRepoOwner ?? string.Empty,
+                gitHubRepoName ?? string.Empty,
                 installationId,
                 _timeProvider);
         }
@@ -117,11 +114,11 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
         return new UpdateProjectResult(request.ProjectId, request.FigmaPat ?? null);
     }
 
-    private async Task ScaffoldBestEffortAsync(Guid projectId, string userErn, CancellationToken ct)
+    private async Task ScaffoldBestEffortAsync(Guid projectId, string triggeredBy, CancellationToken ct)
     {
         try
         {
-            await _genesisStructureScaffolder.ScaffoldAsync(projectId, userErn, ct);
+            await _genesisStructureScaffolder.ScaffoldAsync(projectId, triggeredBy, ct);
         }
         catch (Exception exception)
         {

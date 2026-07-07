@@ -4,6 +4,6 @@ public interface IGitHubArtefactPushService
 {
     Task PushAsync(
         Guid projectId, Guid artefactId, string filePath, int version,
-        string contentType, string s3Key, string publishedByErn,
+    string contentType, string s3Key, string triggeredBy,
         CancellationToken ct);
 }
