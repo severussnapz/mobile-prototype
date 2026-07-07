@@ -13,7 +13,7 @@ public class ProjectMappingProfile : Profile
                 options => options.MapFrom(source => source.PipelineStages.OrderBy(stage => stage.SortOrder)))
             .ForMember(
                 destination => destination.ComplianceDomain,
-                options => options.MapFrom(source => ConvertToKebabCase(source.ComplianceDomain.ToString())))
+                options => options.MapFrom(source => source.ComplianceDomain.ToString()))
             .ForMember(
                 destination => destination.Status,
                 options => options.MapFrom(source => ConvertToKebabCase(source.Status.ToString())))
@@ -21,17 +21,35 @@ public class ProjectMappingProfile : Profile
                 destination => destination.FigmaPatConfigured,
                 options => options.MapFrom(source => source.FigmaPatEncrypted != null))
             .ForMember(
+                destination => destination.FigmaPatHint,
+                options => options.MapFrom(source => source.FigmaPatEncrypted != null ? "••••••••" : null))
+            .ForMember(
                 destination => destination.GitHubApiRepoUrl,
                 options => options.MapFrom(source => source.GitHubApiRepoUrl))
             .ForMember(
                 destination => destination.GitHubAppRepoUrl,
                 options => options.MapFrom(source => source.GitHubAppRepoUrl))
             .ForMember(
+                destination => destination.FigmaFileUrl,
+                options => options.MapFrom(source => source.FigmaFileUrl))
+            .ForMember(
                 destination => destination.ReleaseType,
                 options => options.MapFrom(source => source.ReleaseType))
             .ForMember(
                 destination => destination.AssuranceRequired,
                 options => options.MapFrom(source => source.AssuranceRequired))
+            .ForMember(
+                destination => destination.PilotDeploymentProcess,
+                options => options.MapFrom(source => source.PilotDeploymentProcess))
+            .ForMember(
+                destination => destination.CsoRoleAssigned,
+                options => options.MapFrom(source => source.CsoRoleAssigned))
+            .ForMember(
+                destination => destination.IgOwnerRoleAssigned,
+                options => options.MapFrom(source => source.IgOwnerRoleAssigned))
+            .ForMember(
+                destination => destination.SecurityReviewerAssigned,
+                options => options.MapFrom(source => source.SecurityReviewerAssigned))
             .ForMember(
                 destination => destination.MedicalDeviceFlag,
                 options => options.MapFrom(source => source.MedicalDeviceFlag));

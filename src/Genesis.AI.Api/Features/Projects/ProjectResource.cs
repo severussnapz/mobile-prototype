@@ -54,6 +54,30 @@ public sealed class ProjectResource
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? AssuranceRequired { get; init; }
 
+    [JsonPropertyName("pilotDeploymentProcess")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PilotDeploymentProcess { get; init; }
+
+    [JsonPropertyName("csoRoleAssigned")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? CsoRoleAssigned { get; init; }
+
+    [JsonPropertyName("igOwnerRoleAssigned")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IgOwnerRoleAssigned { get; init; }
+
+    [JsonPropertyName("securityReviewerAssigned")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? SecurityReviewerAssigned { get; init; }
+
+    [JsonPropertyName("figmaFileUrl")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FigmaFileUrl { get; init; }
+
+    [JsonPropertyName("figmaPatHint")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FigmaPatHint { get; init; }
+
     [JsonPropertyName("medicalDeviceFlag")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? MedicalDeviceFlag { get; init; }
