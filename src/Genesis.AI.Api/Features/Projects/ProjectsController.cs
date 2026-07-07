@@ -12,7 +12,6 @@ using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Queries.GetProjectById;
 using Genesis.AI.Domain.Queries.GetProjectParkingLot;
 using Genesis.AI.Domain.Queries.GetProjects;
-using Genesis.AI.Domain.Queries.GetPushStatus;
 using MediatR;
 using Genesis.AI.Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -296,41 +295,4 @@ public class ProjectsController : ControllerBase
         return Ok(new ApiResponse<List<ParkingLotItemResponse>> { Data = dtos });
     }
 
-    /// <summary>
-    /// Get aggregated token usage and estimated cost for all stages in a project.
-    /// </summary>
-    [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
-    [HttpGet("{id:guid}/token-usage")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetProjectTokenUsage(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _mediator.Send(
-            new Domain.Queries.GetProjectTokenUsage.GetProjectTokenUsageQuery(id), cancellationToken);
-
-        return Ok(new ApiResponse<ProjectTokenUsageResponse>
-        {
-            Data = new ProjectTokenUsageResponse
-            {
-                Stages = result.Stages,
-                Totals = new TokenUsageTotals
-                {
-                    InputTokens = result.TotalInputTokens,
-                    OutputTokens = result.TotalOutputTokens,
-                    CacheReadInputTokens = result.TotalCacheReadInputTokens,
-                    CacheWriteInputTokens = result.TotalCacheWriteInputTokens,
-                    TurnCount = result.TotalTurnCount,
-                    EstimatedCost = result.TotalEstimatedCost
-                }
-            }
-        });
-    }
-
-    [HttpGet("{projectId:guid}/push-status")]
-    [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
-    [ProducesResponseType(typeof(PushStatusResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetPushStatus(Guid projectId, CancellationToken cancellationToken)
-    {
-        var result = await _mediator.Send(new GetPushStatusQuery(projectId), cancellationToken);
-        return Ok(new PushStatusResponse(result.UnresolvedCount));
-    }
 }

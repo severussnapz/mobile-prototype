@@ -49,12 +49,7 @@ public sealed class GenerateSessionCloseCommandHandler
             throw new NotFoundException($"Conversation {command.ConversationId} not found.");
         }
 
-        var summary = string.Join(
-            "\n\n",
-            conversation.Messages
-                .OrderBy(message => message.CreatedAt)
-                .TakeLast(20)
-                .Select(message => $"{message.Role}: {message.Content}"));
+        var summary = BuildConversationSummary(conversation);
 
         var prompt = _skillBuilder.Build(command.StageType, summary);
 
@@ -66,51 +61,7 @@ public sealed class GenerateSessionCloseCommandHandler
         var content = aiResponse.Content;
         var filePath = SessionCloseStageMap.GetFilePath(command.StageType);
 
-        var existing = await _artefactRepository.GetByProjectAndFilePathAsync(
-            command.ProjectId,
-            filePath,
-            cancellationToken);
-
-        int version;
-        Artefact artefact;
-        if (existing is null)
-        {
-            version = await _artefactRepository.GetNextVersionForFileAsync(command.ProjectId, filePath, cancellationToken);
-            var s3Key = await _storageService.SaveContentAsync(
-                command.ProjectId,
-                filePath,
-                version,
-                content,
-                "text/markdown",
-                cancellationToken);
-            var sizeBytes = Encoding.UTF8.GetByteCount(content);
-            artefact = Artefact.CreateS3Artefact(
-                command.ProjectId,
-                version,
-                filePath,
-                s3Key,
-                "text/markdown",
-                sizeBytes,
-                command.UserErn,
-                _timeProvider,
-                true);
-            await _artefactRepository.AddAsync(artefact, cancellationToken);
-        }
-        else
-        {
-            version = existing.Version + 1;
-            var s3Key = await _storageService.SaveContentAsync(
-                command.ProjectId,
-                filePath,
-                version,
-                content,
-                "text/markdown",
-                cancellationToken);
-            var sizeBytes = Encoding.UTF8.GetByteCount(content);
-            existing.ReplaceContent(version, s3Key, "text/markdown", sizeBytes, command.UserErn, _timeProvider);
-            artefact = existing;
-            await _artefactRepository.UpdateAsync(artefact, cancellationToken);
-        }
+        var (artefact, version) = await UpsertSessionCloseArtefactAsync(command, filePath, content, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -123,5 +74,92 @@ public sealed class GenerateSessionCloseCommandHandler
             version);
 
         return new GenerateSessionCloseResult(artefact.Id, filePath, version);
+    }
+
+    private static string BuildConversationSummary(Genesis.AI.Domain.AggregatesModel.ConversationAggregate.Conversation conversation)
+    {
+        return string.Join(
+            "\n\n",
+            conversation.Messages
+                .OrderBy(message => message.CreatedAt)
+                .TakeLast(20)
+                .Select(message => $"{message.Role}: {message.Content}"));
+    }
+
+    private async Task<(Artefact Artefact, int Version)> UpsertSessionCloseArtefactAsync(
+        GenerateSessionCloseCommand command,
+        string filePath,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _artefactRepository.GetByProjectAndFilePathAsync(
+            command.ProjectId,
+            filePath,
+            cancellationToken);
+
+        if (existing is null)
+        {
+            return await CreateArtefactAsync(command, filePath, content, cancellationToken);
+        }
+
+        return await UpdateArtefactAsync(command, existing, filePath, content, cancellationToken);
+    }
+
+    private async Task<(Artefact Artefact, int Version)> CreateArtefactAsync(
+        GenerateSessionCloseCommand command,
+        string filePath,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var version = await _artefactRepository.GetNextVersionForFileAsync(command.ProjectId, filePath, cancellationToken);
+        var (s3Key, sizeBytes) = await SaveArtefactContentAsync(command.ProjectId, filePath, version, content, cancellationToken);
+
+        var artefact = Artefact.CreateS3Artefact(
+            command.ProjectId,
+            version,
+            filePath,
+            s3Key,
+            "text/markdown",
+            sizeBytes,
+            command.UserErn,
+            _timeProvider,
+            true);
+
+        await _artefactRepository.AddAsync(artefact, cancellationToken);
+        return (artefact, version);
+    }
+
+    private async Task<(Artefact Artefact, int Version)> UpdateArtefactAsync(
+        GenerateSessionCloseCommand command,
+        Artefact existing,
+        string filePath,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var version = existing.Version + 1;
+        var (s3Key, sizeBytes) = await SaveArtefactContentAsync(command.ProjectId, filePath, version, content, cancellationToken);
+
+        existing.ReplaceContent(version, s3Key, "text/markdown", sizeBytes, command.UserErn, _timeProvider);
+        await _artefactRepository.UpdateAsync(existing, cancellationToken);
+        return (existing, version);
+    }
+
+    private async Task<(string S3Key, int SizeBytes)> SaveArtefactContentAsync(
+        Guid projectId,
+        string filePath,
+        int version,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var s3Key = await _storageService.SaveContentAsync(
+            projectId,
+            filePath,
+            version,
+            content,
+            "text/markdown",
+            cancellationToken);
+
+        var sizeBytes = Encoding.UTF8.GetByteCount(content);
+        return (s3Key, sizeBytes);
     }
 }

@@ -11,38 +11,38 @@ public sealed class PushFailureLogEntityTypeConfiguration
     {
         builder.ToTable("push_failure_log");
 
-        builder.HasKey(p => p.Id);
+        builder.HasKey(pushFailureLog => pushFailureLog.Id);
 
-        builder.Property(p => p.Id)
+        builder.Property(pushFailureLog => pushFailureLog.Id)
             .HasColumnName("push_failure_log_uuid")
             .ValueGeneratedNever();
 
-        builder.Property(p => p.ProjectId)
+        builder.Property(pushFailureLog => pushFailureLog.ProjectId)
             .HasColumnName("project_id")
             .IsRequired();
 
-        builder.Property(p => p.ArtefactId)
+        builder.Property(pushFailureLog => pushFailureLog.ArtefactId)
             .HasColumnName("artefact_id")
             .IsRequired();
 
-        builder.Property(p => p.FilePath)
+        builder.Property(pushFailureLog => pushFailureLog.FilePath)
             .HasColumnName("file_path")
             .HasMaxLength(500)
             .IsRequired();
 
-        builder.Property(p => p.ErrorMessage)
+        builder.Property(pushFailureLog => pushFailureLog.ErrorMessage)
             .HasColumnName("error_message")
             .IsRequired();
 
-        builder.Property(p => p.FailedAt)
+        builder.Property(pushFailureLog => pushFailureLog.FailedAt)
             .HasColumnName("failed_at")
             .IsRequired();
 
-        builder.Property(p => p.RetryCount)
+        builder.Property(pushFailureLog => pushFailureLog.RetryCount)
             .HasColumnName("retry_count")
             .IsRequired();
 
-        builder.Property(p => p.ResolvedAt)
+        builder.Property(pushFailureLog => pushFailureLog.ResolvedAt)
             .HasColumnName("resolved_at");
     }
 }

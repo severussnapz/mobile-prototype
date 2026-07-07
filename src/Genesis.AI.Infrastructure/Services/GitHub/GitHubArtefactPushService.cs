@@ -56,19 +56,13 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
     {
         try
         {
-            // Step 1: Load project
             var project = await _projectRepository.GetByIdAsync(projectId, ct);
             if (project is null || !project.HasGitHubConfig)
             {
                 return;
             }
 
-            // Extract GitHub config (guaranteed non-null by HasGitHubConfig check)
-            var installationId = project.GitHubInstallationId ?? throw new InvalidOperationException("GitHub config inconsistent");
-            var owner = project.GitHubRepoOwner ?? throw new InvalidOperationException("GitHub config inconsistent");
-            var repoName = project.GitHubRepoName ?? throw new InvalidOperationException("GitHub config inconsistent");
-
-            // Step 2: Map path
+            var (installationId, owner, repoName) = GetGitHubProjectConfiguration(project);
             var targetPath = MapPath(filePath);
             if (targetPath is null)
             {
@@ -76,62 +70,20 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
                 return;
             }
 
-            // Step 3: Determine if binary and read content
-            var isBinary = IsContentTypeBinary(contentType);
-            byte[] content;
-
-            if (isBinary)
+            var content = await LoadArtefactContentAsync(projectId, artefactId, filePath, contentType, s3Key, ct);
+            if (content is null)
             {
-                var binaryContent = await _artefactStorageService.GetBinaryContentAsync(s3Key, ct);
-                if (binaryContent is null)
-                {
-                    await _pushFailureLogRepository.AddAsync(
-                        new PushFailureLog(projectId, artefactId, filePath, "S3 binary content returned null", _timeProvider),
-                        ct);
-                    return;
-                }
-                content = binaryContent;
-            }
-            else
-            {
-                var textContent = await _artefactStorageService.GetContentAsync(s3Key, ct);
-                if (textContent is null)
-                {
-                    await _pushFailureLogRepository.AddAsync(
-                        new PushFailureLog(projectId, artefactId, filePath, "S3 text content returned null", _timeProvider),
-                        ct);
-                    return;
-                }
-                content = Encoding.UTF8.GetBytes(textContent);
+                return;
             }
 
-            // Step 4: Mint token
-            var token = await _tokenService.GetInstallationTokenAsync(
-                installationId, ct);
+            var token = await _tokenService.GetInstallationTokenAsync(installationId, ct);
+            var existingSha = await _contentsService.GetFileShaAsync(token, owner, repoName, targetPath, ct);
+            var commitMessage = BuildCommitMessage(filePath, version, triggeredBy, projectId, artefactId);
 
-            // Step 5: Resolve existing SHA
-            var existingSha = await _contentsService.GetFileShaAsync(
+            await _contentsService.PushFileAsync(
                 token,
                 owner,
                 repoName,
-                targetPath,
-                ct);
-
-            // Step 6: Build commit message
-            var appVersion = _versionProvider.GetVersion();
-            var commitMessage =
-                $"feat(artefacts): publish {filePath} v{version}\n\n" +
-                $"Triggered-By: {triggeredBy}\n" +
-                $"Approved-By: {triggeredBy}\n" +
-                $"Project-ID: {projectId}\n" +
-                $"Artefact-ID: {artefactId}\n" +
-                $"Genesis-AI-Version: {appVersion}";
-
-            // Step 7: Push
-            await _contentsService.PushFileAsync(
-                token,
-                project.GitHubRepoOwner!,
-                project.GitHubRepoName!,
                 targetPath,
                 content,
                 commitMessage,
@@ -149,6 +101,62 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
             var log = new PushFailureLog(projectId, artefactId, filePath, exception.Message, _timeProvider);
             await _pushFailureLogRepository.AddAsync(log, ct);
         }
+    }
+
+    private static (string InstallationId, string Owner, string RepoName) GetGitHubProjectConfiguration(Genesis.AI.Domain.AggregatesModel.ProjectAggregate.Project project)
+    {
+        var installationId = project.GitHubInstallationId ?? throw new InvalidOperationException("GitHub config inconsistent");
+        var owner = project.GitHubRepoOwner ?? throw new InvalidOperationException("GitHub config inconsistent");
+        var repoName = project.GitHubRepoName ?? throw new InvalidOperationException("GitHub config inconsistent");
+        return (installationId, owner, repoName);
+    }
+
+    private async Task<byte[]?> LoadArtefactContentAsync(
+        Guid projectId,
+        Guid artefactId,
+        string filePath,
+        string contentType,
+        string s3Key,
+        CancellationToken ct)
+    {
+        if (IsContentTypeBinary(contentType))
+        {
+            var binaryContent = await _artefactStorageService.GetBinaryContentAsync(s3Key, ct);
+            if (binaryContent is not null)
+            {
+                return binaryContent;
+            }
+
+            await LogMissingContentAsync(projectId, artefactId, filePath, "S3 binary content returned null", ct);
+            return null;
+        }
+
+        var textContent = await _artefactStorageService.GetContentAsync(s3Key, ct);
+        if (textContent is not null)
+        {
+            return Encoding.UTF8.GetBytes(textContent);
+        }
+
+        await LogMissingContentAsync(projectId, artefactId, filePath, "S3 text content returned null", ct);
+        return null;
+    }
+
+    private async Task LogMissingContentAsync(Guid projectId, Guid artefactId, string filePath, string message, CancellationToken ct)
+    {
+        var failureLog = new PushFailureLog(projectId, artefactId, filePath, message, _timeProvider);
+        await _pushFailureLogRepository.AddAsync(failureLog, ct);
+    }
+
+    private string BuildCommitMessage(string filePath, int version, string triggeredBy, Guid projectId, Guid artefactId)
+    {
+        var appVersion = _versionProvider.GetVersion();
+        return
+            $"feat(artefacts): publish {filePath} v{version}\n\n" +
+            $"Triggered-By: {triggeredBy}\n" +
+            $"Approved-By: {triggeredBy}\n" +
+            $"Project-ID: {projectId}\n" +
+            $"Artefact-ID: {artefactId}\n" +
+            $"Genesis-AI-Version: {appVersion}";
     }
 
     private static string? MapPath(string filePath)

@@ -48,10 +48,9 @@ public sealed class GitHubAppTokenService : IGitHubTokenService
         ArgumentException.ThrowIfNullOrWhiteSpace(installationId);
 
         var utcNow = _timeProvider.GetUtcNow();
-        if (_tokenCache.TryGetValue(installationId, out var cached)
-            && cached.ExpiresAt - utcNow > CacheSafetyMargin)
+        if (TryGetCachedToken(installationId, utcNow, out var cachedToken))
         {
-            return cached.Token;
+            return cachedToken;
         }
 
         var jwt = CreateJwt(utcNow);
@@ -79,10 +78,7 @@ public sealed class GitHubAppTokenService : IGitHubTokenService
             response.EnsureSuccessStatusCode();
 
             var payload = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            var document = JsonDocument.Parse(payload);
-            var token = document.RootElement.GetProperty("token").GetString()
-                ?? throw new GitHubAuthenticationException("GitHub installation token response did not contain a token.");
-            var expiresAt = document.RootElement.GetProperty("expires_at").GetDateTimeOffset();
+            var (token, expiresAt) = ParseTokenResponse(payload);
 
             _tokenCache[installationId] = (token, expiresAt);
             return token;
@@ -95,6 +91,28 @@ public sealed class GitHubAppTokenService : IGitHubTokenService
         {
             throw new GitHubAuthenticationException("Failed to obtain a GitHub installation token.", exception);
         }
+    }
+
+    private bool TryGetCachedToken(string installationId, DateTimeOffset utcNow, out string token)
+    {
+        if (_tokenCache.TryGetValue(installationId, out var cached)
+            && cached.ExpiresAt - utcNow > CacheSafetyMargin)
+        {
+            token = cached.Token;
+            return true;
+        }
+
+        token = string.Empty;
+        return false;
+    }
+
+    private static (string Token, DateTimeOffset ExpiresAt) ParseTokenResponse(string payload)
+    {
+        using var document = JsonDocument.Parse(payload);
+        var token = document.RootElement.GetProperty("token").GetString()
+            ?? throw new GitHubAuthenticationException("GitHub installation token response did not contain a token.");
+        var expiresAt = document.RootElement.GetProperty("expires_at").GetDateTimeOffset();
+        return (token, expiresAt);
     }
 
     private string CreateJwt(DateTimeOffset utcNow)
