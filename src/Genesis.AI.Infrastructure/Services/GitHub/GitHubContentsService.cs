@@ -4,6 +4,7 @@ using System.Text.Json;
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.GitHub;
 using Genesis.AI.Domain.Interfaces;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace Genesis.AI.Infrastructure.Services.GitHub;
@@ -16,15 +17,10 @@ public sealed class GitHubContentsService : IGitHubContentsService
     private readonly HttpClient _httpClient;
     private readonly ILogger<GitHubContentsService> _logger;
 
-    public GitHubContentsService(HttpClient httpClient, ILogger<GitHubContentsService> logger)
+    public GitHubContentsService(HttpClient httpClient, ILogger<GitHubContentsService>? logger = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    public GitHubContentsService(HttpClient httpClient)
-        : this(httpClient, Microsoft.Extensions.Logging.Abstractions.NullLogger<GitHubContentsService>.Instance)
-    {
+        _logger = logger ?? NullLogger<GitHubContentsService>.Instance;
     }
 
     public async Task<GitHubPushResult> PushFileAsync(

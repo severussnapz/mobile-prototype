@@ -8,6 +8,7 @@ using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Queries.GetProjectById;
 using Genesis.AI.Domain.Queries.GetProjectParkingLot;
 using Genesis.AI.Domain.Queries.GetProjects;
+using Genesis.AI.Domain.Queries.GetPushStatus;
 using MediatR;
 using Genesis.AI.Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -204,5 +205,14 @@ public class ProjectsController : ControllerBase
                 }
             }
         });
+    }
+
+    [HttpGet("{projectId:guid}/push-status")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
+    [ProducesResponseType(typeof(PushStatusResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPushStatus(Guid projectId, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new GetPushStatusQuery(projectId), cancellationToken);
+        return Ok(new PushStatusResponse(result.UnresolvedCount));
     }
 }
