@@ -11,7 +11,7 @@ namespace Genesis.AI.Infrastructure.Services;
 public sealed class BedrockKnowledgeService : IKnowledgeService
 {
     private const int MaxTopN = 20;
-    private const int TargetWordCount = 400;
+    private const int TargetWordCount = 150;
     private const int HardCapChars = 6000;
 
     private readonly IKnowledgeRepository _knowledgeRepository;
@@ -121,6 +121,68 @@ public sealed class BedrockKnowledgeService : IKnowledgeService
         var currentWordCount = 0;
         var inCodeBlock = false;
 
+        // Breadcrumb tracking — maintain heading hierarchy
+        var headingStack = new Dictionary<int, string>(); // level → heading text
+
+        // Overlap tracking — last N words of previous chunk
+        var previousChunkLines = new List<string>();
+        const int OverlapWordTarget = 30; // ~20% of 150 word target
+        var suppressBreadcrumbForCurrentChunk = false;
+
+        string GetBreadcrumb()
+        {
+            if (headingStack.Count == 0) return string.Empty;
+            return string.Join(" > ", headingStack
+                .OrderBy(kvp => kvp.Key)
+                .Select(kvp => kvp.Value));
+        }
+
+        string StripMarkdownSyntax(string line)
+        {
+            // Strip leading # characters and whitespace
+            return System.Text.RegularExpressions.Regex
+                .Replace(line.TrimStart(), @"^#+\s*", string.Empty).Trim();
+        }
+
+        int GetHeadingLevel(string trimmedLine)
+        {
+            if (trimmedLine.StartsWith("### ", StringComparison.Ordinal)) return 3;
+            if (trimmedLine.StartsWith("## ", StringComparison.Ordinal)) return 2;
+            if (trimmedLine.StartsWith("# ", StringComparison.Ordinal)) return 1;
+            return 0;
+        }
+
+        void FlushWithBreadcrumb()
+        {
+            var raw = currentChunk.ToString().Trim();
+            if (string.IsNullOrWhiteSpace(raw)) return;
+
+            var breadcrumb = GetBreadcrumb();
+            var final = suppressBreadcrumbForCurrentChunk || string.IsNullOrEmpty(breadcrumb)
+                ? raw
+                : $"{breadcrumb}\n\n{raw}";
+
+            FlushChunk(chunks, final);
+
+            // Store lines for overlap into next chunk
+            previousChunkLines = raw.Split('\n')
+                .Where(l => !string.IsNullOrWhiteSpace(l))
+                .ToList();
+        }
+
+        string GetOverlapPrefix()
+        {
+            if (previousChunkLines.Count == 0) return string.Empty;
+            var overlapWords = string.Join("\n", previousChunkLines)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .TakeLast(OverlapWordTarget)
+                .ToArray();
+
+            return overlapWords.Length > 0
+                ? string.Join(" ", overlapWords) + "\n\n"
+                : string.Empty;
+        }
+
         foreach (var line in content.Split('\n'))
         {
             var trimmedLine = line.TrimStart();
@@ -130,33 +192,61 @@ public sealed class BedrockKnowledgeService : IKnowledgeService
                 inCodeBlock = !inCodeBlock;
             }
 
-            var isHeading = !inCodeBlock
-                && (trimmedLine.StartsWith("## ", StringComparison.Ordinal)
-                    || trimmedLine.StartsWith("### ", StringComparison.Ordinal));
+            var headingLevel = !inCodeBlock ? GetHeadingLevel(trimmedLine) : 0;
+            var isHeading = headingLevel > 0;
 
-            // Headings always start a new chunk, regardless of current word count.
-            if (isHeading && currentChunk.Length > 0)
+            if (isHeading)
             {
-                FlushChunk(chunks, currentChunk.ToString());
-                currentChunk.Clear();
-                currentWordCount = 0;
+                // Flush current chunk before starting new section
+                if (currentChunk.Length > 0)
+                {
+                    FlushWithBreadcrumb();
+                    currentChunk.Clear();
+                    currentWordCount = 0;
+                }
+
+                // Update heading stack — remove all headings at same or deeper level
+                var keysToRemove = headingStack.Keys
+                    .Where(k => k >= headingLevel)
+                    .ToList();
+                foreach (var key in keysToRemove)
+                {
+                    headingStack.Remove(key);
+                }
+
+                headingStack[headingLevel] = StripMarkdownSyntax(trimmedLine);
+
+                // Start new chunk with overlap from previous chunk
+                var overlap = GetOverlapPrefix();
+                if (!string.IsNullOrEmpty(overlap))
+                {
+                    currentChunk.Append(overlap);
+                    currentWordCount = CountWords(overlap);
+                    suppressBreadcrumbForCurrentChunk = headingStack.Count == 1;
+                }
+                else
+                {
+                    suppressBreadcrumbForCurrentChunk = false;
+                }
             }
 
             currentChunk.AppendLine(line);
             currentWordCount += CountWords(line);
 
-            // Flush at paragraph boundaries when the target word count is reached.
-            if (!inCodeBlock && currentWordCount >= TargetWordCount && string.IsNullOrWhiteSpace(line))
+            // Flush at paragraph boundaries when target word count reached
+            if (!inCodeBlock && currentWordCount >= TargetWordCount
+                && string.IsNullOrWhiteSpace(line))
             {
-                FlushChunk(chunks, currentChunk.ToString());
+                FlushWithBreadcrumb();
                 currentChunk.Clear();
                 currentWordCount = 0;
+                suppressBreadcrumbForCurrentChunk = false;
             }
         }
 
         if (currentChunk.Length > 0)
         {
-            FlushChunk(chunks, currentChunk.ToString());
+            FlushWithBreadcrumb();
         }
 
         return chunks

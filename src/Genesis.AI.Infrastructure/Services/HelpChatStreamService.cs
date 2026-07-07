@@ -75,7 +75,7 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
             message,
             KnowledgeNamespace.GenesisTool,
             null,
-            5,
+            3,
             cancellationToken);
 
         var projectChunks = projectId.HasValue
@@ -117,10 +117,10 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
         IReadOnlyList<KnowledgeChunk> toolChunks,
         IReadOnlyList<KnowledgeChunk> projectChunks)
     {
-        var toolContent = string.Join("\n\n", toolChunks.Select(chunk => chunk.Content));
         var projectContent = projectChunks.Count > 0
             ? string.Join("\n\n", projectChunks.Select(chunk => chunk.Content))
             : "No project context available.";
+        var toolContent = string.Join("\n\n", toolChunks.Select(chunk => chunk.Content));
 
         var hasProjectContext = projectChunks.Count > 0;
         var contextInstruction = hasProjectContext
