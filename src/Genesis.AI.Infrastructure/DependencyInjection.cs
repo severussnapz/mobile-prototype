@@ -93,7 +93,10 @@ public static class DependencyInjection
     private static void AddGitHubIntegration(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecretEncryptionService, AesSecretEncryptionService>();
-        services.AddScoped<IGenesisStructureScaffolder, GenesisStructureScaffolderStub>();
+        services.AddSingleton<IAssemblyVersionProvider, AssemblyVersionProvider>();
+        services.AddSingleton<ICodeownersGenerator, CodeownersGenerator>();
+        services.AddScoped<IProjectMarkdownGenerator, ProjectMarkdownGenerator>();
+        services.AddScoped<IGenesisStructureScaffolder, GenesisStructureScaffolder>();
         services.AddHttpClient<GitHubAppTokenService>((serviceProvider, client) =>
         {
             client.BaseAddress = new Uri("https://api.github.com/");

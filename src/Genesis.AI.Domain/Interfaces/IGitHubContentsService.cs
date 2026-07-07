@@ -13,4 +13,15 @@ public interface IGitHubContentsService
         string commitMessage,
         string? existingSha,
         CancellationToken ct);
+
+    /// <summary>
+    /// Returns true if the file exists (HTTP 200), false if not found (HTTP 404).
+    /// Throws <see cref="System.Net.Http.HttpRequestException"/> for any other status code.
+    /// </summary>
+    Task<bool> FileExistsAsync(
+        string installationToken,
+        string owner,
+        string repo,
+        string path,
+        CancellationToken ct);
 }

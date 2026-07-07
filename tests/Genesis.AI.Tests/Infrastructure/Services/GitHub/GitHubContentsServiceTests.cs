@@ -183,6 +183,56 @@ public sealed class GitHubContentsServiceTests
         Assert.Equal("newsha456", finalPutBody.GetProperty("sha").GetString());
     }
 
+    [Fact]
+    public async Task FileExistsAsync_Returns200_ReturnsTrue()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)));
+        var service = CreateService(handler);
+
+        var result = await service.FileExistsAsync(
+            "token",
+            "owner",
+            "repo",
+            ".genesis/.gitkeep",
+            CancellationToken.None);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task FileExistsAsync_Returns404_ReturnsFalse()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)));
+        var service = CreateService(handler);
+
+        var result = await service.FileExistsAsync(
+            "token",
+            "owner",
+            "repo",
+            ".genesis/.gitkeep",
+            CancellationToken.None);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task FileExistsAsync_Returns500_Throws()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)));
+        var service = CreateService(handler);
+
+        await Assert.ThrowsAsync<System.Net.Http.HttpRequestException>(() =>
+            service.FileExistsAsync(
+                "token",
+                "owner",
+                "repo",
+                ".genesis/.gitkeep",
+                CancellationToken.None));
+    }
+
     private static GitHubContentsService CreateService(StubHttpMessageHandler handler)
     {
         var client = new HttpClient(handler)
