@@ -54,6 +54,17 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
 
         var wasGitHubConfigured = project.HasGitHubConfig;
 
+        if (!string.IsNullOrWhiteSpace(request.Name)
+            && !string.IsNullOrWhiteSpace(request.TimeSheetCode))
+        {
+            project.UpdateDetails(
+                request.Name,
+                request.Description,
+                request.TimeSheetCode,
+                request.ComplianceDomain,
+                _timeProvider);
+        }
+
         if (request.GitHubInstallationId is not null)
         {
             project.SetGitHubConfig(

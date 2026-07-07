@@ -98,6 +98,24 @@ public class Project : Entity, IAggregateRoot
         UpdatedAt = timeProvider.GetUtcNow();
     }
 
+    public void UpdateDetails(
+        string name,
+        string? description,
+        string timeSheetCode,
+        ComplianceDomain complianceDomain,
+        TimeProvider timeProvider)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(timeSheetCode);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        Name = name;
+        Description = description;
+        TimeSheetCode = timeSheetCode;
+        ComplianceDomain = complianceDomain;
+        UpdatedAt = timeProvider.GetUtcNow();
+    }
+
     public void UpdateP00Configuration(
         string? releaseType,
         bool? assuranceRequired,

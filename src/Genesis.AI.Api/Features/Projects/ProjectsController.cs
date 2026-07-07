@@ -4,7 +4,9 @@ using Genesis.AI.Api.Features.Conversations;
 using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.Commands.CreateProject;
 using Genesis.AI.Domain.Commands.DeleteProject;
+using Genesis.AI.Domain.Commands.UpdateProject;
 using Genesis.AI.Domain.Enums;
+using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Queries.GetProjectById;
 using Genesis.AI.Domain.Queries.GetProjectParkingLot;
 using Genesis.AI.Domain.Queries.GetProjects;
@@ -24,13 +26,16 @@ public class ProjectsController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
+    private readonly ILogger<ProjectsController> _logger;
 
     public ProjectsController(
         IMediator mediator,
-        IMapper mapper)
+        IMapper mapper,
+        ILogger<ProjectsController> logger)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -150,6 +155,72 @@ public class ProjectsController : ControllerBase
 
         await _mediator.Send(new DeleteProjectCommand(id), cancellationToken);
         return NoContent();
+    }
+
+    [HttpPatch("{id:guid}")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
+    [ProducesResponseType(typeof(UpdateProjectResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(
+        Guid id,
+        [FromBody] UpdateProjectRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userErn = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "system";
+
+        var project = await _mediator.Send(new GetProjectByIdQuery(id), cancellationToken);
+        if (project is null)
+        {
+            return NotFound(new { userMessage = $"Project with ID '{id}' was not found." });
+        }
+
+        var complianceDomain = project.ComplianceDomain;
+        if (!string.IsNullOrWhiteSpace(request.ComplianceDomain)
+            && !Enum.TryParse<ComplianceDomain>(request.ComplianceDomain, ignoreCase: true, out complianceDomain))
+        {
+            return BadRequest(new
+            {
+                userMessage = $"'{request.ComplianceDomain}' is not a valid compliance domain. Valid values are: ClinicalUk, Generic, Finance."
+            });
+        }
+
+        var command = new UpdateProjectCommand(
+            ProjectId: id,
+            Name: request.Name ?? project.Name,
+            Description: request.Description ?? project.Description,
+            TimeSheetCode: request.TimeSheetCode ?? project.TimeSheetCode,
+            ComplianceDomain: complianceDomain,
+            GitHubApiRepoUrl: request.GitHubApiRepoUrl,
+            GitHubAppRepoUrl: request.GitHubAppRepoUrl,
+            GitHubRepoOwner: null,
+            GitHubRepoName: null,
+            GitHubInstallationId: request.GitHubInstallationId,
+            FigmaFileUrl: request.FigmaFileUrl,
+            FigmaPat: request.FigmaPat,
+            ReleaseType: request.ReleaseType,
+            AssuranceRequired: request.AssuranceRequired,
+            PilotDeploymentProcess: request.PilotDeploymentProcess,
+            CsoRoleAssigned: request.CsoRoleAssigned,
+            IgOwnerRoleAssigned: request.IgOwnerRoleAssigned,
+            SecurityReviewerAssigned: request.SecurityReviewerAssigned,
+            MedicalDeviceFlag: request.MedicalDeviceFlag,
+            UpdatedBy: userErn);
+
+        try
+        {
+            var result = await _mediator.Send(command, cancellationToken);
+            return Ok(new UpdateProjectResponse(result.ProjectId, result.FigmaPatPlaintext));
+        }
+        catch (NotFoundException ex)
+        {
+            return NotFound(new { userMessage = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update project {ProjectId}", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { userMessage = "Failed to save project settings. Please try again." });
+        }
     }
 
     /// <summary>
