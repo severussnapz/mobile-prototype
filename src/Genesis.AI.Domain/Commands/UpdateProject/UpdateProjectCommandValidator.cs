@@ -26,13 +26,9 @@ public sealed class UpdateProjectCommandValidator : AbstractValidator<UpdateProj
                 .WithMessage("ReleaseType must be 'EMIS Web' or 'EMIS-X'.");
         });
 
-        When(command => command.ComplianceDomain is not null, () =>
-        {
-            RuleFor(command => command.ComplianceDomain)
-                .Must(complianceDomain =>
-                    !string.IsNullOrWhiteSpace(complianceDomain)
-                    && ValidComplianceDomains.Contains(complianceDomain))
-                .WithMessage("Compliance Domain must be one of: ClinicalUk, Generic, Finance.");
-        });
+        RuleFor(command => command.ComplianceDomain)
+            .Must(complianceDomain => ValidComplianceDomains.Contains(complianceDomain!))
+            .When(command => !string.IsNullOrWhiteSpace(command.ComplianceDomain))
+            .WithMessage("Compliance Domain must be one of: ClinicalUk, Generic, Finance.");
     }
 }
