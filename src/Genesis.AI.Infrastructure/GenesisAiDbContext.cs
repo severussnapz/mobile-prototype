@@ -1,12 +1,16 @@
 using Genesis.AI.Core.Data;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
+using Genesis.AI.Domain.AggregatesModel.ContractManifestAggregate;
+using Genesis.AI.Domain.AggregatesModel.KnowledgeAggregate;
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
 using Genesis.AI.Domain.AggregatesModel.ConversationAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectDecisionAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectNoteAggregate;
 using Genesis.AI.Domain.AggregatesModel.PrototypeLockAggregate;
+using Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate;
 using Genesis.AI.Domain.AggregatesModel.UiDeltaAggregate;
+using Genesis.AI.Domain.AggregatesModel.HelpChatAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Infrastructure.EntityConfigurations;
 using MediatR;
@@ -26,16 +30,36 @@ public sealed class GenesisAiDbContext(
     public DbSet<ParkingLotItem> ParkingLotItems { get; set; }
     public DbSet<TokenUsageRecord> TokenUsageRecords { get; set; }
     public DbSet<Artefact> Artefacts { get; set; }
+    public DbSet<ContractManifest> ContractManifests { get; set; }
+    public DbSet<ContractManifestPin> ContractManifestPins { get; set; }
     public DbSet<ProjectNote> ProjectNotes { get; set; }
     public DbSet<ProjectDecision> ProjectDecisions { get; set; }
     public DbSet<UiDelta> UiDeltas { get; set; }
     public DbSet<PrototypeLock> PrototypeLocks { get; set; }
+    public DbSet<KnowledgeDocument> KnowledgeDocument { get; set; }
     public DbSet<RequirementChange> RequirementChanges => Set<RequirementChange>();
+    public DbSet<HelpConversation> HelpConversation { get; set; }
+    public DbSet<HelpMessage> HelpMessage { get; set; }
+    public DbSet<PushFailureLog> PushFailureLogs => Set<PushFailureLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         RegisterPostgresEnums(modelBuilder);
-        ApplyEntityConfigurations(modelBuilder);
+        
+        var isInMemory = Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+        
+        if (isInMemory)
+        {
+            modelBuilder.Ignore<KnowledgeDocument>();
+        }
+        else
+        {
+            modelBuilder.Entity<KnowledgeDocument>()
+                .Property(knowledgeDocument => knowledgeDocument.Embedding)
+                .HasColumnType("vector(1024)");
+        }
+        
+        ApplyEntityConfigurations(modelBuilder, isInMemory);
         base.OnModelCreating(modelBuilder);
     }
 
@@ -54,10 +78,11 @@ public sealed class GenesisAiDbContext(
             modelBuilder.HasPostgresEnum<MessageRole>("message_role");
             modelBuilder.HasPostgresEnum<OrchestrationMode>("orchestration_mode");
             modelBuilder.HasPostgresEnum<RequirementImpact>("requirement_impact");
+            modelBuilder.HasPostgresEnum<KnowledgeNamespace>("knowledge_namespace");
         }
     }
 
-    private static void ApplyEntityConfigurations(ModelBuilder modelBuilder)
+    private static void ApplyEntityConfigurations(ModelBuilder modelBuilder, bool isInMemory)
     {
         modelBuilder.ApplyConfiguration(new ProjectEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PipelineStageEntityTypeConfiguration());
@@ -67,10 +92,27 @@ public sealed class GenesisAiDbContext(
         modelBuilder.ApplyConfiguration(new ParkingLotItemEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new TokenUsageRecordEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ArtefactEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new ContractManifestEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new ContractManifestPinEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectNoteEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectDecisionEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new UiDeltaEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PrototypeLockEntityTypeConfiguration());
         modelBuilder.ApplyConfiguration(new RequirementChangeEntityTypeConfiguration());
+
+        ApplyAuxiliaryConfigurations(modelBuilder, isInMemory);
+    }
+
+    private static void ApplyAuxiliaryConfigurations(ModelBuilder modelBuilder, bool isInMemory)
+    {
+        modelBuilder.ApplyConfiguration(new HelpConversationEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new HelpMessageEntityTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new PushFailureLogEntityTypeConfiguration());
+
+        // KnowledgeDocument is ignored for InMemory (integration tests) but configured for PostgreSQL
+        if (!isInMemory)
+        {
+            modelBuilder.ApplyConfiguration(new KnowledgeDocumentEntityTypeConfiguration());
+        }
     }
 }

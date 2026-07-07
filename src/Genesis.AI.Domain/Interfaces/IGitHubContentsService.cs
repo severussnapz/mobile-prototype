@@ -24,4 +24,15 @@ public interface IGitHubContentsService
         string repo,
         string path,
         CancellationToken ct);
+
+    /// <summary>
+    /// Returns the SHA of an existing file, or null if not found (HTTP 404).
+    /// Throws <see cref="System.Net.Http.HttpRequestException"/> for any other status code.
+    /// </summary>
+    Task<string?> GetFileShaAsync(
+        string installationToken,
+        string owner,
+        string repo,
+        string path,
+        CancellationToken ct);
 }

@@ -170,4 +170,37 @@ public sealed class GitHubContentsService : IGitHubContentsService
 
         return new GitHubPushResult(commitSha, fileUrl);
     }
+
+    public async Task<string?> GetFileShaAsync(
+        string installationToken,
+        string owner,
+        string repo,
+        string path,
+        CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(installationToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var requestUri = new Uri($"https://api.github.com/repos/{owner}/{repo}/contents/{path}");
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", installationToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+        request.Headers.UserAgent.ParseAdd("genesis-ai");
+
+        using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        using var document = JsonDocument.Parse(payload);
+        return document.RootElement.GetProperty("sha").GetString();
+    }
 }

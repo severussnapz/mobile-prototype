@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IKnowledgeRepository, KnowledgeRepository>();
         services.AddScoped<IHelpConversationRepository, HelpConversationRepository>();
         services.AddScoped<IHelpChatStreamService, HelpChatStreamService>();
+        services.AddScoped<IPushFailureLogRepository, PushFailureLogRepository>();
         services.AddHostedService<KnowledgeSeederService>();
     }
 
@@ -128,6 +129,8 @@ public static class DependencyInjection
             options.Retry.MaxDelay = TimeSpan.FromSeconds(30);
             options.Retry.UseJitter = true;
         });
+
+        services.AddScoped<IGitHubArtefactPushService, GitHubArtefactPushService>();
     }
 
     private static void AddWorkflowServices(IServiceCollection services)
