@@ -6,6 +6,8 @@ public sealed class UpdateProjectCommandValidator : AbstractValidator<UpdateProj
 {
     private static readonly HashSet<string> ValidReleaseTypes =
         new(StringComparer.OrdinalIgnoreCase) { "EMIS Web", "EMIS-X" };
+    private static readonly HashSet<string> ValidComplianceDomains =
+        new(StringComparer.OrdinalIgnoreCase) { "ClinicalUk", "Generic", "Finance" };
 
     public UpdateProjectCommandValidator()
     {
@@ -22,6 +24,15 @@ public sealed class UpdateProjectCommandValidator : AbstractValidator<UpdateProj
             RuleFor(command => command.ReleaseType)
                 .Must(releaseType => ValidReleaseTypes.Contains(releaseType!))
                 .WithMessage("ReleaseType must be 'EMIS Web' or 'EMIS-X'.");
+        });
+
+        When(command => command.ComplianceDomain is not null, () =>
+        {
+            RuleFor(command => command.ComplianceDomain)
+                .Must(complianceDomain =>
+                    !string.IsNullOrWhiteSpace(complianceDomain)
+                    && ValidComplianceDomains.Contains(complianceDomain))
+                .WithMessage("Compliance Domain must be one of: ClinicalUk, Generic, Finance.");
         });
     }
 }
