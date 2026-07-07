@@ -7,7 +7,6 @@ using System.Text;
 using System.Text.Json;
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Interfaces;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
@@ -21,7 +20,6 @@ public sealed class GitHubAppTokenService : IGitHubTokenService
     private readonly HttpClient _httpClient;
     private readonly TimeProvider _timeProvider;
     private readonly string _appId;
-    private readonly string _privateKeyPem;
     private readonly RSA _rsa;
     private readonly ConcurrentDictionary<string, (string Token, DateTimeOffset ExpiresAt)> _tokenCache = new();
 
@@ -36,25 +34,13 @@ public sealed class GitHubAppTokenService : IGitHubTokenService
     {
     }
 
-    public GitHubAppTokenService(IConfiguration configuration, TimeProvider timeProvider, IHttpClientFactory httpClientFactory)
-        : this(
-            httpClientFactory.CreateClient(nameof(GitHubAppTokenService)),
-            timeProvider,
-            configuration["GITHUB_APP_ID"]
-                ?? throw new InvalidOperationException("Configuration value 'GITHUB_APP_ID' was not found."),
-            configuration["GITHUB_APP_PRIVATE_KEY"]
-                ?? throw new InvalidOperationException("Configuration value 'GITHUB_APP_PRIVATE_KEY' was not found."))
-    {
-    }
-
     private GitHubAppTokenService(HttpClient httpClient, TimeProvider timeProvider, string appId, string privateKeyPem)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _appId = appId;
-        _privateKeyPem = privateKeyPem.Replace("\\n", "\n", StringComparison.Ordinal);
         _rsa = RSA.Create();
-        _rsa.ImportFromPem(_privateKeyPem);
+        _rsa.ImportFromPem(privateKeyPem.Replace("\\n", "\n", StringComparison.Ordinal));
     }
 
     public async Task<string> GetInstallationTokenAsync(string installationId, CancellationToken ct)
