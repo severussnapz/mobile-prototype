@@ -18,6 +18,22 @@ public class Project : Entity, IAggregateRoot
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
+    public string? GitHubApiRepoUrl { get; private set; }
+    public string? GitHubAppRepoUrl { get; private set; }
+    public string? GitHubRepoOwner { get; private set; }
+    public string? GitHubRepoName { get; private set; }
+    public string? GitHubInstallationId { get; private set; }
+    public string? FigmaFileUrl { get; private set; }
+    public string? FigmaPatEncrypted { get; private set; }
+    public string? ReleaseType { get; private set; }
+    public bool? AssuranceRequired { get; private set; }
+    public string? PilotDeploymentProcess { get; private set; }
+    public bool? CsoRoleAssigned { get; private set; }
+    public bool? IgOwnerRoleAssigned { get; private set; }
+    public bool? SecurityReviewerAssigned { get; private set; }
+    public bool? MedicalDeviceFlag { get; private set; }
+
+    public bool HasGitHubConfig => GitHubInstallationId is not null;
 
     private readonly List<PipelineStage> _pipelineStages = [];
     public IReadOnlyCollection<PipelineStage> PipelineStages => _pipelineStages.AsReadOnly();
@@ -56,6 +72,55 @@ public class Project : Entity, IAggregateRoot
     public void SoftDelete(TimeProvider timeProvider)
     {
         IsDeleted = true;
+        UpdatedAt = timeProvider.GetUtcNow();
+    }
+
+    public void SetGitHubConfig(
+        string apiRepoUrl,
+        string appRepoUrl,
+        string owner,
+        string name,
+        string installationId,
+        TimeProvider timeProvider)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiRepoUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appRepoUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(installationId);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        GitHubApiRepoUrl = apiRepoUrl;
+        GitHubAppRepoUrl = appRepoUrl;
+        GitHubRepoOwner = owner;
+        GitHubRepoName = name;
+        GitHubInstallationId = installationId;
+        UpdatedAt = timeProvider.GetUtcNow();
+    }
+
+    public void UpdateP00Configuration(
+        string? releaseType,
+        bool? assuranceRequired,
+        string? pilotDeploymentProcess,
+        bool? csoRoleAssigned,
+        bool? igOwnerRoleAssigned,
+        bool? securityReviewerAssigned,
+        bool? medicalDeviceFlag,
+        string? figmaFileUrl,
+        string? figmaPatEncrypted,
+        TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        ReleaseType = releaseType;
+        AssuranceRequired = assuranceRequired;
+        PilotDeploymentProcess = pilotDeploymentProcess;
+        CsoRoleAssigned = csoRoleAssigned;
+        IgOwnerRoleAssigned = igOwnerRoleAssigned;
+        SecurityReviewerAssigned = securityReviewerAssigned;
+        MedicalDeviceFlag = medicalDeviceFlag;
+        FigmaFileUrl = figmaFileUrl;
+        FigmaPatEncrypted = figmaPatEncrypted;
         UpdatedAt = timeProvider.GetUtcNow();
     }
 

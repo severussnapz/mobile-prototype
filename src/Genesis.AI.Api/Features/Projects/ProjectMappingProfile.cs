@@ -16,7 +16,25 @@ public class ProjectMappingProfile : Profile
                 options => options.MapFrom(source => ConvertToKebabCase(source.ComplianceDomain.ToString())))
             .ForMember(
                 destination => destination.Status,
-                options => options.MapFrom(source => ConvertToKebabCase(source.Status.ToString())));
+                options => options.MapFrom(source => ConvertToKebabCase(source.Status.ToString())))
+            .ForMember(
+                destination => destination.FigmaPatConfigured,
+                options => options.MapFrom(source => source.FigmaPatEncrypted != null))
+            .ForMember(
+                destination => destination.GitHubApiRepoUrl,
+                options => options.MapFrom(source => source.GitHubApiRepoUrl))
+            .ForMember(
+                destination => destination.GitHubAppRepoUrl,
+                options => options.MapFrom(source => source.GitHubAppRepoUrl))
+            .ForMember(
+                destination => destination.ReleaseType,
+                options => options.MapFrom(source => source.ReleaseType))
+            .ForMember(
+                destination => destination.AssuranceRequired,
+                options => options.MapFrom(source => source.AssuranceRequired))
+            .ForMember(
+                destination => destination.MedicalDeviceFlag,
+                options => options.MapFrom(source => source.MedicalDeviceFlag));
 
         CreateMap<PipelineStage, PipelineStageResource>()
             .ForMember(

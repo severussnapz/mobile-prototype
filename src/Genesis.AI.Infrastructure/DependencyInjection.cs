@@ -12,6 +12,7 @@ using Genesis.AI.Domain.Dpia;
 using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.SecurityReviewReport;
+using Genesis.AI.Core.Data;
 using Genesis.AI.Infrastructure.Configuration;
 using Genesis.AI.Infrastructure.EventHandlers;
 using Genesis.AI.Infrastructure.Repositories;
@@ -92,6 +93,7 @@ public static class DependencyInjection
     private static void AddGitHubIntegration(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecretEncryptionService, AesSecretEncryptionService>();
+        services.AddScoped<IGenesisStructureScaffolder, GenesisStructureScaffolderStub>();
         services.AddHttpClient<GitHubAppTokenService>((serviceProvider, client) =>
         {
             client.BaseAddress = new Uri("https://api.github.com/");
@@ -182,6 +184,9 @@ public static class DependencyInjection
                 npgsqlOptions.UseVector();
             });
         });
+
+        services.AddScoped<IUnitOfWork>(serviceProvider =>
+            serviceProvider.GetRequiredService<GenesisAiDbContext>());
     }
 
     private static void MapEnums(NpgsqlDataSourceBuilder dataSourceBuilder)

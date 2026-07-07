@@ -35,6 +35,29 @@ public sealed class ProjectResource
     [JsonPropertyName("updatedAt")]
     public DateTimeOffset UpdatedAt { get; init; }
 
+    [JsonPropertyName("figmaPatConfigured")]
+    public bool FigmaPatConfigured { get; init; }
+
+    [JsonPropertyName("gitHubApiRepoUrl")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GitHubApiRepoUrl { get; init; }
+
+    [JsonPropertyName("gitHubAppRepoUrl")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GitHubAppRepoUrl { get; init; }
+
+    [JsonPropertyName("releaseType")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReleaseType { get; init; }
+
+    [JsonPropertyName("assuranceRequired")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? AssuranceRequired { get; init; }
+
+    [JsonPropertyName("medicalDeviceFlag")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? MedicalDeviceFlag { get; init; }
+
     [JsonPropertyName("pipelineStages")]
     public IReadOnlyList<PipelineStageResource> PipelineStages { get; init; } = [];
 }
