@@ -233,6 +233,43 @@ public sealed class GitHubContentsServiceTests
                 CancellationToken.None));
     }
 
+    [Fact]
+    public async Task GetFileShaAsync_FileExists_ReturnsSha()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"sha\":\"abc123\"}", Encoding.UTF8, "application/json")
+            }));
+        var service = CreateService(handler);
+
+        var result = await service.GetFileShaAsync(
+            "token",
+            "owner",
+            "repo",
+            ".genesis/requirements/REQ-001.md",
+            CancellationToken.None);
+
+        Assert.Equal("abc123", result);
+    }
+
+    [Fact]
+    public async Task GetFileShaAsync_FileNotFound_ReturnsNull()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)));
+        var service = CreateService(handler);
+
+        var result = await service.GetFileShaAsync(
+            "token",
+            "owner",
+            "repo",
+            ".genesis/requirements/REQ-001.md",
+            CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
     private static GitHubContentsService CreateService(StubHttpMessageHandler handler)
     {
         var client = new HttpClient(handler)
