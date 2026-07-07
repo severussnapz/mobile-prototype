@@ -58,7 +58,8 @@
         }
       },
       "System.IdentityModel.Tokens.Jwt": {
-        "type": "Transitive",
+        "type": "CentralTransitive",
+        "requested": "[8.14.0, )",
         "resolved": "8.0.1",
         "contentHash": "GJw3bYkWpOgvN3tJo5X4lYUeIFA2HD293FPUhKmp7qxS+g5ywAb34Dnd3cDAFLkcMohy5XTpoaZ4uAHuw0uSPQ==",
         "dependencies": {
