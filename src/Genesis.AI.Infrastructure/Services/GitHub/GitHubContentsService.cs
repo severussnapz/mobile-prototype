@@ -97,14 +97,26 @@ public sealed class GitHubContentsService : IGitHubContentsService
             body["sha"] = sha;
         }
 
+        var serializedBody = JsonSerializer.Serialize(body, JsonOptions);
+        _logger.LogInformation("GitHub PUT {Uri} — body: {Body}", requestUri, serializedBody);
+
         using var request = new HttpRequestMessage(HttpMethod.Put, requestUri);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", installationToken);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
         request.Headers.UserAgent.ParseAdd("genesis-ai");
-        request.Content = new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
+        request.Content = new StringContent(serializedBody, Encoding.UTF8, "application/json");
 
-        return await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+        var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            _logger.LogWarning("GitHub PUT {Uri} — status {StatusCode}, response: {ResponseBody}",
+                requestUri, (int)response.StatusCode, responseBody);
+        }
+
+        return response;
     }
 
     public async Task<bool> FileExistsAsync(

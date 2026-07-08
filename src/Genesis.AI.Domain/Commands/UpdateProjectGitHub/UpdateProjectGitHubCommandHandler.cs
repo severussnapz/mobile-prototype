@@ -16,27 +16,15 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
     public UpdateProjectGitHubCommandHandler(
         IProjectRepository projectRepository,
         ISecretEncryptionService secretEncryptionService,
-        TimeProvider timeProvider)
-    {
-        _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
-        _secretEncryptionService = secretEncryptionService ?? throw new ArgumentNullException(nameof(secretEncryptionService));
-        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-        _scaffolder = null;
-        _logger = null!;
-    }
-
-    public UpdateProjectGitHubCommandHandler(
-        IProjectRepository projectRepository,
-        ISecretEncryptionService secretEncryptionService,
         TimeProvider timeProvider,
-        IGenesisStructureScaffolder scaffolder,
-        ILogger<UpdateProjectGitHubCommandHandler> logger)
+        IGenesisStructureScaffolder? scaffolder = null,
+        ILogger<UpdateProjectGitHubCommandHandler>? logger = null)
     {
         _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
         _secretEncryptionService = secretEncryptionService ?? throw new ArgumentNullException(nameof(secretEncryptionService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-        _scaffolder = scaffolder ?? throw new ArgumentNullException(nameof(scaffolder));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _scaffolder = scaffolder;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<UpdateProjectGitHubCommandHandler>.Instance;
     }
 
     public async Task<UpdateProjectGitHubResult> Handle(UpdateProjectGitHubCommand request, CancellationToken cancellationToken)
@@ -44,39 +32,30 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
         var project = await _projectRepository.GetByIdAsync(request.ProjectId, cancellationToken)
             ?? throw new NotFoundException($"Project with ID '{request.ProjectId}' was not found.");
 
+        var apiRepoUrl = request.GitHubApiRepoUrl is null
+            ? project.GitHubApiRepoUrl
+            : string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl) ? null : request.GitHubApiRepoUrl;
+        var appRepoUrl = request.GitHubAppRepoUrl is null
+            ? project.GitHubAppRepoUrl
+            : string.IsNullOrWhiteSpace(request.GitHubAppRepoUrl) ? null : request.GitHubAppRepoUrl;
+        var figmaFileUrl = request.FigmaFileUrl is null
+            ? project.FigmaFileUrl
+            : string.IsNullOrWhiteSpace(request.FigmaFileUrl) ? null : request.FigmaFileUrl;
+
         if (!string.IsNullOrWhiteSpace(request.GitHubInstallationId)
-            && !string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl))
+            && !string.IsNullOrWhiteSpace(apiRepoUrl))
         {
-            var apiRepoUrl = (request.GitHubApiRepoUrl is null
-                ? (project.GitHubApiRepoUrl ?? "")
-                : (string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl) ? "" : request.GitHubApiRepoUrl)) ?? "";
-            var appRepoUrl = (request.GitHubAppRepoUrl is null
-                ? (project.GitHubAppRepoUrl ?? apiRepoUrl)
-                : (string.IsNullOrWhiteSpace(request.GitHubAppRepoUrl) ? "" : request.GitHubAppRepoUrl)) ?? apiRepoUrl;
             var uri = new Uri(apiRepoUrl);
             var parts = uri.AbsolutePath.Trim('/').Split('/');
             var owner = parts.Length > 0 ? parts[0] : "";
             var repoName = parts.Length > 1 ? parts[1] : "";
             project.SetGitHubConfig(
-                apiRepoUrl, appRepoUrl, owner, repoName,
+                apiRepoUrl, appRepoUrl ?? apiRepoUrl, owner, repoName,
                 request.GitHubInstallationId, _timeProvider);
         }
         else
         {
-            var gitHubApiRepoUrl = request.GitHubApiRepoUrl is null
-                ? null
-                : (string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl) ? null : request.GitHubApiRepoUrl);
-            var gitHubAppRepoUrl = request.GitHubAppRepoUrl is null
-                ? null
-                : (string.IsNullOrWhiteSpace(request.GitHubAppRepoUrl) ? null : request.GitHubAppRepoUrl);
-            var figmaFileUrl = request.FigmaFileUrl is null
-                ? null
-                : (string.IsNullOrWhiteSpace(request.FigmaFileUrl) ? null : request.FigmaFileUrl);
-            project.UpdateGitHubUrls(
-                gitHubApiRepoUrl,
-                gitHubAppRepoUrl,
-                figmaFileUrl,
-                _timeProvider);
+            project.UpdateGitHubUrls(apiRepoUrl, appRepoUrl, figmaFileUrl, _timeProvider);
         }
 
         if (request.FigmaPat is not null)
