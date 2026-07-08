@@ -8,5 +8,6 @@ public sealed record UpdateProjectGitHubCommand(
     string? GitHubApiRepoUrl,
     string? GitHubAppRepoUrl,
     string? FigmaFileUrl,
-    string? FigmaPat
+    string? FigmaPat,
+    string? GitHubInstallationId
 ) : IRequest<UpdateProjectGitHubResult>;

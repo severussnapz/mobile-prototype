@@ -210,6 +210,7 @@ public class ProjectsController : ControllerBase
         CancellationToken ct)
     {
         var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
+        var installationId = Environment.GetEnvironmentVariable("GITHUB_APP_INSTALLATION_ID");
 
         var command = new UpdateProjectGitHubCommand(
             id,
@@ -217,7 +218,8 @@ public class ProjectsController : ControllerBase
             request.GitHubApiRepoUrl,
             request.GitHubAppRepoUrl,
             request.FigmaFileUrl,
-            request.FigmaPat);
+            request.FigmaPat,
+            installationId);
 
         try
         {

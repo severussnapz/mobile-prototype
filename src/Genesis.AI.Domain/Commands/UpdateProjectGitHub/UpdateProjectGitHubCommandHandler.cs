@@ -25,9 +25,20 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
         var project = await _projectRepository.GetByIdAsync(request.ProjectId, cancellationToken)
             ?? throw new NotFoundException($"Project with ID '{request.ProjectId}' was not found.");
 
-        if (request.GitHubApiRepoUrl is not null
-            || request.GitHubAppRepoUrl is not null
-            || request.FigmaFileUrl is not null)
+        if (!string.IsNullOrWhiteSpace(request.GitHubInstallationId)
+            && !string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl))
+        {
+            var apiRepoUrl = request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl ?? "";
+            var appRepoUrl = request.GitHubAppRepoUrl ?? project.GitHubAppRepoUrl ?? "";
+            var uri = new Uri(apiRepoUrl);
+            var parts = uri.AbsolutePath.Trim('/').Split('/');
+            var owner = parts.Length > 0 ? parts[0] : "";
+            var repoName = parts.Length > 1 ? parts[1] : "";
+            project.SetGitHubConfig(
+                apiRepoUrl, appRepoUrl, owner, repoName,
+                request.GitHubInstallationId, _timeProvider);
+        }
+        else
         {
             project.UpdateGitHubUrls(
                 request.GitHubApiRepoUrl,
