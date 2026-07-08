@@ -30,10 +30,20 @@ public sealed class UpdateProjectDetailsCommandHandler : IRequestHandler<UpdateP
             complianceDomain = parsedDomain;
         }
 
+        var name = request.Name is null
+            ? project.Name
+            : (string.IsNullOrWhiteSpace(request.Name) ? project.Name : request.Name);
+        var description = request.Description is null
+            ? project.Description
+            : (string.IsNullOrWhiteSpace(request.Description) ? null : request.Description);
+        var timeSheetCode = request.TimeSheetCode is null
+            ? project.TimeSheetCode
+            : (string.IsNullOrWhiteSpace(request.TimeSheetCode) ? project.TimeSheetCode : request.TimeSheetCode);
+
         project.UpdateDetails(
-            request.Name ?? project.Name,
-            request.Description ?? project.Description,
-            request.TimeSheetCode ?? project.TimeSheetCode,
+            name,
+            description,
+            timeSheetCode,
             complianceDomain,
             _timeProvider);
 

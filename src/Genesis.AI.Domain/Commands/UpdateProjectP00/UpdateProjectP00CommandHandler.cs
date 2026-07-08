@@ -22,10 +22,17 @@ public sealed class UpdateProjectP00CommandHandler : IRequestHandler<UpdateProje
         var project = await _projectRepository.GetByIdAsync(request.ProjectId, cancellationToken)
             ?? throw new NotFoundException($"Project with ID '{request.ProjectId}' was not found.");
 
+        var releaseType = request.ReleaseType is null
+            ? project.ReleaseType
+            : (string.IsNullOrWhiteSpace(request.ReleaseType) ? null : request.ReleaseType);
+        var pilotDeploymentProcess = request.PilotDeploymentProcess is null
+            ? project.PilotDeploymentProcess
+            : (string.IsNullOrWhiteSpace(request.PilotDeploymentProcess) ? null : request.PilotDeploymentProcess);
+
         project.UpdateP00Configuration(
-            request.ReleaseType ?? project.ReleaseType,
+            releaseType,
             request.AssuranceRequired ?? project.AssuranceRequired,
-            request.PilotDeploymentProcess ?? project.PilotDeploymentProcess,
+            pilotDeploymentProcess,
             request.CsoRoleAssigned ?? project.CsoRoleAssigned,
             request.IgOwnerRoleAssigned ?? project.IgOwnerRoleAssigned,
             request.SecurityReviewerAssigned ?? project.SecurityReviewerAssigned,

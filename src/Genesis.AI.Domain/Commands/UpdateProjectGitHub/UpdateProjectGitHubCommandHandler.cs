@@ -1,6 +1,7 @@
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Interfaces;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace Genesis.AI.Domain.Commands.UpdateProjectGitHub;
 
@@ -9,6 +10,8 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
     private readonly IProjectRepository _projectRepository;
     private readonly ISecretEncryptionService _secretEncryptionService;
     private readonly TimeProvider _timeProvider;
+    private readonly IGenesisStructureScaffolder? _scaffolder;
+    private readonly ILogger<UpdateProjectGitHubCommandHandler> _logger;
 
     public UpdateProjectGitHubCommandHandler(
         IProjectRepository projectRepository,
@@ -18,6 +21,22 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
         _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
         _secretEncryptionService = secretEncryptionService ?? throw new ArgumentNullException(nameof(secretEncryptionService));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _scaffolder = null;
+        _logger = null!;
+    }
+
+    public UpdateProjectGitHubCommandHandler(
+        IProjectRepository projectRepository,
+        ISecretEncryptionService secretEncryptionService,
+        TimeProvider timeProvider,
+        IGenesisStructureScaffolder scaffolder,
+        ILogger<UpdateProjectGitHubCommandHandler> logger)
+    {
+        _projectRepository = projectRepository ?? throw new ArgumentNullException(nameof(projectRepository));
+        _secretEncryptionService = secretEncryptionService ?? throw new ArgumentNullException(nameof(secretEncryptionService));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _scaffolder = scaffolder ?? throw new ArgumentNullException(nameof(scaffolder));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<UpdateProjectGitHubResult> Handle(UpdateProjectGitHubCommand request, CancellationToken cancellationToken)
@@ -28,10 +47,12 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
         if (!string.IsNullOrWhiteSpace(request.GitHubInstallationId)
             && !string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl))
         {
-            var apiRepoUrl = request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl ?? "";
-            var appRepoUrl = request.GitHubAppRepoUrl 
-                ?? project.GitHubAppRepoUrl 
-                ?? apiRepoUrl;
+            var apiRepoUrl = (request.GitHubApiRepoUrl is null
+                ? (project.GitHubApiRepoUrl ?? "")
+                : (string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl) ? "" : request.GitHubApiRepoUrl)) ?? "";
+            var appRepoUrl = (request.GitHubAppRepoUrl is null
+                ? (project.GitHubAppRepoUrl ?? apiRepoUrl)
+                : (string.IsNullOrWhiteSpace(request.GitHubAppRepoUrl) ? "" : request.GitHubAppRepoUrl)) ?? apiRepoUrl;
             var uri = new Uri(apiRepoUrl);
             var parts = uri.AbsolutePath.Trim('/').Split('/');
             var owner = parts.Length > 0 ? parts[0] : "";
@@ -42,10 +63,19 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
         }
         else
         {
+            var gitHubApiRepoUrl = request.GitHubApiRepoUrl is null
+                ? null
+                : (string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl) ? null : request.GitHubApiRepoUrl);
+            var gitHubAppRepoUrl = request.GitHubAppRepoUrl is null
+                ? null
+                : (string.IsNullOrWhiteSpace(request.GitHubAppRepoUrl) ? null : request.GitHubAppRepoUrl);
+            var figmaFileUrl = request.FigmaFileUrl is null
+                ? null
+                : (string.IsNullOrWhiteSpace(request.FigmaFileUrl) ? null : request.FigmaFileUrl);
             project.UpdateGitHubUrls(
-                request.GitHubApiRepoUrl,
-                request.GitHubAppRepoUrl,
-                request.FigmaFileUrl,
+                gitHubApiRepoUrl,
+                gitHubAppRepoUrl,
+                figmaFileUrl,
                 _timeProvider);
         }
 
@@ -65,6 +95,12 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
         }
 
         await _projectRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (_scaffolder is not null && project.HasGitHubConfig)
+        {
+            try { await _scaffolder.ScaffoldAsync(request.ProjectId, request.TriggeredBy, cancellationToken); }
+            catch (Exception ex) { _logger?.LogWarning(ex, "Scaffold failed {ProjectId}", request.ProjectId); }
+        }
 
         return new UpdateProjectGitHubResult(
             request.FigmaPat is not null ? request.FigmaPat : null);

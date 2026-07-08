@@ -32,6 +32,7 @@ public class ProjectsController : ControllerBase
     private readonly IMapper _mapper;
     private readonly ILogger<ProjectsController> _logger;
     private readonly IGitHubArtefactPushService _githubPushService;
+    private readonly IGenesisStructureScaffolder? _scaffolder;
 
     public ProjectsController(
         IMediator mediator,
@@ -43,6 +44,21 @@ public class ProjectsController : ControllerBase
         _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _githubPushService = githubPushService ?? throw new ArgumentNullException(nameof(githubPushService));
+        _scaffolder = null;
+    }
+
+    public ProjectsController(
+        IMediator mediator,
+        IMapper mapper,
+        ILogger<ProjectsController> logger,
+        IGitHubArtefactPushService githubPushService,
+        IGenesisStructureScaffolder scaffolder)
+    {
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _githubPushService = githubPushService ?? throw new ArgumentNullException(nameof(githubPushService));
+        _scaffolder = scaffolder ?? throw new ArgumentNullException(nameof(scaffolder));
     }
 
     /// <summary>
@@ -335,6 +351,12 @@ public class ProjectsController : ControllerBase
                 });
             }
 
+            if (_scaffolder is not null)
+            {
+                try { await _scaffolder.ScaffoldAsync(id, triggeredBy, ct); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Scaffold failed {ProjectId}", id); }
+            }
+
             await _githubPushService.PushAsync(
                 id,
                 artefactId,
@@ -372,6 +394,12 @@ public class ProjectsController : ControllerBase
     {
         try
         {
+            if (_scaffolder is not null)
+            {
+                try { await _scaffolder.ScaffoldAsync(projectId, triggeredBy, ct); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Scaffold failed {ProjectId}", projectId); }
+            }
+
             var artefacts = await _mediator.Send(new GetArtefactsByStageQuery(projectId), ct);
             foreach (var artefact in artefacts)
             {
