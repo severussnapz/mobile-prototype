@@ -7,4 +7,6 @@ public interface IPushFailureLogRepository
     Task AddAsync(PushFailureLog log, CancellationToken ct);
 
     Task<int> GetUnresolvedCountAsync(Guid projectId, CancellationToken ct);
+
+    Task<IReadOnlyList<Guid>> GetFailedArtefactIdsAsync(Guid projectId, CancellationToken ct);
 }

@@ -24,4 +24,13 @@ public sealed class PushFailureLogRepository : IPushFailureLogRepository
         return _context.PushFailureLogs
             .CountAsync(pushFailureLog => pushFailureLog.ProjectId == projectId && pushFailureLog.ResolvedAt == null, ct);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetFailedArtefactIdsAsync(Guid projectId, CancellationToken ct)
+    {
+        return await _context.PushFailureLogs
+            .Where(pushFailureLog => pushFailureLog.ProjectId == projectId && pushFailureLog.ResolvedAt == null)
+            .Select(pushFailureLog => pushFailureLog.ArtefactId)
+            .Distinct()
+            .ToListAsync(ct);
+    }
 }
