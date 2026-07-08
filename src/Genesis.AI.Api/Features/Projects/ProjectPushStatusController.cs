@@ -24,6 +24,10 @@ public sealed class ProjectPushStatusController : ControllerBase
     public async Task<IActionResult> GetPushStatus(Guid projectId, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(new GetPushStatusQuery(projectId), cancellationToken);
-        return Ok(new PushStatusResponse(result.UnresolvedCount));
+        return Ok(new
+        {
+            unresolvedCount = result.UnresolvedCount,
+            failedArtefactIds = result.FailedArtefactIds
+        });
     }
 }

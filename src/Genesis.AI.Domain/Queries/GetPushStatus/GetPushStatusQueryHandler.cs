@@ -15,6 +15,7 @@ public sealed class GetPushStatusQueryHandler : IRequestHandler<GetPushStatusQue
     public async Task<GetPushStatusResult> Handle(GetPushStatusQuery request, CancellationToken cancellationToken)
     {
         var count = await _repository.GetUnresolvedCountAsync(request.ProjectId, cancellationToken);
-        return new GetPushStatusResult(count);
+        var failedIds = await _repository.GetFailedArtefactIdsAsync(request.ProjectId, cancellationToken);
+        return new GetPushStatusResult(count, failedIds);
     }
 }
