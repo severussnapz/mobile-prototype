@@ -27,20 +27,30 @@ public class UndoApproveRequirementChangeCommandTests
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
+        var reqFilePath = "requirements/REQ-001-unified-inbound-inbox.md";
+
         var previousArtefact = Artefact.CreateS3Artefact(
-            projectId, 1, "requirements/REQ-001.md",
+            projectId, 1, reqFilePath,
             "s3-key-v1", "text/markdown", 100, "idris.issa", TimeProvider.System, true);
         var currentArtefact = Artefact.CreateS3Artefact(
-            projectId, 2, "requirements/REQ-001.md",
+            projectId, 2, reqFilePath,
             "s3-key-v2", "text/markdown", 120, "idris.issa", TimeProvider.System, true);
 
         artefactRepositoryMock
-            .Setup(r => r.GetPreviousVersionAsync(
+            .Setup(r => r.GetByProjectAndFilePathAsync(
                 projectId, "requirements/REQ-001.md", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Artefact?)null);
+        artefactRepositoryMock
+            .Setup(r => r.GetProjectArtefactManifestAsync(
+                projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Artefact> { currentArtefact });
+        artefactRepositoryMock
+            .Setup(r => r.GetPreviousVersionAsync(
+                projectId, reqFilePath, It.IsAny<CancellationToken>()))
             .ReturnsAsync(previousArtefact);
         artefactRepositoryMock
             .Setup(r => r.GetByProjectAndFilePathAsync(
-                projectId, "requirements/REQ-001.md", It.IsAny<CancellationToken>()))
+                projectId, reqFilePath, It.IsAny<CancellationToken>()))
             .ReturnsAsync(currentArtefact);
         artefactStorageMock
             .Setup(s => s.GetContentAsync("s3-key-v1", It.IsAny<CancellationToken>()))
@@ -75,14 +85,14 @@ public class UndoApproveRequirementChangeCommandTests
         artefactStorageMock.Verify(s => s.GetContentAsync("s3-key-v1",
             It.IsAny<CancellationToken>()), Times.Once);
         artefactStorageMock.Verify(s => s.SaveContentAsync(
-            projectId, "requirements/REQ-001.md", 3,
+            projectId, reqFilePath, 3,
             "# REQ-001 previous content", "text/markdown",
             It.IsAny<CancellationToken>()), Times.Once);
         artefactRepositoryMock.Verify(r => r.AddAsync(
             It.Is<Artefact>(artefact =>
                 artefact.ProjectId == projectId &&
                 artefact.Version == 3 &&
-                artefact.FilePath == "requirements/REQ-001.md" &&
+                artefact.FilePath == reqFilePath &&
                 artefact.S3Key == "s3-key-v3"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -127,9 +137,22 @@ public class UndoApproveRequirementChangeCommandTests
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
+        var reqFilePath = "requirements/REQ-001-unified-inbound-inbox.md";
+        var currentArtefact = Artefact.CreateS3Artefact(
+            projectId, 2, reqFilePath,
+            "s3-key-v2", "text/markdown", 120, "idris.issa", TimeProvider.System, true);
+
+        artefactRepositoryMock
+            .Setup(r => r.GetByProjectAndFilePathAsync(
+                projectId, "requirements/REQ-001.md", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Artefact?)null);
+        artefactRepositoryMock
+            .Setup(r => r.GetProjectArtefactManifestAsync(
+                projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Artefact> { currentArtefact });
         artefactRepositoryMock
             .Setup(r => r.GetPreviousVersionAsync(
-                projectId, "requirements/REQ-001.md", It.IsAny<CancellationToken>()))
+                projectId, reqFilePath, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Artefact?)null);
 
         var handler = new UndoApproveRequirementChangeCommandHandler(
@@ -146,6 +169,67 @@ public class UndoApproveRequirementChangeCommandTests
         CancellationToken.None);
 
         Assert.Equal(ChangeStatus.Pending, change.Status);
+        artefactStorageMock.Verify(s => s.SaveContentAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(),
+            It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenNoMatchingRequirementArtefactPath_UndoesStatusWithoutRestoringFile()
+    {
+        var projectId = Guid.NewGuid();
+        var changeId = Guid.NewGuid();
+        var change = BuildApprovedChange(projectId, changeId);
+
+        var repositoryMock = new Mock<IRequirementChangeRepository>();
+        var unitOfWorkMock = new Mock<Genesis.AI.Core.Data.IUnitOfWork>();
+        var artefactRepositoryMock = new Mock<IArtefactRepository>();
+        var artefactStorageMock = new Mock<IArtefactStorageService>();
+
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(change);
+        repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
+        unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        artefactRepositoryMock
+            .Setup(r => r.GetByProjectAndFilePathAsync(
+                projectId, "requirements/REQ-001.md", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Artefact?)null);
+        artefactRepositoryMock
+            .Setup(r => r.GetProjectArtefactManifestAsync(
+                projectId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Artefact>
+            {
+                Artefact.CreateS3Artefact(
+                    projectId,
+                    1,
+                    "prototype/index.html",
+                    "s3-prototype",
+                    "text/html",
+                    200,
+                    "idris.issa",
+                    TimeProvider.System,
+                    true)
+            });
+
+        var handler = new UndoApproveRequirementChangeCommandHandler(
+            repositoryMock.Object,
+            artefactRepositoryMock.Object,
+            artefactStorageMock.Object,
+            TimeProvider.System);
+
+        await handler.Handle(new UndoApproveRequirementChangeCommand(
+            ProjectId: projectId,
+            ChangeId: changeId,
+            UndoneBy: "idris.issa",
+            UndoRationale: null),
+        CancellationToken.None);
+
+        Assert.Equal(ChangeStatus.Pending, change.Status);
+        artefactRepositoryMock.Verify(r => r.GetPreviousVersionAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         artefactStorageMock.Verify(s => s.SaveContentAsync(
             It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<int>(),
             It.IsAny<string>(), It.IsAny<string>(),

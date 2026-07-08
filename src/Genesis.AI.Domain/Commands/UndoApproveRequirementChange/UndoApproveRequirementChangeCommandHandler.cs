@@ -1,6 +1,7 @@
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Interfaces;
+using System.Linq;
 
 namespace Genesis.AI.Domain.Commands.UndoApproveRequirementChange;
 
@@ -54,7 +55,12 @@ public sealed class UndoApproveRequirementChangeCommandHandler
         string undoneBy,
         CancellationToken cancellationToken)
     {
-        var reqFilePath = $"requirements/{change.ReqId}.md";
+        var reqFilePath = await ResolveReqFilePathAsync(change, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(reqFilePath))
+        {
+            return;
+        }
 
         var previousArtefact = await _artefactRepository.GetPreviousVersionAsync(
             change.ProjectId, reqFilePath, cancellationToken);
@@ -95,5 +101,37 @@ public sealed class UndoApproveRequirementChangeCommandHandler
             true);
 
         await _artefactRepository.AddAsync(restoredArtefact, cancellationToken);
+    }
+
+    private async Task<string?> ResolveReqFilePathAsync(
+        RequirementChange change,
+        CancellationToken cancellationToken)
+    {
+        var legacyPath = $"requirements/{change.ReqId}.md";
+
+        var exactMatch = await _artefactRepository.GetByProjectAndFilePathAsync(
+            change.ProjectId,
+            legacyPath,
+            cancellationToken);
+
+        if (exactMatch is not null)
+        {
+            return legacyPath;
+        }
+
+        var allArtefacts = await _artefactRepository.GetProjectArtefactManifestAsync(
+            change.ProjectId,
+            cancellationToken);
+
+        var reqPrefix = "requirements/";
+        var reqIdPathSegmentPrefix = $"/{change.ReqId}-";
+        var reqIdExactSuffix = $"/{change.ReqId}.md";
+
+        var matchedArtefact = allArtefacts.FirstOrDefault(artefact =>
+            artefact.FilePath.StartsWith(reqPrefix, StringComparison.OrdinalIgnoreCase) &&
+            (artefact.FilePath.Contains(reqIdPathSegmentPrefix, StringComparison.OrdinalIgnoreCase) ||
+             artefact.FilePath.EndsWith(reqIdExactSuffix, StringComparison.OrdinalIgnoreCase)));
+
+        return matchedArtefact?.FilePath;
     }
 }
