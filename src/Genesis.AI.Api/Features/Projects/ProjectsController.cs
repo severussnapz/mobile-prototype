@@ -324,6 +324,15 @@ public class ProjectsController : ControllerBase
                 return NotFound(new { userMessage = "Artefact not found." });
             }
 
+            var project = await _mediator.Send(new GetProjectByIdQuery(id), ct);
+            if (project is not null && !project.HasGitHubConfig)
+            {
+                return BadRequest(new
+                {
+                    userMessage = "GitHub is not configured for this project. Go to Settings to add a GitHub repository."
+                });
+            }
+
             await _githubPushService.PushAsync(
                 id,
                 artefactId,
