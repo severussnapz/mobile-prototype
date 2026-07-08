@@ -178,5 +178,17 @@ public class ArtefactRepository : IArtefactRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task MarkPushedToGitHubAsync(Guid artefactId, TimeProvider timeProvider, CancellationToken ct)
+    {
+        var artefact = await _context.Artefacts.FirstOrDefaultAsync(entity => entity.Id == artefactId, ct);
+        if (artefact is null)
+        {
+            return;
+        }
+
+        artefact.MarkPushedToGitHub(timeProvider);
+        await UnitOfWork.SaveChangesAsync(ct);
+    }
+
 
 }

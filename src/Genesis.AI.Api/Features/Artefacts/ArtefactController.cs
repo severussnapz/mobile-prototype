@@ -52,7 +52,8 @@ public class ArtefactController : ControllerBase
             ContentType = artefact.ContentType,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         });
 
         if (!string.IsNullOrEmpty(prefix))
@@ -101,7 +102,8 @@ public class ArtefactController : ControllerBase
             Content = content,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         });
     }
 
@@ -187,7 +189,8 @@ public class ArtefactController : ControllerBase
             ContentType = artefact.ContentType,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         });
 
         return Created(string.Empty, dtos);

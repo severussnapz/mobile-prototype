@@ -13,6 +13,7 @@ public class Artefact : Entity, IAggregateRoot
     public long? SizeBytes { get; private set; }
     public string CreatedBy { get; private set; } = null!;
     public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? GitHubPushedAt { get; private set; }
 
     private Artefact() { } // Required for EF Core
 
@@ -104,5 +105,11 @@ public class Artefact : Entity, IAggregateRoot
             Version,
             CreatedBy));
         return true;
+    }
+
+    public void MarkPushedToGitHub(TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        GitHubPushedAt = timeProvider.GetUtcNow();
     }
 }

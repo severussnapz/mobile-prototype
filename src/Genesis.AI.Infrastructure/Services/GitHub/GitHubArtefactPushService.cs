@@ -21,6 +21,7 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
         };
 
     private readonly IProjectRepository _projectRepository;
+    private readonly IArtefactRepository? _artefactRepository;
     private readonly IArtefactStorageService _artefactStorageService;
     private readonly IGitHubTokenService _tokenService;
     private readonly IGitHubContentsService _contentsService;
@@ -37,9 +38,11 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
         IPushFailureLogRepository pushFailureLogRepository,
         IAssemblyVersionProvider versionProvider,
         TimeProvider timeProvider,
-        ILogger<GitHubArtefactPushService> logger)
+        ILogger<GitHubArtefactPushService> logger,
+        IArtefactRepository? artefactRepository = null)
     {
         _projectRepository = projectRepository;
+        _artefactRepository = artefactRepository;
         _artefactStorageService = artefactStorageService;
         _tokenService = tokenService;
         _contentsService = contentsService;
@@ -89,6 +92,11 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
                 commitMessage,
                 existingSha,
                 ct);
+
+            if (_artefactRepository is not null)
+            {
+                await _artefactRepository.MarkPushedToGitHubAsync(artefactId, _timeProvider, ct);
+            }
         }
         catch (Exception exception)
         {
