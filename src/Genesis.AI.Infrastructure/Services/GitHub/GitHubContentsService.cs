@@ -58,7 +58,8 @@ public sealed class GitHubContentsService : IGitHubContentsService
             resolvedSha,
             ct).ConfigureAwait(false);
 
-        if (firstResponse.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+        if (firstResponse.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity ||
+            firstResponse.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             resolvedSha = await GetCurrentShaAsync(requestUri, installationToken, ct).ConfigureAwait(false);
             using var retryResponse = await SendPutAsync(
