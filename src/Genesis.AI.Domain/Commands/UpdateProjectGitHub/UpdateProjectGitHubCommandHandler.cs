@@ -29,7 +29,9 @@ public sealed class UpdateProjectGitHubCommandHandler : IRequestHandler<UpdatePr
             && !string.IsNullOrWhiteSpace(request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl))
         {
             var apiRepoUrl = request.GitHubApiRepoUrl ?? project.GitHubApiRepoUrl ?? "";
-            var appRepoUrl = request.GitHubAppRepoUrl ?? project.GitHubAppRepoUrl ?? "";
+            var appRepoUrl = request.GitHubAppRepoUrl 
+                ?? project.GitHubAppRepoUrl 
+                ?? apiRepoUrl;
             var uri = new Uri(apiRepoUrl);
             var parts = uri.AbsolutePath.Trim('/').Split('/');
             var owner = parts.Length > 0 ? parts[0] : "";
