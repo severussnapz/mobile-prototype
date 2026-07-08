@@ -212,6 +212,7 @@ public class PushToGitHubTests
     {
         var mapper = new Mock<IMapper>();
         var logger = new Mock<ILogger<ProjectsController>>();
+        var scaffolder = new Mock<IGenesisStructureScaffolder>();
 
         var controllerType = typeof(ProjectsController);
         var constructors = controllerType.GetConstructors();
@@ -248,6 +249,12 @@ public class PushToGitHubTests
                 if (parameterType == typeof(IGitHubArtefactPushService))
                 {
                     args[index] = pushService.Object;
+                    continue;
+                }
+
+                if (parameterType == typeof(IGenesisStructureScaffolder))
+                {
+                    args[index] = scaffolder.Object;
                     continue;
                 }
 

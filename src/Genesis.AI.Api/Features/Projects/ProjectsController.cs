@@ -38,27 +38,14 @@ public class ProjectsController : ControllerBase
         IMediator mediator,
         IMapper mapper,
         ILogger<ProjectsController> logger,
-        IGitHubArtefactPushService githubPushService)
-    {
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _githubPushService = githubPushService ?? throw new ArgumentNullException(nameof(githubPushService));
-        _scaffolder = null;
-    }
-
-    public ProjectsController(
-        IMediator mediator,
-        IMapper mapper,
-        ILogger<ProjectsController> logger,
         IGitHubArtefactPushService githubPushService,
-        IGenesisStructureScaffolder scaffolder)
+        IGenesisStructureScaffolder? scaffolder = null)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _githubPushService = githubPushService ?? throw new ArgumentNullException(nameof(githubPushService));
-        _scaffolder = scaffolder ?? throw new ArgumentNullException(nameof(scaffolder));
+        _scaffolder = scaffolder;
     }
 
     /// <summary>
