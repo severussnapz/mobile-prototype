@@ -158,6 +158,18 @@ internal sealed class PrototypeElementValidator
         return !string.Equals(originalText, updatedText, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Returns true if the updated element has MORE classes than the original —
+    /// an unambiguous unrequested addition.
+    /// <para>
+    /// Known ceiling: a 1-for-1 class swap (count unchanged) is not detected.
+    /// Removing a valid class and adding an invented class (e.g. btn-primary → text-red)
+    /// passes this check. Distinguishing a legitimate replacement (btn-primary → btn-danger)
+    /// from an invented-class swap requires an allowlist of valid UI kit classes.
+    /// Tracked as a known ceiling — revisit when the EMIS UI kit class catalogue is
+    /// available as a structured source.
+    /// </para>
+    /// </summary>
     // Mode 4 (Option A, full-tree): extract ALL class tokens anywhere in the HTML, not
     // just the root. A child element gaining class="text-red" is still an unrequested
     // structural change — the class vocabulary is the UI kit's domain.
@@ -172,7 +184,8 @@ internal sealed class PrototypeElementValidator
         var originalClasses = ExtractAllClasses(original);
         var updatedClasses = ExtractAllClasses(updated);
 
-        // Allow class replacement, but reject class addition.
+        // Count-based heuristic: catches additions, not 1-for-1 invented-class swaps.
+        // See XML doc above for the known ceiling.
         return updatedClasses.Count > originalClasses.Count;
     }
 
