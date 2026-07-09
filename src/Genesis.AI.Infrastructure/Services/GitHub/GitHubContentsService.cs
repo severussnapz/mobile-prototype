@@ -111,9 +111,10 @@ public sealed class GitHubContentsService : IGitHubContentsService
 
         if (!response.IsSuccessStatusCode)
         {
-            var responseBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            _logger.LogWarning("GitHub PUT {Uri} — status {StatusCode}, response: {ResponseBody}",
-                requestUri, (int)response.StatusCode, responseBody);
+            _logger.LogWarning("GitHub PUT {Uri} — status {StatusCode}",
+                requestUri, (int)response.StatusCode);
+            // NOTE: Do NOT read response.Content here — ReadPushResultAsync needs to read it.
+            // Streams can only be read once; reading here would return empty on second read.
         }
 
         return response;
