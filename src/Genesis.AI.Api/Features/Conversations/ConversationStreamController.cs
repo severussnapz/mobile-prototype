@@ -1113,6 +1113,25 @@ public class ConversationStreamController : ControllerBase
                            "This is a mandatory safety marker that identifies the artefact as a throwaway prototype.";
                 }
 
+                // Clinical safety guard: reject saves of prototype/index.html containing
+                // format-plausible NHS numbers. A 10-digit number matching NNN NNN NNNN
+                // could be mistaken for a real patient identifier if the prototype is
+                // shared outside the team.
+                if (prototypeSingleFile &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+                    System.Text.RegularExpressions.Regex.IsMatch(
+                        content,
+                        @"\d{3}\s?\d{3}\s?\d{4}",
+                        System.Text.RegularExpressions.RegexOptions.None))
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected: prototype/index.html contains a format-plausible NHS number ({Length} chars)",
+                        content.Length);
+                    return "Error: PLAUSIBLE_NHS_NUMBER_DETECTED: The prototype HTML contains a number matching " +
+                           "the NHS number format (NNN NNN NNNN). Use obviously fake identifiers such as " +
+                           "'999 000 0000' or 'NHS: XXXX' instead. Remove all format-plausible NHS numbers before saving.";
+                }
+
                 var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
                 if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
                     duplicateInjectedHeading is not null)

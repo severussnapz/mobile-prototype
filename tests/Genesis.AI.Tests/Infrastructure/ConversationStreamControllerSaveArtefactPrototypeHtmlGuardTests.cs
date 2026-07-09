@@ -111,6 +111,19 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
     }
 
     [Fact]
+    public async Task SaveArtefact_WhenPrototypeContainsFormatPlausibleNhsNumber_RejectsWithClinicalSafetyError()
+    {
+        var controller = CreateController(prototypeSingleFileEnabled: true, out _, out _);
+        var toolCall = BuildSaveArtefactToolCall(
+            "prototype/index.html",
+            "<!DOCTYPE html><html><head><title>Prototype</title></head><body><div>PROTOTYPE ONLY</div><p>NHS: 123 456 7890</p></body></html>");
+
+        var result = await InvokeExecuteToolCallAsync(controller, toolCall, StageType.Prototype, prototypeSingleFile: true);
+
+        Assert.Contains("PLAUSIBLE_NHS_NUMBER_DETECTED", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ExecuteToolCallAsync_SaveArtefactSingleFilePrototypeWithPrototypeOnlyBanner_IsNotRejectedByPrototypeOnlyGuard()
     {
         var controller = CreateController(prototypeSingleFileEnabled: true, out var artefactRepositoryMock, out var artefactStorageServiceMock);
