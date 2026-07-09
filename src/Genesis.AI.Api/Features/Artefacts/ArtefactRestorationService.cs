@@ -71,7 +71,7 @@ internal sealed class ArtefactRestorationService : IArtefactRestorationService
             restoredContentType,
             cancellationToken);
 
-        var userId_actual = userId ?? "system";
+        var actualUserId = userId ?? "system";
         var restoredArtefact = Artefact.CreateS3Artefact(
             projectId,
             nextVersion,
@@ -79,7 +79,7 @@ internal sealed class ArtefactRestorationService : IArtefactRestorationService
             newStorageKey,
             restoredContentType,
             Encoding.UTF8.GetByteCount(sourceContent),
-            userId_actual,
+            actualUserId,
             _timeProvider,
             true);
 
