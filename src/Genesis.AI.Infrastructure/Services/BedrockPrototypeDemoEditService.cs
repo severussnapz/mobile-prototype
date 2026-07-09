@@ -154,7 +154,10 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         }
         catch (Exception exception)
         {
-            _logger.LogError(
+            // Best-effort: edit returned to client even if persistence fails.
+            // Prototype is a throwaway artefact — failed S3 write is non-fatal.
+            // Logged as warning so failures are observable in production logs.
+            _logger.LogWarning(
                 exception,
                 "Failed to persist surgical prototype edit for project {ProjectId}; the edit was returned to the client but not saved.",
                 projectId);
@@ -222,7 +225,10 @@ public sealed class BedrockPrototypeDemoEditService : IPrototypeDemoEditService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
+            // Best-effort: edit returned to client even if persistence fails.
+            // Prototype is a throwaway artefact — failed S3 write is non-fatal.
+            // Logged as warning so failures are observable in production logs.
+            _logger.LogWarning(ex,
                 "Surgical edit token usage: failed to record for conversation {ConversationId} — edit already succeeded.",
                 conversationId);
         }
