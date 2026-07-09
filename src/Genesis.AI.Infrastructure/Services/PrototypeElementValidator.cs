@@ -165,7 +165,7 @@ internal sealed class PrototypeElementValidator
     /// Returns true if the updated element has MORE classes than the original —
     /// an unambiguous unrequested addition.
     /// <para>
-    /// Known ceiling: a 1-for-1 class swap (count unchanged) is not detected.
+    /// Known ceiling: a 1-for-1 class swap where count stays equal is not detected.
     /// Removing a valid class and adding an invented class (e.g. btn-primary → text-red)
     /// passes this check. Distinguishing a legitimate replacement (btn-primary → btn-danger)
     /// from an invented-class swap requires an allowlist of valid UI kit classes.
