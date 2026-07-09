@@ -230,7 +230,10 @@ internal sealed class PrototypeElementValidator
             return "(no reason provided)";
         }
 
-        return line[(reasonStart + 1)..].Trim().TrimEnd("-->".ToCharArray());
+        var reason = line[(reasonStart + 1)..].Trim();
+        return reason.EndsWith("-->", StringComparison.Ordinal)
+            ? reason[..^3].TrimEnd()
+            : reason;
     }
 
     private static HashSet<string> ExtractAllClasses(string html)
