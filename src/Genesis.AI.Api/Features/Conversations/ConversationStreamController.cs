@@ -437,12 +437,17 @@ public class ConversationStreamController : ControllerBase
             {
                 var toolCallsThisTurn = new List<AiToolCall>();
                 var turnText = new StringBuilder(); // Text produced in THIS turn only
+                var maxTokens = prototypeSingleFile ? 64000 : 32768;
 
                 // Insert a newline between turns so post-tool text doesn't run into pre-tool text
                 var needsNewlineSeparator = fullResponse.Length > 0 && fullResponse[^1] != '\n';
 
                 await foreach (var streamEvent in _aiService.StreamWithToolsAsync(
-                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType), cancellationToken))
+                    aiSystemPrompt,
+                    aiMessages,
+                    PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType),
+                    cancellationToken,
+                    maxTokens: maxTokens))
                 {
                     switch (streamEvent)
                     {
