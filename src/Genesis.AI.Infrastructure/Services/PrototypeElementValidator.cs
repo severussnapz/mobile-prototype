@@ -100,6 +100,9 @@ internal sealed class PrototypeElementValidator
             return false;
         }
 
+        // Known ceiling: multiple adjacent root elements with no trailing prose
+        // (e.g. <b>x</b><i>y</i>) pass this check. True single-root enforcement
+        // requires full document parsing. Acceptable for prototype generation.
         var afterRoot = output[(lastClose + 1)..].Trim();
         return afterRoot.Length == 0;
     }
