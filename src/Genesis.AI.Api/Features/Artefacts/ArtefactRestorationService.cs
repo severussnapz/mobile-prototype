@@ -155,7 +155,7 @@ internal sealed class ArtefactRestorationService : IArtefactRestorationService
             .Take(size)
             .Select(entry => new ArtefactVersionResponse
             {
-                Id = Guid.Empty,
+                Id = DeterministicGuid(projectId, filePath, entry.Version),
                 Version = entry.Version,
                 CreatedAt = entry.LastModified,
                 CreatedBy = "system",
@@ -164,4 +164,19 @@ internal sealed class ArtefactRestorationService : IArtefactRestorationService
             })
             .ToList();
     }
+
+    #pragma warning disable CA5351 // Deterministic non-cryptographic ID derivation; no security boundary.
+    private static Guid DeterministicGuid(Guid projectId, string filePath, int version)
+    {
+        var input = $"{projectId}:{filePath}:{version}";
+        var hash = System.Security.Cryptography.MD5.HashData(
+            System.Text.Encoding.UTF8.GetBytes(input));
+
+        // Set version bits to 3 (MD5/name-based) per RFC 4122.
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x30);
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
+
+        return new Guid(hash);
+    }
+    #pragma warning restore CA5351
 }
