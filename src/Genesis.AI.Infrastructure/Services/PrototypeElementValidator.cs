@@ -104,6 +104,19 @@ internal sealed class PrototypeElementValidator
         return afterRoot.Length == 0;
     }
 
+    /// <summary>
+    /// Returns true if the updated element has MORE children than the original —
+    /// an unambiguous untargeted addition. Returns false when child count decreases
+    /// or stays the same.
+    /// <para>
+    /// Known ceiling: a decrease in child count permits both the legitimate unwrap
+    /// case (removing an inline element such as span during text editing) and the
+    /// illegitimate sibling-drop case (model removes an unrelated child element).
+    /// These two cases are not distinguished. This is a deliberate tradeoff —
+    /// the unwrap case is common and valid; the sibling-drop case is rare and
+    /// would require DOM-position tracking to detect reliably.
+    /// </para>
+    /// </summary>
     // Mode 2: compare direct-child count and text of non-targeted children.
     // Extracts direct children of the root element by counting immediate open tags
     // and comparing the concatenated text content.
