@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Genesis.AI.Api.Features.Conversations;
@@ -243,33 +242,21 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         StageType stageType,
         bool prototypeSingleFile)
     {
-        var method = typeof(ConversationStreamController).GetMethod(
-            "ExecuteToolCallAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.NotNull(method);
-
-        var invocation = method!.Invoke(
-            controller,
-            [
-                toolCall,
-                new Conversation(Guid.NewGuid(), 6, TimeProvider.System),
-                new List<Artefact>(),
-                new List<ParkingLotItem>(),
-                new List<ParkingLotItem>(),
-                "tester",
-                Guid.NewGuid(),
-                (StageType?)stageType,
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                new StrongBox<int>(0),
-                new StrongBox<bool>(false),
-                new StrongBox<bool>(false),
-                prototypeSingleFile,
-                CancellationToken.None
-            ]);
-
-        Assert.NotNull(invocation);
-        return await (Task<string>)invocation!;
+        return await controller.ExecuteToolCallAsync(
+            toolCall,
+            new Conversation(Guid.NewGuid(), 6, TimeProvider.System),
+            new List<Artefact>(),
+            new List<ParkingLotItem>(),
+            new List<ParkingLotItem>(),
+            "tester",
+            Guid.NewGuid(),
+            (StageType?)stageType,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new StrongBox<int>(0),
+            new StrongBox<bool>(false),
+            new StrongBox<bool>(false),
+            prototypeSingleFile,
+            CancellationToken.None);
     }
 }
