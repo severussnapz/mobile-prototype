@@ -105,18 +105,6 @@ public sealed class BedrockAiService : IAiService, IDisposable
         AiSystemPrompt systemPrompt,
         IReadOnlyList<AiMessage> messages,
         IReadOnlyList<AiToolDefinition> tools,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        await foreach (var streamEvent in StreamWithToolsAsync(systemPrompt, messages, tools, cancellationToken, 32768))
-        {
-            yield return streamEvent;
-        }
-    }
-
-    public async IAsyncEnumerable<AiStreamEvent> StreamWithToolsAsync(
-        AiSystemPrompt systemPrompt,
-        IReadOnlyList<AiMessage> messages,
-        IReadOnlyList<AiToolDefinition> tools,
         [EnumeratorCancellation] CancellationToken cancellationToken,
         int maxTokens = 32768)
     {

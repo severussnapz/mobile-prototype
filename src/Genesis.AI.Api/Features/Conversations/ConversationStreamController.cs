@@ -1128,8 +1128,8 @@ public class ConversationStreamController : ControllerBase
                         "Tool save_artefact rejected: prototype/index.html contains a format-plausible NHS number ({Length} chars)",
                         content.Length);
                     return "Error: PLAUSIBLE_NHS_NUMBER_DETECTED: The prototype HTML contains a number matching " +
-                           "the NHS number format (NNN NNN NNNN). Use obviously fake identifiers such as " +
-                           "'999 000 0000' or 'NHS: XXXX' instead. Remove all format-plausible NHS numbers before saving.";
+                           "the NHS number format (NNN NNN NNNN). Use obviously fake identifiers such as NHS: XXXX or Patient-001 — never real or plausible NHS numbers. " +
+                           "Remove all format-plausible NHS numbers before saving.";
                 }
 
                 var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
