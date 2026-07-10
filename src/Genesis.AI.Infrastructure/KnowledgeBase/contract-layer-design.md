@@ -1,11 +1,11 @@
 # Contract Layer — Design
 
-**Status:** Partial design. Conceptual model settled; enforcement mechanism decided (§9a); TDD gate, guardrail set, and tag vocabulary open.
+**Status:** Design complete. All decisions settled — conceptual model, enforcement, guardrails, TDD gate, and tag vocabulary. Implementation-ready pending sign-off.
 **Plan reference:** Plan 4d, item 1 (Contract enforcement) and item 17 (Contract layer design session — no implementation before this design is signed off).
 **Owner:** Idris Issa.
-**Prerequisite for:** Plan 5 (TDD Agent). No TDD work begins until the remaining open questions (§9b) are resolved.
+**Prerequisite for:** Plan 5 (TDD Agent). This design is the sign-off gate; implementation may proceed once approved.
 
-> **Enforcement is decided (§9a): injection via the existing per-turn prompt rebuild, with an optional cheap tool-layer backstop on the contract specifically.** This was verified against the codebase, not assumed — the per-turn rebuild with `stalenessNotice`/`handoverBlock` contributors already exists in `ConversationStreamController.cs`. A separate finding surfaced during this decision: the SESSION-CLOSE artefact is generated but never re-injected on resume (§9a). That is a real gap, small to fix (add one prompt contributor), and is logged as a Plan 4d item.
+> **Enforcement decided (§9a):** injection via the existing per-turn prompt rebuild, plus a locked-in tool-layer backstop on the contract. **TDD gate decided (§9b-i):** strict form — manifest pins REQ+ARCH provenance, gate blocks on drift, hard rule keyed off domain badges governs fast-path vs full re-run. **Tag vocabulary decided (§9b):** stable `tagId` identity (not path-based), renames surfaced as human-confirmed reviewable events. All verified against the codebase where applicable, not assumed. The SESSION-CLOSE re-injection gap found during this design is fixed and committed (first instance of the injection-contributor pattern).
 
 ---
 
@@ -242,13 +242,74 @@ All three follow TDD: tests first (RED), then the contributor/branch (GREEN), ve
 
 ---
 
-## 9b. Open questions (next session)
+## 9b. Tag vocabulary — DECIDED
 
-**These block implementation. Resolve before any code.**
+The traceability section location is settled (§6: structured section in `DATA-MODELS.md`). This fixes the shape of a single tag entry.
 
-1. **TDD gate specifics (Plan 5).** Is the gate "contract exists and approved," or the stricter "contract manifest version matches the REQ version the tests trace to"? The stricter form guarantees the tests, the requirements, and the contract are all mutually consistent before code generation.
+### The entry
 
-2. **Tag vocabulary specifics.** The traceability section location is decided (§6). The exact fields and format of a single tag entry are not (element identifier format, how an anchor is referenced, how draft/ratified state is represented).
+Each tag entry has these fields:
+
+| Field | Purpose | Mutable? |
+|---|---|---|
+| `tagId` | Stable identity, assigned once at first tagging. Project-scoped sequential (`TAG-0001`…), same convention as HAZ-IDs. Never reused, never reassigned. | Immutable |
+| `element` | Current human-meaningful path into the contract (e.g. `DB-SCHEMA.sql#patients.nhs_number`, `API-CONTRACT.yaml#/paths/patient-match/post`). **Descriptive, not identity** — used by the diff-matcher to detect when a change touches the element; can change on rename. | Mutable (a change is a reviewable event) |
+| `domain` | CS / IG / SEC. Drives badge routing and re-review. | Set at tagging |
+| `anchor` | Upstream reference justifying the tag: HAZ-ID (CS), DPIA risk ref (IG), threat/control ref (SEC). | Set at tagging |
+| `state` | `draft` / `ratified`. | draft → ratified |
+| `ratifiedBy` | Role-holder identity (role, resolved to person via RBAC). Null while draft. | Set at ratification |
+| `ratifiedAt` | Timestamp. Null while draft. | Set at ratification |
+
+### Why stable identity (not path-based identity)
+
+The identity is `tagId`, **not** the element path. This was decided against the cheaper path-only option because path-based identity is **brittle**: on a rename or refactor the path changes and the tag silently detaches from the thing it was tracking. In a regulated clinical system, a silently-broken safety-relevant audit link is the specific catastrophe this layer exists to prevent — and it is *untraceable a year later*, after many refactors, when someone tries to reconstruct why a tag stopped tracking a field. The audit trail would have a hole with no way to prove the tag ever covered its element.
+
+The severity of that failure — not its probability — drives the decision. A rename may be rare, but the cost when it happens is a broken safety-audit link, which is never acceptable. You do not gamble on the frequency of a low-probability, high-severity event when the mitigation (a stable ID) is cheap relative to the blast radius. (Note this is the same severity-over-probability logic as the TDD gate, §9b-i — invest in the durable form now, because retrofitting after the fact is the mass-correction trap.)
+
+### How renames stay safe
+
+With stable `tagId`, a rename becomes a **visible, reviewable event**, never a silent detach. When P04 re-runs and produces a new contract version, the tagging pass maps existing `tagId`s onto the new contract:
+
+- Path unchanged → tag carries forward silently.
+- Path changed, successor identifiable → surfaced as a "confirm this rename" review item (`TAG-0031` moved from A to B). The role-holder confirms, same as ratifying the original tag.
+- Successor not identifiable → surfaced as "`TAG-0031`'s element has vanished; re-locate or retire it."
+
+This reuses the diff machinery that already exists for staleness — not a new subsystem.
+
+**Honest limitation:** stable IDs make the *identity* durable, but the rename-*mapping* heuristic (guessing A became B) can be wrong. The mitigation is that the guess is **always surfaced for human confirmation, never applied silently** — the role-holder ratifies a rename the same way they ratify an original tag. So the heuristic can be wrong without being dangerous. What stable IDs buy is not a perfect rename-tracker; it is the guarantee that a rename can *never silently break the link* — worst case is a flagged re-confirmation, not a hole in the audit trail.
+
+---
+
+## 9b-i. TDD gate — DECIDED
+
+**The gate is the stricter form: the contract must be provably consistent with the upstream artefacts it was produced from, and its tags must be ratified, before Plan 5 (TDD) can start for a feature.**
+
+Rationale for strict-from-day-one: retrofitting a gate onto a system already in flight means every artefact produced under a loose gate becomes suspect and must be re-validated. At ~500 engineers that is a mass correction exercise across live work, not a code change. The complexity is cheaper to carry from the start, when there is nothing to correct.
+
+### Provenance field
+
+The manifest carries a provenance field pinning **both** the REQ version and the ARCH version the contract was produced from. Both, not REQ alone — a P03 architecture change (e.g. splitting one service into two) changes the API contract as much as a requirement change does. Pinning only the REQ would miss architecture drift.
+
+### The gate checks (all must hold)
+
+1. Contract manifest exists and is approved for this feature.
+2. Manifest's pinned REQ version == current approved REQ version **and** pinned ARCH version == current approved ARCH version.
+3. Manifest's tags are ratified, not draft (§6) — the TDD agent consumes the contract including its safety tags; starting TDD against unratified tags would generate tests against classifications the role-holders have not confirmed.
+
+Any failure blocks Plan 5 start for that feature.
+
+### On mismatch — the hard rule (proportionate, no gate-level human judgement)
+
+A REQ or ARCH mismatch is not an error; it signals the upstream moved after the contract was designed. The gate blocks and reports which upstream moved and to what version. What happens next is governed by a **hard rule keyed off the existing domain badges** on the upstream CHANGE record:
+
+- **Badged change (material** — new AC, changed interface, service split): a full P04 re-run is forced. The contract must be re-produced against the new upstream version.
+- **Unbadged change (cosmetic** — typo, clarification with no AC/interface impact): a fast-path contract re-approval is allowed.
+
+The badge already encodes materiality, so the gate needs no human judgement to decide fast-path vs full-re-run. This is what keeps the strict gate *proportionate*: without it, every trivial upstream edit would force a full contract re-run, breeding frustration and eventually a bypass. With it, the gate blocks hard on real drift and fast-paths cosmetic change.
+
+### Audit consequence
+
+The strict gate makes the chain non-repudiable: tests were written against contract vN, produced from REQ vX and ARCH vY, approved by named role-holders on given dates. Unbroken provenance from requirement to test.
 
 ---
 
@@ -294,6 +355,16 @@ Every producer→consumer seam in the pipeline has a test that fails if the hand
 
 ## 10. Sequencing note
 
-The contract layer is Plan 4d item 1 and its design (item 17) must be signed off before implementation. Enforcement (§9a) and the guardrail set (§9c) are now decided. Plan 5 (TDD Agent) consumes the contract and cannot begin until the TDD gate (§9b.1) is defined.
+The contract layer is Plan 4d item 1 and its design (item 17). **The design is now complete** — all five decision areas settled (conceptual model, enforcement §9a, guardrail set §9c, TDD gate §9b-i, tag vocabulary §9b). This document is the sign-off gate; contract implementation may proceed once approved.
 
-**What is now unblocked:** the SESSION-CLOSE re-injection fix depends only on guardrail 3 (artefact write→read-back), which is now defined. It can therefore proceed under TDD as the first, lowest-risk instance of the injection-contributor pattern — ahead of the contract enforcement, which additionally needs the TDD gate (§9b.1). Remaining before contract implementation: TDD gate specifics and tag vocabulary (§9b).
+**Already done:** the SESSION-CLOSE re-injection fix (found during this design, §9a) is implemented, tested (write→resume→present-in-prompt round trip), and committed — the first, lowest-risk instance of the injection-contributor pattern the contract enforcement reuses.
+
+**Implementation order once signed off:**
+1. Contract artefacts + manifest (reuse existing per-filePath versioning; add manifest with REQ+ARCH provenance).
+2. Pin + staleness check (feeds existing `stalenessNotice`; the SESSION-CLOSE fix proved the contributor pattern).
+3. Contract injection + tool-layer backstop (§9a).
+4. Tagging: P04 draft pass, traceability section, role-holder ratification worklist (§6, §9b vocabulary).
+5. TDD gate (§9b-i) — the Plan 5 entry condition.
+6. Guardrail suite (§9c) — built alongside, not after.
+
+Plan 5 (TDD Agent) begins only when the gate (§9b-i) is in place and green.
