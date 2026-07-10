@@ -282,6 +282,58 @@ public class ConversationsApiTests : IDisposable
     }
 
     [Fact]
+    public async Task StreamAiResponse_WhenPublishedSessionCloseArtefactExistsForStage_InjectsItIntoSystemPrompt()
+    {
+        var client = _factory.CreateAdminClient();
+        var (projectId, stageId) = await CreateProjectAndGetFirstStageAsync(client);
+        var conversationId = await CreateConversationAsync(client, stageId);
+
+        var capturedPrompts = new List<AiSystemPrompt>();
+        _factory.AiServiceMock
+            .Setup(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<AiSystemPrompt, IReadOnlyList<AiMessage>, IReadOnlyList<AiToolDefinition>, CancellationToken>(
+                (prompt, _, _, _) => capturedPrompts.Add(prompt))
+            .Returns(CreateStreamEvents([new AiTextChunk("ok")]));
+
+        var artefactPayload = new StringContent(
+            """
+            {
+              "artefacts": [
+                {
+                  "filePath": "session-close/SESSION-CLOSE-P01.md",
+                  "contentType": "text/markdown",
+                  "content": "## Session Close\nRESUME-MARKER-XYZ"
+                }
+              ]
+            }
+            """,
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
+        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
+
+        var streamRequest = new StringContent(
+            """{"content":"continue"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
+        _ = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.NotEmpty(capturedPrompts);
+        Assert.Contains(
+            capturedPrompts,
+            prompt => string.Concat(prompt.StablePart, prompt.MutablePart)
+                .Contains("RESUME-MARKER-XYZ", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task StreamAiResponse_Pipeline02CompletionGate_MissingRequiredArtefactsDoesNotAdvancePhase()
     {
         var client = _factory.CreateAdminClient();

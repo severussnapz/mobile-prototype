@@ -211,6 +211,7 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         var skillContentServiceMock = new Mock<ISkillContentService>();
         var activeSkillsServiceMock = new Mock<IActiveSkillsService>();
         var foundationServiceMock = new Mock<IFoundationService>();
+        var sessionCloseContextBuilderMock = new Mock<ISessionCloseContextBuilder>();
         var prototypeAssemblyServiceMock = new Mock<IPrototypeAssemblyService>();
         var prototypeFragmentMigrationServiceMock = new Mock<IPrototypeFragmentMigrationService>();
 
@@ -229,6 +230,7 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
             skillContentServiceMock.Object,
             activeSkillsServiceMock.Object,
             foundationServiceMock.Object,
+            sessionCloseContextBuilderMock.Object,
             prototypeAssemblyServiceMock.Object,
             prototypeFragmentMigrationServiceMock.Object,
             tokenOptions,

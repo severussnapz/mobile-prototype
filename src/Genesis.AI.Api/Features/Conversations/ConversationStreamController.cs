@@ -43,6 +43,7 @@ public class ConversationStreamController : ControllerBase
     private readonly ISkillContentService _skillContentService;
     private readonly IActiveSkillsService _activeSkillsService;
     private readonly IFoundationService _foundationService;
+    private readonly ISessionCloseContextBuilder _sessionCloseContextBuilder;
     private readonly IPrototypeAssemblyService _prototypeAssemblyService;
     private readonly IPrototypeFragmentMigrationService _prototypeFragmentMigrationService;
     private readonly IPrototypeDomSearchService? _prototypeDomSearchService;
@@ -62,6 +63,7 @@ public class ConversationStreamController : ControllerBase
         ISkillContentService skillContentService,
         IActiveSkillsService activeSkillsService,
         IFoundationService foundationService,
+        ISessionCloseContextBuilder sessionCloseContextBuilder,
         IPrototypeAssemblyService prototypeAssemblyService,
         IPrototypeFragmentMigrationService prototypeFragmentMigrationService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
@@ -78,6 +80,7 @@ public class ConversationStreamController : ControllerBase
         _skillContentService = skillContentService ?? throw new ArgumentNullException(nameof(skillContentService));
         _activeSkillsService = activeSkillsService ?? throw new ArgumentNullException(nameof(activeSkillsService));
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
+        _sessionCloseContextBuilder = sessionCloseContextBuilder ?? throw new ArgumentNullException(nameof(sessionCloseContextBuilder));
         _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
         _prototypeFragmentMigrationService = prototypeFragmentMigrationService ?? throw new ArgumentNullException(nameof(prototypeFragmentMigrationService));
         _prototypeDomSearchService = prototypeDomSearchService;
@@ -320,6 +323,10 @@ public class ConversationStreamController : ControllerBase
         }
 
         // Build split AiSystemPrompt: stable part (cached) + mutable part (fresh each turn)
+        var sessionCloseContext = stageType.HasValue
+            ? await _sessionCloseContextBuilder.BuildSessionCloseContextAsync(projectId, stageType.Value, cancellationToken)
+            : string.Empty;
+
         AiSystemPrompt aiSystemPrompt;
         if (_tokenOptimisationOptions.FoundationPrefixEnabled && stageType.HasValue)
         {
@@ -353,6 +360,11 @@ public class ConversationStreamController : ControllerBase
                 mutablePart += $"\n\n---\n\n## REQUEST INTENT ROUTING (API-ENFORCED)\n\n{prototypeIntentDirective}";
             }
 
+            if (!string.IsNullOrEmpty(sessionCloseContext))
+            {
+                mutablePart += $"\n\n---\n\n{sessionCloseContext}";
+            }
+
             mutablePart += stalenessNotice;
             mutablePart += handoverBlock;
 
@@ -377,6 +389,11 @@ public class ConversationStreamController : ControllerBase
             if (!string.IsNullOrEmpty(prototypeIntentDirective))
             {
                 systemPrompt += $"\n\n---\n\n## REQUEST INTENT ROUTING (API-ENFORCED)\n\n{prototypeIntentDirective}";
+            }
+
+            if (!string.IsNullOrEmpty(sessionCloseContext))
+            {
+                systemPrompt += $"\n\n---\n\n{sessionCloseContext}";
             }
 
             systemPrompt += stalenessNotice;
