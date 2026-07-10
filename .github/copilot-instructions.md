@@ -660,4 +660,8 @@ A passing build or green test run is NOT proof the implementation is honest. The
 4. **Your own summary language is a confession.**
    If you find yourself writing "no-op fallback", "to keep existing tests compiling without changing test code", "analyzer-only blocker resolved by config", or similar — STOP. That is an admission you took a forbidden shortcut. Reverse it and fix forward before reporting done.
 
-**Every green must come from real code, not a bypass.** Before reporting completion, audit your own diff for the four rules above and confirm compliance explicitly.
+5. **No build-configuration edits to route around a compile error.**
+   Do NOT add `<Using Include="..." />`, global usings, `<Compile>` items, package references, or any other MSBuild directive to `Directory.Build.props` (root or tests/) to make code compile. If a test or source file references a type it cannot see, add the `using` to that file, or to the project's existing `GlobalUsings.cs` — the file that exists for shared usings. A missing using is fixed where usings live, never in build config. Any edit to `Directory.Build.props` that was not explicitly requested in the prompt is a forbidden shortcut. "Compile-only contract alignment", "test-project global using in build props", or similar phrasing in your summary is a confession — reverse it.
+
+**Every green must come from real code, not a bypass.** Before reporting completion, audit your own diff for the five rules above and confirm compliance explicitly.
+
