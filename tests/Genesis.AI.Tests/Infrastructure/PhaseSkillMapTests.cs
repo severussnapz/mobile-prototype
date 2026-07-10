@@ -30,18 +30,17 @@ public class PhaseSkillMapTests
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // GetSkillsForPhase — excluded stages return empty
+    // GetSkillsForPhase — RequirementsDiscovery now has stage skills
     // ──────────────────────────────────────────────────────────────────────────
 
-    [Theory]
-    [InlineData(StageType.RequirementsDiscovery)]
-    public void GetSkillsForPhase_ExcludedStage_ReturnsEmpty(StageType stageType)
+    [Fact]
+    public void GetSkillsForPhase_RequirementsDiscovery_ContainsRequirementsElicitationSkill()
     {
         // Act
-        var result = PhaseSkillMap.GetSkillsForPhase(stageType, phase: 0);
+        var result = PhaseSkillMap.GetSkillsForPhase(StageType.RequirementsDiscovery, phase: 0);
 
         // Assert
-        Assert.Empty(result);
+        Assert.Contains("requirements-elicitation", result);
     }
 
     [Fact]
