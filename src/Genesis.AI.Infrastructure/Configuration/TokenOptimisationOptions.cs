@@ -78,4 +78,14 @@ public sealed class TokenOptimisationOptions
     /// clarifications, or contradiction flags back to requirement files.
     /// </summary>
     public bool RequirementFeedbackEnabled { get; set; }
+
+    /// <summary>
+    /// When enabled, the Prototype stage (P02) runs the single-file HTML builder:
+    /// the <c>PrototypeDemoGeneration.md</c> prompt plus the single-file tool set
+    /// (save_artefact/edit_artefact/search_in_artefact), and the deterministic fragment
+    /// migration is skipped. This flag gates BOTH prompt selection AND tool selection
+    /// atomically — the two must never drift. When <c>false</c>, the Prototype stage
+    /// keeps the fragment/assembly pipeline (Pipeline02Prototype.md + apply_to_scope).
+    /// </summary>
+    public bool PrototypeSingleFileEnabled { get; set; }
 }

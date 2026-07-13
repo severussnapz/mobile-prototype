@@ -48,4 +48,35 @@ public class EmbeddedPromptServiceTests
         Assert.Contains("bdat_analysis", phaseNames);
         Assert.Contains("adr_creation", phaseNames);
     }
+
+    [Fact]
+    public void GetPrototypeSingleFilePrompt_ReturnsMultiTurnBuilderPrompt_NotFragmentPrompt()
+    {
+        var singleFilePrompt = _service.GetPrototypeSingleFilePrompt();
+
+        // Comes from PrototypeDemoGeneration.md (single-file, multi-turn) ...
+        Assert.Contains("Prototype Builder AI", singleFilePrompt);
+        Assert.Contains("prototype/index.html", singleFilePrompt);
+        // ... and never from the fragment pipeline (Pipeline02Prototype.md).
+        Assert.DoesNotContain("_shell.html", singleFilePrompt);
+        Assert.DoesNotContain("apply_to_scope", singleFilePrompt);
+    }
+
+    [Fact]
+    public void GetPrototypeSingleFilePrompt_IncludesEmisXDesignSystemReference()
+    {
+        var singleFilePrompt = _service.GetPrototypeSingleFilePrompt();
+
+        // UI kit content is folded into the (cacheable) stable prompt part.
+        Assert.Contains("EMIS-X Design System Reference", singleFilePrompt);
+    }
+
+    [Fact]
+    public void GetSystemPrompt_ForPrototype_ReturnsFragmentPromptNotSingleFilePrompt()
+    {
+        var fragmentPrompt = _service.GetSystemPrompt(StageType.Prototype);
+        var singleFilePrompt = _service.GetPrototypeSingleFilePrompt();
+
+        Assert.NotEqual(fragmentPrompt, singleFilePrompt);
+    }
 }

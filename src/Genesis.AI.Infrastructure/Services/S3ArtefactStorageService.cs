@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using Amazon.S3;
 using Amazon.S3.Model;
@@ -121,6 +122,73 @@ public class S3ArtefactStorageService : IArtefactStorageService
         await _s3Client.DeleteObjectAsync(_bucketName, storageKey, cancellationToken);
 
         _logger.LogInformation("Deleted artefact content from S3: {StorageKey}", storageKey);
+    }
+
+    public async Task<IReadOnlyList<(int Version, long SizeBytes, DateTimeOffset LastModified)>> ListVersionsAsync(
+        Guid projectId,
+        string filePath,
+        CancellationToken cancellationToken)
+    {
+        var normalisedPath = filePath.TrimStart('/');
+        var prefix = $"projects/{projectId}/artefacts/{normalisedPath}/";
+
+        var versions = new List<(int Version, long SizeBytes, DateTimeOffset LastModified)>();
+
+        try
+        {
+            string? continuationToken = null;
+            do
+            {
+                var response = await _s3Client.ListObjectsV2Async(
+                    new ListObjectsV2Request
+                    {
+                        BucketName = _bucketName,
+                        Prefix = prefix,
+                        ContinuationToken = continuationToken
+                    },
+                    cancellationToken);
+
+                foreach (var s3Object in response.S3Objects)
+                {
+                    if (TryParseVersion(s3Object.Key, prefix, out var version))
+                    {
+                        versions.Add((
+                            version,
+                            s3Object.Size,
+                            new DateTimeOffset(DateTime.SpecifyKind(s3Object.LastModified, DateTimeKind.Utc))));
+                    }
+                }
+
+                continuationToken = response.IsTruncated ? response.NextContinuationToken : null;
+            }
+            while (continuationToken is not null);
+        }
+        catch (AmazonS3Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Failed to list artefact versions from S3 for prefix {Prefix}; returning empty list.",
+                prefix);
+            return [];
+        }
+
+        return versions
+            .OrderByDescending(entry => entry.Version)
+            .ToList();
+    }
+
+    private static bool TryParseVersion(string key, string prefix, out int version)
+    {
+        version = 0;
+
+        // Only direct children of the prefix are version objects (key = "{prefix}v{N}").
+        var suffix = key[prefix.Length..];
+        if (suffix.Length < 2 || suffix[0] != 'v' || suffix.Contains('/'))
+        {
+            return false;
+        }
+
+        return int.TryParse(suffix[1..], out version);
     }
 
     private static string BuildStorageKey(Guid projectId, string filePath, int version)

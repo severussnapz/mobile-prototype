@@ -21,6 +21,12 @@ public class ArtefactRepository : IArtefactRepository
         await _context.Artefacts.AddAsync(artefact, cancellationToken);
     }
 
+    public Task UpdateAsync(Artefact artefact, CancellationToken cancellationToken)
+    {
+        _context.Artefacts.Update(artefact);
+        return Task.CompletedTask;
+    }
+
     public async Task DeleteByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         var tracked = await _context.Artefacts.FirstOrDefaultAsync(artefact => artefact.Id == id, cancellationToken);
@@ -59,6 +65,9 @@ public class ArtefactRepository : IArtefactRepository
 
     public async Task<int> GetNextVersionForFileAsync(Guid projectId, string filePath, CancellationToken cancellationToken)
     {
+        // ponytail: version allocation -> S3 write -> DB row is not atomic.
+        // Concurrent edits on the same filePath could collide on the S3 key.
+        // Acceptable for single-user editor; revisit if concurrent edits needed.
         var maxVersion = await _context.Artefacts
             .Where(artefact => artefact.ProjectId == projectId && artefact.FilePath == filePath)
             .MaxAsync(artefact => (int?)artefact.Version, cancellationToken);

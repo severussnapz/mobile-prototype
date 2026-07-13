@@ -16,7 +16,7 @@ public class RequirementImpactClassifierTests
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiResponse("cosmetic", 10, 2));
+            .ReturnsAsync(new AiResponse("cosmetic", 10, 2, 0, 0));
 
         var classifier = new RequirementImpactClassifier(aiServiceMock.Object);
 

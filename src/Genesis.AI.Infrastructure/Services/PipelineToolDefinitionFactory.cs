@@ -70,4 +70,23 @@ internal static class PipelineToolDefinitionFactory
     {
         return PrototypeDomToolBuilder.BuildApplyToScopeTool();
     }
+
+    // Single-file prototype builder tool set: the model reads requirements, generates and
+    // saves prototype/index.html, then refines it surgically. Excludes every fragment/DOM
+    // tool (apply_to_scope, set_node_*, insert_adjacent_html, remove_element) and the
+    // windowing/orchestration tools (advance_requirement, set_orchestration_mode).
+    internal static IReadOnlyList<AiToolDefinition> BuildPrototypeSingleFileTools()
+    {
+        return new AiToolDefinition[]
+        {
+            ArtefactToolBuilder.BuildSaveArtefactTool(),
+            BuildEditArtefactTool(),
+            ArtefactToolBuilder.BuildGetArtefactTool(),
+            ArtefactToolBuilder.BuildListArtefactsTool(),
+            ParkingLotToolBuilder.BuildAddParkingLotItemTool(),
+            ParkingLotToolBuilder.BuildResolveParkingLotItemTool(),
+            FeedbackToolBuilder.BuildProposeRequirementChangeTool(),
+            ProgressToolBuilder.BuildUpdateProgressTool()
+        };
+    }
 }

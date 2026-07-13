@@ -31,7 +31,7 @@ public class ConversationStreamController : ControllerBase
     private const int Pipeline02CompletionPhaseNumber = 6;
     private const string PrototypeHtmlArtefactPath = "prototype/index.html";
     private const string PrototypeNotesArtefactPath = "prototype/PROTOTYPE_NOTES.md";
-    private static readonly Regex InjectedSectionHeadingRegex = new(
+    private static readonly Regex _injectedSectionHeadingRegex = new(
         @"^## (?<heading>.+ \(Added by [^)]+\))$",
         RegexOptions.Multiline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
@@ -173,10 +173,16 @@ public class ConversationStreamController : ControllerBase
         Response.Headers.CacheControl = "no-cache";
         Response.Headers.Connection = "keep-alive";
 
-        // Resolve the system prompt from the stage type (stageType already loaded for auth check above)
-        var basePrompt = stageType is not null
-            ? _promptService.GetSystemPrompt(stageType.Value)
-            : GetFallbackPrompt();
+        // Resolve the system prompt from the stage type (stageType already loaded for auth check above).
+        // Single-file prototype mode (flag + Prototype stage) swaps in the PrototypeDemoGeneration.md
+        // prompt (with EMIS-X UI kit) instead of the fragment-pipeline Pipeline02Prototype.md.
+        var prototypeSingleFile = _tokenOptimisationOptions.PrototypeSingleFileEnabled
+            && stageType == StageType.Prototype;
+        var basePrompt = prototypeSingleFile
+            ? _promptService.GetPrototypeSingleFilePrompt()
+            : stageType is not null
+                ? _promptService.GetSystemPrompt(stageType.Value)
+                : GetFallbackPrompt();
 
         // Inject current API-managed state into the system prompt
         var conversationWithParkingLot = await _conversationRepository.GetByIdWithParkingLotAsync(id, cancellationToken);
@@ -194,12 +200,17 @@ public class ConversationStreamController : ControllerBase
         // Build lightweight artefact manifest (file paths + versions only — LLM uses tools to read content)
         var artefactManifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
         var artefactManifestSection = BuildArtefactManifest(artefactManifest);
-        var prototypeIntentDirective = BuildPrototypeIntentRoutingDirective(stageType, request.Content, artefactManifest);
+        var prototypeIntentDirective = BuildPrototypeIntentRoutingDirective(
+            stageType,
+            request.Content,
+            artefactManifest,
+            prototypeSingleFile);
 
         // Prototype fragment migration — runs before LLM initialises, fully awaited (no race condition).
         // Detection: prototype/fragments/_shell.html exists → skip. Monolith present → split into fragments.
         // Pure C#, no LLM call, deterministic. Safe to call on every Prototype conversation.
-        if (stageType == StageType.Prototype)
+        // Skipped entirely in single-file mode — that path never produces fragments.
+        if (stageType == StageType.Prototype && !prototypeSingleFile)
         {
             await _prototypeFragmentMigrationService.MigrateIfNeededAsync(
                 projectId, initiatedBy: User.GetUserErn() ?? "system", cancellationToken);
@@ -426,12 +437,17 @@ public class ConversationStreamController : ControllerBase
             {
                 var toolCallsThisTurn = new List<AiToolCall>();
                 var turnText = new StringBuilder(); // Text produced in THIS turn only
+                var maxTokens = prototypeSingleFile ? 64000 : 32768;
 
                 // Insert a newline between turns so post-tool text doesn't run into pre-tool text
                 var needsNewlineSeparator = fullResponse.Length > 0 && fullResponse[^1] != '\n';
 
                 await foreach (var streamEvent in _aiService.StreamWithToolsAsync(
-                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType), cancellationToken))
+                    aiSystemPrompt,
+                    aiMessages,
+                    PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType),
+                    cancellationToken,
+                    maxTokens: maxTokens))
                 {
                     switch (streamEvent)
                     {
@@ -522,7 +538,7 @@ public class ConversationStreamController : ControllerBase
                             ? fpProp.GetString() ?? string.Empty
                             : string.Empty;
                         var isPrototypePath = requestedPath.StartsWith("prototype/", StringComparison.OrdinalIgnoreCase);
-                        if (!isPrototypePath)
+                        if (!isPrototypePath && !prototypeSingleFile)
                         {
                             if (readBudgetUsed >= maxReadBudget)
                             {
@@ -558,6 +574,7 @@ public class ConversationStreamController : ControllerBase
                             searchCountThisTurn,
                             postSearchReadBlocked,
                             zeroMatchToolBlocked,
+                            prototypeSingleFile,
                             cancellationToken);
                     }
                     catch (ToolExecutionFailedException exception)
@@ -963,7 +980,7 @@ public class ConversationStreamController : ControllerBase
         }
     }
 
-    private async Task<string> ExecuteToolCallWithRetryAsync(
+    internal async Task<string> ExecuteToolCallWithRetryAsync(
         AiToolCall toolCall,
         Conversation conversation,
         List<Artefact> savedArtefacts,
@@ -977,6 +994,7 @@ public class ConversationStreamController : ControllerBase
         StrongBox<int> searchCountThisTurn,
         StrongBox<bool> postSearchReadBlocked,
         StrongBox<bool> zeroMatchToolBlocked,
+        bool prototypeSingleFile,
         CancellationToken cancellationToken)
     {
         for (var attempt = 1; attempt <= ToolExecutionRetryCount + 1; attempt++)
@@ -997,6 +1015,7 @@ public class ConversationStreamController : ControllerBase
                     searchCountThisTurn,
                     postSearchReadBlocked,
                     zeroMatchToolBlocked,
+                    prototypeSingleFile,
                     cancellationToken);
             }
             catch (Exception exception) when (attempt <= ToolExecutionRetryCount)
@@ -1022,7 +1041,7 @@ public class ConversationStreamController : ControllerBase
             $"Tool '{toolCall.ToolName}' failed after {ToolExecutionRetryCount + 1} attempts.");
     }
 
-    private async Task<string> ExecuteToolCallAsync(
+    internal async Task<string> ExecuteToolCallAsync(
         AiToolCall toolCall,
         Conversation conversation,
         List<Artefact> savedArtefacts,
@@ -1036,6 +1055,7 @@ public class ConversationStreamController : ControllerBase
         StrongBox<int> searchCountThisTurn,
         StrongBox<bool> postSearchReadBlocked,
         StrongBox<bool> zeroMatchToolBlocked,
+        bool prototypeSingleFile,
         CancellationToken cancellationToken)
     {
         const int maxSearchesPerTurn = 5;
@@ -1062,6 +1082,56 @@ public class ConversationStreamController : ControllerBase
                 var filePath = root.GetProperty("file_path").GetString()!;
                 var content = root.GetProperty("content").GetString()!;
 
+                // Single-file prototype corruption guard: reject saves of prototype/index.html
+                // that are not complete valid HTML documents. Prevents context-truncation from
+                // writing partial content (e.g. 40 bytes) that corrupts the prototype.
+                if (prototypeSingleFile &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+                    (!content.TrimStart().StartsWith("<!DOCTYPE html>", StringComparison.OrdinalIgnoreCase) ||
+                     !content.TrimEnd().EndsWith("</html>", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected: prototype/index.html is not a complete HTML document ({Length} chars)",
+                        content.Length);
+                    return "Error: INVALID_PROTOTYPE_HTML: The content must be a complete HTML document — " +
+                           "starting with <!DOCTYPE html> and ending with </html>. " +
+                           "Your response was truncated. Do not save partial HTML — regenerate the complete prototype.";
+                }
+
+                // Single-file prototype banner guard: reject saves of prototype/index.html
+                // that are missing the required PROTOTYPE ONLY safety banner.
+                // The banner identifies the artefact as a throwaway prototype, not production UI.
+                if (prototypeSingleFile &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+                    !content.Contains("PROTOTYPE ONLY", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected: prototype/index.html is missing the PROTOTYPE ONLY banner ({Length} chars)",
+                        content.Length);
+                    return "Error: MISSING_PROTOTYPE_BANNER: The prototype HTML must include a visible 'PROTOTYPE ONLY' banner. " +
+                           "Add an amber full-width banner at the very top of <body> containing the text 'PROTOTYPE ONLY'. " +
+                           "This is a mandatory safety marker that identifies the artefact as a throwaway prototype.";
+                }
+
+                // Clinical safety guard: reject saves of prototype/index.html containing
+                // format-plausible NHS numbers. A 10-digit number matching NNN NNN NNNN
+                // could be mistaken for a real patient identifier if the prototype is
+                // shared outside the team.
+                if (prototypeSingleFile &&
+                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+                    System.Text.RegularExpressions.Regex.IsMatch(
+                        content,
+                        @"\d{3}\s?\d{3}\s?\d{4}",
+                        System.Text.RegularExpressions.RegexOptions.None))
+                {
+                    _logger.LogWarning(
+                        "Tool save_artefact rejected: prototype/index.html contains a format-plausible NHS number ({Length} chars)",
+                        content.Length);
+                    return "Error: PLAUSIBLE_NHS_NUMBER_DETECTED: The prototype HTML contains a number matching " +
+                           "the NHS number format (NNN NNN NNNN). Use obviously fake identifiers such as NHS: XXXX or Patient-001 — never real or plausible NHS numbers. " +
+                           "Remove all format-plausible NHS numbers before saving.";
+                }
+
                 var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
                 if (filePath.StartsWith("requirements/REQ-", StringComparison.OrdinalIgnoreCase) &&
                     duplicateInjectedHeading is not null)
@@ -1086,7 +1156,12 @@ public class ConversationStreamController : ControllerBase
                         var existingSizeBytes = existingPrototype.SizeBytes ?? 0;
                         var contentIsLargeForEditing = existingSizeBytes > 50_000 || content.Length > 50_000;
 
-                        if (!contentIsLargeForEditing)
+                        if (ShouldBlockPrototypeRegenerationSave(
+                                stageType,
+                                filePath,
+                                prototypeSingleFile,
+                                prototypeAlreadyExists: true,
+                                contentIsLargeForEditing))
                         {
                             _logger.LogWarning(
                                 "Tool save_artefact rejected for existing prototype HTML regeneration: {FilePath}",
@@ -1096,14 +1171,17 @@ public class ConversationStreamController : ControllerBase
                                    "Only the initial prototype creation may use save_artefact for prototype/index.html.";
                         }
 
-                        _logger.LogInformation(
-                            "Tool save_artefact: allowing full regeneration of prototype/index.html " +
-                            "(existing size: {ExistingBytes} bytes — too large for targeted edit_artefact)",
-                            existingSizeBytes);
+                        if (!prototypeSingleFile && contentIsLargeForEditing)
+                        {
+                            _logger.LogInformation(
+                                "Tool save_artefact: allowing full regeneration of prototype/index.html " +
+                                "(existing size: {ExistingBytes} bytes — too large for targeted edit_artefact)",
+                                existingSizeBytes);
+                        }
                     }
                 }
 
-                if (stageType == StageType.Prototype)
+                if (stageType == StageType.Prototype && !prototypeSingleFile)
                 {
                     var validation = ValidatePipeline02SaveContract(filePath, content);
                     if (!validation.IsValid)
@@ -1338,8 +1416,7 @@ public class ConversationStreamController : ControllerBase
 
                 // Block direct reads of the assembled prototype — it is the output, not a fragment to edit.
                 // The LLM should only read/edit fragment files (prototype/fragments/*).
-                if (stageType == StageType.Prototype &&
-                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase))
+                if (ShouldBlockPrototypeRegenerationRead(stageType, filePath, prototypeSingleFile))
                 {
                     _logger.LogWarning("Tool get_artefact: blocked read of assembled prototype/index.html — redirect to fragments");
                     return "Error: prototype/index.html is the assembled output and cannot be read directly. " +
@@ -1351,12 +1428,16 @@ public class ConversationStreamController : ControllerBase
                 // during a Prototype edit. _shell.html mirrors the migration step's own build
                 // detection — an edit works on the fragments, never the requirements.
                 if (stageType == StageType.Prototype &&
+                    !prototypeSingleFile &&
                     filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase))
                 {
                     var shellFragment = await _artefactRepository.GetByProjectAndFilePathAsync(
                         projectId, "prototype/fragments/_shell.html", cancellationToken);
                     var readGuardError = PrototypeReadGuard.ValidateGetArtefact(
-                        stageType, filePath, prototypeAlreadyBuilt: shellFragment is not null);
+                        stageType,
+                        filePath,
+                        prototypeAlreadyBuilt: shellFragment is not null,
+                        prototypeSingleFile: prototypeSingleFile);
                     if (readGuardError is not null)
                     {
                         _logger.LogWarning(
@@ -1389,7 +1470,7 @@ public class ConversationStreamController : ControllerBase
                 const int largeFileThreshold = 50_000;
                 var alreadyReadThisRequest = filesReadThisRequest.Contains(filePath);
                 var getArtefactResult = BuildGetArtefactResult(
-                    filePath, artefactContent, artefact.Version, alreadyReadThisRequest, largeFileThreshold);
+                    filePath, artefactContent, artefact.Version, alreadyReadThisRequest, largeFileThreshold, prototypeSingleFile);
                 filesReadThisRequest.Add(filePath);
 
                 _logger.LogInformation(
@@ -1582,14 +1663,14 @@ public class ConversationStreamController : ControllerBase
 
                 // Require get_artefact to be called first this request so Claude anchors against
                 // the real file content, not memory or a previous cached version.
-                if (!filesReadThisRequest.Contains(filePath))
+                if (!filesReadThisRequest.Contains(filePath) &&
+                    !(prototypeSingleFile && !string.IsNullOrEmpty(oldStr)))
                 {
                     _logger.LogWarning(
                         "Tool edit_artefact blocked: {FilePath} not read this request — forcing get_artefact first",
                         filePath);
                     return $"Error: FILE_NOT_READ: You must call get_artefact on '{filePath}' before editing it. " +
-                           "For large files this returns a structural outline of all CSS selectors and HTML sections — " +
-                           "use that to find your anchor, then call search_in_artefact if you need the exact surrounding lines.";
+                           "Read the file first to anchor your edit against the real content, then call edit_artefact.";
                 }
 
                 // Block edits where get_artefact was called in the same turn — the file content
@@ -2026,12 +2107,15 @@ public class ConversationStreamController : ControllerBase
         return sb.ToString();
     }
 
-    private static string BuildPrototypeIntentRoutingDirective(
+    internal static string BuildPrototypeIntentRoutingDirective(
         StageType? stageType,
         string? latestUserMessage,
-        IReadOnlyList<Artefact> artefactManifest)
+        IReadOnlyList<Artefact> artefactManifest,
+        bool prototypeSingleFile)
     {
-        if (stageType != StageType.Prototype || string.IsNullOrWhiteSpace(latestUserMessage))
+        if (stageType != StageType.Prototype ||
+            prototypeSingleFile ||
+            string.IsNullOrWhiteSpace(latestUserMessage))
         {
             return string.Empty;
         }
@@ -2209,6 +2293,30 @@ public class ConversationStreamController : ControllerBase
         return "text/markdown";
     }
 
+    internal static bool ShouldBlockPrototypeRegenerationRead(
+        StageType? stageType,
+        string filePath,
+        bool prototypeSingleFile)
+    {
+        return stageType == StageType.Prototype &&
+               !prototypeSingleFile &&
+               filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool ShouldBlockPrototypeRegenerationSave(
+        StageType? stageType,
+        string filePath,
+        bool prototypeSingleFile,
+        bool prototypeAlreadyExists,
+        bool contentIsLargeForEditing)
+    {
+        return stageType == StageType.Prototype &&
+               !prototypeSingleFile &&
+               filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
+               prototypeAlreadyExists &&
+               !contentIsLargeForEditing;
+    }
+
     private static string ToNfc(string text)
     {
         return text.ToNfc();
@@ -2228,11 +2336,13 @@ public class ConversationStreamController : ControllerBase
         string artefactContent,
         int version,
         bool alreadyReadThisRequest,
-        int largeFileThreshold)
+        int largeFileThreshold,
+        bool prototypeSingleFile = false)
     {
         var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
         var isPrototypeHtmlFragment =
-            filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase)
+            (filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase)
+             || (prototypeSingleFile && filePath.Equals("prototype/index.html", StringComparison.OrdinalIgnoreCase)))
             && extension is ".html" or ".htm";
 
         if (isPrototypeHtmlFragment && alreadyReadThisRequest)
@@ -2305,7 +2415,7 @@ public class ConversationStreamController : ControllerBase
     {
         var headingCounts = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        foreach (Match match in InjectedSectionHeadingRegex.Matches(content))
+        foreach (Match match in _injectedSectionHeadingRegex.Matches(content))
         {
             var heading = match.Groups["heading"].Value;
             if (!headingCounts.TryAdd(heading, 1))

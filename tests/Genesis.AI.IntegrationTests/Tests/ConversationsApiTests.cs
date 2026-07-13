@@ -243,7 +243,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("save_artefact", "tool-use-1", savePrototypeToolInput)
@@ -299,7 +300,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("advance_phase", "tool-use-advance", advancePhaseToolInput)
@@ -338,7 +340,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("save_artefact", "tool-use-invalid", invalidSaveToolInput)
@@ -371,7 +374,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()));
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int>()));
 
         // 55 turns of tool calls (brings turnsRemaining to 5, triggering the near_limit warning)
         for (var turn = 0; turn < 55; turn++)
@@ -411,7 +415,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()));
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int>()));
 
         // 60 turns of tool calls — exhausts the loop completely (default max is 60)
         for (var turn = 0; turn < 60; turn++)
@@ -458,7 +463,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int>()))
             // Turn 1: AI attempts to advance without saving — gate error returned as tool result
             .Returns(CreateStreamEvents(
             [
@@ -508,7 +514,8 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<int>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("advance_requirement", "tool-use-advance", advanceRequirementInput)

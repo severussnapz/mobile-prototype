@@ -65,7 +65,11 @@ public sealed class MockTokenGenerator
 
     public string CreateAdminToken()
     {
+        // Explicitly pass userErn + userName to avoid hitting the overload
+        // CreateBearerToken(string userErn, string userName, params string[])
+        // when the number of string arguments matches its positional parameters.
         return CreateBearerToken(
+            TestUserErn, "Test User",
             "genai-req.admin",
             "genai-req.read",
             "genai-req.write",
@@ -76,12 +80,16 @@ public sealed class MockTokenGenerator
 
     public string CreateReadOnlyToken()
     {
-        return CreateBearerToken("genai-req.read");
+        return CreateBearerToken(TestUserErn, "Test User", "genai-req.read");
     }
 
     public string CreateWriteToken()
     {
-        return CreateBearerToken("genai-req.read", "genai-req.write");
+        // Two-argument call without explicit userErn/userName resolves to
+        // CreateBearerToken(string userErn, string userName, params string[])
+        // instead of CreateBearerToken(params string[]), leaving authorisations
+        // empty — no auth claims, all policies 403. Explicit overload is required.
+        return CreateBearerToken(TestUserErn, "Test User", "genai-req.read", "genai-req.write");
     }
 
     public string CreateExpiredToken(params string[] authorisations)
