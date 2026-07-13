@@ -84,7 +84,6 @@ public static class DependencyInjection
         services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
         services.AddScoped<IPrototypeDomSearchService, PrototypeDomSearchService>();
         services.AddScoped<IPrototypeDemoEditService, BedrockPrototypeDemoEditService>();
-        services.AddScoped<IPrototypeDemoGenerationService, BedrockPrototypeDemoGenerationService>();
         services.AddScoped<IPrototypeDomMutationService, PrototypeDomMutationService>();
         services.AddScoped<StructuralEditDraftService>();
         services.AddScoped<IStructuralEditReorderService, StructuralEditReorderService>();
