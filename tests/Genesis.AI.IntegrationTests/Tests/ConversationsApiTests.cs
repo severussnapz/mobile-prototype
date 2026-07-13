@@ -243,8 +243,7 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<int>()))
+                It.IsAny<CancellationToken>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("save_artefact", "tool-use-1", savePrototypeToolInput)
@@ -282,69 +281,6 @@ public class ConversationsApiTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveArtefact_PublishedSessionCloseArtefact_ReturnsCreated()
-    {
-        var client = _factory.CreateAdminClient();
-        var (projectId, _) = await CreateProjectAndGetFirstStageAsync(client);
-
-        var artefactPayload = BuildSessionCloseArtefactPayload();
-
-        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
-
-        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
-    }
-
-    [Fact]
-    public async Task StreamAiResponse_WhenPublishedSessionCloseArtefactExistsForStage_InjectsItIntoSystemPrompt()
-    {
-        var client = _factory.CreateAdminClient();
-        var (projectId, stageId) = await CreateProjectAndGetFirstStageAsync(client);
-        var conversationId = await CreateConversationAsync(client, stageId);
-
-        var capturedPrompts = new List<AiSystemPrompt>();
-        _factory.AiServiceMock
-            .Setup(service => service.StreamWithToolsAsync(
-                It.IsAny<AiSystemPrompt>(),
-                It.IsAny<IReadOnlyList<AiMessage>>(),
-                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<AiSystemPrompt, IReadOnlyList<AiMessage>, IReadOnlyList<AiToolDefinition>, CancellationToken>(
-                (prompt, _, _, _) => capturedPrompts.Add(prompt))
-            .Returns(CreateStreamEvents([new AiTextChunk("ok")]));
-
-        await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", BuildSessionCloseArtefactPayload());
-
-        var streamRequest = new StringContent(
-            """{"content":"continue"}""",
-            System.Text.Encoding.UTF8,
-            "application/json");
-
-        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
-        _ = await streamResponse.Content.ReadAsStringAsync();
-
-        Assert.Contains(
-            capturedPrompts,
-            prompt => string.Concat(prompt.StablePart, prompt.MutablePart)
-                .Contains("RESUME-MARKER-XYZ", StringComparison.Ordinal));
-    }
-
-    private static StringContent BuildSessionCloseArtefactPayload()
-        => new(
-            """
-            {
-              "artefacts": [
-                {
-                  "filePath": "session-close/SESSION-CLOSE-P01.md",
-                  "contentType": "text/markdown",
-                  "content": "## Session Close\nRESUME-MARKER-XYZ"
-                }
-              ]
-            }
-            """,
-            System.Text.Encoding.UTF8,
-            "application/json");
-
-    [Fact]
     public async Task StreamAiResponse_Pipeline02CompletionGate_MissingRequiredArtefactsDoesNotAdvancePhase()
     {
         var client = _factory.CreateAdminClient();
@@ -363,8 +299,7 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<int>()))
+                It.IsAny<CancellationToken>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("advance_phase", "tool-use-advance", advancePhaseToolInput)
@@ -403,8 +338,7 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<int>()))
+                It.IsAny<CancellationToken>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("save_artefact", "tool-use-invalid", invalidSaveToolInput)
@@ -437,8 +371,7 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<int>()));
+                It.IsAny<CancellationToken>()));
 
         // 55 turns of tool calls (brings turnsRemaining to 5, triggering the near_limit warning)
         for (var turn = 0; turn < 55; turn++)
@@ -478,8 +411,7 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<int>()));
+                It.IsAny<CancellationToken>()));
 
         // 60 turns of tool calls — exhausts the loop completely (default max is 60)
         for (var turn = 0; turn < 60; turn++)
@@ -526,8 +458,7 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<int>()))
+                It.IsAny<CancellationToken>()))
             // Turn 1: AI attempts to advance without saving — gate error returned as tool result
             .Returns(CreateStreamEvents(
             [
@@ -577,8 +508,7 @@ public class ConversationsApiTests : IDisposable
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<IReadOnlyList<AiToolDefinition>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<int>()))
+                It.IsAny<CancellationToken>()))
             .Returns(CreateStreamEvents(
             [
                 new AiToolCall("advance_requirement", "tool-use-advance", advanceRequirementInput)

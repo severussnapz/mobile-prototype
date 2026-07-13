@@ -204,7 +204,7 @@ public sealed class GenesisStructureScaffolderTests
                 callCount++;
                 if (callCount == 2)
                 {
-                    throw new Exception("GitHub push failed");
+                    throw new InvalidOperationException("GitHub push failed");
                 }
                 return new GitHubPushResult("sha123", "https://github.com/...");
             });

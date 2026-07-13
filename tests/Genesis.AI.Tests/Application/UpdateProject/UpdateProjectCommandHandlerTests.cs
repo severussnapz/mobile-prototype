@@ -142,7 +142,7 @@ public sealed class UpdateProjectCommandHandlerTests
         _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
         _scaffolder
             .Setup(scaffolder => scaffolder.ScaffoldAsync(project.Id, command.UpdatedBy, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("boom"));
+            .ThrowsAsync(new InvalidOperationException("boom"));
 
         var exception = await Record.ExceptionAsync(() => _handler.Handle(command, CancellationToken.None));
 

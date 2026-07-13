@@ -454,17 +454,12 @@ public class ConversationStreamController : ControllerBase
             {
                 var toolCallsThisTurn = new List<AiToolCall>();
                 var turnText = new StringBuilder(); // Text produced in THIS turn only
-                var maxTokens = prototypeSingleFile ? 64000 : 32768;
 
                 // Insert a newline between turns so post-tool text doesn't run into pre-tool text
                 var needsNewlineSeparator = fullResponse.Length > 0 && fullResponse[^1] != '\n';
 
                 await foreach (var streamEvent in _aiService.StreamWithToolsAsync(
-                    aiSystemPrompt,
-                    aiMessages,
-                    PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType),
-                    cancellationToken,
-                    maxTokens: maxTokens))
+                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType), cancellationToken))
                 {
                     switch (streamEvent)
                     {
@@ -487,7 +482,13 @@ public class ConversationStreamController : ControllerBase
                             break;
 
                         case AiStreamError streamError:
-                            var errorEventData = JsonSerializer.Serialize(new { error = streamError.Message, reason = streamError.Reason });
+                            _logger.LogError("AI stream error for conversation {ConversationId}: {Reason} — {Message}",
+                                id, streamError.Reason, streamError.Message);
+                            var errorEventData = JsonSerializer.Serialize(new
+                            {
+                                error = "AI generation failed. Please try again. If the problem persists, contact support.",
+                                reason = streamError.Reason
+                            });
                             await Response.WriteAsync($"event: error\ndata: {errorEventData}\n\n", cancellationToken);
                             await Response.Body.FlushAsync(cancellationToken);
                             break;
@@ -997,7 +998,7 @@ public class ConversationStreamController : ControllerBase
         }
     }
 
-    internal async Task<string> ExecuteToolCallWithRetryAsync(
+    private async Task<string> ExecuteToolCallWithRetryAsync(
         AiToolCall toolCall,
         Conversation conversation,
         List<Artefact> savedArtefacts,
@@ -1058,7 +1059,7 @@ public class ConversationStreamController : ControllerBase
             $"Tool '{toolCall.ToolName}' failed after {ToolExecutionRetryCount + 1} attempts.");
     }
 
-    internal async Task<string> ExecuteToolCallAsync(
+    private async Task<string> ExecuteToolCallAsync(
         AiToolCall toolCall,
         Conversation conversation,
         List<Artefact> savedArtefacts,
@@ -1128,25 +1129,6 @@ public class ConversationStreamController : ControllerBase
                     return "Error: MISSING_PROTOTYPE_BANNER: The prototype HTML must include a visible 'PROTOTYPE ONLY' banner. " +
                            "Add an amber full-width banner at the very top of <body> containing the text 'PROTOTYPE ONLY'. " +
                            "This is a mandatory safety marker that identifies the artefact as a throwaway prototype.";
-                }
-
-                // Clinical safety guard: reject saves of prototype/index.html containing
-                // format-plausible NHS numbers. A 10-digit number matching NNN NNN NNNN
-                // could be mistaken for a real patient identifier if the prototype is
-                // shared outside the team.
-                if (prototypeSingleFile &&
-                    filePath.Equals(PrototypeHtmlArtefactPath, StringComparison.OrdinalIgnoreCase) &&
-                    System.Text.RegularExpressions.Regex.IsMatch(
-                        content,
-                        @"\d{3}\s?\d{3}\s?\d{4}",
-                        System.Text.RegularExpressions.RegexOptions.None))
-                {
-                    _logger.LogWarning(
-                        "Tool save_artefact rejected: prototype/index.html contains a format-plausible NHS number ({Length} chars)",
-                        content.Length);
-                    return "Error: PLAUSIBLE_NHS_NUMBER_DETECTED: The prototype HTML contains a number matching " +
-                           "the NHS number format (NNN NNN NNNN). Use obviously fake identifiers such as NHS: XXXX or Patient-001 — never real or plausible NHS numbers. " +
-                           "Remove all format-plausible NHS numbers before saving.";
                 }
 
                 var duplicateInjectedHeading = FindDuplicateInjectedSectionHeading(content);
