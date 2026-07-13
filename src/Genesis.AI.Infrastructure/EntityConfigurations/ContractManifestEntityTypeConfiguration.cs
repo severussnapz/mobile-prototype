@@ -13,7 +13,7 @@ public class ContractManifestEntityTypeConfiguration : IEntityTypeConfiguration<
         builder.HasKey(contractManifest => contractManifest.Id);
 
         builder.Property(contractManifest => contractManifest.Id)
-            .HasColumnName("id")
+            .HasColumnName("contract_manifest_id")
             .ValueGeneratedNever();
 
         builder.Property(contractManifest => contractManifest.ProjectId)

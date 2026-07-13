@@ -13,7 +13,7 @@ public class ContractManifestPinEntityTypeConfiguration : IEntityTypeConfigurati
         builder.HasKey(contractManifestPin => contractManifestPin.Id);
 
         builder.Property(contractManifestPin => contractManifestPin.Id)
-            .HasColumnName("id")
+            .HasColumnName("contract_manifest_pin_id")
             .ValueGeneratedNever();
 
         builder.Property(contractManifestPin => contractManifestPin.ManifestId)

@@ -4,7 +4,11 @@ using Genesis.AI.Api.Features.Conversations;
 using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.Commands.CreateProject;
 using Genesis.AI.Domain.Commands.DeleteProject;
+using Genesis.AI.Domain.Commands.UpdateProjectDetails;
+using Genesis.AI.Domain.Commands.UpdateProjectGitHub;
+using Genesis.AI.Domain.Commands.UpdateProjectP00;
 using Genesis.AI.Domain.Enums;
+using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Queries.GetProjectById;
 using Genesis.AI.Domain.Queries.GetProjectParkingLot;
 using Genesis.AI.Domain.Queries.GetProjects;
@@ -23,13 +27,16 @@ public class ProjectsController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
+    private readonly ILogger<ProjectsController> _logger;
 
     public ProjectsController(
         IMediator mediator,
-        IMapper mapper)
+        IMapper mapper,
+        ILogger<ProjectsController> logger)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -151,6 +158,135 @@ public class ProjectsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPatch("{id:guid}/details")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateDetails(
+        Guid id,
+        [FromBody] UpdateProjectDetailsRequest request,
+        CancellationToken ct)
+    {
+        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
+
+        var command = new UpdateProjectDetailsCommand(
+            id,
+            triggeredBy,
+            request.Name,
+            request.Description,
+            request.TimeSheetCode,
+            request.ComplianceDomain);
+
+        try
+        {
+            await _mediator.Send(command, ct);
+            return Ok();
+        }
+        catch (NotFoundException ex)
+        {
+            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update project details {ProjectId}", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save project details. Please try again."));
+        }
+    }
+
+    [HttpPatch("{id:guid}/github")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateGitHub(
+        Guid id,
+        [FromBody] UpdateProjectGitHubRequest request,
+        CancellationToken ct)
+    {
+        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
+        var installationId = Environment.GetEnvironmentVariable("GITHUB_APP_INSTALLATION_ID");
+
+        var command = new UpdateProjectGitHubCommand(
+            id,
+            triggeredBy,
+            request.GitHubApiRepoUrl,
+            request.GitHubAppRepoUrl,
+            request.FigmaFileUrl,
+            request.FigmaPat,
+            installationId);
+
+        try
+        {
+            var result = await _mediator.Send(command, ct);
+            return Ok(new UpdateProjectGitHubResponse(
+                result.FigmaPatPlaintext,
+                result.ApiRepoVerified,
+                result.ApiRepoError,
+                result.AppRepoVerified,
+                result.AppRepoError));
+        }
+        catch (NotFoundException ex)
+        {
+            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
+        }
+        catch (GitHubScaffoldFailedException ex)
+        {
+            var problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Service unavailable",
+                Detail = "Failed to save GitHub configuration. Please try again."
+            };
+            problemDetails.Extensions["userMessage"] = ex.UserMessage;
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, problemDetails);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update GitHub config {ProjectId}", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save GitHub configuration. Please try again."));
+        }
+    }
+
+    [HttpPatch("{id:guid}/p00")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateP00(
+        Guid id,
+        [FromBody] UpdateProjectP00Request request,
+        CancellationToken ct)
+    {
+        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
+
+        var command = new UpdateProjectP00Command(
+            id,
+            triggeredBy,
+            request.ReleaseType,
+            request.AssuranceRequired,
+            request.PilotDeploymentProcess,
+            request.CsoRoleAssigned,
+            request.IgOwnerRoleAssigned,
+            request.SecurityReviewerAssigned,
+            request.MedicalDeviceFlag);
+
+        try
+        {
+            await _mediator.Send(command, ct);
+            return Ok();
+        }
+        catch (NotFoundException ex)
+        {
+            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update P00 config {ProjectId}", id);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save project configuration. Please try again."));
+        }
+    }
+
     /// <summary>
     /// Get all parking lot items across all conversations in a project.
     /// </summary>
@@ -177,32 +313,4 @@ public class ProjectsController : ControllerBase
         return Ok(new ApiResponse<List<ParkingLotItemResponse>> { Data = dtos });
     }
 
-    /// <summary>
-    /// Get aggregated token usage and estimated cost for all stages in a project.
-    /// </summary>
-    [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
-    [HttpGet("{id:guid}/token-usage")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetProjectTokenUsage(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _mediator.Send(
-            new Domain.Queries.GetProjectTokenUsage.GetProjectTokenUsageQuery(id), cancellationToken);
-
-        return Ok(new ApiResponse<ProjectTokenUsageResponse>
-        {
-            Data = new ProjectTokenUsageResponse
-            {
-                Stages = result.Stages,
-                Totals = new TokenUsageTotals
-                {
-                    InputTokens = result.TotalInputTokens,
-                    OutputTokens = result.TotalOutputTokens,
-                    CacheReadInputTokens = result.TotalCacheReadInputTokens,
-                    CacheWriteInputTokens = result.TotalCacheWriteInputTokens,
-                    TurnCount = result.TotalTurnCount,
-                    EstimatedCost = result.TotalEstimatedCost
-                }
-            }
-        });
-    }
 }

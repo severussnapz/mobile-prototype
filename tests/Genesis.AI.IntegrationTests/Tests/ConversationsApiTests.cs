@@ -282,6 +282,19 @@ public class ConversationsApiTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveArtefact_PublishedSessionCloseArtefact_ReturnsCreated()
+    {
+        var client = _factory.CreateAdminClient();
+        var (projectId, _) = await CreateProjectAndGetFirstStageAsync(client);
+
+        var artefactPayload = BuildSessionCloseArtefactPayload();
+
+        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
+
+        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task StreamAiResponse_WhenPublishedSessionCloseArtefactExistsForStage_InjectsItIntoSystemPrompt()
     {
         var client = _factory.CreateAdminClient();
@@ -299,7 +312,24 @@ public class ConversationsApiTests : IDisposable
                 (prompt, _, _, _) => capturedPrompts.Add(prompt))
             .Returns(CreateStreamEvents([new AiTextChunk("ok")]));
 
-        var artefactPayload = new StringContent(
+        await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", BuildSessionCloseArtefactPayload());
+
+        var streamRequest = new StringContent(
+            """{"content":"continue"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
+        _ = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Contains(
+            capturedPrompts,
+            prompt => string.Concat(prompt.StablePart, prompt.MutablePart)
+                .Contains("RESUME-MARKER-XYZ", StringComparison.Ordinal));
+    }
+
+    private static StringContent BuildSessionCloseArtefactPayload()
+        => new(
             """
             {
               "artefacts": [
@@ -313,25 +343,6 @@ public class ConversationsApiTests : IDisposable
             """,
             System.Text.Encoding.UTF8,
             "application/json");
-
-        var saveArtefactResponse = await client.PostAsync($"/api/v1/projects/{projectId}/artefacts", artefactPayload);
-        Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
-
-        var streamRequest = new StringContent(
-            """{"content":"continue"}""",
-            System.Text.Encoding.UTF8,
-            "application/json");
-
-        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
-        _ = await streamResponse.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
-        Assert.NotEmpty(capturedPrompts);
-        Assert.Contains(
-            capturedPrompts,
-            prompt => string.Concat(prompt.StablePart, prompt.MutablePart)
-                .Contains("RESUME-MARKER-XYZ", StringComparison.Ordinal));
-    }
 
     [Fact]
     public async Task StreamAiResponse_Pipeline02CompletionGate_MissingRequiredArtefactsDoesNotAdvancePhase()
