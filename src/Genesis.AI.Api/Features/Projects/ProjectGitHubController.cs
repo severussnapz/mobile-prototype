@@ -79,7 +79,14 @@ public sealed class ProjectGitHubController : ControllerBase
 
             if (_scaffolder is not null)
             {
-                try { await _scaffolder.ScaffoldAsync(id, triggeredBy, ct); }
+                try
+                {
+                    var scaffoldResult = await _scaffolder.ScaffoldAsync(id, triggeredBy, ct);
+                    if (!scaffoldResult.IsSuccess)
+                    {
+                        _logger.LogWarning("Scaffold reported failure for project {ProjectId}: {FailureReason}", id, scaffoldResult.FailureReason);
+                    }
+                }
                 catch (Exception ex) { _logger.LogWarning(ex, "Scaffold failed {ProjectId}", id); }
             }
 
@@ -150,7 +157,11 @@ public sealed class ProjectGitHubController : ControllerBase
 
         try
         {
-            await scaffolder.ScaffoldAsync(projectId, triggeredBy, CancellationToken.None);
+            var scaffoldResult = await scaffolder.ScaffoldAsync(projectId, triggeredBy, CancellationToken.None);
+            if (!scaffoldResult.IsSuccess)
+            {
+                logger.LogWarning("Scaffold reported failure for project {ProjectId}: {FailureReason}", projectId, scaffoldResult.FailureReason);
+            }
         }
         catch (Exception ex)
         {
