@@ -3,6 +3,7 @@ using Genesis.AI.Infrastructure;
 using Genesis.AI.Infrastructure.Repositories;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 
 namespace Genesis.AI.Tests.Infrastructure.Repositories;
 
@@ -128,7 +129,7 @@ public sealed class PushFailureLogRepositoryTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
 
-        var mediator = NSubstitute.Substitute.For<IMediator>();
+        var mediator = new Mock<IMediator>().Object;
         return new GenesisAiDbContext(options, mediator);
     }
 }

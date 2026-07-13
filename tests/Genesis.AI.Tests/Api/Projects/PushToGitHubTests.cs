@@ -59,7 +59,7 @@ public class PushToGitHubTests
     }
 
     [Fact]
-    public async Task PushArtefact_Success_Returns200WithUserMessage()
+    public async Task PushArtefact_Success_Returns201WithUserMessage()
     {
         var projectId = Guid.NewGuid();
         var artefactId = Guid.NewGuid();
@@ -87,9 +87,9 @@ public class PushToGitHubTests
 
         var result = await controller.PushArtefact(projectId, artefactId, CancellationToken.None);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
-        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
-        var message = ExtractUserMessage(ok.Value);
+        var created = Assert.IsType<CreatedResult>(result);
+        Assert.Equal(StatusCodes.Status201Created, created.StatusCode);
+        var message = ExtractUserMessage(created.Value);
         Assert.False(string.IsNullOrWhiteSpace(message));
     }
 
@@ -206,15 +206,14 @@ public class PushToGitHubTests
         Assert.Contains("12", message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static ProjectsController CreateController(
+    private static ProjectGitHubController CreateController(
         Mock<IMediator> mediator,
         Mock<IGitHubArtefactPushService> pushService)
     {
-        var mapper = new Mock<IMapper>();
-        var logger = new Mock<ILogger<ProjectsController>>();
+        var logger = new Mock<ILogger<ProjectGitHubController>>();
         var scaffolder = new Mock<IGenesisStructureScaffolder>();
 
-        var controllerType = typeof(ProjectsController);
+        var controllerType = typeof(ProjectGitHubController);
         var constructors = controllerType.GetConstructors();
 
         object? instance = null;
@@ -234,13 +233,7 @@ public class PushToGitHubTests
                     continue;
                 }
 
-                if (parameterType == typeof(IMapper))
-                {
-                    args[index] = mapper.Object;
-                    continue;
-                }
-
-                if (parameterType == typeof(ILogger<ProjectsController>))
+                if (parameterType == typeof(ILogger<ProjectGitHubController>))
                 {
                     args[index] = logger.Object;
                     continue;
@@ -271,9 +264,9 @@ public class PushToGitHubTests
             break;
         }
 
-        if (instance is not ProjectsController controller)
+        if (instance is not ProjectGitHubController controller)
         {
-            throw new InvalidOperationException("Unable to construct ProjectsController for tests.");
+            throw new InvalidOperationException("Unable to construct ProjectGitHubController for tests.");
         }
 
         var claims = new[]
@@ -294,13 +287,5 @@ public class PushToGitHubTests
     }
 
     private static string ExtractUserMessage(object? responseBody)
-    {
-        if (responseBody is null)
-        {
-            return string.Empty;
-        }
-
-        var property = responseBody.GetType().GetProperty("userMessage");
-        return property?.GetValue(responseBody)?.ToString() ?? string.Empty;
-    }
+        => responseBody is PushActionResponse response ? response.UserMessage : string.Empty;
 }

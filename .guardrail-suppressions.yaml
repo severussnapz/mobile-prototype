@@ -70,6 +70,9 @@ suppressions:
   - id: ENG-003
     path: "src/Genesis.AI.Domain/AggregatesModel/ProjectAggregate/PipelineStage.cs"
     justification: "Child entity of Project aggregate — not an aggregate root"
+  - id: ENG-003
+    path: "src/Genesis.AI.Domain/AggregatesModel/ContractManifestAggregate/ContractManifestPin.cs"
+    justification: "ContractManifestPin is a child entity of ContractManifest aggregate — same established suppression pattern as HelpMessage, ParkingLotItem"
 
 
   # OBS-001: Dockerfile.dev is for local development only — Dynatrace
@@ -202,3 +205,11 @@ suppressions:
   - id: API-007
     path: "src/Genesis.AI.Api/Features/PrototypeDemo/PrototypeDemoEditController.cs"
     justification: "Locked contract — app-side editElement() expects 200 OK with { data: { status, updatedOuterHtml, rejectionReason } }. EditElement is a command that returns a four-valued result, not a resource creation; 201 + Location header would break the committed client."
+
+  - id: PG-008
+    path: "db/migrations/V18__enable_pgvector.sql"
+    justification: "pgvector extension approved for use via platform exception — required for Knowledge Service vector similarity search"
+
+  - id: SC-007
+    path: "docker-compose.yml"
+    justification: "Local development only — floating tag intentional for local dev. Production uses managed RDS Aurora PostgreSQL"

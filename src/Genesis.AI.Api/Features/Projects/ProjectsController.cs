@@ -9,9 +9,6 @@ using Genesis.AI.Domain.Commands.UpdateProjectGitHub;
 using Genesis.AI.Domain.Commands.UpdateProjectP00;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Exceptions;
-using Genesis.AI.Domain.Interfaces;
-using Genesis.AI.Domain.Queries.GetArtefactById;
-using Genesis.AI.Domain.Queries.GetArtefactsByStage;
 using Genesis.AI.Domain.Queries.GetProjectById;
 using Genesis.AI.Domain.Queries.GetProjectParkingLot;
 using Genesis.AI.Domain.Queries.GetProjects;
@@ -31,21 +28,15 @@ public class ProjectsController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
     private readonly ILogger<ProjectsController> _logger;
-    private readonly IGitHubArtefactPushService _githubPushService;
-    private readonly IGenesisStructureScaffolder? _scaffolder;
 
     public ProjectsController(
         IMediator mediator,
         IMapper mapper,
-        ILogger<ProjectsController> logger,
-        IGitHubArtefactPushService githubPushService,
-        IGenesisStructureScaffolder? scaffolder = null)
+        ILogger<ProjectsController> logger)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _githubPushService = githubPushService ?? throw new ArgumentNullException(nameof(githubPushService));
-        _scaffolder = scaffolder;
     }
 
     /// <summary>
@@ -305,113 +296,4 @@ public class ProjectsController : ControllerBase
 
         return Ok(new ApiResponse<List<ParkingLotItemResponse>> { Data = dtos });
     }
-
-    [HttpPost("{id:guid}/push-all")]
-    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    public async Task<IActionResult> PushAll(Guid id, CancellationToken ct)
-    {
-        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
-        _ = PushAllBestEffortAsync(id, triggeredBy, ct);
-        return Accepted(new { userMessage = "GitHub sync started. Check push status for results." });
-    }
-
-    [HttpPost("{id:guid}/artefacts/{artefactId:guid}/push")]
-    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    public async Task<IActionResult> PushArtefact(Guid id, Guid artefactId, CancellationToken ct)
-    {
-        var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
-
-        try
-        {
-            var artefact = await _mediator.Send(new GetArtefactByIdQuery(artefactId), ct);
-            if (artefact is null || artefact.ProjectId != id)
-            {
-                return NotFound(new { userMessage = "Artefact not found." });
-            }
-
-            var project = await _mediator.Send(new GetProjectByIdQuery(id), ct);
-            if (project is not null && !project.HasGitHubConfig)
-            {
-                return BadRequest(new
-                {
-                    userMessage = "GitHub is not configured for this project. Go to Settings to add a GitHub repository."
-                });
-            }
-
-            if (_scaffolder is not null)
-            {
-                try { await _scaffolder.ScaffoldAsync(id, triggeredBy, ct); }
-                catch (Exception ex) { _logger.LogWarning(ex, "Scaffold failed {ProjectId}", id); }
-            }
-
-            await _githubPushService.PushAsync(
-                id,
-                artefactId,
-                artefact.FilePath,
-                artefact.Version,
-                artefact.ContentType,
-                artefact.S3Key,
-                triggeredBy,
-                ct);
-
-            return Ok(new { userMessage = "Pushed to GitHub successfully." });
-        }
-        catch (GitHubAuthenticationException)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Genesis AI cannot connect to GitHub. Check the installation ID in Project Settings." });
-        }
-        catch (GitHubFileTooLargeException)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "This artefact is too large to push to GitHub (limit 12 MB)." });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Push failed for artefact {ArtefactId}", artefactId);
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new { userMessage = "Failed to push artefact to GitHub. Please try again." });
-        }
-    }
-
-    private async Task PushAllBestEffortAsync(Guid projectId, string triggeredBy, CancellationToken ct)
-    {
-        try
-        {
-            if (_scaffolder is not null)
-            {
-                try { await _scaffolder.ScaffoldAsync(projectId, triggeredBy, ct); }
-                catch (Exception ex) { _logger.LogWarning(ex, "Scaffold failed {ProjectId}", projectId); }
-            }
-
-            var artefacts = await _mediator.Send(new GetArtefactsByStageQuery(projectId), ct);
-            foreach (var artefact in artefacts)
-            {
-                try
-                {
-                    await _githubPushService.PushAsync(
-                        projectId,
-                        artefact.Id,
-                        artefact.FilePath,
-                        artefact.Version,
-                        artefact.ContentType,
-                        artefact.S3Key,
-                        triggeredBy,
-                        ct);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Bulk push failed for artefact {ArtefactId}", artefact.Id);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Bulk push failed for project {ProjectId}", projectId);
-        }
-    }
-
 }

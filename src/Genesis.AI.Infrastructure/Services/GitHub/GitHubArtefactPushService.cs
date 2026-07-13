@@ -62,16 +62,13 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
         try
         {
             var project = await _projectRepository.GetByIdAsync(projectId, ct);
-            _logger.LogInformation("Project loaded: HasGitHubConfig={HasGitHubConfig}, InstallationId={InstallationId}", project?.HasGitHubConfig ?? false, project?.GitHubInstallationId);
             if (project is null || !project.HasGitHubConfig)
             {
-                _logger.LogInformation("Project null or no GitHub config — returning early");
                 return;
             }
 
             var (installationId, owner, repoName) = GetGitHubProjectConfiguration(project);
             var targetPath = MapPath(filePath);
-            _logger.LogInformation("Path mapped: Original={FilePath}, Mapped={TargetPath}", filePath, targetPath);
             if (targetPath is null)
             {
                 _logger.LogWarning("Unmapped path {FilePath} — skipping push", filePath);
@@ -79,43 +76,29 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
             }
 
             var content = await LoadArtefactContentAsync(projectId, artefactId, filePath, contentType, s3Key, ct);
-            _logger.LogInformation("Content loaded: ContentLength={ContentLength}, IsNull={IsNull}", content?.Length ?? 0, content is null);
             if (content is null)
             {
-                _logger.LogInformation("Content is null — returning early");
                 return;
             }
 
-            _logger.LogInformation("Token mint starting for installation {InstallationId}", installationId);
             var token = await _tokenService.GetInstallationTokenAsync(installationId, ct);
-            _logger.LogInformation("Token obtained: TokenLength={TokenLength}", token?.Length ?? 0);
             if (string.IsNullOrWhiteSpace(token))
             {
-                _logger.LogInformation("Token is null or empty — returning early");
                 return;
             }
-            
-            var existingSha = await _contentsService.GetFileShaAsync(token, owner, repoName, targetPath, ct);
-            _logger.LogInformation("SHA resolution complete: ExistingSha={ExistingSha}, IsNull={IsNull}", existingSha ?? "null", existingSha is null);
-            
-            var commitMessage = BuildCommitMessage(filePath, version, triggeredBy, projectId, artefactId);
 
-            await _contentsService.PushFileAsync(
+            await PushArtefactContentAsync(
                 token,
                 owner,
                 repoName,
                 targetPath,
                 content,
-                commitMessage,
-                existingSha,
+                filePath,
+                version,
+                triggeredBy,
+                projectId,
+                artefactId,
                 ct);
-            
-            _logger.LogInformation("Push complete for {TargetPath}", targetPath);
-
-            if (_artefactRepository is not null)
-            {
-                await _artefactRepository.MarkPushedToGitHubAsync(artefactId, _timeProvider, ct);
-            }
         }
         catch (Exception exception)
         {
@@ -127,6 +110,40 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
 
             var log = new PushFailureLog(projectId, artefactId, filePath, exception.Message, _timeProvider);
             await _pushFailureLogRepository.AddAsync(log, ct);
+        }
+    }
+
+    private async Task PushArtefactContentAsync(
+        string token,
+        string owner,
+        string repoName,
+        string targetPath,
+        byte[] content,
+        string filePath,
+        int version,
+        string triggeredBy,
+        Guid projectId,
+        Guid artefactId,
+        CancellationToken ct)
+    {
+        var existingSha = await _contentsService.GetFileShaAsync(token, owner, repoName, targetPath, ct);
+        var commitMessage = BuildCommitMessage(filePath, version, triggeredBy, projectId, artefactId);
+
+        await _contentsService.PushFileAsync(
+            token,
+            owner,
+            repoName,
+            targetPath,
+            content,
+            commitMessage,
+            existingSha,
+            ct);
+
+        _logger.LogInformation("Push complete for {TargetPath}", targetPath);
+
+        if (_artefactRepository is not null)
+        {
+            await _artefactRepository.MarkPushedToGitHubAsync(artefactId, _timeProvider, ct);
         }
     }
 
@@ -147,12 +164,10 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
         CancellationToken ct)
     {
         var isBinary = IsContentTypeBinary(contentType);
-        _logger.LogInformation("Loading content: ContentType={ContentType}, IsBinary={IsBinary}, S3Key={S3Key}", contentType, isBinary, s3Key);
-        
+
         if (isBinary)
         {
             var binaryContent = await _artefactStorageService.GetBinaryContentAsync(s3Key, ct);
-            _logger.LogInformation("Binary content loaded: Length={Length}, IsNull={IsNull}", binaryContent?.Length ?? 0, binaryContent is null);
             if (binaryContent is not null)
             {
                 return binaryContent;
@@ -163,7 +178,6 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
         }
 
         var textContent = await _artefactStorageService.GetContentAsync(s3Key, ct);
-        _logger.LogInformation("Text content loaded: Length={Length}, IsNull={IsNull}", textContent?.Length ?? 0, textContent is null);
         if (textContent is not null)
         {
             return Encoding.UTF8.GetBytes(textContent);

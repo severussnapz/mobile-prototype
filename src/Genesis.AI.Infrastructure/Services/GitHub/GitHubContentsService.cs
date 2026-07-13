@@ -98,7 +98,7 @@ public sealed class GitHubContentsService : IGitHubContentsService
         }
 
         var serializedBody = JsonSerializer.Serialize(body, JsonOptions);
-        _logger.LogInformation("GitHub PUT {Uri} — body: {Body}", requestUri, serializedBody);
+        _logger.LogInformation("GitHub PUT {Path}", path);
 
         using var request = new HttpRequestMessage(HttpMethod.Put, requestUri);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", installationToken);
