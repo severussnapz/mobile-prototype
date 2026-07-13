@@ -71,7 +71,7 @@ public sealed class KnowledgeSeederService : BackgroundService
             return true;
         }
 
-        if (!Prefixes.Any(p => resourceName.StartsWith(p, StringComparison.Ordinal)))
+        if (!Prefixes.Any(knownPrefix => resourceName.StartsWith(knownPrefix, StringComparison.Ordinal)))
         {
             return true;
         }
@@ -88,7 +88,7 @@ public sealed class KnowledgeSeederService : BackgroundService
     /// </summary>
     internal static string BuildSourcePath(string resourceName)
     {
-        var prefix = Prefixes.First(p => resourceName.StartsWith(p, StringComparison.Ordinal));
+        var prefix = Prefixes.First(knownPrefix => resourceName.StartsWith(knownPrefix, StringComparison.Ordinal));
         var folder = prefix == PromptsPrefix ? "Prompts" :
                      prefix == SkillsPrefix ? "Skills" : "KnowledgeBase";
         var fileName = resourceName[prefix.Length..];
@@ -100,7 +100,6 @@ public sealed class KnowledgeSeederService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var knowledgeService = scope.ServiceProvider.GetRequiredService<IKnowledgeService>();
         var dbContext = scope.ServiceProvider.GetRequiredService<GenesisAiDbContext>();
-
         var assembly = Assembly.GetExecutingAssembly();
 
         var indexed = 0;
@@ -109,66 +108,90 @@ public sealed class KnowledgeSeederService : BackgroundService
 
         foreach (var resourceName in assembly.GetManifestResourceNames())
         {
-            var prefix = Prefixes.FirstOrDefault(p => resourceName.StartsWith(p, StringComparison.Ordinal));
-            if (prefix is null || !resourceName.EndsWith(MarkdownSuffix, StringComparison.Ordinal))
-            {
-                continue;
-            }
+            var seedResult = await ProcessResourceAsync(
+                assembly,
+                resourceName,
+                knowledgeService,
+                dbContext,
+                cancellationToken);
 
-            if (resourceName.Contains(ExcludedMarker, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            try
-            {
-                var content = ReadAndStripFrontmatter(assembly, resourceName);
-                if (string.IsNullOrWhiteSpace(content))
-                {
-                    skipped++;
-                    continue;
-                }
-
-                var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
-                var sourcePath = BuildSourcePath(resourceName);
-
-                var exists = await dbContext.Database
-                    .SqlQuery<int>($"""
-                        SELECT 1 FROM knowledge_document
-                        WHERE namespace = 'genesis_tool'::knowledge_namespace
-                        AND source_path = {sourcePath}
-                        AND chunk_index = 0
-                        LIMIT 1
-                        """)
-                    .AnyAsync(cancellationToken);
-
-                if (exists)
-                {
-                    skipped++;
-                    continue;
-                }
-
-                await knowledgeService.IndexDocumentAsync(
-                    KnowledgeNamespace.GenesisTool,
-                    projectId: null,
-                    sourcePath,
-                    content,
-                    new Dictionary<string, string>
-                    {
-                        ["contentHash"] = hash,
-                        ["prefix"] = prefix
-                    },
-                    cancellationToken);
-
-                indexed++;
-            }
-            catch (Exception exception)
-            {
-                failed++;
-                _logger.LogWarning(exception, "Failed to seed knowledge resource {ResourceName}", resourceName);
-            }
+            indexed += seedResult.Indexed;
+            skipped += seedResult.Skipped;
+            failed += seedResult.Failed;
         }
 
+        LogSeedingSummary(indexed, skipped, failed);
+    }
+
+    private async Task<(int Indexed, int Skipped, int Failed)> ProcessResourceAsync(
+        Assembly assembly,
+        string resourceName,
+        IKnowledgeService knowledgeService,
+        GenesisAiDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (ShouldExcludeResource(resourceName))
+        {
+            return (0, 0, 0);
+        }
+
+        try
+        {
+            var content = ReadAndStripFrontmatter(assembly, resourceName);
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return (0, 1, 0);
+            }
+
+            var sourcePath = BuildSourcePath(resourceName);
+            if (await ResourceAlreadyIndexedAsync(dbContext, sourcePath, cancellationToken))
+            {
+                return (0, 1, 0);
+            }
+
+            var prefix = Prefixes.First(knownPrefix => resourceName.StartsWith(knownPrefix, StringComparison.Ordinal));
+            var metadata = BuildMetadata(content, prefix);
+
+            await knowledgeService.IndexDocumentAsync(
+                KnowledgeNamespace.GenesisTool,
+                projectId: null,
+                sourcePath,
+                content,
+                metadata,
+                cancellationToken);
+
+            return (1, 0, 0);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to seed knowledge resource {ResourceName}", resourceName);
+            return (0, 0, 1);
+        }
+    }
+
+    private static Dictionary<string, string> BuildMetadata(string content, string prefix)
+    {
+        return new Dictionary<string, string>
+        {
+            ["contentHash"] = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content))),
+            ["prefix"] = prefix
+        };
+    }
+
+    private static Task<bool> ResourceAlreadyIndexedAsync(
+        GenesisAiDbContext dbContext,
+        string sourcePath,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.KnowledgeDocument.AnyAsync(
+            knowledgeDocument => knowledgeDocument.Namespace == KnowledgeNamespace.GenesisTool
+                && knowledgeDocument.SourcePath == sourcePath
+                && knowledgeDocument.ChunkIndex == 0,
+            cancellationToken);
+    }
+
+    private void LogSeedingSummary(int indexed, int skipped, int failed)
+    {
         _logger.LogInformation(
             "Knowledge seeder complete: {Indexed} indexed, {Skipped} skipped, {Failed} failed",
             indexed,

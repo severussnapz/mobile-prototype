@@ -118,9 +118,9 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
         IReadOnlyList<KnowledgeChunk> projectChunks)
     {
         var projectContent = projectChunks.Count > 0
-            ? string.Join("\n\n", projectChunks.Select(chunk => chunk.Content))
+            ? string.Join("\n\n", projectChunks.Select(projectChunk => projectChunk.Content))
             : "No project context available.";
-        var toolContent = string.Join("\n\n", toolChunks.Select(chunk => chunk.Content));
+        var toolContent = string.Join("\n\n", toolChunks.Select(toolChunk => toolChunk.Content));
 
         var hasProjectContext = projectChunks.Count > 0;
         var contextInstruction = hasProjectContext

@@ -2,12 +2,6 @@ using Genesis.AI.Domain.Enums;
 
 namespace Genesis.AI.Domain.Interfaces;
 
-public record KnowledgeChunk(
-    string Content,
-    string SourcePath,
-    double Score,
-    Dictionary<string, string> Metadata);
-
 public interface IKnowledgeService
 {
     Task IndexDocumentAsync(

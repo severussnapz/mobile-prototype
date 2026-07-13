@@ -3,6 +3,7 @@ using Genesis.AI.Domain.AggregatesModel.KnowledgeAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
 
@@ -10,6 +11,9 @@ namespace Genesis.AI.Infrastructure.Repositories;
 
 public class KnowledgeRepository : IKnowledgeRepository
 {
+    private const int MaxIndexAttempts = 2;
+    private const string KnowledgeDocumentChunkConstraint = "uq_knowledge_document_chunk";
+
     private readonly GenesisAiDbContext _context;
 
     public KnowledgeRepository(GenesisAiDbContext context)
@@ -26,27 +30,28 @@ public class KnowledgeRepository : IKnowledgeRepository
         string sourcePath,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-        try
+        for (var attempt = 1; attempt <= MaxIndexAttempts; attempt++)
         {
-            // Delete existing chunks for this source path
-            await _context.KnowledgeDocument
-                .Where(k => k.Namespace == knowledgeNamespace
-                    && k.SourcePath == sourcePath
-                    && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
-                .ExecuteDeleteAsync(cancellationToken);
-
-            // Insert new chunks
-            _context.KnowledgeDocument.AddRange(documents);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                await ReplaceChunksAsync(documents, knowledgeNamespace, projectId, sourcePath, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return;
+            }
+            catch (DbUpdateException exception) when (attempt < MaxIndexAttempts && IsKnowledgeChunkConstraintViolation(exception))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                _context.ChangeTracker.Clear();
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+
+        throw new InvalidOperationException("Knowledge document indexing failed after retry.");
     }
 
     public async Task<IReadOnlyList<KnowledgeChunk>> QuerySimilarAsync(
@@ -60,21 +65,21 @@ public class KnowledgeRepository : IKnowledgeRepository
         // The Vector.CosineDistance instance method translates to the pgvector <=> operator.
         // OrderBy before Select ensures the HNSW index is used for the ORDER BY.
         var results = await _context.KnowledgeDocument
-            .Where(k => k.Namespace == knowledgeNamespace
-                && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
-            .Select(k => new
+            .Where(knowledgeDocument => knowledgeDocument.Namespace == knowledgeNamespace
+                && (projectId == null ? knowledgeDocument.ProjectId == null : knowledgeDocument.ProjectId == projectId))
+            .Select(knowledgeDocument => new
             {
-                k.Content,
-                k.SourcePath,
-                k.Metadata,
-                Distance = k.Embedding.CosineDistance(queryEmbedding)
+                knowledgeDocument.Content,
+                knowledgeDocument.SourcePath,
+                knowledgeDocument.Metadata,
+                Distance = knowledgeDocument.Embedding.CosineDistance(queryEmbedding)
             })
-            .OrderBy(x => x.Distance)
+            .OrderBy(result => result.Distance)
             .Take(topN)
             .ToListAsync(cancellationToken);
 
         return results
-            .Select(x => new KnowledgeChunk(x.Content, x.SourcePath, 1.0 - x.Distance, x.Metadata))
+            .Select(result => new KnowledgeChunk(result.Content, result.SourcePath, 1.0 - result.Distance, result.Metadata))
             .ToList();
     }
 
@@ -87,9 +92,35 @@ public class KnowledgeRepository : IKnowledgeRepository
         // ponytail: ExecuteDeleteAsync executes directly as DELETE SQL, bypassing the
         // change tracker. SaveChangesAsync after it would be a no-op — omitted intentionally.
         await _context.KnowledgeDocument
-            .Where(k => k.Namespace == knowledgeNamespace
-                && k.SourcePath == sourcePath
-                && (projectId == null ? k.ProjectId == null : k.ProjectId == projectId))
+            .Where(knowledgeDocument => knowledgeDocument.Namespace == knowledgeNamespace
+                && knowledgeDocument.SourcePath == sourcePath
+                && (projectId == null ? knowledgeDocument.ProjectId == null : knowledgeDocument.ProjectId == projectId))
             .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    private async Task ReplaceChunksAsync(
+        IReadOnlyList<KnowledgeDocument> documents,
+        KnowledgeNamespace knowledgeNamespace,
+        Guid? projectId,
+        string sourcePath,
+        CancellationToken cancellationToken)
+    {
+        await _context.KnowledgeDocument
+            .Where(knowledgeDocument => knowledgeDocument.Namespace == knowledgeNamespace
+                && knowledgeDocument.SourcePath == sourcePath
+                && (projectId == null ? knowledgeDocument.ProjectId == null : knowledgeDocument.ProjectId == projectId))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        _context.KnowledgeDocument.AddRange(documents);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static bool IsKnowledgeChunkConstraintViolation(DbUpdateException exception)
+    {
+        return exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: KnowledgeDocumentChunkConstraint
+        };
     }
 }

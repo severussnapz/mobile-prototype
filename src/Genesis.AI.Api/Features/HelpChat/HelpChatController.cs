@@ -1,7 +1,7 @@
 using Genesis.AI.Api.Authentication;
 using Genesis.AI.Domain.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
 
 namespace Genesis.AI.Tests.Api;
 
@@ -27,6 +27,7 @@ public sealed class HelpChatController : ControllerBase
     }
 
     [HttpGet("conversations")]
+    [Authorize(Policy = AuthorisationPolicies.ConversationRead)]
     public async Task<ActionResult<HelpConversationResponse?>> GetConversation(
         [FromQuery] Guid? projectId,
         CancellationToken cancellationToken)
@@ -51,6 +52,7 @@ public sealed class HelpChatController : ControllerBase
 
     [HttpPost("stream")]
     [Produces("text/event-stream")]
+    [Authorize(Policy = AuthorisationPolicies.ConversationWrite)]
     public async Task<IActionResult> Stream(
         [FromBody] HelpStreamRequest request,
         CancellationToken cancellationToken)
@@ -74,25 +76,5 @@ public sealed class HelpChatController : ControllerBase
         }
 
         return new EmptyResult();
-    }
-}
-
-public sealed class StreamReader : IDisposable
-{
-    private readonly System.IO.StreamReader _inner;
-
-    public StreamReader(Stream stream, Encoding encoding)
-    {
-        _inner = new System.IO.StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
-    }
-
-    public Task<string> ReadToEndAsync()
-    {
-        return _inner.ReadToEndAsync();
-    }
-
-    public void Dispose()
-    {
-        _inner.Dispose();
     }
 }

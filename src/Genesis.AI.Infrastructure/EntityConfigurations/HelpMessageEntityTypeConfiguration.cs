@@ -9,15 +9,15 @@ public class HelpMessageEntityTypeConfiguration : IEntityTypeConfiguration<HelpM
     public void Configure(EntityTypeBuilder<HelpMessage> builder)
     {
         builder.ToTable("help_message");
-        builder.HasKey(m => m.Id);
-        builder.Property(m => m.Id)
+        builder.HasKey(helpMessage => helpMessage.Id);
+        builder.Property(helpMessage => helpMessage.Id)
             .HasColumnName("help_message_uuid")
             .ValueGeneratedNever();
-        builder.Property(m => m.HelpConversationId)
+        builder.Property(helpMessage => helpMessage.HelpConversationId)
             .HasColumnName("help_conversation_id")
             .IsRequired();
-        builder.Property(m => m.Role).HasColumnName("role").HasMaxLength(20).IsRequired();
-        builder.Property(m => m.Content).HasColumnName("content").IsRequired();
-        builder.Property(m => m.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(helpMessage => helpMessage.Role).HasColumnName("role").HasMaxLength(20).IsRequired();
+        builder.Property(helpMessage => helpMessage.Content).HasColumnName("content").IsRequired();
+        builder.Property(helpMessage => helpMessage.CreatedAt).HasColumnName("created_at").IsRequired();
     }
 }

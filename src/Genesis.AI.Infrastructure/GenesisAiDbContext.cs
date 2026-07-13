@@ -50,7 +50,7 @@ public sealed class GenesisAiDbContext(
         else
         {
             modelBuilder.Entity<KnowledgeDocument>()
-                .Property(k => k.Embedding)
+                .Property(knowledgeDocument => knowledgeDocument.Embedding)
                 .HasColumnType("vector(1024)");
         }
         

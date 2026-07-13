@@ -10,39 +10,39 @@ public class KnowledgeDocumentEntityTypeConfiguration : IEntityTypeConfiguration
     public void Configure(EntityTypeBuilder<KnowledgeDocument> builder)
     {
         builder.ToTable("knowledge_document");
-        builder.HasKey(d => d.Id);
-        builder.Property(d => d.Id)
+        builder.HasKey(knowledgeDocument => knowledgeDocument.Id);
+        builder.Property(knowledgeDocument => knowledgeDocument.Id)
             .HasColumnName("knowledge_document_uuid")
             .ValueGeneratedNever();
-        builder.Property(d => d.Namespace)
+        builder.Property(knowledgeDocument => knowledgeDocument.Namespace)
             .HasColumnName("namespace")
             .IsRequired();
-        builder.Property(d => d.ProjectId)
+        builder.Property(knowledgeDocument => knowledgeDocument.ProjectId)
             .HasColumnName("project_id");
-        builder.Property(d => d.SourcePath)
+        builder.Property(knowledgeDocument => knowledgeDocument.SourcePath)
             .HasColumnName("source_path")
             .HasMaxLength(500)
             .IsRequired();
-        builder.Property(d => d.ChunkIndex)
+        builder.Property(knowledgeDocument => knowledgeDocument.ChunkIndex)
             .HasColumnName("chunk_index")
             .IsRequired();
-        builder.Property(d => d.Content)
+        builder.Property(knowledgeDocument => knowledgeDocument.Content)
             .HasColumnName("content")
             .IsRequired();
-        builder.Property(d => d.Embedding)
+        builder.Property(knowledgeDocument => knowledgeDocument.Embedding)
             .HasColumnName("embedding")
             .IsRequired();
-        builder.Property(d => d.Metadata)
+        builder.Property(knowledgeDocument => knowledgeDocument.Metadata)
             .HasColumnName("metadata")
             .HasColumnType("jsonb")
             .HasConversion(
-                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, (JsonSerializerOptions?)null) ?? new())
+                metadata => JsonSerializer.Serialize(metadata, (JsonSerializerOptions?)null),
+                serializedMetadata => JsonSerializer.Deserialize<Dictionary<string, string>>(serializedMetadata, (JsonSerializerOptions?)null) ?? new())
             .IsRequired();
-        builder.Property(d => d.CreatedAt)
+        builder.Property(knowledgeDocument => knowledgeDocument.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
-        builder.Property(d => d.UpdatedAt)
+        builder.Property(knowledgeDocument => knowledgeDocument.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();
     }

@@ -24,7 +24,7 @@ public class HelpConversationRepository : IHelpConversationRepository
     public async Task<HelpConversation?> GetByIdWithMessagesAsync(Guid id, CancellationToken cancellationToken)
     {
         return await _context.HelpConversation
-            .Include(conversation => conversation.Messages.OrderBy(m => m.CreatedAt))
+            .Include(conversation => conversation.Messages.OrderBy(message => message.CreatedAt))
             .FirstOrDefaultAsync(conversation => conversation.Id == id, cancellationToken);
     }
 

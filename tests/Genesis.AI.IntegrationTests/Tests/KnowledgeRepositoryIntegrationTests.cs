@@ -248,9 +248,19 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
         return new Vector(floats);
     }
 
+    private async Task SeedKnowledgeSourcePathAsync(
+        IKnowledgeRepository repository,
+        KnowledgeNamespace knowledgeNamespace,
+        Guid projectId,
+        string sourcePath,
+        params KnowledgeDocument[] documents)
+    {
+        await repository.IndexAsync(documents, knowledgeNamespace, projectId, sourcePath, _cancellationToken);
+    }
+
     [Fact]
     [Trait("Category", "RequiresDocker")]
-    public async Task IndexAsync_DeletesExistingChunks_BeforeInsertingNew()
+    public async Task IndexAsync_InsertsInitialChunks_ForSourcePath()
     {
         if (!_fixture.DockerAvailable)
         {
@@ -277,13 +287,45 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
             new Dictionary<string, string> { ["chunkIndex"] = "1" },
             TimeProvider.System);
 
-        await repo.IndexAsync(new[] { chunk1, chunk2 }, namespace_, projectId, sourcePath, _cancellationToken);
+        await SeedKnowledgeSourcePathAsync(repo, namespace_, projectId, sourcePath, chunk1, chunk2);
 
         var countAfterFirstIndex = await _fixture.Context!.KnowledgeDocument
             .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
-        Assert.Equal(2, countAfterFirstIndex);
 
-        // Action: Index same sourcePath with 1 new chunk
+        Assert.Equal(2, countAfterFirstIndex);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresDocker")]
+    public async Task IndexAsync_ReplacesExistingChunks_WhenSourcePathAlreadyExists()
+    {
+        if (!_fixture.DockerAvailable)
+        {
+            Assert.Skip("Docker is not available on this machine.");
+        }
+
+        var repo = CreateRepository();
+        var projectId = Guid.NewGuid();
+        var sourcePath = "requirements/REQ-001.md";
+        var namespace_ = KnowledgeNamespace.ProjectArtefact;
+
+        var chunk1 = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 0,
+            "First chunk content",
+            CreateEmbedding(1),
+            new Dictionary<string, string> { ["chunkIndex"] = "0" },
+            TimeProvider.System);
+
+        var chunk2 = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 1,
+            "Second chunk content",
+            CreateEmbedding(2),
+            new Dictionary<string, string> { ["chunkIndex"] = "1" },
+            TimeProvider.System);
+
+        _fixture.Context!.KnowledgeDocument.AddRange(chunk1, chunk2);
+        _fixture.Context.SaveChanges();
+
         var newChunk = KnowledgeDocument.Create(
             namespace_, projectId, sourcePath, 0,
             "New single chunk content (replaced old chunks)",
@@ -292,11 +334,6 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
             TimeProvider.System);
 
         await repo.IndexAsync(new[] { newChunk }, namespace_, projectId, sourcePath, _cancellationToken);
-
-        // Assert: Only 1 chunk exists for that sourcePath
-        var finalCount = await _fixture.Context!.KnowledgeDocument
-            .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
-        Assert.Equal(1, finalCount);
 
         var finalChunks = await _fixture.Context!.KnowledgeDocument
             .Where(k => k.SourcePath == sourcePath && k.ProjectId == projectId)
@@ -307,7 +344,7 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
 
     [Fact]
     [Trait("Category", "RequiresDocker")]
-    public async Task IndexAsync_IsAtomic_WhenCalledTwiceConcurrently_NoOrphanedChunks()
+    public async Task IndexAsync_WhenCalledTwiceConcurrently_LeavesOneOrTwoChunks()
     {
         if (!_fixture.DockerAvailable || _fixture.Context == null)
         {
@@ -352,15 +389,59 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
 
         await Task.WhenAll(task1, task2);
 
-        // Assert: Use a fresh context to verify the final state
         await using var verificationContext = _fixture.CreateDbContext();
         var finalCount = await verificationContext.KnowledgeDocument
             .CountAsync(k => k.SourcePath == sourcePath && k.ProjectId == projectId, _cancellationToken);
 
         Assert.True(finalCount == 1 || finalCount == 2,
             $"Expected 1 or 2 chunks after concurrent calls, but got {finalCount}");
+    }
 
-        // Verify no chunk_index collisions within the same source path
+    [Fact]
+    [Trait("Category", "RequiresDocker")]
+    public async Task IndexAsync_WhenCalledTwiceConcurrently_DoesNotCreateDuplicateChunkIndices()
+    {
+        if (!_fixture.DockerAvailable || _fixture.Context == null)
+        {
+            Assert.Skip("Docker is not available on this machine.");
+        }
+
+        await using var context1 = _fixture.CreateDbContext();
+        await using var context2 = _fixture.CreateDbContext();
+        var repo1 = new KnowledgeRepository(context1);
+        var repo2 = new KnowledgeRepository(context2);
+
+        var projectId = Guid.NewGuid();
+        var sourcePath = "requirements/CONCURRENT.md";
+        var namespace_ = KnowledgeNamespace.ProjectArtefact;
+
+        var chunk1A = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 0,
+            "First call - chunk 1",
+            CreateEmbedding(1),
+            new Dictionary<string, string> { ["chunkIndex"] = "0" },
+            TimeProvider.System);
+
+        var chunk1B = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 1,
+            "First call - chunk 2",
+            CreateEmbedding(2),
+            new Dictionary<string, string> { ["chunkIndex"] = "1" },
+            TimeProvider.System);
+
+        var chunk2A = KnowledgeDocument.Create(
+            namespace_, projectId, sourcePath, 0,
+            "Second call - single chunk",
+            CreateEmbedding(3),
+            new Dictionary<string, string> { ["chunkIndex"] = "0" },
+            TimeProvider.System);
+
+        var task1 = repo1.IndexAsync(new[] { chunk1A, chunk1B }, namespace_, projectId, sourcePath, _cancellationToken);
+        var task2 = repo2.IndexAsync(new[] { chunk2A }, namespace_, projectId, sourcePath, _cancellationToken);
+
+        await Task.WhenAll(task1, task2);
+
+        await using var verificationContext = _fixture.CreateDbContext();
         var chunks = await verificationContext.KnowledgeDocument
             .Where(k => k.SourcePath == sourcePath && k.ProjectId == projectId)
             .OrderBy(k => k.ChunkIndex)
@@ -470,14 +551,8 @@ public class KnowledgeRepositoryIntegrationTests : IClassFixture<KnowledgeReposi
         await repo.IndexAsync(new[] { req001Chunk1, req001Chunk2 }, namespace_, projectId, "requirements/REQ-001.md", _cancellationToken);
         await repo.IndexAsync(new[] { req002Chunk1 }, namespace_, projectId, "requirements/REQ-002.md", _cancellationToken);
 
-        var countBefore = await _fixture.Context!.KnowledgeDocument
-            .CountAsync(k => k.ProjectId == projectId, _cancellationToken);
-        Assert.Equal(3, countBefore);
-
-        // Action: Delete REQ-001
         await repo.DeleteBySourcePathAsync(namespace_, projectId, "requirements/REQ-001.md", _cancellationToken);
 
-        // Assert: REQ-001 chunks = 0, REQ-002 chunks = 1
         var req001Count = await _fixture.Context!.KnowledgeDocument
             .CountAsync(k => k.SourcePath == "requirements/REQ-001.md" && k.ProjectId == projectId, _cancellationToken);
         var req002Count = await _fixture.Context!.KnowledgeDocument
