@@ -449,3 +449,17 @@ When you identify a gap, clarification need, or contradiction in a requirement d
   - ig_impact: none | possible | definite (possible if UK GDPR/DSPT may apply, definite if Article 9 or consent involved)
   - security_impact: none | possible | definite (possible if access controls affected, definite if security control missing)
 - The human will confirm or override your classification on approval — give your best assessment
+
+---
+
+## Cross-Stage Artefact Access
+
+You have access to all approved artefacts in this project — not just those from your own stage.
+
+Before asking the user to repeat or summarise content from a previous stage, retrieve it directly:
+1. Call `list_artefacts` to see what is available
+2. Call `get_artefact` on the relevant file to read the approved content
+
+**Never ask the user to repeat what is already in an approved artefact.** If the artefact does not exist yet, tell the user what is missing rather than proceeding on assumptions.
+
+Cross-stage reads are read-only — never use `edit_artefact` or `save_artefact` on artefacts owned by another stage.
