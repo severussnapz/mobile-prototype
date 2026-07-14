@@ -39,7 +39,7 @@ env:
   # RDS_HOST is the Aurora cluster writer endpoint (rdsClusterEndpoint status
   # output) — TODO: set once feat/kro-rds-definition is merged and the stack runs.
   - name: RDS_HOST
-    value: "REPLACE_WITH_RDS_CLUSTER_ENDPOINT"
+    value: "genesis-ai-requirements-api-db-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com"
   - name: RDS_PORT
     value: "5432"
   - name: RDS_DB_NAME
@@ -83,7 +83,7 @@ flyway:
     # Aurora writer endpoint (ApplicationStack status `rdsClusterEndpoint`).
     # TODO: set once the stack provisions.
     - name: FLYWAY_URL
-      value: "jdbc:postgresql://REPLACE_WITH_RDS_CLUSTER_ENDPOINT:5432/genesis_ai_requirements"
+      value: "jdbc:postgresql://genesis-ai-requirements-api-db-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com:5432/genesis_ai_requirements"
     - name: FLYWAY_USER
       valueFrom:
         secretKeyRef:
@@ -122,7 +122,7 @@ secretProviderClass:
   objects:
     # ARN of the RDS-managed master secret (ApplicationStack status
     # `masterUserSecret`). TODO: set once the stack provisions.
-    - objectName: "REPLACE_WITH_RDS_MASTER_USER_SECRET_ARN"
+    - objectName: "arn:aws:secretsmanager:eu-west-2:442042551704:secret:rds!cluster-cd5d7697-3f98-4cad-85d9-5d216803d512-aPs50g"
       objectType: secretsmanager
       jmesPath:
         - path: username
