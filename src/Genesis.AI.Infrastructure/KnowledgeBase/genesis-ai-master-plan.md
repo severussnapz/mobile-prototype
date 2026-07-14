@@ -380,6 +380,13 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] Impact (clinical-safety, HIGH): the CSO agent scores hazards without being able to see all existing hazard cards — risk of duplicate HAZ-IDs and missed hazards. The agent itself flagged identifier integrity (OI-P06-004) as unresolvable without the full sequence.
 - [ ] Fix direction: proper resolution is the structure-aware chunker + small-to-big retrieval from the Knowledge Layer plan (match small, inject the parent section) so an agent pulls a specific hazard card by heading path rather than a whole-file outline. Interim option: extend the full-content bypass to registry-class artefacts the pipeline reads whole. Needs a real large-file retrieval test — not the InMemory-tested path.
 
+**Known gap — help chat retrieves wrong chunk on vague follow-up queries (surfaced in use, July 2026):**
+- [ ] Observed live: "why are we doing it" (referencing the Artefact Scope Restructure in prior turn) retrieved DCB0129 Control Elicitation Method content instead. Wrong chunk scored highest because the query had no anchor — the help chat does not pass conversation history as retrieval context, so each query hits the vector store cold.
+- [ ] Root cause: two compounding factors — (1) vague follow-up queries ("why are we doing it", "what is the advantage of this") carry no subject anchor, so retrieval matches whatever chunk scores highest globally; (2) clinical safety content (P06/DCB0129) is densely indexed and wins on generic terms against design doc content. Namespace contamination in `genesis-tool`.
+- [ ] Impact: users asking natural follow-up questions in help chat get irrelevant or misleading answers. Trust in the help chat degrades; users stop using it.
+- [ ] Short-term workaround: instruct users to include the subject in every query ("why are we doing the artefact scope restructure?") — the retrieval model needs the anchor in the query, not just in conversational context.
+- [ ] Fix direction: (1) structure-aware chunker with heading-path prefixes (Knowledge Layer Phase 3) gives each chunk enough subject context that retrieval scores correctly even on short queries; (2) hybrid tsvector + vector (Phase 5) catches identifier queries like "artefact scope restructure" via lexical match when vector score is weak; (3) pass last N turns of help chat history as retrieval context so follow-up queries inherit the subject anchor from the conversation.
+
 **Effort remaining:** ~2 weeks.
 **Owner:** Idris
 **Gate:** Plan 5 cannot start until all items above are checked off.
