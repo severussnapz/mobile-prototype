@@ -135,6 +135,7 @@ public sealed class RequirementChangesController : ControllerBase
         var approvedBy = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "unknown";
 
         var command = new ApproveRequirementChangeCommand(
+            ProjectId: projectId,
             ChangeId: changeId,
             ApprovedAcText: request.ApprovedAcText,
             ClinicalSafetyImpact: ParseImpact(request.ClinicalSafetyImpact),
@@ -165,6 +166,7 @@ public sealed class RequirementChangesController : ControllerBase
         var undoneBy = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "unknown";
 
         var command = new UndoApproveRequirementChangeCommand(
+            ProjectId: projectId,
             ChangeId: changeId,
             UndoneBy: undoneBy,
             UndoRationale: request.UndoRationale);
@@ -191,7 +193,7 @@ public sealed class RequirementChangesController : ControllerBase
         var rejectedBy = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "unknown";
 
         await _rejectHandler.Handle(
-            new RejectRequirementChangeCommand(changeId, rejectedBy),
+            new RejectRequirementChangeCommand(projectId, changeId, rejectedBy),
             cancellationToken);
 
         var change = await _repository.GetByIdAsync(changeId, cancellationToken);
@@ -211,7 +213,7 @@ public sealed class RequirementChangesController : ControllerBase
         var reviewer = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "unknown";
 
         await _reviewHandler.Handle(
-            new RecordDomainReviewCommand(changeId, ReviewDomain.ClinicalSafety, reviewer),
+            new RecordDomainReviewCommand(projectId, changeId, ReviewDomain.ClinicalSafety, reviewer),
             cancellationToken);
 
         var change = await _repository.GetByIdAsync(changeId, cancellationToken);
@@ -233,7 +235,7 @@ public sealed class RequirementChangesController : ControllerBase
         var reviewer = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "unknown";
 
         await _reviewHandler.Handle(
-            new RecordDomainReviewCommand(changeId, ReviewDomain.InformationGovernance, reviewer),
+            new RecordDomainReviewCommand(projectId, changeId, ReviewDomain.InformationGovernance, reviewer),
             cancellationToken);
 
         var change = await _repository.GetByIdAsync(changeId, cancellationToken);
@@ -255,7 +257,7 @@ public sealed class RequirementChangesController : ControllerBase
         var reviewer = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "unknown";
 
         await _reviewHandler.Handle(
-            new RecordDomainReviewCommand(changeId, ReviewDomain.Security, reviewer),
+            new RecordDomainReviewCommand(projectId, changeId, ReviewDomain.Security, reviewer),
             cancellationToken);
 
         var change = await _repository.GetByIdAsync(changeId, cancellationToken);

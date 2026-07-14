@@ -1,5 +1,7 @@
 using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
+using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Interfaces;
+using System.Linq;
 
 namespace Genesis.AI.Domain.Commands.UndoApproveRequirementChange;
 
@@ -28,7 +30,10 @@ public sealed class UndoApproveRequirementChangeCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var change = await _repository.GetByIdAsync(command.ChangeId, cancellationToken)
+        var change = await _repository.GetByIdForProjectAsync(
+            command.ChangeId,
+            command.ProjectId,
+            cancellationToken)
             ?? throw new InvalidOperationException(
                 $"Requirement change '{command.ChangeId}' not found.");
 
@@ -37,16 +42,25 @@ public sealed class UndoApproveRequirementChangeCommandHandler
             rationale: command.UndoRationale,
             timeProvider: _timeProvider);
 
-        await RestorePreviousReqVersionAsync(change, cancellationToken);
+        await RestorePreviousReqVersionAsync(
+            change,
+            command.UndoneBy,
+            cancellationToken);
 
         await _repository.UnitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private async Task RestorePreviousReqVersionAsync(
         RequirementChange change,
+        string undoneBy,
         CancellationToken cancellationToken)
     {
-        var reqFilePath = $"requirements/{change.ReqId}.md";
+        var reqFilePath = await ResolveReqFilePathAsync(change, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(reqFilePath))
+        {
+            return;
+        }
 
         var previousArtefact = await _artefactRepository.GetPreviousVersionAsync(
             change.ProjectId, reqFilePath, cancellationToken);
@@ -67,12 +81,57 @@ public sealed class UndoApproveRequirementChangeCommandHandler
         var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
             change.ProjectId, reqFilePath, cancellationToken);
 
-        await _artefactStorageService.SaveContentAsync(
+        var storageKey = await _artefactStorageService.SaveContentAsync(
             change.ProjectId,
             reqFilePath,
             nextVersion,
             previousContent,
             "text/markdown",
             cancellationToken);
+
+        var restoredArtefact = Artefact.CreateS3Artefact(
+            change.ProjectId,
+            nextVersion,
+            reqFilePath,
+            storageKey,
+            "text/markdown",
+            System.Text.Encoding.UTF8.GetByteCount(previousContent),
+            undoneBy,
+            _timeProvider,
+            true);
+
+        await _artefactRepository.AddAsync(restoredArtefact, cancellationToken);
+    }
+
+    private async Task<string?> ResolveReqFilePathAsync(
+        RequirementChange change,
+        CancellationToken cancellationToken)
+    {
+        var legacyPath = $"requirements/{change.ReqId}.md";
+
+        var exactMatch = await _artefactRepository.GetByProjectAndFilePathAsync(
+            change.ProjectId,
+            legacyPath,
+            cancellationToken);
+
+        if (exactMatch is not null)
+        {
+            return legacyPath;
+        }
+
+        var allArtefacts = await _artefactRepository.GetProjectArtefactManifestAsync(
+            change.ProjectId,
+            cancellationToken);
+
+        var reqPrefix = "requirements/";
+        var reqIdPathSegmentPrefix = $"/{change.ReqId}-";
+        var reqIdExactSuffix = $"/{change.ReqId}.md";
+
+        var matchedArtefact = allArtefacts.FirstOrDefault(artefact =>
+            artefact.FilePath.StartsWith(reqPrefix, StringComparison.OrdinalIgnoreCase) &&
+            (artefact.FilePath.Contains(reqIdPathSegmentPrefix, StringComparison.OrdinalIgnoreCase) ||
+             artefact.FilePath.EndsWith(reqIdExactSuffix, StringComparison.OrdinalIgnoreCase)));
+
+        return matchedArtefact?.FilePath;
     }
 }

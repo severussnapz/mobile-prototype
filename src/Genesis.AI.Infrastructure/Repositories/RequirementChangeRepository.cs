@@ -30,6 +30,17 @@ public sealed class RequirementChangeRepository : IRequirementChangeRepository
             .FirstOrDefaultAsync(change => change.Id == id, cancellationToken);
     }
 
+    public async Task<RequirementChange?> GetByIdForProjectAsync(
+        Guid id,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.RequirementChanges
+            .FirstOrDefaultAsync(
+                change => change.Id == id && change.ProjectId == projectId,
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<RequirementChange>> GetByProjectIdAsync(
         Guid projectId,
         CancellationToken cancellationToken)

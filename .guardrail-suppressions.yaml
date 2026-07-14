@@ -73,6 +73,9 @@ suppressions:
   - id: ENG-003
     path: "src/Genesis.AI.Domain/AggregatesModel/ContractManifestAggregate/ContractManifestPin.cs"
     justification: "Child entity of ContractManifest aggregate — owned by the root, not an aggregate root"
+  - id: ENG-003
+    path: "src/Genesis.AI.Domain/AggregatesModel/KnowledgeAggregate/KnowledgeDocument.cs"
+    justification: "KnowledgeDocument is a persistence entity not a domain aggregate — same established suppression pattern as HelpMessage, ParkingLotItem"
 
 
   # OBS-001: Dockerfile.dev is for local development only — Dynatrace

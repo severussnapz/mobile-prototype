@@ -22,7 +22,7 @@ public class ApproveRequirementChangeCommandTests
         var artefactRepositoryMock = new Mock<IArtefactRepository>();
         var artefactStorageMock = new Mock<IArtefactStorageService>();
 
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -75,6 +75,7 @@ public class ApproveRequirementChangeCommandTests
             TimeProvider.System);
 
         var command = new ApproveRequirementChangeCommand(
+            ProjectId: projectId,
             ChangeId: changeId,
             ApprovedAcText: null,
             ClinicalSafetyImpact: ImpactLevel.None,
@@ -104,7 +105,7 @@ public class ApproveRequirementChangeCommandTests
         var artefactRepositoryMock = new Mock<IArtefactRepository>();
         var artefactStorageMock = new Mock<IArtefactStorageService>();
 
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -120,6 +121,7 @@ public class ApproveRequirementChangeCommandTests
             TimeProvider.System);
 
         var command = new ApproveRequirementChangeCommand(
+            ProjectId: projectId,
             ChangeId: changeId,
             ApprovedAcText: "[ ] Human corrected text.",
             ClinicalSafetyImpact: ImpactLevel.None,
@@ -137,7 +139,7 @@ public class ApproveRequirementChangeCommandTests
     public async Task Handle_WhenChangeNotFound_ThrowsInvalidOperationException()
     {
         var repositoryMock = new Mock<IRequirementChangeRepository>();
-        repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(),
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),
             It.IsAny<CancellationToken>()))
             .ReturnsAsync((RequirementChange?)null);
 
@@ -149,6 +151,7 @@ public class ApproveRequirementChangeCommandTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new ApproveRequirementChangeCommand(
+                ProjectId: Guid.NewGuid(),
                 ChangeId: Guid.NewGuid(),
                 ApprovedAcText: null,
                 ClinicalSafetyImpact: ImpactLevel.None,

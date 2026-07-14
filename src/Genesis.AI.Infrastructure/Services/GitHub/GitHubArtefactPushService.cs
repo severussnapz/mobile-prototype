@@ -87,9 +87,18 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
                 return;
             }
 
-            await PushContentAsync(
-                token, owner, repoName, targetPath, content,
-                filePath, version, triggeredBy, projectId, artefactId, ct);
+            await PushArtefactContentAsync(
+                token,
+                owner,
+                repoName,
+                targetPath,
+                content,
+                filePath,
+                version,
+                triggeredBy,
+                projectId,
+                artefactId,
+                ct);
         }
         catch (Exception exception)
         {
@@ -104,15 +113,7 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
         }
     }
 
-    private static (string InstallationId, string Owner, string RepoName) GetGitHubProjectConfiguration(Genesis.AI.Domain.AggregatesModel.ProjectAggregate.Project project)
-    {
-        var installationId = project.GitHubInstallationId ?? throw new InvalidOperationException("GitHub config inconsistent");
-        var owner = project.GitHubRepoOwner ?? throw new InvalidOperationException("GitHub config inconsistent");
-        var repoName = project.GitHubRepoName ?? throw new InvalidOperationException("GitHub config inconsistent");
-        return (installationId, owner, repoName);
-    }
-
-    private async Task PushContentAsync(
+    private async Task PushArtefactContentAsync(
         string token,
         string owner,
         string repoName,
@@ -144,6 +145,14 @@ public sealed class GitHubArtefactPushService : IGitHubArtefactPushService
         {
             await _artefactRepository.MarkPushedToGitHubAsync(artefactId, _timeProvider, ct);
         }
+    }
+
+    private static (string InstallationId, string Owner, string RepoName) GetGitHubProjectConfiguration(Genesis.AI.Domain.AggregatesModel.ProjectAggregate.Project project)
+    {
+        var installationId = project.GitHubInstallationId ?? throw new InvalidOperationException("GitHub config inconsistent");
+        var owner = project.GitHubRepoOwner ?? throw new InvalidOperationException("GitHub config inconsistent");
+        var repoName = project.GitHubRepoName ?? throw new InvalidOperationException("GitHub config inconsistent");
+        return (installationId, owner, repoName);
     }
 
     private async Task<byte[]?> LoadArtefactContentAsync(

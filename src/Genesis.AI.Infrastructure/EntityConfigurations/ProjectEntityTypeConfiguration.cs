@@ -59,6 +59,55 @@ public class ProjectEntityTypeConfiguration : IEntityTypeConfiguration<Project>
             .HasColumnName("is_deleted")
             .IsRequired();
 
+        builder.Property(project => project.GitHubApiRepoUrl)
+            .HasColumnName("github_api_repo_url")
+            .HasMaxLength(500);
+
+        builder.Property(project => project.GitHubAppRepoUrl)
+            .HasColumnName("github_app_repo_url")
+            .HasMaxLength(500);
+
+        builder.Property(project => project.GitHubRepoOwner)
+            .HasColumnName("github_repo_owner")
+            .HasMaxLength(200);
+
+        builder.Property(project => project.GitHubRepoName)
+            .HasColumnName("github_repo_name")
+            .HasMaxLength(200);
+
+        builder.Property(project => project.GitHubInstallationId)
+            .HasColumnName("github_installation_id")
+            .HasMaxLength(100);
+
+        builder.Property(project => project.FigmaFileUrl)
+            .HasColumnName("figma_file_url")
+            .HasMaxLength(500);
+
+        builder.Property(project => project.FigmaPatEncrypted)
+            .HasColumnName("figma_pat_encrypted");
+
+        builder.Property(project => project.ReleaseType)
+            .HasColumnName("release_type")
+            .HasMaxLength(50);
+
+        builder.Property(project => project.AssuranceRequired)
+            .HasColumnName("assurance_required");
+
+        builder.Property(project => project.PilotDeploymentProcess)
+            .HasColumnName("pilot_deployment_process");
+
+        builder.Property(project => project.CsoRoleAssigned)
+            .HasColumnName("cso_role_assigned");
+
+        builder.Property(project => project.IgOwnerRoleAssigned)
+            .HasColumnName("ig_owner_role_assigned");
+
+        builder.Property(project => project.SecurityReviewerAssigned)
+            .HasColumnName("security_reviewer_assigned");
+
+        builder.Property(project => project.MedicalDeviceFlag)
+            .HasColumnName("medical_device_flag");
+
         builder.HasIndex(project => project.Code)
             .IsUnique()
             .HasFilter("is_deleted = false");
