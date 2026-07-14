@@ -12,6 +12,7 @@
     <EmbeddedResource Include="Resources\*.json" />
     <EmbeddedResource Include="Resources\emis-x-base.css" />
     <EmbeddedResource Include="Resources\emis-x-ui-kit.md" />
+    <EmbeddedResource Include="KnowledgeBase\**\*.md" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,8 @@
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Pgvector" />
+    <PackageReference Include="Pgvector.EntityFrameworkCore" />
   </ItemGroup>
 
   <ItemGroup>

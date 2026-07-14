@@ -34,7 +34,7 @@ public class Artefact : Entity, IAggregateRoot
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(s3Key);
 
-        return new Artefact
+        var artefact = new Artefact
         {
             Id = Guid.NewGuid(),
             ProjectId = projectId,
@@ -47,6 +47,17 @@ public class Artefact : Entity, IAggregateRoot
             CreatedBy = createdBy,
             CreatedAt = timeProvider.GetUtcNow()
         };
+
+        if (isPublished)
+        {
+            artefact.AddDomainEvent(new ArtefactPublishedDomainEvent(
+                artefact.ProjectId,
+                artefact.FilePath,
+                artefact.S3Key,
+                artefact.ContentType));
+        }
+
+        return artefact;
     }
 
     /// <summary>
@@ -81,6 +92,11 @@ public class Artefact : Entity, IAggregateRoot
         }
 
         IsPublished = true;
+        AddDomainEvent(new ArtefactPublishedDomainEvent(
+            ProjectId,
+            FilePath,
+            S3Key,
+            ContentType));
         return true;
     }
 }

@@ -83,6 +83,25 @@
           "Npgsql": "10.0.0"
         }
       },
+      "Pgvector": {
+        "type": "Direct",
+        "requested": "[0.3.2, )",
+        "resolved": "0.3.2",
+        "contentHash": "n7M5LuNejHUmtWky3zCbNO+tP1Gnjiuv9Qtu4LyvB1602dD8RiBxxCQp9jEjM0ZFDxAZF1oOWkNIkXw46KT00Q==",
+        "dependencies": {
+          "Npgsql": "8.0.5"
+        }
+      },
+      "Pgvector.EntityFrameworkCore": {
+        "type": "Direct",
+        "requested": "[0.3.0, )",
+        "resolved": "0.3.0",
+        "contentHash": "HVMcglKLOg979w67k8DOvKO+xJvfBHv/GcAgv/fI8alK8zp9oIYJUYP9BSV6n6+3GwkfynAJ77euwow4/c7HoA==",
+        "dependencies": {
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "9.0.1",
+          "Pgvector": "0.3.2"
+        }
+      },
       "AWSSDK.Core": {
         "type": "Transitive",
         "resolved": "3.7.402.82",
@@ -342,7 +361,8 @@
           "FluentValidation.DependencyInjectionExtensions": "[11.11.0, )",
           "Genesis.AI.Core": "[1.0.0, )",
           "MediatR": "[12.4.1, )",
-          "Npgsql": "[9.0.3, )"
+          "Npgsql": "[9.0.3, )",
+          "Pgvector": "[0.3.2, )"
         }
       },
       "FluentValidation.DependencyInjectionExtensions": {
