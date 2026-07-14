@@ -25,7 +25,6 @@ spec:
   description: "Genesis AI Requirements API"
   # OIDC subject pattern for the CI role trust policy (schema field: githubOIDC).
   githubOIDC: "repo:emisgroup/genesis-ai-requirements-api:*"
-  additionPolicies: []
 
   # --- ECR: container image repositories ------------------------------------
   # ecr.enabled       → main repo `genesis-ai-requirements-api` (app image).
