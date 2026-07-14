@@ -59,8 +59,9 @@ env:
 # This is the EKS replacement for the legacy ECS migration task — no ECS task
 # definition, no db-migrations-* security group, no genesis run-flyway workflow.
 #
-# The migration image is built/pushed by .github/workflows/build-flyway.yml as
-# `:flyway-latest` (db/migrations baked in).
+# The migration image is built/pushed by .github/workflows/build-flyway.yml to
+# the dedicated `genesis-ai-requirements-api-flyway` repo as `:latest`
+# (db/migrations baked in).
 #
 # Credentials: the initial schema — including V13, which grants `rds_iam` to
 # genesis_ai_app — must run as the Aurora MASTER user, because IAM database auth
@@ -80,8 +81,10 @@ job:
   enabled: true
   name: flyway-migration
   image:
-    repository: 442042551704.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api
-    tag: flyway-latest
+    # Dedicated migration image repo (ecr.enableFlywayECRRepo=true), pushed by
+    # .github/workflows/build-flyway.yml as `<repo>-flyway:latest`.
+    repository: 442042551704.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
+    tag: latest
     pullPolicy: Always
   # Read the master password from the CSI-mounted file, then run Flyway. Reading
   # the file (rather than a secretKeyRef env) avoids the secret-sync race where
