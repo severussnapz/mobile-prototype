@@ -53,6 +53,7 @@ spec:
     databaseSubnetGroupName: genesis-net-vpc
     ingressSecurityGroupIds: []
     engineVersion: "17.7"
+    family: aurora-postgresql17
     instanceType: "db.serverless"
     serverlessV2ScalingConfiguration:
       minCapacity: "0.5"
