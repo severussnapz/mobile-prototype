@@ -10,6 +10,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <NoWarn>CA1707;CA1848;CA1873;xUnit1051</NoWarn>
+    <NoWarn>CA1707;CA1848;CA1873;CA1305;xUnit1051</NoWarn>
   </PropertyGroup>
 </Project>

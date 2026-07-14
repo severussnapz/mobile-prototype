@@ -466,7 +466,13 @@ public class ConversationStreamController : ControllerBase
                             break;
 
                         case AiStreamError streamError:
-                            var errorEventData = JsonSerializer.Serialize(new { error = streamError.Message, reason = streamError.Reason });
+                            _logger.LogError("AI stream error for conversation {ConversationId}: {Reason} — {Message}",
+                                id, streamError.Reason, streamError.Message);
+                            var errorEventData = JsonSerializer.Serialize(new
+                            {
+                                error = "AI generation failed. Please try again. If the problem persists, contact support.",
+                                reason = streamError.Reason
+                            });
                             await Response.WriteAsync($"event: error\ndata: {errorEventData}\n\n", cancellationToken);
                             await Response.Body.FlushAsync(cancellationToken);
                             break;

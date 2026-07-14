@@ -165,7 +165,8 @@ public class ArtefactVersionController : ControllerBase
             ContentType = artefact.ContentType,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         };
     }
 }

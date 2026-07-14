@@ -11,4 +11,5 @@ public sealed class ArtefactDetailResponse
     public long? SizeBytes { get; init; }
     public string CreatedBy { get; init; } = null!;
     public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? GitHubPushedAt { get; init; }
 }

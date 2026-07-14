@@ -13,6 +13,7 @@ public class Artefact : Entity, IAggregateRoot
     public long? SizeBytes { get; private set; }
     public string CreatedBy { get; private set; } = null!;
     public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? GitHubPushedAt { get; private set; }
 
     private Artefact() { } // Required for EF Core
 
@@ -54,7 +55,10 @@ public class Artefact : Entity, IAggregateRoot
                 artefact.ProjectId,
                 artefact.FilePath,
                 artefact.S3Key,
-                artefact.ContentType));
+                artefact.ContentType,
+                artefact.Id,
+                artefact.Version,
+                createdBy));
         }
 
         return artefact;
@@ -96,7 +100,16 @@ public class Artefact : Entity, IAggregateRoot
             ProjectId,
             FilePath,
             S3Key,
-            ContentType));
+            ContentType,
+            Id,
+            Version,
+            CreatedBy));
         return true;
+    }
+
+    public void MarkPushedToGitHub(TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        GitHubPushedAt = timeProvider.GetUtcNow();
     }
 }

@@ -21,7 +21,10 @@ public sealed class RejectRequirementChangeCommandHandler
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var change = await _repository.GetByIdAsync(command.ChangeId, cancellationToken)
+        var change = await _repository.GetByIdForProjectAsync(
+            command.ChangeId,
+            command.ProjectId,
+            cancellationToken)
             ?? throw new InvalidOperationException(
                 $"Requirement change '{command.ChangeId}' not found.");
 

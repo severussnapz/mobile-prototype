@@ -7,15 +7,18 @@ using Genesis.AI.Domain.Commands.ProposeRequirementChange;
 using Genesis.AI.Domain.Commands.RecordDomainReview;
 using Genesis.AI.Domain.Commands.RejectRequirementChange;
 using Genesis.AI.Domain.Commands.ReopenStageForAmendment;
+using Genesis.AI.Domain.Commands.GenerateSessionClose;
 using Genesis.AI.Domain.Commands.UndoApproveRequirementChange;
 using Genesis.AI.Domain.Dpia;
 using Genesis.AI.Domain.HazardLog;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.SecurityReviewReport;
+using Genesis.AI.Core.Data;
 using Genesis.AI.Infrastructure.Configuration;
 using Genesis.AI.Infrastructure.EventHandlers;
 using Genesis.AI.Infrastructure.Repositories;
 using Genesis.AI.Infrastructure.Services;
+using Genesis.AI.Infrastructure.Services.GitHub;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -40,6 +43,7 @@ public static class DependencyInjection
         AddRepositories(services);
         AddPipelineServices(services);
         AddDocumentBuilders(services);
+        AddGitHubIntegration(services, configuration);
         AddWorkflowServices(services);
 
         services.Configure<TokenOptimisationOptions>(
@@ -64,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IKnowledgeRepository, KnowledgeRepository>();
         services.AddScoped<IHelpConversationRepository, HelpConversationRepository>();
         services.AddScoped<IHelpChatStreamService, HelpChatStreamService>();
+        services.AddScoped<IPushFailureLogRepository, PushFailureLogRepository>();
         services.AddHostedService<KnowledgeSeederService>();
     }
 
@@ -87,6 +92,48 @@ public static class DependencyInjection
         services.AddSingleton<ISecurityReviewReportBuilder, SecurityReviewReportBuilder>();
     }
 
+    private static void AddGitHubIntegration(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton<ISecretEncryptionService, AesSecretEncryptionService>();
+        services.AddSingleton<IAssemblyVersionProvider, AssemblyVersionProvider>();
+        services.AddSingleton<ICodeownersGenerator, CodeownersGenerator>();
+        services.AddScoped<IProjectMarkdownGenerator, ProjectMarkdownGenerator>();
+        services.AddScoped<IGenesisStructureScaffolder, GenesisStructureScaffolder>();
+        services.AddHttpClient<GitHubAppTokenService>((serviceProvider, client) =>
+        {
+            client.BaseAddress = new Uri("https://api.github.com/");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("genesis-ai");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+        })
+        .AddStandardResilienceHandler(options =>
+        {
+            options.Retry.MaxRetryAttempts = 3;
+            options.Retry.Delay = TimeSpan.FromSeconds(1);
+            options.Retry.MaxDelay = TimeSpan.FromSeconds(30);
+            options.Retry.UseJitter = true;
+        });
+
+        services.AddSingleton<IGitHubTokenService, GitHubAppTokenService>();
+
+        services.AddHttpClient<IGitHubContentsService, GitHubContentsService>((_, client) =>
+        {
+            client.BaseAddress = new Uri("https://api.github.com/");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("genesis-ai");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+        })
+        .AddStandardResilienceHandler(options =>
+        {
+            options.Retry.MaxRetryAttempts = 3;
+            options.Retry.Delay = TimeSpan.FromSeconds(1);
+            options.Retry.MaxDelay = TimeSpan.FromSeconds(30);
+            options.Retry.UseJitter = true;
+        });
+
+        services.AddScoped<IGitHubArtefactPushService, GitHubArtefactPushService>();
+    }
+
     private static void AddWorkflowServices(IServiceCollection services)
     {
         services.AddScoped<INormalisationGateService, NormalisationGateService>();
@@ -101,10 +148,12 @@ public static class DependencyInjection
         services.AddScoped<IStructuralEditMutationService, StructuralEditMutationService>();
         services.AddScoped<IStructuralEditService, StructuralEditService>();
         services.AddScoped<IRequirementImpactClassifier, RequirementImpactClassifier>();
+        services.AddScoped<ISessionCloseSkillBuilder, SessionCloseSkillBuilder>();
         services.AddScoped<IRequirementsFeedbackLoopService, RequirementsFeedbackLoopService>();
         services.AddScoped<IChangeFileWriterService, ChangeFileWriterService>();
         services.AddScoped<IContractValidationService, ContractValidationService>();
         services.AddScoped<IPipelineReadinessService, PipelineReadinessService>();
+        services.AddScoped<GenerateSessionCloseCommandHandler>();
         services.AddScoped<ProposeRequirementChangeCommandHandler>();
         services.AddScoped<IPrototypeFragmentMigrationService, PrototypeFragmentMigrationService>();
         services.AddScoped<ApproveRequirementChangeCommandHandler>();
@@ -144,6 +193,9 @@ public static class DependencyInjection
                 npgsqlOptions.UseVector();
             });
         });
+
+        services.AddScoped<IUnitOfWork>(serviceProvider =>
+            serviceProvider.GetRequiredService<GenesisAiDbContext>());
     }
 
     private static void MapEnums(NpgsqlDataSourceBuilder dataSourceBuilder)

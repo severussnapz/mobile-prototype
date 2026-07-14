@@ -54,5 +54,8 @@ public class ArtefactEntityTypeConfiguration : IEntityTypeConfiguration<Artefact
         builder.Property(artefact => artefact.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
+
+        builder.Property(artefact => artefact.GitHubPushedAt)
+            .HasColumnName("github_pushed_at");
     }
 }

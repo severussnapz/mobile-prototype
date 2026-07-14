@@ -1,5 +1,5 @@
 # Genesis AI — Master Delivery Plan
-Version: 4.0 — Updated July 2026
+Version: 4.2 — Updated July 2026
 Owner: Idris Issa
 Stack: .NET 10, ASP.NET Core, MediatR, EF Core, Postgres + pgvector, React/TypeScript, AWS Bedrock (PrivateLink), AngleSharp, LocalStack, ClosedXML
 
@@ -113,10 +113,13 @@ A product person sits with a customer. Laptop open. Genesis AI running. They des
 | 3e | Fragment Migration + swap_class + Prototype Skills | ✅ COMPLETE |
 | 3f | Prototype Edit Reliability (smart search) | ✅ COMPLETE — merged |
 | 4 | Prototype Demo Builder (v0/Lovable-style) | ✅ COMPLETE — pending prod flag |
-| 4b | Knowledge Service + Help Chat Panel | 📋 NEXT |
-| 4c | GitHub Integration + Platform Extensions | 📋 AFTER 4b |
+| 4b | Knowledge Service + Help Chat Panel | ✅ COMPLETE |
+| 4c | GitHub Integration + Platform Extensions | ✅ COMPLETE — PRs raised, awaiting merge |
 | KG | EMIS Knowledge Graph Service | 📋 PARALLEL TRACK — Darren's team |
-| 5 | Code Quality: Skills + Two-Agent TDD | 📋 PENDING — after 4c |
+| 4d | Engineering Foundation | 🔄 IN PROGRESS |
+| 4d-R | PR Review Agent | 📋 IN DESIGN — runs alongside 4d |
+| 4e | Flow Spec (behavioural flow artefact) | 📋 IN DESIGN — P01→P02 seam, enriches P02/P06/TDD |
+| 5 | Code Quality: Skills + Two-Agent TDD | 📋 PENDING — after 4d |
 | 6 | Swarm Planning | 📋 PENDING — after 5 + KG Phase 1-4 |
 | 7 | Manifest Generator + Executor | 📋 PENDING — alongside 6 |
 | 8 | .genesis/ Repo Sustainability | 📋 PENDING — after 6 |
@@ -163,13 +166,13 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 
 **What it is:** A v0/Lovable-style clickable demo builder replacing the fragment/assembly/apply_to_scope pipeline for the prototype stage. Chat-left, preview-right, single self-contained HTML rendered in a sandboxed iframe. Supersedes the fragment-based approach entirely for new prototypes.
 
-**Status:** Complete (July 2026). Pending real-session BA validation and production flag flip.
+**Status:** Complete (July 2026). Pending production flag flip.
 
 **Architecture:**
 - Generation: real `Conversation` linked to prototype `PipelineStage`. `PrototypeSingleFileEnabled` flag gates BOTH prompt selection AND tool selection atomically
-- Surgical edits: right-click → `editElement` → `BedrockPrototypeDemoEditService` → `PrototypeElementReplacer` (fingerprint matching). Bypasses conversation tool loop intentionally — context fills up on large files
-- Vibe edits: free-text → `sendMessage` → conversation AI → `edit_artefact` or `save_artefact`
-- Token usage: recorded for both generation and surgical edits via `RecordSurgicalEditTokenUsageAsync`
+- Surgical edits: right-click → editElement → BedrockPrototypeDemoEditService → PrototypeElementReplacer (fingerprint matching). Bypasses conversation tool loop intentionally — context fills up on large files
+- Vibe edits: free-text → sendMessage → conversation AI → edit_artefact or save_artefact
+- Token usage: recorded for both generation and surgical edits via RecordSurgicalEditTokenUsageAsync
 
 **What's built (verified July 2026):**
 - Conversation wired to prototype PipelineStage — token usage, chat history, parking lot, notes & decisions
@@ -181,7 +184,6 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - Building indicator, message feedback (Copy/Retry/Thumbs), chat history persistence
 - Runtime guards: HTML completeness, PROTOTYPE ONLY banner
 - Wave G cleanup: dead generation code retired
-- Test counts: 776 unit + 120 integration passing (API), 360 passing (App)
 
 **Locked architectural decisions:**
 - UI kit: EMIS-X only — no selector, no switching
@@ -190,113 +192,59 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - EMIS-X UI kit in stable Bedrock prompt cache — cached at 10x cheaper rate
 
 **Pending before production:**
-1. Real-session validation — a BA using the builder on an actual feature requirement
-2. Flip `PrototypeSingleFileEnabled: true` in `appsettings.json`
+- Flip PrototypeSingleFileEnabled: true in appsettings.json
+- Anchor failure root cause resolved — surgical edit fingerprint mismatches (see Plan 4d)
 
 **Wave H (after production flag flip):**
-- Figma Option A — IFigmaImageService calls Figma `/v1/images/{file_key}`, returns PNG, feeds into existing vision input path. PAT stored as project-level secret
+- Figma Option A — IFigmaImageService calls Figma /v1/images/{file_key}, returns PNG, feeds into existing vision input path. PAT stored as project-level secret
 
-**Note on legacy fragment pipeline:** Plans 3b/3c/3e (apply_to_scope, swap_class, AngleSharp DOM pipeline) remain active in production until Plan 4 is proven in real sessions and the production flag is flipped. The fragment pipeline is not retired until Wave G cleanup is confirmed complete in production.
-
----
-
-## Plan 4b — Knowledge Service + Help Chat Panel 📋 NEXT
-
-**Status:** Next — no dependency on Plan 4 production flag flip. Starts immediately.
-
-**What it is:** Two interconnected deliverables that give Genesis AI a living knowledge layer and a persistent help interface available from any pipeline stage.
-
-### Genesis AI Knowledge Service
-
-Inside `genesis-ai-requirements-api` — not a separate repo. Owned by the Genesis AI requirements team. When Workstream C (full Knowledge Graph) delivers, `IKnowledgeService` is swapped for a Knowledge Graph MCP client — one clean swap, no rearchitecting.
-
-**Technology:** PostgreSQL with pgvector extension. Bedrock Titan Text Embeddings v2. Both already in the VPC.
-
-**Two namespaces, one table:**
-- `genesis-tool` — Genesis AI pipeline documentation (global). Seeded on deployment from embedded markdown resources. Updated via PR governed by CODEOWNERS
-- `project-artefact` — approved artefacts per project. Indexed at artefact approval time tagged with projectId. Re-indexed on amendment
-
-**IKnowledgeService interface:**
-```csharp
-Task IndexDocumentAsync(string @namespace, Guid? projectId, string sourcePath,
-    string content, Dictionary<string, string> metadata, CancellationToken ct);
-
-Task<IReadOnlyList<KnowledgeChunk>> QueryAsync(string query, string @namespace,
-    Guid? projectId, int topN = 5, CancellationToken ct);
-
-Task DeleteBySourcePathAsync(string @namespace, Guid? projectId,
-    string sourcePath, CancellationToken ct);
-```
-
-**Workstream C plug-in point:** Replace `BedrockKnowledgeService` with `KnowledgeGraphMcpClient`. DI registration swap only. No changes to callers.
-
-### Help Chat Panel
-
-Not a pipeline stage. Not tied to PipelineStage. Not a new route.
-
-**HelpConversation aggregate** — dedicated lightweight aggregate. No StageId. No phases. No parking lot. ProjectId? and UserErn only. DB-persisted.
-
-**Query pattern per turn:**
-1. Embed user message via Bedrock Titan
-2. Query `genesis-tool` — top 5 chunks from Genesis AI documentation
-3. If projectId present — query `project-artefact` filtered by projectId — top 5 chunks from approved artefacts
-4. Inject both into system prompt
-5. Bedrock responds grounded in tool docs and project context
-
-**Frontend:** Persistent floating panel rendered at Shell level in Routes.tsx. Toggle button always visible bottom-right. 400px wide, full viewport height, slides in from right. Available from every page without navigation.
-
-**Migration sequence:** V18 (pgvector), V19 (knowledge_documents), V20 (help_conversations + help_messages)
-
-**Build order:**
-- Day 1: pgvector + Knowledge Service (IKnowledgeService, BedrockKnowledgeService, KnowledgeSeederService)
-- Day 2: Artefact approval hook (index on approval, re-index on amendment, delete on project deletion)
-- Day 3: HelpConversation aggregate + HelpChatController + HelpChatStreamService
-- Day 4: HelpChatPanel in the app + wire into Shell
-- Day 5: User guide (written, indexed into genesis-tool namespace, downloadable from tool)
-
-**Success criteria:**
-- User can ask "what does P06 do?" from any pipeline stage and get an accurate grounded answer
-- User in P06 can ask "what requirements did we capture in P01?" and get an answer from the actual approved REQ file — not a hallucination
-- When context not found, help chat says so directly and does not hallucinate
-- Workstream C plug-in requires no changes to HelpChatStreamService or HelpChatPanel
+**Note on legacy fragment pipeline:** Plans 3b/3c/3e (apply_to_scope, swap_class, AngleSharp DOM pipeline) remain active in production until Plan 4 is proven in real sessions and the production flag is flipped.
 
 ---
 
-## Plan 4c — GitHub Integration + Platform Extensions 📋 AFTER 4b
+## Plan 4b — Knowledge Service + Help Chat Panel ✅ COMPLETE
 
-**Status:** After Plan 4b — depends on artefact approval hook established in 4b.
+**Status:** Complete (July 2026).
 
-**What it is:** genesis-ai[bot] commits approved artefacts to .genesis/ in feature repos. Every approval is a Git commit. Git history is the audit trail and Knowledge Graph data feed.
+**What was built:**
+- Genesis AI Knowledge Service — pgvector inside genesis-ai-requirements-api. Two namespaces: genesis-tool (Genesis AI pipeline docs, global, seeded on deployment) and project-artefact (approved artefacts per project, indexed at approval time)
+- IKnowledgeService interface — clean swap to Workstream C Knowledge Graph MCP when ready
+- ArtefactPublishedDomainEvent handler indexes artefacts on approval
+- HelpConversation aggregate — lightweight, DB-persisted, no StageId, ProjectId? and UserErn only
+- HelpChatController — stream endpoint + conversation history
+- HelpChatStreamService — queries both namespaces per turn, injects into Bedrock system prompt
+- Help Chat Panel — persistent floating panel at Shell level, available from every page
+- User guide indexed into genesis-tool namespace on deployment
 
-**Core deliverables:**
-- `genesis-ai[bot]` machine user — organisational, fine-grained PAT, never a human engineer's token
-- `PATCH /api/v1/projects/{id}` — stores GitHub token + repo URLs + Teams webhook encrypted. Auto-registers webhooks. Test Connection validates bot token identity
-- `ScaffoldGenesisStructureAsync` — commits .genesis/ folder structure to feature repos
-- `GitHubIntegrationService.PushArtefactAsync` — post-approval artefact push to .genesis/ in feature repo. All artefact types: MD, XLSX, HTML, SESSION-CLOSE files, PROJECT.md
-- P00 project setup form extension — new fields (CSO, IG owner, security reviewer, release type, assurance, MD flag). DB migration. Generates PROJECT.md
-- SESSION-CLOSE button — all pipeline stages. One SESSION-CLOSE-P0n.md per stage, upserted not duplicated. Shared skill, stage-parameterised
-- P06 Excel export — DCB0129-{id}.xlsx at approval time using ClosedXML. Stored in S3, pushed to .genesis/clinical-safety/
-- P06 DB API integration — post-approval webhook to CS team's hazard tracking DB
-- CODEOWNERS file — team-based, not individual-based. `@emisgroup/clinical-safety-owners` for P06, `@emisgroup/ig-owners` for P07, `@emisgroup/security-owners` for P08. Maintained via GitHub org team membership — the file itself never changes when individuals change roles
+**Migrations:** V18 (pgvector) ✅ V19 (knowledge_document) ✅ V20 (help_conversations + help_messages) ✅
+**Workstream C plug-in point:** IKnowledgeService → KnowledgeGraphMcpClient. DI swap only.
 
-**Commit convention:**
-```
-chore: approve REQ-001 — Unified Inbound Document Inbox
-Approved-by: [user display name] ([user ERN])
-Pipeline-stage: P01
-Project: documents-manager-increment-1
-```
+---
 
-**Migration sequence:** V21 (project_github_config), V22 (p00_fields_on_projects)
+## Plan 4c — GitHub Integration + Platform Extensions ✅ COMPLETE (PRs raised, awaiting merge)
 
-**Prerequisite for:** Plan 6 (swarm needs GitHub webhooks), Knowledge Graph Service (indexer needs GitHub API access, bot token for commit attribution)
+**Status:** Feature-complete (July 2026). PRs raised and reviewed. Awaiting merge.
+
+**What was built:**
+- D1 ✅ AesSecretEncryptionService, GitHubAppTokenService, GitHubContentsService — GitHub App token, AES-256-GCM encryption, Contents API client
+- D2 ✅ P00 form extension — V21/V22 migrations, three focused PATCH endpoints (/details, /github, /p00), UpdateProjectGitHubCommand/DetailsCommand/P00Command
+- D3 ✅ GenesisStructureScaffolder — pushes 11 files to .genesis/, idempotent, CODEOWNERS, PROJECT.md
+- D4 ✅ GitHubArtefactPushService — post-approval artefact push, push_failure_log (V23), github_pushed_at (V24), ArtefactPublishedDomainEvent extended
+- D5 ✅ SESSION-CLOSE endpoint — GenerateSessionCloseCommandHandler, upserts per stage, isPublished: true triggers GitHub push
+- D6 ✅ P06 Excel hazard log — on-demand via existing button (not auto on approval)
+- D7 ⏸️ P06 hazard tracking DB API — parked pending CS team API schema
+- Push-to-GitHub UI ✅ — bulk push button, per-artefact Push button, GitHub status column, filter
+- Settings tab ✅ — Project Details, GitHub Configuration, P00 Configuration, push-status badge
+
+**Migrations:** V21 ✅ V22 ✅ V23 ✅ V24 ✅
+**genesis-ai-bot bypass:** Added to emisgroup "Force Pull Request on Main" org ruleset.
 
 ---
 
 ## EMIS Knowledge Graph Service 📋 PARALLEL TRACK
 
 **Owner:** Darren Sheavills (AI/Architecture domain)
-**Repo:** `emis-knowledge-graph` (new standalone repo)
+**Repo:** emis-knowledge-graph (new standalone repo)
 **Status:** Design complete, build starting
 
 **Three graphs:**
@@ -305,13 +253,9 @@ Project: documents-manager-increment-1
 - Graph 3 — Infrastructure: from Terraform state, AWS Config, K8s manifests
 
 **Seed:** 25 years of EMIS history — git history, ServiceNow, Confluence, DCB0129 artefacts, NHS contracts, support tickets
-
 **Exposed as:** MCP server (C# minimal API). Every Genesis AI pipeline, Copilot, and Cursor connects to it.
-
 **Key MCP tools:** graph_search_entities, graph_get_neighbours, graph_get_schema, graph_get_endpoints, graph_get_blast_radius, graph_get_patterns, graph_get_hotspots, graph_get_test_coverage, graph_get_migration_status
-
 **Technology:** PostgreSQL (existing estate), C# throughout. No external graph platforms.
-
 **Pipeline acceleration:** Graph injects ~800 tokens of ranked, centrality-weighted context before every LLM turn. Reduces clarification questions by ~80%. Makes every pipeline EMIS-specific not generic.
 
 **Build phases:**
@@ -325,9 +269,244 @@ Project: documents-manager-increment-1
 
 ---
 
+## Mission 30 Retro Actions — Status Update (July 2026)
+
+**Source:** Mission 30 Retro — 23 feedback items from teams using raw Copilot prompts.
+**Context:** All feedback was generated by teams NOT using Genesis AI. The majority are closed by migration to Genesis AI.
+
+| Action | Description | Status |
+|---|---|---|
+| Action 1 | Help Chat Panel | ✅ COMPLETE — Plan 4b |
+| Action 2 | User Guide | ✅ COMPLETE — indexed into genesis-tool namespace |
+| Action 3 | SESSION-CLOSE Button (all stages) | ✅ COMPLETE — Plan 4c D5 |
+| Action 4 | Figma Option A integration | 📋 Wave H — after PrototypeSingleFileEnabled prod flip |
+| Action 5 | Artefact push to feature repo (.genesis/) | ✅ COMPLETE — Plan 4c D4 |
+| Action 6 | P00 project setup form extension | ✅ COMPLETE — Plan 4c D2 |
+| Action 7 | P06 Excel export artefact | ✅ COMPLETE — on-demand via existing button |
+| Action 8 | P06 DB API integration | ⏸️ PARKED — CS team API schema not yet defined |
+| Action 9 | CODEOWNERS file + prompt governance | ✅ COMPLETE — Plan 4c D3/D8 |
+| Action 10 | Pipeline chat cross-stage artefact access | 📋 PENDING — prompt update per stage, after Plan 4c ships |
+| Planned 1 | Project Dashboard (KPIs and OKRs) | 📋 PENDING — design session required (Idris, Yas, Roel) |
+| Planned 2 | Medical Device Pipeline (P09) | 📋 PENDING — design session with Indra required |
+
+9 of 10 engineering actions complete or in progress. Action 8 parked. Action 10 and design sessions pending.
+
+---
+
+## Plan 4d — Engineering Foundation 🔄 IN PROGRESS
+
+**What it is:** A focused engineering improvement sprint to close the contract integrity gaps exposed by the Plan 4c container test, plus the contract layer design and guardrail infrastructure that Plan 5 depends on.
+
+**Why it exists:** The Plan 4c container test revealed seven classes of bug that unit tests did not catch: missing response model field mappings, enum serialisation mismatches, missing controller actions, form state contamination, EF column mapping gaps, frontend/backend property name mismatches, and full aggregate loads for single-field updates. Additionally, three silent-seam failures were caught during July 2026: the DTO mapping gap (fields computed but never reaching the HTTP body), the SESSION-CLOSE write-only artefact (generated but never re-injected on resume), and the missing PATCH route class. These are structural gaps that compound as Plan 5 adds complexity.
+
+### Completed (July 2026)
+
+**Contract layer design — complete, implementation started**
+- `contract-layer-design.md` committed to KnowledgeBase — full design covering contract definition (4 plain-text files under `.genesis/design/`), versioning via existing per-filePath mechanism with a `CONTRACT.md` manifest pinning a coherent set, resumption/staleness model reusing CHANGE-record domain badges, enforcement via per-turn prompt rebuild (verified against real code), tagging governance across CS/IG/SEC (P04 drafts mechanically, role-holders ratify at P06/P07/P08 as by-product of existing assessment), TDD gate (strict form — manifest pins REQ+ARCH provenance), tag vocabulary (stable `tagId` identity, renames surfaced as human-confirmed events via existing parking-lot/CHANGE machinery), and guardrail set (five seam-test types targeting the silent-seam failure class).
+- Contract manifest aggregate: `ContractManifest` + `ContractManifestPin` entities, `ContractPinRole` enum, V25 migration, `IContractManifestRepository`, EF configs — all committed. Pins are `(role, filePath, version)` value records — fully-qualified references, not bare ints. Factory enforces exactly one pin per role; required set derived from enum so it auto-tracks new roles.
+
+**SESSION-CLOSE re-injection fix — complete**
+- Gap confirmed: SESSION-CLOSE artefacts were generated, stored, and pushed to GitHub but never read back into the prompt on resume. Write-only artefact.
+- Fix: `ISessionCloseContextBuilder` / `SessionCloseContextBuilder` — reads latest published SESSION-CLOSE artefact for the current stage and injects it into the mutable part of the per-turn prompt rebuild.
+- Integration test (guardrail 3, stronger form): write → resume → assert content present in rebuilt prompt.
+- First instance of the injection-contributor pattern the contract enforcement will reuse.
+
+**Copilot anti-shortcut rules — committed to repo**
+- Five rules in `.github/copilot-instructions.md`: no optional/nullable dependencies with null-object fallbacks; no warning suppression; no test assertion changes to force green; confession-language self-audit; no build-configuration edits to route around compile errors.
+- Three Copilot cheats caught and reversed live (null-object bypass, CA1859 suppression, build-props global-using hack) — all GREEN, none shipped.
+
+**Seam guardrail set — designed and documented**
+- Five seam-test types defined: result→HTTP body, command→route, artefact write→read-back (stronger form), tool registration→wiring, pin→resolution.
+- Standing rule: a new class of seam failure means a new seam-test type in the family — never just fixing the instance.
+
+**SDLC skills library — committed to KnowledgeBase and Infrastructure/Skills/**
+- 19 senior-expert SDLC skills across two bundles committed to KnowledgeBase.
+- 5 pipeline-agent skills committed to `Infrastructure/Skills/` and wired into `PhaseSkillMap`:
+  - `agent-discipline` — universal, all stages, all phases
+  - `requirements-elicitation` — P01, all phases
+  - `api-contract-design-craft` — P04 phase 1
+  - `seam-testing` — in folder, unwired (ready for Plan 5)
+  - `review-agent-discipline` — in folder, unwired (injected via Review Agent prompt)
+- P01 early-return exclusion removed from PhaseSkillMap — RequirementsDiscovery now receives skills.
+
+**Both PRs fixed and re-reviewed**
+- API PR: IAiService `StreamWithToolsAsync` collapsed to single optional-param method; 7 integration mocks updated; NHS guard error message fixed.
+- App PR: lint clean; aria-label i18n; emoji removed from visually-hidden spans; sandbox iframe test split.
+- Re-review comments posted on both PRs. Awaiting merge.
+
+**Test counts (verified July 2026):**
+- API: 942 unit + 128 integration
+- App: 362 tests, tsc clean, lint clean
+
+### Remaining items (all must be checked before Plan 5 starts)
+
+**Production gates:**
+- [x] Bulk push button noop fixed ✅
+- [x] Session-close button noop fixed ✅
+- [x] BA validation session on a real feature requirement ✅
+- [ ] `PrototypeSingleFileEnabled: true` flipped in production
+- [ ] Anchor failure root cause resolved — surgical edit fingerprint mismatches, fix root cause not symptom
+- [ ] Both PRs merged to main
+
+**Contract layer implementation (contract-layer-design.md §10 items 2–6):**
+- [ ] Create command — reads current approved REQ + ARCH versions, validates pinned artefacts exist, writes manifest
+- [ ] Staleness check + injection — per-turn rebuild, feeds existing `stalenessNotice`
+- [ ] Error catalogue — `ERROR-CATALOGUE.md` as P04 output, versioned, frontend reads from it
+- [ ] Tagging — P04 draft pass, traceability section, P06/P07/P08 ratification worklist
+- [ ] TDD gate — strict form, REQ+ARCH provenance, blocks Plan 5 start
+- [ ] Guardrail suite — five seam-test types
+- [ ] PR Review Agent wired into pipeline pre-commit gate (see Plan 4d-R)
+
+**Engineering hygiene:**
+- [ ] DTO mapping completeness structural fix — vertical slice from UpdateProjectGitHub as reference implementation; every result field requires response DTO + controller mapping + mapping test; backfill all existing response models
+- [ ] Systemic error handling audit — every existing endpoint audited for silent failures; two-tier pattern (Tier 1 ProblemDetails + userMessage, Tier 2 push_failure_log) enforced by default not by exception; guardrail tests added
+- [ ] NSwag type generation configured
+- [ ] Controller completeness check in all Copilot prompt templates
+- [ ] JSON field name integration tests for all response models
+- [ ] Behavioural tests for same-turn edit guard, post-search read block, zero-match block (ToolExecutionContext prerequisite)
+- [ ] ToolExecutionContext extraction
+
+**Pipeline Prompt Quality Review — full P01–P11 audit:**
+- [ ] Anti-rationalization tables added to every Skills file (ref: https://github.com/addyosmani/agent-skills)
+- [ ] Binary stop conditions — replace all subjective exit criteria with checkable binary conditions
+- [ ] Stage-by-stage optimisation — P01–P11, prompt structure, phase sequencing, question quality, output template completeness, token efficiency
+- [ ] Cross-stage traceability audit — HAZ-IDs → P06, ADRs → P03, CHECKs → P11
+- [ ] Doubt-driven development gate — formalise CLAIM → EXTRACT → DOUBT → RECONCILE across all stages
+- [ ] LLM/script boundary audit — for each P01–P11 stage prompt, ask: "What is the LLM doing here that a script should do?" Flag any instance where the prompt asks the LLM to fetch, extract, parse, or construct something the stage handler could pre-process and inject as structured data. Known instance: P08→P09 pre-swarm assembly — open decisions to be queried from the artefact DB and injected as a formatted list, not mined from raw artefact text. Output: one findings note per flagged stage; fixes committed before Plan 5.
+
+**Effort remaining:** ~2 weeks.
+**Owner:** Idris
+**Gate:** Plan 5 cannot start until all items above are checked off.
+
+---
+
+## Plan 4d-R — PR Review Agent 📋 IN DESIGN (runs alongside Plan 4d)
+
+**What it is:** A structured, evidence-based review agent that gates code commits and PRs. Two activation points, one shared base prompt.
+
+**Why it exists:** "Tests passing" proved insufficient — Copilot reached for shortcuts that went GREEN while hiding defects (null-object bypass, warning suppression, build-config edits). The Review Agent is the structural answer: a mandatory review of every diff against a rule set before code commits or merges.
+
+### Architecture
+
+**Three prompt documents committed to KnowledgeBase:**
+- `review-agent-base.md` — shared foundation: seven review dimensions, finding format (Rule ID, severity, file:line, evidence, impact, fix, autofix), output structure (summary, blockers, important, polish, passing checks, final verdict, action checklist), behaviour constraints.
+- `review-agent-genesis-pipeline.md` — P11 pre-commit gate: nine Genesis-specific rules (GENESIS-001 through GENESIS-009).
+- `review-agent-github-ci.md` — GitHub Actions PR gate: CI-scoped Genesis rules, conventional commits, AWS Bedrock via PrivateLink, deference to pipeline gate for artefact-context checks.
+
+### Point 1 — Genesis Pipeline Pre-Commit Gate
+
+```
+P11 generates code + tests
+        ↓
+Review Agent (review-agent-genesis-pipeline.md)
+        ↓
+APPROVE / APPROVE WITH COMMENTS → genesis-ai[bot] commits
+REQUEST CHANGES → returned to P11 with findings as structured input
+BLOCKED → human escalation, genesis-ai[bot] does not commit
+```
+
+Output: `REVIEW-{id}.md` artefact committed to `.genesis/review/` alongside the generated code.
+
+### Point 2 — GitHub CI/CD PR Gate
+
+```
+Developer pushes / genesis-ai[bot] commits
+        ↓
+Review Agent (GitHub Actions, review-agent-github-ci.md)
+        ↓
+APPROVE → required status check passes, PR can merge
+BLOCKED → status check fails, PR blocked
+```
+
+Required status check name: `genesis-review-agent`. Model: AWS Bedrock via PrivateLink.
+
+### Nine Genesis-Specific Rules (GENESIS-001 through GENESIS-009)
+
+| Rule | Severity | What it catches |
+|---|---|---|
+| GENESIS-001 | Critical | Optional/nullable dependencies with null-object fallbacks |
+| GENESIS-002 | Critical | Warning suppression (NoWarn, #pragma disable) |
+| GENESIS-003 | Critical | Build-config edits to route around compile errors |
+| GENESIS-004 | Critical | Test assertion changes to force green |
+| GENESIS-005 | High | Type erasure in test helpers (IReadOnlyList<object>) |
+| GENESIS-006 | High | EF Core missing ToTable/HasColumnName mappings |
+| GENESIS-007 | Critical | NHS data in logs, error messages, query strings, unencrypted fields |
+| GENESIS-008 | High/Blocker | Missing seam tests for introduced seams |
+| GENESIS-009 | High | Schema change without Flyway migration |
+
+**Status:** Prompts designed and committed to KnowledgeBase. Pipeline wiring (Point 1) is a Plan 4d item. GitHub Actions wiring (Point 2) is a Workstream G item (Shantanu).
+
+**Owner:** Idris (pipeline wiring), Shantanu (CI/CD wiring).
+
+---
+
+## Plan 4e — Flow Spec (Behavioural Flow Artefact) 📋 IN DESIGN (runs alongside Plan 4d)
+
+**What it is:** An optional, per-requirement behavioural flow artefact at the P01→P02 seam. The agent drafts a flow diagram from a plain-English description of how a feature behaves; the user audits and corrects it; on approval a structured flow model is persisted against the requirement and consumed downstream by P02 (prototype), P06 (clinical safety) and the TDD agent. The canvas is what you audit, not what you author.
+
+**Why it exists:** P01 produces prose REQs with acceptance criteria; P02 produces screens. Nothing between them captures behavioural sequencing — step → decision → branch → loop — explicitly. Prose ACs describe sequencing and loops awkwardly; a clickable prototype shows the screens while hiding the branching logic. A clinician spots a missing branch in a flow diagram in seconds — they cannot spot it by clicking through five prototype screens. In a regulated context every decision node is where a clinical hazard hides, which makes the flow a direct DCB0129 (P06) input, not a cosmetic aid.
+
+### The user loop
+1. **Describe** — the user types the behaviour in plain English inside the P01 conversation.
+2. **Draft** — the agent emits the structured flow model; a deterministic validator confirms structural completeness; the diagram renders. The user did not draw it — the agent did.
+3. **Audit + correct** — the user reads it and corrects by plain-English instruction ("escalation should come before the video step") or by clicking a node and describing the change. No dragging, no palette, no building.
+4. **Approve** — the approved flow persists against the requirement and feeds P02 and P06.
+
+### Load-bearing decisions (everything else stands on these)
+1. **Source of truth is a structured flow model, not the Mermaid.** The Mermaid markup is a generated rendering for humans; never persisted as master, never parsed downstream. Storing rendering DSL as master and mining structure back out of it is the P08→P09 anti-pattern (LLMs mining raw artefact text for structured data the DB could supply directly).
+2. **Decision conditions are references to acceptance criteria, not copies.** A decision condition ("pain > 6 or refill request") *is* a binary AC. The node holds an `ac_ref`; the AC owns the truth. Editing a condition in the flow proposes an AC change via `propose_requirement_change` (Plan 3d) — never a silent second copy.
+3. **Click-to-edit resolves by stable node id, never by rendered-text string match** — avoids `ANCHOR_AMBIGUOUS`, the Plan 3a lesson.
+4. **Optional, keyed on graph-structure, enriches — never gates.** The agent offers a flow only when behaviour has structure a flat AC list cannot hold (sequencing, loops, convergence); a lone binary decision stays as two ACs. When a flow is absent, every downstream stage degrades gracefully to today's prose-AC behaviour. No downstream stage may hard-depend on a flow existing — that is the completeness check on the word "optional".
+5. **One flow per requirement; the container is the requirement, not a canvas or a tab strip.** A flow is an optional child artefact hanging off `requirement_id`, inheriting the requirement's identity, versioning, staleness and change machinery. A pathway spanning two requirements lives with the requirement that owns its outcome; the hand-off is a terminal node referencing the other requirement's flow (`flow_ref`), never a merged canvas — the seam where deferred Plan 14 plugs in.
+
+### The flow model (minimal — not a workflow builder)
+Persisted as data in the DB (not S3 content); the human-readable `FLOW-{id}.md` rendering is pushed to GitHub for audit and never parsed.
+
+```
+FlowModel   flow_id (PK), requirement_id (FK, unique), version, entry_node_id, status (draft|approved)
+FlowNode    node_id (stable), flow_id (FK), type (step|decision|terminal), label,
+            ac_ref   (nullable — on decision nodes; references an AC id, NOT a copy),
+            flow_ref (nullable — on terminal nodes; references another requirement's flow)
+FlowEdge    edge_id (PK), flow_id (FK), source_node_id, target_node_id,
+            branch_label (nullable — on edges leaving a decision node)
+```
+Loops are an edge whose target is an earlier node. Convergence is multiple edges into one node. No special constructs — it is a directed graph.
+
+**Deterministic validation ("schema validates it" — script, not LLM):** exactly one entry node; every node reachable; every decision node has ≥2 outgoing edges and a resolvable `ac_ref`; every branch terminates; every loop is escapable; every `ac_ref`/`flow_ref` resolves. LLM drafts (judgment); the validator enforces completeness (mechanics).
+
+### Downstream consumption — one model, many readers
+- **P02 prototype** reads nodes + edges as states + transitions — steps become candidate screens, edges become navigation. A fourth structural input alongside REQ prose, the EMIS-X UI kit and the style reference.
+- **P06 clinical safety** reads decision nodes + escalation terminals as hazard sites. Branch → candidate HAZ-ID.
+- **TDD agent (Plan 5+)** reads paths — every entry-to-terminal path is a behavioural test case, every decision a branch-coverage obligation, every loop a termination test.
+- **The REQ** reconciles conditions via `ac_ref` through the existing Plan 3d AC-insertion / `propose_requirement_change` machinery.
+
+**Disciplines:** one model, many readers (no per-stage artefact — that would recreate the write-only failure class); the flow→downstream boundary is a seam (seam-test family treatment); Mermaid is never parsed downstream; conditions reference ACs; clicks resolve by node id.
+
+### Deferred framing (named, not accidental)
+Sibling child artefact (build now — reuses `requirement_id`, per-requirement windowing and the Plan 3d change machinery almost untouched) vs the requirement as a structured object whose behaviour is graph-shaped (cleaner — dissolves the two-masters tension — but a real change to the requirement model). **Build the sibling-artefact version now, with the condition-as-AC-reference rule baked in, and design the flow model so it can be promoted into the requirement structure later without a rewrite.**
+
+### Dependencies
+**Proven / reused (no new build):** per-requirement conversations + `requirement_id` FK (Plan 1); Plan 3d change machinery + `propose_requirement_change`; immutable S3 versioning + artefact push (Plan 4c); the Plan 4 chat-left / render-right + click-to-target interaction pattern.
+
+**New build:** flow model tables + Flyway migration (explicit `ToTable`/`HasColumnName`); `draft_flow` and `edit_flow_node` tools (structural edits via the vibe path); deterministic structural validator; Mermaid render + node click-target surface (lighter than the prototype iframe); downstream projection readers for P02, P06 and the TDD agent; binding the flow to the Plan 3d change loop in **both** directions (a requirement change marks its flow stale; a flow condition edit proposes a requirement/AC change back).
+
+### Status, owner, positioning
+**Status:** 📋 IN DESIGN.
+**Owner:** Idris.
+**Positioning:** Not a Plan 5 blocker. Design now (alongside Plan 4d); build after the Plan 4 production flag flip (the render/edit surface must be proven in real sessions first), then run in parallel with the rest of Plan 4d and with Plan 5. The output enriches Plan 5 (flow paths → behavioural tests); Plan 5 does not hard-depend on it.
+**Effort (indicative, pre-build — not committed):** ~2–3 weeks for the backend model + validator + `draft_flow` and the render/audit/approve loop (Phases 1–2). Downstream projections land incrementally: P02 and P06 first, the TDD projection with Plan 5.
+**Open call:** `FLOW-{id}.md` co-located in `requirements/` vs a sibling `flows/` folder — confirm with Darren's team whether the nightly Knowledge Graph indexer prefers flows as their own node type before Phase 1.
+
+**Suggested phasing:**
+1. Flow model + migration + deterministic validator + `draft_flow` (backend, no UI).
+2. Render surface + `edit_flow_node` + playback-before-save + approve (the user loop).
+3. Downstream projections — P02, then P06, then the TDD path-to-test projection with Plan 5.
+
+---
+
 ## Plan 5 — Code Quality: Skills + Two-Agent TDD 📋 PENDING
 
-**Prerequisite:** Plan 4c complete.
+**Prerequisite:** Plan 4d complete (all items checked off).
 
 **What it is:**
 - response-discipline.md skill — eliminates preamble bloat
@@ -336,6 +515,8 @@ Project: documents-manager-increment-1
 - Two-agent TDD: Agent A writes tests from REQ CHECKs (cannot see implementation), Agent B makes them pass (cannot modify tests)
 - TASK-NNN-TESTS and TASK-NNN-CODE as separate manifest entries
 - TASK-NNN-CODE.can_start = false until TASK-NNN-TESTS is human_approved
+- `seam-testing` skill (already in Infrastructure/Skills/) wired into P11
+- `review-agent-discipline` skill wired into the Review Agent prompt at P11
 
 ---
 
@@ -404,6 +585,8 @@ P11 — TDD / Code Generation
 
 P09 position and conditional vs always-on status to be confirmed with Indra before any engineering begins.
 
+Flow Spec (Plan 4e) is an optional per-requirement artefact produced in P01 and projected into P02, P06 and the TDD agent — it is not a pipeline stage.
+
 ---
 
 ## Artefact Structure in Feature Repos
@@ -411,15 +594,19 @@ P09 position and conditional vs always-on status to be confirmed with Indra befo
 ```
 {feature-repo}/
   .genesis/
-    requirements/         REQ-{id}.md, CHANGE-{id}.md
+    requirements/         REQ-{id}.md, CHANGE-{id}.md, FLOW-{id}.md
     architecture/         ARCH-{id}.md
     clinical-safety/      DCB0129-{id}.md, DCB0129-{id}.xlsx
     ig/                   IG-{id}.md
     security/             SEC-{id}.md
     prototype/            index.html
+    design/               API-CONTRACT.yaml, DB-SCHEMA.sql, DATA-MODELS.md, ERROR-CATALOGUE.md, CONTRACT.md
     session-close/        SESSION-CLOSE-P01.md … SESSION-CLOSE-P08.md
+    review/               REVIEW-{id}.md
     project/              PROJECT.md
 ```
+
+`FLOW-{id}.md` is the human-readable Mermaid rendering of a requirement's flow, for audit only. The structured flow model lives in the DB and is what downstream stages read — the rendering is never parsed.
 
 ---
 
@@ -433,11 +620,14 @@ TokenOptimisation.PrototypeDomModeEnabled         ✅ LIVE
 TokenOptimisation.PrototypeFragmentsEnabled       ✅ LIVE (legacy — active until Plan 4 prod flag flip)
 TokenOptimisation.ActiveSkillInjectionEnabled     ✅ LIVE
 TokenOptimisation.RequirementFeedbackEnabled      ✅ LIVE
-TokenOptimisation.PrototypeSingleFileEnabled      ✅ LIVE in Dev / ❌ false in Production — flip after BA validation
+TokenOptimisation.PrototypeSingleFileEnabled      ✅ LIVE in Dev / ❌ false in Production — flip after anchor fix
 
-KnowledgeService.Enabled                         📋 Plan 4b Day 1
-KnowledgeService.ProjectArtefactIndexingEnabled  📋 Plan 4b Day 2
-HelpChat.Enabled                                 📋 Plan 4b Day 3
+FlowSpec.Enabled                                 📋 Plan 4e
+FlowSpec.DownstreamInjectionEnabled              📋 Plan 4e (gates P02/P06/TDD projection separately)
+
+KnowledgeService.Enabled                         ✅ LIVE — Plan 4b
+KnowledgeService.ProjectArtefactIndexingEnabled  ✅ LIVE — Plan 4b
+HelpChat.Enabled                                 ✅ LIVE — Plan 4b
 
 KnowledgeGraph.IndexerEnabled                    📋 KG Phase 1
 KnowledgeGraph.McpServerEnabled                  📋 KG Phase 1
@@ -445,9 +635,9 @@ KnowledgeGraph.PipelineInjectionEnabled          📋 KG Phase 4
 KnowledgeGraph.BlastRadiusEnabled                📋 KG Phase 5
 KnowledgeGraph.LegacyIndexingEnabled             📋 KG Phase 5
 
-Project.GitHubIntegrationEnabled                 📋 Plan 4c
-Project.ArtefactPushEnabled                      📋 Plan 4c
-Project.SessionCloseEnabled                      📋 Plan 4c
+Project.GitHubIntegrationEnabled                 ✅ LIVE — Plan 4c
+Project.ArtefactPushEnabled                      ✅ LIVE — Plan 4c
+Project.SessionCloseEnabled                      ✅ LIVE — Plan 4c
 
 Swarm.ManifestGenerationEnabled                  📋 Plan 6
 Swarm.GitHubWebhookEnabled                       📋 Plan 6
@@ -475,17 +665,31 @@ The only non-C# artefacts:
 ## Implementation Order
 
 ```
-NOW (active):
-  Plan 4b — Knowledge Service + Help Chat Panel
+COMPLETE:
+  Plan 4b — Knowledge Service + Help Chat Panel ✅
+  Plan 4c — GitHub Integration + Platform Extensions ✅ (PRs awaiting merge)
 
-NEXT (after 4b):
-  Plan 4c — GitHub Integration + Platform Extensions
-  Plan 4  — Production flag flip (after BA validation, runs in parallel)
+NOW (active):
+  Plan 4d — Engineering Foundation 🔄
+             Contract layer implementation (create command next)
+             Anchor failure root cause investigation
+             Engineering hygiene items
+             Pipeline Prompt Quality Review (P01–P11)
+  Plan 4d-R — PR Review Agent (design complete, wiring pending)
+  Plan 4e — Flow Spec (in design — P01→P02 behavioural flow artefact)
 
 PARALLEL (Darren's team):
   Knowledge Graph Service Phase 1-2
 
-AFTER 4c:
+AFTER Plan 4 production flag flip (gated only on the flag, NOT on the full 4d→5 gate):
+  Plan 4e build — Phase 1 (flow model + validator + draft_flow),
+                  Phase 2 (render + audit/approve loop).
+                  Runs in parallel with the rest of Plan 4d and with Plan 5.
+                  Downstream projections land incrementally: P02 and P06 first,
+                  the TDD path-to-test projection with Plan 5.
+                  Enriches Plan 5 — does NOT gate it.
+
+AFTER 4d complete (hard gate — all Plan 4d items checked off):
   Plan 5  — Two-Agent TDD + Code Quality Skills
   KG Phase 3-4 (parallel with Plan 5)
 
@@ -501,6 +705,20 @@ AFTER 6:
   Plan 11 — Fine-tuning: Validation Model
   Plan 12 — Autonomous Loop
 ```
+
+---
+
+### PR size rule
+If a PR touches more than 20 files or takes more than a day to implement — it is too big. Split it at the deliverable boundary.
+
+### Cherry-pick discipline
+Cherry-pick from exp to PR branch **frequently and in real time** — not at the end of a plan when 136 commits have accumulated. Each time a logical piece is solid on exp, cherry-pick it across. The PR branch always has a readable history; the exp branch is disposable.
+
+### What went wrong (and why the rule exists)
+Plans 4b, 4c, and 4d were built on a single exp branch over months. PRs were raised directly from exp. When the PRs merged and new work accumulated, the exp branch and main diverged in a way that made cherry-picking impossible (intermediate stub commits conflicted with final state already on main). The result was a single 266-file commit on the PR branch — unreviewed in any meaningful sense.
+
+The fix is structural: PR branches are created before work starts, not after.
+
 
 ---
 

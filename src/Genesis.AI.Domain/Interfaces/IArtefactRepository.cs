@@ -66,4 +66,6 @@ public interface IArtefactRepository
     /// Used for prototype version recovery/history.
     /// </summary>
     Task<IReadOnlyList<Artefact>> GetVersionsByFilePathAsync(Guid projectId, string filePath, CancellationToken cancellationToken);
+
+    Task MarkPushedToGitHubAsync(Guid artefactId, TimeProvider timeProvider, CancellationToken ct);
 }

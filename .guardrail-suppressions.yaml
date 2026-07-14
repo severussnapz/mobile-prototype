@@ -71,6 +71,9 @@ suppressions:
     path: "src/Genesis.AI.Domain/AggregatesModel/ProjectAggregate/PipelineStage.cs"
     justification: "Child entity of Project aggregate — not an aggregate root"
   - id: ENG-003
+    path: "src/Genesis.AI.Domain/AggregatesModel/ContractManifestAggregate/ContractManifestPin.cs"
+    justification: "ContractManifestPin is a child entity of ContractManifest aggregate — same established suppression pattern as HelpMessage, ParkingLotItem"
+  - id: ENG-003
     path: "src/Genesis.AI.Domain/AggregatesModel/KnowledgeAggregate/KnowledgeDocument.cs"
     justification: "KnowledgeDocument is a persistence entity not a domain aggregate — same established suppression pattern as HelpMessage, ParkingLotItem"
 
@@ -212,4 +215,4 @@ suppressions:
 
   - id: SC-007
     path: "docker-compose.yml"
-    justification: "Local development only — floating tag is intentional for local dev. Production uses managed RDS Aurora PostgreSQL"
+    justification: "Local development only — floating tag intentional for local dev. Production uses managed RDS Aurora PostgreSQL"
