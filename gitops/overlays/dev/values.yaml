@@ -143,4 +143,4 @@ SecurityGroupPolicy:
   matchLabels:
     app.kubernetes.io/name: genesis-ai-requirements-api
   groupIds:
-    - sg-073355f91f514751a
+    - sg-02895b4fefca7778f
