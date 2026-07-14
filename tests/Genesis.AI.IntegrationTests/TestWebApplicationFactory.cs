@@ -1,4 +1,5 @@
 using Genesis.AI.Domain.Interfaces;
+using Genesis.AI.Domain.GitHub;
 using Genesis.AI.Infrastructure;
 using Genesis.AI.TestFramework;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 
 namespace Genesis.AI.IntegrationTests;
@@ -17,15 +19,20 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
     private readonly MockTokenGenerator _tokenGenerator;
     private readonly string _databaseName;
     private readonly Mock<IAiService> _aiServiceMock;
+    private readonly Mock<IPrototypeDemoEditService> _prototypeDemoEditServiceMock;
+    private readonly IPushFailureLogRepository? _pushFailureLogRepository;
 
     public MockTokenGenerator TokenGenerator => _tokenGenerator;
     public Mock<IAiService> AiServiceMock => _aiServiceMock;
+    public Mock<IPrototypeDemoEditService> PrototypeDemoEditServiceMock => _prototypeDemoEditServiceMock;
 
-    public TestWebApplicationFactory()
+    public TestWebApplicationFactory(IPushFailureLogRepository? pushFailureLogRepository = null)
     {
         _tokenGenerator = new MockTokenGenerator();
         _databaseName = $"TestDb_{Guid.NewGuid()}";
         _aiServiceMock = new Mock<IAiService>();
+        _prototypeDemoEditServiceMock = new Mock<IPrototypeDemoEditService>();
+        _pushFailureLogRepository = pushFailureLogRepository;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -71,6 +78,9 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
             // Mock IAiService — integration tests don't call AWS Bedrock
             services.AddSingleton(_aiServiceMock.Object);
 
+            // Mock IPrototypeDemoEditService — the edit controller's HTTP/auth/serialisation
+            // contract is exercised here; the service's internal validation is covered by its
+            // own Day 2b unit tests. Last registration wins, overriding the scoped Bedrock impl.
             // Fake IArtefactStorageService — integration tests don't call S3/LocalStack.
             // Keeps content in memory so save/read round-trips work.
             var storageMock = new Mock<IArtefactStorageService>();
@@ -105,10 +115,100 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
                 .Returns((string key, CancellationToken _) =>
                     Task.FromResult(binaryStore.TryGetValue(key, out var stored) ? stored : null));
             services.AddSingleton(storageMock.Object);
+
+            // Mock IKnowledgeService — the ArtefactPublishedDomainEvent handler indexes published
+            // artefacts into pgvector via Bedrock embeddings; integration tests don't call AWS.
+            services.AddSingleton(new Mock<IKnowledgeService>().Object);
+
+            if (_pushFailureLogRepository is not null)
+            {
+                services.AddSingleton(_pushFailureLogRepository);
+            }
         });
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IGitHubTokenService>();
+            services.AddSingleton<IGitHubTokenService>(_ =>
+            {
+                var mock = new Mock<IGitHubTokenService>();
+                mock.Setup(service => service.GetInstallationTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync("test-token");
+                return mock.Object;
+            });
+
+            services.RemoveAll<IGitHubContentsService>();
+            services.AddSingleton<IGitHubContentsService>(_ =>
+            {
+                var mock = new Mock<IGitHubContentsService>();
+                mock.Setup(service => service.PushFileAsync(
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<byte[]>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string?>(),
+                        It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new GitHubPushResult("sha123", "https://github.com/test"));
+                mock.Setup(service => service.FileExistsAsync(
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(false);
+                mock.Setup(service => service.GetFileShaAsync(
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<CancellationToken>()))
+                    .ReturnsAsync((string?)null);
+                return mock.Object;
+            });
+
+            services.RemoveAll<IGenesisStructureScaffolder>();
+            services.AddScoped<IGenesisStructureScaffolder>(_ =>
+            {
+                var mock = new Mock<IGenesisStructureScaffolder>();
+                mock.Setup(service => service.ScaffoldAsync(
+                        It.IsAny<Guid>(),
+                        It.IsAny<string>(),
+                        It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+                return mock.Object;
+            });
+
+            services.RemoveAll<IGitHubArtefactPushService>();
+            services.AddScoped<IGitHubArtefactPushService>(_ =>
+            {
+                var mock = new Mock<IGitHubArtefactPushService>();
+                mock.Setup(service => service.PushAsync(
+                        It.IsAny<Guid>(),
+                        It.IsAny<Guid>(),
+                        It.IsAny<string>(),
+                        It.IsAny<int>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<string>(),
+                        It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+                return mock.Object;
+            });
+
+            services.RemoveAll<ISecretEncryptionService>();
+            services.AddSingleton<ISecretEncryptionService>(_ =>
+            {
+                var mock = new Mock<ISecretEncryptionService>();
+                mock.Setup(service => service.Encrypt(It.IsAny<string>())).Returns("encrypted-test-value");
+                mock.Setup(service => service.Decrypt(It.IsAny<string>())).Returns("decrypted-test-value");
+                mock.Setup(service => service.Mask(It.IsAny<string>())).Returns("••••••••");
+                mock.Setup(service => service.MaskWithSuffix(It.IsAny<string>(), It.IsAny<int>()))
+                    .Returns("••••••••test");
+                return mock.Object;
+            });
+
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 options.Authority = null;
@@ -127,6 +227,10 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
                     ClockSkew = TimeSpan.FromMinutes(5)
                 };
             });
+
+            // Mock IPrototypeDemoEditService — must run after Infrastructure.AddInfrastructure()
+            // so this singleton registration wins over the scoped Bedrock implementation.
+            services.AddSingleton(_prototypeDemoEditServiceMock.Object);
         });
 
         builder.UseEnvironment("Testing");

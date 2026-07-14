@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.Queries.GetArtefactVersions;
@@ -18,20 +17,14 @@ namespace Genesis.AI.Api.Features.Artefacts;
 public class ArtefactVersionController : ControllerBase
 {
     private readonly IMediator _mediator;
-    private readonly IArtefactRepository _artefactRepository;
-    private readonly IArtefactStorageService _artefactStorageService;
-    private readonly TimeProvider _timeProvider;
+    private readonly IArtefactRestorationService _restorationService;
 
     public ArtefactVersionController(
         IMediator mediator,
-        IArtefactRepository artefactRepository,
-        IArtefactStorageService artefactStorageService,
-        TimeProvider timeProvider)
+        IArtefactRestorationService restorationService)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
-        _artefactRepository = artefactRepository ?? throw new ArgumentNullException(nameof(artefactRepository));
-        _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
-        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _restorationService = restorationService ?? throw new ArgumentNullException(nameof(restorationService));
     }
 
     [HttpGet("versions")]
@@ -44,32 +37,7 @@ public class ArtefactVersionController : ControllerBase
         [FromQuery] PaginationFilter pagination,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            return BadRequest("filePath query parameter is required.");
-
-        var result = await _mediator.Send(new GetArtefactVersionsQuery(projectId, filePath), cancellationToken);
-        if (result.Versions.Count == 0)
-            return Ok(new List<ArtefactVersionResponse>());
-
-        var page = Math.Max(1, pagination.Page);
-        var size = Math.Max(1, pagination.Size);
-        var skip = (page - 1) * size;
-
-        var versions = result.Versions
-            .Skip(skip)
-            .Take(size)
-            .ToList()
-            .ConvertAll(artefact => new ArtefactVersionResponse
-        {
-            Id = artefact.Id,
-            Version = artefact.Version,
-            CreatedAt = artefact.CreatedAt,
-            CreatedBy = artefact.CreatedBy,
-            SizeBytes = artefact.SizeBytes,
-            ContentType = artefact.ContentType
-        });
-
-        return Ok(versions);
+        return await GetVersionsInternal(projectId, filePath, pagination, cancellationToken);
     }
 
     [HttpGet("history")]
@@ -82,12 +50,35 @@ public class ArtefactVersionController : ControllerBase
         [FromQuery] PaginationFilter pagination,
         CancellationToken cancellationToken)
     {
+        return await GetVersionsInternal(projectId, filePath, pagination, cancellationToken);
+    }
+
+    private async Task<ActionResult<IReadOnlyList<ArtefactVersionResponse>>> GetVersionsInternal(
+        Guid projectId,
+        string filePath,
+        PaginationFilter pagination,
+        CancellationToken cancellationToken)
+    {
         if (string.IsNullOrWhiteSpace(filePath))
             return BadRequest("filePath query parameter is required.");
 
         var result = await _mediator.Send(new GetArtefactVersionsQuery(projectId, filePath), cancellationToken);
+        
+        // For prototype files, always use S3 history as the source of truth
+        if (string.Equals(filePath.Trim(), "prototype/index.html", StringComparison.OrdinalIgnoreCase))
+        {
+            var fallbackVersions = await _restorationService.BuildS3FallbackVersionsAsync(
+                projectId, filePath, pagination, cancellationToken);
+            return Ok(fallbackVersions);
+        }
+
+        // For non-prototype files, use DB results or S3 fallback if DB is empty
         if (result.Versions.Count == 0)
-            return Ok(new List<ArtefactVersionResponse>());
+        {
+            var fallbackVersions = await _restorationService.BuildS3FallbackVersionsAsync(
+                projectId, filePath, pagination, cancellationToken);
+            return Ok(fallbackVersions);
+        }
 
         var page = Math.Max(1, pagination.Page);
         var size = Math.Max(1, pagination.Size);
@@ -98,21 +89,21 @@ public class ArtefactVersionController : ControllerBase
             .Take(size)
             .ToList()
             .ConvertAll(artefact => new ArtefactVersionResponse
-        {
-            Id = artefact.Id,
-            Version = artefact.Version,
-            CreatedAt = artefact.CreatedAt,
-            CreatedBy = artefact.CreatedBy,
-            SizeBytes = artefact.SizeBytes,
-            ContentType = artefact.ContentType
-        });
+            {
+                Id = artefact.Id,
+                Version = artefact.Version,
+                CreatedAt = artefact.CreatedAt,
+                CreatedBy = artefact.CreatedBy,
+                SizeBytes = artefact.SizeBytes,
+                ContentType = artefact.ContentType
+            });
 
         return Ok(versions);
     }
 
     [HttpPost("restore")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ArtefactSummaryResponse>> RestoreByBody(
@@ -123,12 +114,22 @@ public class ArtefactVersionController : ControllerBase
         if (request.Version <= 0)
             return BadRequest("version must be greater than 0.");
 
-        return await RestoreArtefactVersionInternal(projectId, request.FilePath, request.Version, cancellationToken);
+        var restored = await _restorationService.RestoreArtefactVersionAsync(
+            projectId, request.FilePath, request.Version, 
+            User.GetUserErn() ?? User.FindFirstValue("sub"), 
+            cancellationToken);
+        
+        if (restored is null)
+            return NotFound();
+
+        var summary = MapSummary(restored);
+        return CreatedAtAction(nameof(GetVersionsByFilePath), 
+            new { projectId, filePath = restored.FilePath }, summary);
     }
 
     [HttpPost("versions/{version:int}/restore")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ArtefactSummaryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ArtefactSummaryResponse>> RestoreByRoute(
@@ -140,64 +141,17 @@ public class ArtefactVersionController : ControllerBase
         if (version <= 0)
             return BadRequest("version must be greater than 0.");
 
-        return await RestoreArtefactVersionInternal(projectId, request.FilePath, version, cancellationToken);
-    }
-
-    private async Task<ActionResult<ArtefactSummaryResponse>> RestoreArtefactVersionInternal(
-        Guid projectId,
-        string filePath,
-        int version,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-            return BadRequest("filePath is required.");
-
-        var normalisedFilePath = filePath.Trim();
-        var versions = await _artefactRepository.GetVersionsByFilePathAsync(projectId, normalisedFilePath, cancellationToken);
-        if (versions.Count == 0)
-            return NotFound();
-
-        var sourceVersion = versions.FirstOrDefault(artefact => artefact.Version == version);
-        if (sourceVersion is null)
-            return NotFound();
-
-        var latestVersion = versions.Max(artefact => artefact.Version);
-        if (version == latestVersion)
-        {
-            return Ok(MapSummary(sourceVersion));
-        }
-
-        var sourceContent = await _artefactStorageService.GetContentAsync(sourceVersion.S3Key, cancellationToken);
-        if (string.IsNullOrEmpty(sourceContent))
-            return NotFound();
-
-        var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(projectId, normalisedFilePath, cancellationToken);
-        var restoredContentType = sourceVersion.ContentType;
-
-        var newStorageKey = await _artefactStorageService.SaveContentAsync(
-            projectId,
-            normalisedFilePath,
-            nextVersion,
-            sourceContent,
-            restoredContentType,
+        var restored = await _restorationService.RestoreArtefactVersionAsync(
+            projectId, request.FilePath, version, 
+            User.GetUserErn() ?? User.FindFirstValue("sub"), 
             cancellationToken);
+        
+        if (restored is null)
+            return NotFound();
 
-        var userId = User.GetUserErn() ?? User.FindFirstValue("sub") ?? "system";
-        var restoredArtefact = Artefact.CreateS3Artefact(
-            projectId,
-            nextVersion,
-            normalisedFilePath,
-            newStorageKey,
-            restoredContentType,
-            Encoding.UTF8.GetByteCount(sourceContent),
-            userId,
-            _timeProvider,
-            true);
-
-        await _artefactRepository.AddAsync(restoredArtefact, cancellationToken);
-        await _artefactRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
-
-        return Ok(MapSummary(restoredArtefact));
+        var summary = MapSummary(restored);
+        return CreatedAtAction(nameof(GetVersionsByFilePath), 
+            new { projectId, filePath = restored.FilePath }, summary);
     }
 
     private static ArtefactSummaryResponse MapSummary(Artefact artefact)
@@ -211,7 +165,8 @@ public class ArtefactVersionController : ControllerBase
             ContentType = artefact.ContentType,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         };
     }
 }

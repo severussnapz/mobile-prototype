@@ -47,6 +47,7 @@ public class ConversationRepository : IConversationRepository
     {
         return await _context.Conversations
             .AsNoTracking()
+            .Include(conversation => conversation.Messages)
             .Where(conversation => conversation.StageId == stageId)
             .OrderByDescending(conversation => conversation.CreatedAt)
             .ToListAsync(cancellationToken);

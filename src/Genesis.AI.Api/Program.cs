@@ -1,4 +1,5 @@
 using Genesis.AI.Api.Authentication;
+using Genesis.AI.Api.Features.Artefacts;
 using Genesis.AI.Api.Health;
 using Genesis.AI.Api.Middleware;
 using Genesis.AI.Core.Filters;
@@ -100,6 +101,9 @@ builder.Services.AddAutoMapper(typeof(Program).Assembly);
 
 // Infrastructure (EF Core + Npgsql)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// API services
+builder.Services.AddScoped<IArtefactRestorationService, ArtefactRestorationService>();
 
 // TimeProvider for testable clock
 builder.Services.AddSingleton(TimeProvider.System);

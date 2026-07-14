@@ -11,12 +11,13 @@ public class RejectRequirementChangeCommandTests
     [Fact]
     public async Task Handle_WhenPendingChange_SetsRejectedStatus()
     {
+        var projectId = Guid.NewGuid();
         var changeId = Guid.NewGuid();
-        var change = BuildPendingChange(changeId);
+        var change = BuildPendingChange(projectId, changeId);
 
         var repositoryMock = new Mock<IRequirementChangeRepository>();
         var unitOfWorkMock = new Mock<Genesis.AI.Core.Data.IUnitOfWork>();
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -26,7 +27,7 @@ public class RejectRequirementChangeCommandTests
             repositoryMock.Object, TimeProvider.System);
 
         await handler.Handle(
-            new RejectRequirementChangeCommand(changeId, "idris.issa"),
+            new RejectRequirementChangeCommand(projectId, changeId, "idris.issa"),
             CancellationToken.None);
 
         Assert.Equal(ChangeStatus.Rejected, change.Status);
@@ -36,7 +37,7 @@ public class RejectRequirementChangeCommandTests
     public async Task Handle_WhenChangeNotFound_ThrowsInvalidOperationException()
     {
         var repositoryMock = new Mock<IRequirementChangeRepository>();
-        repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(),
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),
             It.IsAny<CancellationToken>()))
             .ReturnsAsync((RequirementChange?)null);
 
@@ -45,14 +46,14 @@ public class RejectRequirementChangeCommandTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(
-                new RejectRequirementChangeCommand(Guid.NewGuid(), "idris.issa"),
+                new RejectRequirementChangeCommand(Guid.NewGuid(), Guid.NewGuid(), "idris.issa"),
                 CancellationToken.None));
     }
 
-    private static RequirementChange BuildPendingChange(Guid changeId)
+    private static RequirementChange BuildPendingChange(Guid projectId, Guid changeId)
     {
         var change = RequirementChange.Propose(
-            projectId: Guid.NewGuid(),
+            projectId: projectId,
             reqId: "REQ-001",
             changeType: ChangeType.Gap,
             raisingPipeline: "pipeline_05_pxd",
@@ -71,13 +72,14 @@ public class RecordDomainReviewCommandTests
     [Fact]
     public async Task Handle_WhenClinicalSafetyReview_SetsClinicalSafetyReviewed()
     {
+        var projectId = Guid.NewGuid();
         var changeId = Guid.NewGuid();
-        var change = BuildApprovedChange(changeId, ImpactLevel.Definite,
+        var change = BuildApprovedChange(projectId, changeId, ImpactLevel.Definite,
             ImpactLevel.None, ImpactLevel.None);
 
         var repositoryMock = new Mock<IRequirementChangeRepository>();
         var unitOfWorkMock = new Mock<Genesis.AI.Core.Data.IUnitOfWork>();
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -87,7 +89,7 @@ public class RecordDomainReviewCommandTests
             repositoryMock.Object, TimeProvider.System);
 
         await handler.Handle(
-            new RecordDomainReviewCommand(changeId, ReviewDomain.ClinicalSafety, "cso@emis.com"),
+            new RecordDomainReviewCommand(projectId, changeId, ReviewDomain.ClinicalSafety, "cso@emis.com"),
             CancellationToken.None);
 
         Assert.True(change.ClinicalSafetyReviewed);
@@ -98,13 +100,14 @@ public class RecordDomainReviewCommandTests
     [Fact]
     public async Task Handle_WhenIgReview_SetsIgReviewed()
     {
+        var projectId = Guid.NewGuid();
         var changeId = Guid.NewGuid();
-        var change = BuildApprovedChange(changeId, ImpactLevel.None,
+        var change = BuildApprovedChange(projectId, changeId, ImpactLevel.None,
             ImpactLevel.Definite, ImpactLevel.None);
 
         var repositoryMock = new Mock<IRequirementChangeRepository>();
         var unitOfWorkMock = new Mock<Genesis.AI.Core.Data.IUnitOfWork>();
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -114,7 +117,7 @@ public class RecordDomainReviewCommandTests
             repositoryMock.Object, TimeProvider.System);
 
         await handler.Handle(
-            new RecordDomainReviewCommand(changeId, ReviewDomain.InformationGovernance,
+            new RecordDomainReviewCommand(projectId, changeId, ReviewDomain.InformationGovernance,
                 "dpo@emis.com"),
             CancellationToken.None);
 
@@ -126,13 +129,14 @@ public class RecordDomainReviewCommandTests
     [Fact]
     public async Task Handle_WhenSecurityReview_SetsSecurityReviewed()
     {
+        var projectId = Guid.NewGuid();
         var changeId = Guid.NewGuid();
-        var change = BuildApprovedChange(changeId, ImpactLevel.None,
+        var change = BuildApprovedChange(projectId, changeId, ImpactLevel.None,
             ImpactLevel.None, ImpactLevel.Definite);
 
         var repositoryMock = new Mock<IRequirementChangeRepository>();
         var unitOfWorkMock = new Mock<Genesis.AI.Core.Data.IUnitOfWork>();
-        repositoryMock.Setup(r => r.GetByIdAsync(changeId, It.IsAny<CancellationToken>()))
+        repositoryMock.Setup(r => r.GetByIdForProjectAsync(changeId, projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(change);
         repositoryMock.Setup(r => r.UnitOfWork).Returns(unitOfWorkMock.Object);
         unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -142,7 +146,7 @@ public class RecordDomainReviewCommandTests
             repositoryMock.Object, TimeProvider.System);
 
         await handler.Handle(
-            new RecordDomainReviewCommand(changeId, ReviewDomain.Security,
+            new RecordDomainReviewCommand(projectId, changeId, ReviewDomain.Security,
                 "security@emis.com"),
             CancellationToken.None);
 
@@ -152,13 +156,14 @@ public class RecordDomainReviewCommandTests
     }
 
     private static RequirementChange BuildApprovedChange(
+        Guid projectId,
         Guid changeId,
         ImpactLevel clinicalSafety,
         ImpactLevel ig,
         ImpactLevel security)
     {
         var change = RequirementChange.Propose(
-            projectId: Guid.NewGuid(),
+            projectId: projectId,
             reqId: "REQ-001",
             changeType: ChangeType.Gap,
             raisingPipeline: "pipeline_05_pxd",

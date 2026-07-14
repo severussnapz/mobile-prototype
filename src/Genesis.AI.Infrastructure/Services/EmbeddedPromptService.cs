@@ -9,6 +9,8 @@ public sealed class EmbeddedPromptService : IPromptService
 {
     private static readonly FrozenDictionary<StageType, string> PromptCache = LoadAllPrompts();
 
+    private static readonly string PrototypeSingleFilePromptContent = LoadPrototypeSingleFilePrompt();
+
     private static readonly FrozenDictionary<StageType, string[]> PhaseDefinitions = new Dictionary<StageType, string[]>
     {
         [StageType.RequirementsDiscovery] = [
@@ -160,6 +162,11 @@ public sealed class EmbeddedPromptService : IPromptService
             : throw new InvalidOperationException($"No prompt found for stage type: {stageType}");
     }
 
+    public string GetPrototypeSingleFilePrompt()
+    {
+        return PrototypeSingleFilePromptContent;
+    }
+
     public int GetTotalPhases(StageType stageType)
     {
         return PhaseDefinitions.TryGetValue(stageType, out var phases)
@@ -202,5 +209,31 @@ public sealed class EmbeddedPromptService : IPromptService
         }
 
         return result.ToFrozenDictionary();
+    }
+
+    // Single-file prototype builder: PrototypeDemoGeneration.md + EMIS-X UI kit reference.
+    // Assembled once and placed in the stable (cached) prompt part so the UI kit is not
+    // re-billed on every conversation turn.
+    private static string LoadPrototypeSingleFilePrompt()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var prompt = LoadEmbeddedResource(assembly, "Genesis.AI.Infrastructure.Prompts.PrototypeDemoGeneration.md");
+        var uiKit = LoadEmbeddedResource(assembly, "Genesis.AI.Infrastructure.Resources.emis-x-ui-kit.md");
+
+        return $"""
+            {prompt}
+
+            ## EMIS-X Design System Reference
+
+            {uiKit}
+            """;
+    }
+
+    private static string LoadEmbeddedResource(Assembly assembly, string resourceName)
+    {
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded resource not found: {resourceName}");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }

@@ -8,6 +8,10 @@ public interface IArtefactRepository
     IUnitOfWork UnitOfWork { get; }
 
     Task AddAsync(Artefact artefact, CancellationToken cancellationToken);
+    /// <summary>
+    /// Marks an existing artefact as modified so EF Core will persist changes on next SaveChanges.
+    /// </summary>
+    Task UpdateAsync(Artefact artefact, CancellationToken cancellationToken);
     Task DeleteByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<Artefact?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<Artefact>> GetByProjectIdAsync(Guid projectId, CancellationToken cancellationToken);
@@ -62,4 +66,6 @@ public interface IArtefactRepository
     /// Used for prototype version recovery/history.
     /// </summary>
     Task<IReadOnlyList<Artefact>> GetVersionsByFilePathAsync(Guid projectId, string filePath, CancellationToken cancellationToken);
+
+    Task MarkPushedToGitHubAsync(Guid artefactId, TimeProvider timeProvider, CancellationToken ct);
 }

@@ -177,6 +177,64 @@ public class ToolCallWiringTests
     }
 
     [Fact]
+    public void GetArtefact_ReadBudgetGuard_IsBypassedInPrototypeSingleFileMode()
+    {
+        // Single-file prototype mode reads requirements/* directly before save_artefact.
+        // The non-prototype read-budget guard must be disabled when prototypeSingleFile is true.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        Assert.Contains(
+            "if (!isPrototypePath && !prototypeSingleFile)",
+            controllerSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaveArtefact_Pipeline02ContractGuard_IsBypassedInPrototypeSingleFileMode()
+    {
+        // Single-file prototype mode should not run the fragment-pipeline save contract gate.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        Assert.Contains(
+            "if (stageType == StageType.Prototype && !prototypeSingleFile)",
+            controllerSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EditArtefact_UsesDirectFilePathReadGuard()
+    {
+        // The read guard should use the requested file path directly with no prototype-demo alias.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        Assert.Contains(
+            "if (!filesReadThisRequest.Contains(filePath) &&",
+            controllerSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EditArtefact_SingleFileMode_BypassesReadGuardWhenOldStrProvided()
+    {
+        // Single-file mode should allow edit_artefact without get_artefact when
+        // old_str already provides a non-empty verbatim anchor.
+        var controllerSource = File.ReadAllText(
+            Path.Combine("..", "..", "..", "..", "..", "src", "Genesis.AI.Api",
+                "Features", "Conversations", "ConversationStreamController.cs"));
+
+        Assert.Contains(
+            "!(prototypeSingleFile && !string.IsNullOrEmpty(oldStr))",
+            controllerSource,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SearchInArtefact_NoMatch_ReturnsAskUserForHtml()
     {
         // Plan 3f: when search_in_artefact finds no elements,

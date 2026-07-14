@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.Commands.CreateArtefacts;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.Queries.GetArtefactById;
@@ -18,13 +19,16 @@ public class ArtefactController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IArtefactStorageService _artefactStorageService;
+    private readonly ILogger<ArtefactController> _logger;
 
     public ArtefactController(
         IMediator mediator,
-        IArtefactStorageService artefactStorageService)
+        IArtefactStorageService artefactStorageService,
+        ILogger<ArtefactController> logger)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _artefactStorageService = artefactStorageService ?? throw new ArgumentNullException(nameof(artefactStorageService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -48,7 +52,8 @@ public class ArtefactController : ControllerBase
             ContentType = artefact.ContentType,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         });
 
         if (!string.IsNullOrEmpty(prefix))
@@ -75,7 +80,17 @@ public class ArtefactController : ControllerBase
         if (artefact is null || artefact.ProjectId != projectId)
             return NotFound();
 
-        var content = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
+        string? content;
+        try
+        {
+            content = await _artefactStorageService.GetContentAsync(artefact.S3Key, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to read artefact content from S3 for artefact {ArtefactId}", artefactId);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiErrorResponse.Create("503", "Service unavailable", "Unable to load this artefact. Please try again."));
+        }
 
         return Ok(new ArtefactDetailResponse
         {
@@ -87,7 +102,8 @@ public class ArtefactController : ControllerBase
             Content = content,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         });
     }
 
@@ -110,7 +126,18 @@ public class ArtefactController : ControllerBase
         if (artefact is null || artefact.ProjectId != projectId)
             return NotFound();
 
-        var content = await _artefactStorageService.GetBinaryContentAsync(artefact.S3Key, cancellationToken);
+        byte[]? content;
+        try
+        {
+            content = await _artefactStorageService.GetBinaryContentAsync(artefact.S3Key, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to read binary artefact from S3 for artefact {ArtefactId}", artefactId);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiErrorResponse.Create("503", "Service unavailable", "Unable to download this artefact. Please try again."));
+        }
+
         if (content is null || content.Length == 0)
             return NotFound();
 
@@ -141,7 +168,17 @@ public class ArtefactController : ControllerBase
             request.Artefacts.ConvertAll(artefactRequest => new Domain.Commands.CreateArtefacts.CreateArtefactItem(
                 artefactRequest.FilePath, artefactRequest.Content, artefactRequest.ContentType)));
 
-        var artefacts = await _mediator.Send(command, cancellationToken);
+        IReadOnlyList<Genesis.AI.Domain.AggregatesModel.ArtefactAggregate.Artefact> artefacts;
+        try
+        {
+            artefacts = await _mediator.Send(command, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save artefacts for project {ProjectId}", projectId);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                ApiErrorResponse.Create("503", "Service unavailable", "Unable to save artefact. Please try again."));
+        }
 
         var dtos = artefacts.ToList().ConvertAll(artefact => new ArtefactSummaryResponse
         {
@@ -152,7 +189,8 @@ public class ArtefactController : ControllerBase
             ContentType = artefact.ContentType,
             SizeBytes = artefact.SizeBytes,
             CreatedBy = artefact.CreatedBy,
-            CreatedAt = artefact.CreatedAt
+            CreatedAt = artefact.CreatedAt,
+            GitHubPushedAt = artefact.GitHubPushedAt
         });
 
         return Created(string.Empty, dtos);

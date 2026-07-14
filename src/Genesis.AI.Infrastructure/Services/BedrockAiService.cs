@@ -53,7 +53,9 @@ public sealed class BedrockAiService : IAiService, IDisposable
         return new AiResponse(
             content,
             (int)response.Usage.InputTokens,
-            (int)response.Usage.OutputTokens);
+            (int)response.Usage.OutputTokens,
+            (int)response.Usage.CacheReadInputTokens,
+            (int)response.Usage.CacheWriteInputTokens);
     }
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
@@ -147,16 +149,17 @@ public sealed class BedrockAiService : IAiService, IDisposable
                     JsonDocument? parsedInput = null;
                     AiStreamError? parseError = null;
 
-                    try
-                    {
-                        parsedInput = JsonDocument.Parse(
-                            string.IsNullOrWhiteSpace(inputJson) ? "{}" : inputJson);
+                        try
+                        {
+                            parsedInput = JsonDocument.Parse(
+                                string.IsNullOrWhiteSpace(inputJson) ? "{}" : inputJson);
                     }
                     catch (JsonException ex)
                     {
-                        _logger.LogWarning(ex,
-                            "Failed to parse tool input JSON for {ToolName}: {Input}",
-                            currentToolName, inputJson);
+                            _logger.LogWarning(ex,
+                                "Failed to parse tool input JSON for {ToolName}. PayloadLength={PayloadLength}",
+                                currentToolName,
+                                inputJson?.Length ?? 0);
                         parseError = new AiStreamError(
                             "tool_parse_failure",
                             $"Failed to parse tool input for '{currentToolName}'. The AI response may have been truncated due to output token limits.");
@@ -241,7 +244,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
             }).ToList(),
             InferenceConfig = new InferenceConfiguration
             {
-                MaxTokens = 32768,
+                MaxTokens = 64000,
                 Temperature = _thinkingBudget > 0 ? 1.0f : 0.7f
             },
             AdditionalModelRequestFields = BuildThinkingConfig()
@@ -257,7 +260,7 @@ public sealed class BedrockAiService : IAiService, IDisposable
             Messages = messages.Select(BuildMessage).ToList(),
             InferenceConfig = new InferenceConfiguration
             {
-                MaxTokens = 32768,
+                MaxTokens = 64000,
                 Temperature = _thinkingBudget > 0 ? 1.0f : 0.7f
             },
             AdditionalModelRequestFields = BuildThinkingConfig()

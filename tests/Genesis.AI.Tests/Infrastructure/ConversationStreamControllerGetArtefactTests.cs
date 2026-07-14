@@ -51,6 +51,23 @@ public class ConversationStreamControllerGetArtefactTests
     }
 
     [Fact]
+    public void BuildGetArtefactResult_LargePrototypeIndexSingleFileMode_ReturnsFullContent()
+    {
+        var content = "<!DOCTYPE html><html><body>" + new string('x', 60_000) + "</body></html>";
+
+        var result = ConversationStreamController.BuildGetArtefactResult(
+            "prototype/index.html",
+            content,
+            version: 7,
+            alreadyReadThisRequest: false,
+            largeFileThreshold: LargeFileThreshold,
+            prototypeSingleFile: true);
+
+        Assert.DoesNotContain("STRUCTURAL OUTLINE", result, StringComparison.Ordinal);
+        Assert.Contains(content, result, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildGetArtefactResult_PrototypeHtmlFragmentAlreadyRead_ReturnsPointerNotContent()
     {
         var content = "<div class=\"screen\" id=\"screen-checkout\">" + new string('a', 60_000) + "</div>";

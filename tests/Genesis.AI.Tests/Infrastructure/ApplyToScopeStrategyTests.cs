@@ -147,7 +147,7 @@ public class GenerateFromContextStrategyTests
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiResponse(aiJson, 100, 50));
+            .ReturnsAsync(new AiResponse(aiJson, 100, 50, 0, 0));
 
         var strategy = new GenerateFromContextStrategy(mockAiService.Object);
         var results = await strategy.DeriveValuesAsync(matches, null, CancellationToken.None);
@@ -176,7 +176,7 @@ public class GenerateFromContextStrategyTests
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiResponse(aiJson, 100, 50));
+            .ReturnsAsync(new AiResponse(aiJson, 100, 50, 0, 0));
 
         var strategy = new GenerateFromContextStrategy(mockAiService.Object);
         var results = await strategy.DeriveValuesAsync(matches, null, CancellationToken.None);
@@ -199,7 +199,7 @@ public class GenerateFromContextStrategyTests
                 It.IsAny<AiSystemPrompt>(),
                 It.IsAny<IReadOnlyList<AiMessage>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiResponse("not valid json", 100, 50));
+            .ReturnsAsync(new AiResponse("not valid json", 100, 50, 0, 0));
 
         var strategy = new GenerateFromContextStrategy(mockAiService.Object);
         var results = await strategy.DeriveValuesAsync(matches, null, CancellationToken.None);

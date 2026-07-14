@@ -2,6 +2,7 @@ namespace Genesis.AI.Api.Features.Conversations;
 
 public class MessageFeedbackResponse
 {
+    public Guid ConversationId { get; set; }
     public Guid MessageId { get; set; }
     public string StageType { get; set; } = null!;
     public bool IsHelpful { get; set; }

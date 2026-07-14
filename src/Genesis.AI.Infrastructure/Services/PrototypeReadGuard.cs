@@ -14,9 +14,10 @@ public static class PrototypeReadGuard
     public static string? ValidateGetArtefact(
         StageType? stageType,
         string filePath,
-        bool prototypeAlreadyBuilt)
+        bool prototypeAlreadyBuilt,
+        bool prototypeSingleFile)
     {
-        if (stageType != StageType.Prototype || !prototypeAlreadyBuilt)
+        if (stageType != StageType.Prototype || prototypeSingleFile || !prototypeAlreadyBuilt)
         {
             return null;
         }

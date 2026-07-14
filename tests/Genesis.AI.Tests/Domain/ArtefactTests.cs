@@ -95,4 +95,57 @@ public class ArtefactTests
         Assert.False(promoted);
         Assert.True(artefact.IsPublished);
     }
+
+    [Fact]
+    public void CreateS3Artefact_WhenIsPublishedTrue_RaisesArtefactPublishedDomainEvent()
+    {
+        var projectId = Guid.NewGuid();
+
+        var artefact = Artefact.CreateS3Artefact(
+            projectId, 1, "requirements/REQ-001.md",
+            "projects/p/artefacts/requirements/REQ-001.md/v1", "text/markdown", 10, "user-1", _timeProvider, true);
+
+        var domainEvent = Assert.Single(artefact.DomainEvents.OfType<ArtefactPublishedDomainEvent>());
+        Assert.Equal(projectId, domainEvent.ProjectId);
+        Assert.Equal("requirements/REQ-001.md", domainEvent.FilePath);
+        Assert.Equal("projects/p/artefacts/requirements/REQ-001.md/v1", domainEvent.S3Key);
+        Assert.Equal("text/markdown", domainEvent.ContentType);
+    }
+
+    [Fact]
+    public void CreateS3Artefact_WhenIsPublishedFalse_DoesNotRaiseDomainEvent()
+    {
+        var artefact = Artefact.CreateS3Artefact(
+            Guid.NewGuid(), 1, "prototype/fragments/screen-01.html", "s3-key", "text/html", 10, "user-1", _timeProvider, false);
+
+        Assert.Empty(artefact.DomainEvents.OfType<ArtefactPublishedDomainEvent>());
+    }
+
+    [Fact]
+    public void PromoteToPublished_RaisesArtefactPublishedDomainEvent()
+    {
+        var projectId = Guid.NewGuid();
+        var artefact = Artefact.CreateS3Artefact(
+            projectId, 1, "requirements/REQ-002.md", "s3-key-v1", "text/markdown", 10, "user-1", _timeProvider, false);
+
+        artefact.PromoteToPublished();
+
+        var domainEvent = Assert.Single(artefact.DomainEvents.OfType<ArtefactPublishedDomainEvent>());
+        Assert.Equal(projectId, domainEvent.ProjectId);
+        Assert.Equal("requirements/REQ-002.md", domainEvent.FilePath);
+        Assert.Equal("s3-key-v1", domainEvent.S3Key);
+        Assert.Equal("text/markdown", domainEvent.ContentType);
+    }
+
+    [Fact]
+    public void PromoteToPublished_WhenAlreadyPublished_DoesNotRaiseDomainEvent()
+    {
+        var artefact = Artefact.CreateS3Artefact(
+            Guid.NewGuid(), 1, "requirements/REQ-001.md", "s3-key", "text/markdown", 10, "user-1", _timeProvider, true);
+        artefact.ClearDomainEvents();
+
+        artefact.PromoteToPublished();
+
+        Assert.Empty(artefact.DomainEvents.OfType<ArtefactPublishedDomainEvent>());
+    }
 }
