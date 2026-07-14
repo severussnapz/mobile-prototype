@@ -11,7 +11,7 @@ spec:
   sources:
     - repoURL: centraluk.jfrog.io
       chart: genesis-helm-rel-loc/emisx-service
-      targetRevision: 0.3.6       # Pin to a specific chart version — never `latest`
+      targetRevision: 1.1.0       # Pin to a specific chart version — never `latest`
       helm:
         valueFiles:
           - $values/gitops/base/values.yaml           # Shared base values

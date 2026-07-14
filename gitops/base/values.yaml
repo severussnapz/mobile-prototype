@@ -2,39 +2,38 @@
 # Environment overlays (gitops/overlays/<env>/values.yaml) layer image tag,
 # replica count and environment-specific config on top of these.
 #
-# NOTE: validate these keys against the pinned chart version (0.3.6) — the chart
+# NOTE: validate these keys against the pinned chart version (1.1.0) — the chart
 # is the source of truth for supported value structure.
 nameOverride: genesis-ai-requirements-api
 namespaceOverride: genesis-ai-requirements-api-ns
 
-# Standard EMIS-X resource tags (mirrors the genesis-hello-world reference).
-# TODO: confirm the cost-allocation tags (ask_id, project_code, owner, team)
+# Standard EMIS-X cloud governance tags (chart key: emis_tags — mirrors the
+# genesis-hello-world reference).
+# TODO: confirm the cost-allocation tags (aide, project_code, owner, team)
 # with the owning team — these currently inherit the genesis-platform values.
-labels:
-  emis-x.uk/Module: ecs-service
-  emis-x.uk/Repo: genesis-ai-requirements-api
-  emis-x.uk/application: genesis-ai-requirements-api
-  emis-x.uk/ask_id: aide_0091384
-  emis-x.uk/business_unit: primary-care
-  emis-x.uk/cost_centre: emis-x
-  emis-x.uk/env: dev
-  emis-x.uk/environment: non-prod
-  emis-x.uk/hosting_location: aws.442042551704
-  emis-x.uk/lifecycle: production
-  emis-x.uk/owner: group.emisx-platform-engineering
-  emis-x.uk/portfolio: "442042551704"
-  emis-x.uk/product: emis-x
-  emis-x.uk/programme_name: emis-x-gp
-  emis-x.uk/project_code: prj0012275
-  emis-x.uk/project_name: genesis-platform
-  emis-x.uk/service: genesis-ai-requirements-api
-  emis-x.uk/service_location: england
-  emis-x.uk/service_tier: p1
-  emis-x.uk/team: group.emisx-platform-engineering
-  emis-x.uk/value_stream: nhs-integrated-care
+emis_tags:
+  repo: genesis-ai-requirements-api
+  application: genesis-ai-requirements-api
+  aide: aide_0091384
+  business_unit: primary-care
+  cost_centre: emis-x
+  environment: non-prod
+  hosting_location: aws.442042551704
+  lifecycle: production
+  owner: group.emisx-platform-engineering
+  portfolio: "442042551704"
+  product: emis-x
+  programme_name: emis-x-gp
+  project_code: prj0012275
+  project_name: genesis-platform
+  service: genesis-ai-requirements-api
+  service_location: england
+  service_tier: p1
+  team: group.emisx-platform-engineering
+  value_stream: nhs-integrated-care
 
 serviceAccount:
-  create: true
+  create: "true"
 
 # Container listens on 8080 (ASPNETCORE default in the container image).
 service:

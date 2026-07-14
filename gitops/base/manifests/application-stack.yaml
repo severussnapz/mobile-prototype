@@ -52,7 +52,7 @@ spec:
     # the RGD — they are not fields on the rds spec block.
     databaseSubnetGroupName: genesis-net-vpc
     ingressSecurityGroupIds: []
-    engineVersion: "16.9"
+    engineVersion: "17.7"
     instanceType: "db.serverless"
     deletionProtection: true
     backupRetentionPeriod: 7

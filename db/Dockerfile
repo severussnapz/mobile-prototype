@@ -15,7 +15,7 @@
 #
 # 11.20.2-alpine is multi-arch (arm64 + amd64); we build arm64 to match the
 # Graviton EKS node pool.
-FROM flyway/flyway:11.20.2-alpine
+FROM centraluk.jfrog.io/glb-docker-vir/flyway/flyway:12.11.0-alpine
 
 # Copy SQL migration scripts (build context is ./db, so this is db/migrations).
 COPY migrations/ /flyway/sql/
