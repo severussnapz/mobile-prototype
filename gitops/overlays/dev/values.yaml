@@ -137,3 +137,10 @@ secretProviderClass:
           key: username
         - objectName: rds-password
           key: password
+
+SecurityGroupPolicy:
+  enabled: true
+  matchLabels:
+    app.kubernetes.io/name: genesis-ai-requirements-api
+  groupIds:
+    - sg-073355f91f514751a
