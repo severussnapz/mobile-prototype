@@ -37,7 +37,7 @@ public class KnowledgeDocumentEntityTypeConfiguration : IEntityTypeConfiguration
             .HasColumnType("jsonb")
             .HasConversion(
                 metadata => JsonSerializer.Serialize(metadata, (JsonSerializerOptions?)null),
-                metadataJson => JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson, (JsonSerializerOptions?)null) ?? new())
+                serializedMetadata => JsonSerializer.Deserialize<Dictionary<string, string>>(serializedMetadata, (JsonSerializerOptions?)null) ?? new())
             .IsRequired();
         builder.Property(knowledgeDocument => knowledgeDocument.CreatedAt)
             .HasColumnName("created_at")

@@ -4,7 +4,7 @@ using Pgvector;
 
 namespace Genesis.AI.Domain.AggregatesModel.KnowledgeAggregate;
 
-public class KnowledgeDocument : Entity, IAggregateRoot
+public class KnowledgeDocument : Entity
 {
     public KnowledgeNamespace Namespace { get; private set; }
     public Guid? ProjectId { get; private set; }

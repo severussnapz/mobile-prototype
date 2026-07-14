@@ -443,11 +443,7 @@ public class ConversationStreamController : ControllerBase
                 var needsNewlineSeparator = fullResponse.Length > 0 && fullResponse[^1] != '\n';
 
                 await foreach (var streamEvent in _aiService.StreamWithToolsAsync(
-                    aiSystemPrompt,
-                    aiMessages,
-                    PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType),
-                    cancellationToken,
-                    maxTokens: maxTokens))
+                    aiSystemPrompt, aiMessages, PipelineToolDefinitions.GetTools(_tokenOptimisationOptions, stageType), cancellationToken))
                 {
                     switch (streamEvent)
                     {

@@ -9,14 +9,16 @@ namespace Genesis.AI.Infrastructure.EventHandlers;
 
 /// <summary>
 /// Indexes published artefact content into the project knowledge namespace (pgvector)
-/// when an <see cref="ArtefactPublishedDomainEvent"/> is dispatched.
+/// and pushes the artefact to GitHub when an <see cref="ArtefactPublishedDomainEvent"/>
+/// is dispatched.
 ///
 /// Domain events fire from <c>DatabaseContext.SaveChangesAsync</c> BEFORE
 /// <c>base.SaveChangesAsync</c>. The artefact content is written to object storage before
 /// that save is called, so <see cref="IArtefactStorageService.GetContentAsync"/> is safe here.
 ///
-/// Indexing is best-effort: any failure is logged and swallowed so it can never fail the
-/// artefact save that triggered it.
+/// Both side effects are best-effort: any failure is logged and swallowed so it can never
+/// fail the artefact save that triggered it. Indexing and push are independent — a failure
+/// in one must not prevent the other.
 /// </summary>
 [SuppressMessage(
     "Naming",
@@ -42,17 +44,6 @@ public sealed class ArtefactPublishedDomainEventHandler
     public ArtefactPublishedDomainEventHandler(
         IArtefactStorageService storageService,
         IKnowledgeService knowledgeService,
-        ILogger<ArtefactPublishedDomainEventHandler> logger)
-    {
-        _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
-        _knowledgeService = knowledgeService ?? throw new ArgumentNullException(nameof(knowledgeService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _pushService = null!; // ctor overload below
-    }
-
-    public ArtefactPublishedDomainEventHandler(
-        IArtefactStorageService storageService,
-        IKnowledgeService knowledgeService,
         IGitHubArtefactPushService pushService,
         ILogger<ArtefactPublishedDomainEventHandler> logger)
     {
@@ -66,7 +57,7 @@ public sealed class ArtefactPublishedDomainEventHandler
         ArtefactPublishedDomainEvent notification,
         CancellationToken cancellationToken)
     {
-        // Try to index if content is indexable
+        // Indexing — only for text-bearing content types.
         if (IndexableContentTypes.Contains(notification.ContentType))
         {
             try
@@ -111,29 +102,26 @@ public sealed class ArtefactPublishedDomainEventHandler
             }
         }
 
-        // Independent push attempt — regardless of content type or indexing result
-        if (_pushService is not null)
+        // Push — independent of content type and indexing result.
+        try
         {
-            try
-            {
-                await _pushService.PushAsync(
-                    notification.ProjectId,
-                    notification.ArtefactId,
-                    notification.FilePath,
-                    notification.Version,
-                    notification.ContentType,
-                    notification.S3Key,
-                    notification.TriggeredBy,
-                    cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                // Best-effort — push failures must never fail the artefact save that raised this event.
-                _logger.LogError(
-                    exception,
-                    "ArtefactPublishedDomainEventHandler: failed to push {FilePath} to GitHub",
-                    notification.FilePath);
-            }
+            await _pushService.PushAsync(
+                notification.ProjectId,
+                notification.ArtefactId,
+                notification.FilePath,
+                notification.Version,
+                notification.ContentType,
+                notification.S3Key,
+                notification.TriggeredBy,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            // Best-effort — push failures must never fail the artefact save that raised this event.
+            _logger.LogError(
+                exception,
+                "ArtefactPublishedDomainEventHandler: failed to push {FilePath} to GitHub",
+                notification.FilePath);
         }
     }
 }

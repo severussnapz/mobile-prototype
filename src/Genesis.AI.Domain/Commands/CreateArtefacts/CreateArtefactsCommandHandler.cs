@@ -29,9 +29,12 @@ public class CreateArtefactsCommandHandler : IRequestHandler<CreateArtefactsComm
             if (string.IsNullOrWhiteSpace(item.FilePath) || string.IsNullOrWhiteSpace(item.Content))
                 continue;
 
-            var nextVersion = await _artefactRepository.GetNextVersionAsync(request.ProjectId, cancellationToken);
-            var contentType = item.ContentType ?? "text/markdown";
             var filePath = item.FilePath.Trim();
+            var nextVersion = await _artefactRepository.GetNextVersionForFileAsync(
+                request.ProjectId,
+                filePath,
+                cancellationToken);
+            var contentType = item.ContentType ?? "text/markdown";
 
             var storageKey = await _artefactStorageService.SaveContentAsync(
                 request.ProjectId,
