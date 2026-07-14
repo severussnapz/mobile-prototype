@@ -22,7 +22,7 @@ public class HealthCheckTests : IDisposable
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync("/healthz");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -32,7 +32,7 @@ public class HealthCheckTests : IDisposable
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/health/ready");
+        var response = await client.GetAsync("/healthz/ready");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -42,7 +42,7 @@ public class HealthCheckTests : IDisposable
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync("/healthz");
 
         Assert.False(response.Headers.Contains("Server"));
     }

@@ -2,15 +2,6 @@
   "version": 2,
   "dependencies": {
     "net10.0": {
-      "AspNetCore.HealthChecks.NpgSql": {
-        "type": "Direct",
-        "requested": "[9.0.0, )",
-        "resolved": "9.0.0",
-        "contentHash": "npc58/AD5zuVxERdhCl2Kb7WnL37mwX42SJcXIwvmEig0/dugOLg3SIwtfvvh3TnvTwR/sk5LYNkkPaBdks61A==",
-        "dependencies": {
-          "Npgsql": "8.0.3"
-        }
-      },
       "AutoMapper": {
         "type": "Direct",
         "requested": "[13.0.1, )",
@@ -64,8 +55,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "3.7.402.82",
-        "contentHash": "TyFbwJMYCk44hNynALtAsnvATs1JIZUncks6u7tEhyknJW2grGyvWcJXnReaJ35TzkVaw902JhE9PWfsoGLnfQ=="
+        "resolved": "3.7.402.91",
+        "contentHash": "B0oP+hfVhLacXwqVOcCAcFj44wEYdfzX3fF0CSEDw8hoiLAyyDyjHtbTrqqtyiwW3fyTOrvrKfgPHOejGBu7gw=="
       },
       "ClosedXML.Parser": {
         "type": "Transitive",
@@ -372,6 +363,7 @@
         "dependencies": {
           "AWSSDK.BedrockRuntime": "[3.7.422, )",
           "AWSSDK.Extensions.NETCore.Setup": "[3.7.301, )",
+          "AWSSDK.RDS": "[3.7.415.15, )",
           "AWSSDK.S3": "[3.7.416.7, )",
           "AngleSharp": "[1.3.0, )",
           "ClosedXML": "[0.104.2, )",
@@ -408,6 +400,15 @@
         "contentHash": "hXejqa+G72kVCSmpKlNVWDEqa8KVWOFL/asgoE2mairQOnmTCv6vMxaXjJ0nQaad5/21zTdKDIfDiki5YTne1Q==",
         "dependencies": {
           "AWSSDK.Core": "3.7.300"
+        }
+      },
+      "AWSSDK.RDS": {
+        "type": "CentralTransitive",
+        "requested": "[3.7.415.15, )",
+        "resolved": "3.7.415.15",
+        "contentHash": "R4EQDFLHlpLUtD2FHqtWyqb0JPQtfyumPiqmuo+LMDzoQoT9xDc1op7zh8iVZiHN0rdOls8GoIA0uxZ+rCtQkg==",
+        "dependencies": {
+          "AWSSDK.Core": "[3.7.402.91, 4.0.0)"
         }
       },
       "AWSSDK.S3": {

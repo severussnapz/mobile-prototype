@@ -1,0 +1,55 @@
+# Manual GitOps escape hatch: reconcile manifests, check for drift, or force a
+# rollout restart against a chosen environment. Delegates to the shared EMIS-X
+# gitops template. Mirrors the genesis-hello-world reference.
+name: gitops
+# checkov:skip=CKV_GHA_7 reason="Inputs provide a debugging escape hatch"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment for GitOps deployment"
+        required: true
+        default: "dev"
+      gitops_project_name:
+        description: "The name of the GitOps ArgoCD project"
+        required: true
+        type: string
+        default: "genesis-ai-requirements-api"
+      gitops_manifest_reconcile:
+        description: "Enables you to reconcile the manifests in the GitOps repository with ArgoCD applications"
+        type: boolean
+        default: true
+      gitops_drift_check:
+        description: "Enables you to check for drift and sync applications if drift is detected"
+        type: boolean
+        default: false
+      gitops_restart:
+        description: "Enables you to force restart the deployment"
+        required: false
+        type: boolean
+        default: false
+      gitops_deployment_names:
+        description: "Comma-separated list of deployment names to restart"
+        required: true
+        type: string
+        default: "genesis-ai-requirements-api"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  gitops:
+    name: GitOps Deploy
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/gitops-template.yaml@bb01c9db204291901add2e3417bb029658a77e37 # shared-gha-workflow-templates v7.9.0
+    with:
+      environment: ${{ github.event.inputs.environment }}
+      gitops_project_name: ${{ github.event.inputs.gitops_project_name }}
+      gitops_manifest_reconcile: ${{ fromJSON(github.event.inputs.gitops_manifest_reconcile) }}
+      gitops_drift_check: ${{ fromJSON(github.event.inputs.gitops_drift_check) }}
+      gitops_restart: ${{ fromJSON(github.event.inputs.gitops_restart) }}
+      gitops_deployment_names: ${{ github.event.inputs.gitops_deployment_names }}
+    secrets:
+      GITOPS_URL: ${{ secrets.GITOPS_URL }}
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}

@@ -19,10 +19,12 @@ public class ArtefactPublishedDomainEventHandlerTests
 {
     private readonly Mock<IArtefactStorageService> _storageService = new();
     private readonly Mock<IKnowledgeService> _knowledgeService = new();
+    private readonly Mock<IGitHubArtefactPushService> _pushService = new();
 
     private ArtefactPublishedDomainEventHandler CreateHandler() => new(
         _storageService.Object,
         _knowledgeService.Object,
+        _pushService.Object,
         NullLogger<ArtefactPublishedDomainEventHandler>.Instance);
 
     [Fact]

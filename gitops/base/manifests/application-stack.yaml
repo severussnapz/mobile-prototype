@@ -1,0 +1,74 @@
+# KRO ApplicationStack — provisions this service's AWS resources via ACK controllers.
+#
+# Resources requested:
+#   - ECR repositories     (app image + dedicated `-flyway` migration image repo)
+#   - S3 bucket            (artefact storage; replaces LocalStack used locally)
+#   - Aurora PostgreSQL    (Serverless v2; replaces the local postgres container)
+#   - Bedrock invoke IAM   (scoped to a single foundation model in eu-west-2)
+#   - Pod Identity IAM role (workload AWS access; RDS + secret access auto-attached
+#     by CompositeFoundation via attachRDSAccessPolicy when rds.enabled=true)
+#
+# Served under `kro.run/v1alpha1`. Each resource is a nested `spec` block gated
+# by its own `enabled` flag (e.g. rds.enabled, s3.enabled) — there is no separate
+# apiVersion per resource and no flat top-level enableX booleans.
+apiVersion: kro.run/v1alpha1
+kind: ApplicationStack
+metadata:
+  name: genesis-ai-requirements-api
+  namespace: genesis-ai-requirements-api-ns
+  labels:
+    app.kubernetes.io/part-of: genesis
+    app.kubernetes.io/component: application-stack
+spec:
+  instance: genesis-ai-requirements-api
+  repositoryName: genesis-ai-requirements-api
+  description: "Genesis AI Requirements API"
+  # OIDC subject pattern for the CI role trust policy (schema field: githubOIDC).
+  githubOIDC: "repo:emisgroup/genesis-ai-requirements-api:*"
+
+  # --- ECR: container image repositories ------------------------------------
+  # ecr.enabled       → main repo `genesis-ai-requirements-api` (app image).
+  # enableFlywayECRRepo → dedicated repo `genesis-ai-requirements-api-flyway`
+  # for the migration image (platform convention). Both are pushed by CI
+  # (build.yml / build-flyway.yml) via the OIDC role
+  # service-level-genesis-ai-requirements-api-stor-ecr-access and pulled by the
+  # workload Deployment / flyway PreSync job respectively.
+  ecr:
+    enabled: true
+    enableFlywayECRRepo: true
+
+  # --- S3: artefact storage -------------------------------------------------
+  s3:
+    enabled: true
+    instance: ""            # defaults to .spec.instance
+    enableVersioning: true
+
+  # --- RDS: Aurora PostgreSQL Serverless v2 ---------------------------------
+  rds:
+    enabled: true
+    databaseName: genesis_ai_requirements
+    username: genesis_ai_app
+    # vpcId / vpcCidr are sourced from the genesis-cluster-config ConfigMap by
+    # the RGD — they are not fields on the rds spec block.
+    databaseSubnetGroupName: genesis-net-vpc
+    ingressSecurityGroupIds: []
+    engineVersion: "17.7"
+    instanceType: "db.serverless"
+    deletionProtection: true
+    backupRetentionPeriod: 7
+    enableReader: false
+    enableProxy: false
+    proxyIamAuth: "REQUIRED"
+
+  # --- Bedrock: scoped model invoke -----------------------------------------
+  bedrock:
+    enabled: true
+    # Claude Sonnet 4.6 — the model BedrockAiService targets. Confirm the exact
+    # eu-west-2 foundation-model / inference-profile id available in the account.
+    modelId: anthropic.claude-sonnet-4-6
+
+  # --- Required tags --------------------------------------------------------
+  tags:
+    application: emisx-genesis-ai-requirements-api
+    service: genesis-ai-requirements-api
+    repo: "emisgroup/genesis-ai-requirements-api"

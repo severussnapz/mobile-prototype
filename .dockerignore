@@ -1,0 +1,29 @@
+# Build artefacts — must not leak the host's MSBuild assets cache into the image
+# (causes ResolvePackageAssets MSB4018 failures during the container build).
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# Local tooling and IDE
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+
+# Source control and CI
+.git/
+.gitignore
+.github/
+
+# Local environment and secrets
+.env
+**/*.env
+.env.*
+
+# Test output
+**/TestResults/
+**/coverage/
+
+# Node (frontend tooling, if any)
+**/node_modules/

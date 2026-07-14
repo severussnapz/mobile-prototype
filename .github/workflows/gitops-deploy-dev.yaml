@@ -1,0 +1,33 @@
+# Reconciles the dev Argo CD Application(s) whenever the gitops manifests change
+# on main. Delegates to the shared EMIS-X gitops-application template.
+#
+# `gitops_project_name` MUST match the Argo CD AppProject name created in the
+# genesis repo (platform/base/service-team-projects/).
+name: GitOps Deploy DEV
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gitops/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: gitops-dev
+  cancel-in-progress: false
+
+jobs:
+  applications:
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/gitops-application-template.yaml@bb01c9db204291901add2e3417bb029658a77e37 # shared-gha-workflow-templates v7.9.0
+    with:
+      environment: dev
+      gitops_project_name: genesis-ai-requirements-api
+      gitops_overlays_path: gitops/overlays
+      gitops_application_file_prefix: application
+    secrets:
+      GITOPS_URL: ${{ secrets.GITOPS_URL }}
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}

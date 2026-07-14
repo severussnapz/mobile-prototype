@@ -1,0 +1,43 @@
+# Builds the Flyway migration image (db/migrations baked in) and pushes it to
+# ECR for dev as `genesis-ai-requirements-api-flyway:latest`.
+#
+# This image is run by the EKS golden-path migration runner: the emisx-service
+# chart's `flyway-migration` Job, which Argo CD executes as a PreSync hook
+# before each deployment (see gitops/overlays/dev/values.yaml `job` block).
+#
+# Build this BEFORE the first dev Argo sync, otherwise the PreSync hook will
+# fail to pull the image. Delegates to the shared EMIS-X build-and-push template
+# (OIDC -> ECR, arm64), mirroring .github/workflows/build.yml.
+name: Build Flyway Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "db/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-push:
+    name: "Build & Push Flyway"
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/docker-build-push-template.yaml@bb01c9db204291901add2e3417bb029658a77e37 # shared-gha-workflow-templates v7.9.0
+    with:
+      # Dedicated migration image repo provisioned by the ApplicationStack
+      # (ecr.enableFlywayECRRepo=true) — separate from the app image repo.
+      image-name: genesis-ai-requirements-api-flyway
+      context: ./db
+      dockerfile: ./db/Dockerfile
+      environments: "['dev']"
+      tag: latest
+      project_key: emis
+      platforms: "['linux/arm64']"
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_ROLE_ARN: ${{ secrets.ECR_ROLE_ARN }}
+      GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+      ZSCALER_BASE64_ROOT_CA: ${{ secrets.ZSCALER_BASE64_ROOT_CA }}
