@@ -54,10 +54,27 @@ spec:
     ingressSecurityGroupIds: []
     engineVersion: "17.7"
     instanceType: "db.serverless"
+    serverlessV2ScalingConfiguration:
+      minCapacity: "0.5"
+      maxCapacity: "8"
     deletionProtection: true
     backupRetentionPeriod: 7
+    enableDataApi: false
+    # Performance Insights
+    insightsEnabled: false
+    insightsRetentionPeriod: 7
+    # Enhanced Monitoring
+    monitoringInterval: 0
+    monitoringRoleArn: ""
+    # Reader replica
     enableReader: false
+    # Proxy
     enableProxy: false
+    proxyIngressSecurityGroupIds: []
+    proxySubnetIds: []
+    proxyDebugLogging: false
+    proxyIdleClientTimeout: 300
+    proxyRequireTls: true
     proxyIamAuth: "REQUIRED"
 
   # --- Bedrock: scoped model invoke -----------------------------------------
