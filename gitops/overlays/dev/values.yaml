@@ -1,0 +1,139 @@
+# Dev environment overrides for the emisx-service chart.
+replicaCount: 1
+
+image:
+  repository: 442042551704.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api
+  pullPolicy: Always
+  # dev images are pushed as `:latest` by .github/workflows/build.yml. Pinned
+  # release tags are used for int/stg/prd once those environments onboard.
+  tag: latest
+
+# Full application environment for dev.
+#
+# Declared in one place because Argo/Helm REPLACE list values across valueFiles
+# (no array merge). The API reaches RDS, S3 and Bedrock through the Pod Identity
+# role from the ApplicationStack — no DB password / ExternalSecret is involved.
+#
+# RDS uses IAM database authentication: when RDS_HOST is set the API builds a
+# passwordless connection string and signs short-lived IAM tokens
+# (DependencyInjection.AddPersistence). The pod-identity role needs the
+# `rds-db:connect` action for db user `genesis_ai_app` (provisioned by the KRO
+# RDS composite on branch feat/kro-rds-definition).
+env:
+  - name: ASPNETCORE_ENVIRONMENT
+    value: Production
+  - name: HOSTING_ENVIRONMENT
+    value: AWS
+  - name: AWS_REGION
+    value: eu-west-2
+  # S3 artefact storage — bucket provisioned by the ApplicationStack.
+  # TODO: confirm the exact bucket name the composite derives from `instance`.
+  - name: S3__ArtefactBucketName
+    value: genesis-ai-requirements-api
+  # Bedrock — region + model the BedrockAiService targets.
+  - name: Bedrock__Region
+    value: eu-west-2
+  - name: Bedrock__ModelId
+    value: anthropic.claude-sonnet-4-6
+  # RDS (IAM auth). RDS_USER / RDS_DB_NAME mirror the ApplicationStack rds block.
+  # RDS_HOST is the Aurora cluster writer endpoint (rdsClusterEndpoint status
+  # output) — TODO: set once feat/kro-rds-definition is merged and the stack runs.
+  - name: RDS_HOST
+    value: "REPLACE_WITH_RDS_CLUSTER_ENDPOINT"
+  - name: RDS_PORT
+    value: "5432"
+  - name: RDS_DB_NAME
+    value: genesis_ai_requirements
+  - name: RDS_USER
+    value: genesis_ai_app
+  # Dev OIDC settings for JWT bearer auth.
+  # TODO: confirm the dev identity Authority + Audience values.
+  - name: Authentication__Authority
+    value: "REPLACE_WITH_DEV_IDENTITY_AUTHORITY"
+  - name: Authentication__Audience
+    value: "REPLACE_WITH_DEV_AUDIENCE"
+
+# --- Database migrations (EKS golden path) ----------------------------------
+# Flyway runs as an initContainer (chart `flyway:` block) in the API pod, before
+# the app container starts, applying db/migrations against the Aurora cluster.
+# This is the EKS replacement for the legacy ECS migration task — no ECS task
+# definition, no db-migrations-* security group, no genesis run-flyway workflow.
+#
+# The migration image is built/pushed by .github/workflows/build-flyway.yml to
+# the dedicated `genesis-ai-requirements-api-flyway` repo as `:latest`
+# (db/migrations baked in).
+#
+# Credentials: the initial schema — including V13, which grants `rds_iam` to
+# genesis_ai_app — must run as the Aurora MASTER user, because IAM database auth
+# is not usable until V13 has been applied. genesis_ai_app is the cluster master
+# username with an RDS-managed password in Secrets Manager. The top-level
+# `secretProviderClass` below syncs that secret into a `rds-credentials` K8s
+# Secret (the CSI volume mount on the pod drives the sync before the initContainer
+# runs); the flyway initContainer reads username/password from it via secretKeyRef.
+# The running API itself uses RDS IAM auth (RDS_HOST above) and never reads this
+# secret.
+flyway:
+  enabled: true
+  image:
+    repository: 442042551704.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
+    tag: latest
+    pullPolicy: Always
+  args: ["migrate"]
+  env:
+    # Aurora writer endpoint (ApplicationStack status `rdsClusterEndpoint`).
+    # TODO: set once the stack provisions.
+    - name: FLYWAY_URL
+      value: "jdbc:postgresql://REPLACE_WITH_RDS_CLUSTER_ENDPOINT:5432/genesis_ai_requirements"
+    - name: FLYWAY_USER
+      valueFrom:
+        secretKeyRef:
+          name: rds-credentials
+          key: username
+    - name: FLYWAY_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: rds-credentials
+          key: password
+    # Aurora can briefly refuse connections immediately after provisioning/sync.
+    - name: FLYWAY_CONNECT_RETRIES
+      value: "60"
+
+# CSI mount that drives the Secrets Store driver to sync the RDS master secret
+# into the `rds-credentials` K8s Secret (see secretProviderClass below). The
+# mount on the pod is what triggers the sync before the flyway initContainer runs.
+volumeMounts:
+  - name: db-master-secret
+    mountPath: /mnt/secrets-store
+    readOnly: true
+volumes:
+  - name: db-master-secret
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: genesis-ai-requirements-api-db-master-spc
+
+# Syncs the RDS-managed master secret into a `rds-credentials` K8s Secret that
+# the flyway initContainer reads via secretKeyRef.
+secretProviderClass:
+  enabled: true
+  region: eu-west-2
+  name: genesis-ai-requirements-api-db-master-spc
+  objects:
+    # ARN of the RDS-managed master secret (ApplicationStack status
+    # `masterUserSecret`). TODO: set once the stack provisions.
+    - objectName: "REPLACE_WITH_RDS_MASTER_USER_SECRET_ARN"
+      objectType: secretsmanager
+      jmesPath:
+        - path: username
+          objectAlias: rds-username
+        - path: password
+          objectAlias: rds-password
+  secretObjects:
+    - secretName: rds-credentials
+      type: Opaque
+      data:
+        - objectName: rds-username
+          key: username
+        - objectName: rds-password
+          key: password
