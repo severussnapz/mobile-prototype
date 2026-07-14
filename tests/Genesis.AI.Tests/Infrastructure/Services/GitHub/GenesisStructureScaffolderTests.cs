@@ -13,10 +13,12 @@ public sealed class GenesisStructureScaffolderTests
     private readonly Mock<IProjectRepository> _projectRepository;
     private readonly Mock<IGitHubTokenService> _tokenService;
     private readonly Mock<IGitHubContentsService> _contentsService;
+    private readonly Mock<IPushFailureLogRepository> _pushFailureLogRepository;
     private readonly Mock<ICodeownersGenerator> _codeownersGenerator;
     private readonly Mock<IProjectMarkdownGenerator> _markdownGenerator;
     private readonly Mock<IAssemblyVersionProvider> _versionProvider;
     private readonly Mock<ILogger<GenesisStructureScaffolder>> _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly GenesisStructureScaffolder _scaffolder;
 
     public GenesisStructureScaffolderTests()
@@ -24,10 +26,12 @@ public sealed class GenesisStructureScaffolderTests
         _projectRepository = new Mock<IProjectRepository>();
         _tokenService = new Mock<IGitHubTokenService>();
         _contentsService = new Mock<IGitHubContentsService>();
+        _pushFailureLogRepository = new Mock<IPushFailureLogRepository>();
         _codeownersGenerator = new Mock<ICodeownersGenerator>();
         _markdownGenerator = new Mock<IProjectMarkdownGenerator>();
         _versionProvider = new Mock<IAssemblyVersionProvider>();
         _logger = new Mock<ILogger<GenesisStructureScaffolder>>();
+        _timeProvider = TimeProvider.System;
 
         _tokenService
             .Setup(service => service.GetInstallationTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -51,14 +55,16 @@ public sealed class GenesisStructureScaffolderTests
             _projectRepository.Object,
             _tokenService.Object,
             _contentsService.Object,
+            _pushFailureLogRepository.Object,
             _codeownersGenerator.Object,
             _markdownGenerator.Object,
             _versionProvider.Object,
+            _timeProvider,
             _logger.Object);
     }
 
     [Fact]
-    public async Task ScaffoldAsync_NoGitHubConfig_ReturnsWithoutPushing()
+    public async Task ScaffoldAsync_NoGitHubConfig_ReturnsFailureWithoutPushing()
     {
         var project = new Project(
             "TST", "Test Project", "desc", "PORTASK0001045",
@@ -68,7 +74,9 @@ public sealed class GenesisStructureScaffolderTests
             .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(project);
 
-        await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+        var result = await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
 
         _contentsService.Verify(service => service.PushFileAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -90,7 +98,9 @@ public sealed class GenesisStructureScaffolderTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+        var result = await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
 
         _contentsService.Verify(service => service.PushFileAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -106,7 +116,9 @@ public sealed class GenesisStructureScaffolderTests
             .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(project);
 
-        await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+        var result = await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
 
         var pushedPaths = _contentsService
             .Invocations
@@ -136,7 +148,9 @@ public sealed class GenesisStructureScaffolderTests
             .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(project);
 
-        await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+        var result = await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
 
         var pushedPaths = _contentsService
             .Invocations
@@ -155,7 +169,9 @@ public sealed class GenesisStructureScaffolderTests
             .Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(project);
 
-        await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+        var result = await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
 
         var commitMessage = _contentsService
             .Invocations
@@ -170,7 +186,7 @@ public sealed class GenesisStructureScaffolderTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_PushFailure_DoesNotThrow()
+    public async Task ScaffoldAsync_PushFailure_ReturnsFailureAndLogsPushFailure()
     {
         var project = CreateProject();
         _projectRepository
@@ -188,29 +204,36 @@ public sealed class GenesisStructureScaffolderTests
                 callCount++;
                 if (callCount == 2)
                 {
-                    throw new Exception("GitHub push failed");
+                    throw new InvalidOperationException("GitHub push failed");
                 }
                 return new GitHubPushResult("sha123", "https://github.com/...");
             });
 
-        var exception = await Record.ExceptionAsync(() =>
-            _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None));
+        var result = await _scaffolder.ScaffoldAsync(project.Id, "test-user@emisgroup.com", CancellationToken.None);
 
-        Assert.Null(exception);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("GitHub push failed", result.FailureReason);
+        _pushFailureLogRepository.Verify(
+            repository => repository.AddAsync(
+                It.Is<Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate.PushFailureLog>(
+                    log => log.ProjectId == project.Id
+                        && log.FilePath == ".genesis/scaffold"
+                        && log.ErrorMessage == "GitHub push failed"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
-    public async Task ScaffoldAsync_ProjectNotFound_DoesNotThrow()
+    public async Task ScaffoldAsync_ProjectNotFound_ReturnsFailure()
     {
         var projectId = Guid.NewGuid();
         _projectRepository
             .Setup(repository => repository.GetByIdAsync(projectId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Project?)null);
 
-        var exception = await Record.ExceptionAsync(() =>
-            _scaffolder.ScaffoldAsync(projectId, "test-user@emisgroup.com", CancellationToken.None));
+        var result = await _scaffolder.ScaffoldAsync(projectId, "test-user@emisgroup.com", CancellationToken.None);
 
-        Assert.Null(exception);
+        Assert.False(result.IsSuccess);
     }
 
     private static Project CreateProject()

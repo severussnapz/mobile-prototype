@@ -118,7 +118,14 @@ public sealed class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectC
     {
         try
         {
-            await _genesisStructureScaffolder.ScaffoldAsync(projectId, triggeredBy, ct);
+            var scaffoldResult = await _genesisStructureScaffolder.ScaffoldAsync(projectId, triggeredBy, ct);
+            if (!scaffoldResult.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Genesis structure scaffolding failed for project {ProjectId}: {FailureReason}",
+                    projectId,
+                    scaffoldResult.FailureReason);
+            }
         }
         catch (Exception exception)
         {

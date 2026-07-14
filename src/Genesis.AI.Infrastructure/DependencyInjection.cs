@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IMessageFeedbackRepository, MessageFeedbackRepository>();
         services.AddScoped<IArtefactRepository, ArtefactRepository>();
+        services.AddScoped<IContractManifestRepository, ContractManifestRepository>();
         services.AddScoped<IProjectNoteRepository, ProjectNoteRepository>();
         services.AddScoped<IProjectDecisionRepository, ProjectDecisionRepository>();
         services.AddScoped<IUiDeltaRepository, UiDeltaRepository>();
@@ -141,6 +142,7 @@ public static class DependencyInjection
         services.AddScoped<INormalisationGateService, NormalisationGateService>();
         services.AddScoped<IPlanningGateService, PlanningGateService>();
         services.AddScoped<IFoundationService, FoundationService>();
+        services.AddScoped<ISessionCloseContextBuilder, SessionCloseContextBuilder>();
         services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
         services.AddScoped<IPrototypeDomSearchService, PrototypeDomSearchService>();
         services.AddScoped<IPrototypeDemoEditService, BedrockPrototypeDemoEditService>();

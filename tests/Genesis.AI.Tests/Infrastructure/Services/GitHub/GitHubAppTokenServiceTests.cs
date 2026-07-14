@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -69,8 +70,8 @@ public sealed class GitHubAppTokenServiceTests : IDisposable
         var token = new JwtSecurityTokenHandler().ReadJwtToken(jwt!);
         Assert.Equal(AppId, token.Claims.Single(claim => claim.Type == JwtRegisteredClaimNames.Iss).Value);
 
-        var iat = long.Parse(token.Claims.Single(claim => claim.Type == JwtRegisteredClaimNames.Iat).Value);
-        var exp = long.Parse(token.Claims.Single(claim => claim.Type == JwtRegisteredClaimNames.Exp).Value);
+        var iat = long.Parse(token.Claims.Single(claim => claim.Type == JwtRegisteredClaimNames.Iat).Value, CultureInfo.InvariantCulture);
+        var exp = long.Parse(token.Claims.Single(claim => claim.Type == JwtRegisteredClaimNames.Exp).Value, CultureInfo.InvariantCulture);
 
         Assert.Equal(660, exp - iat);
         Assert.True(iat <= DateTimeOffset.UtcNow.ToUnixTimeSeconds());

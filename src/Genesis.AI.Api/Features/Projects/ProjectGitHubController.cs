@@ -1,5 +1,6 @@
 using Genesis.AI.Api.Authentication;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
+using Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate;
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.Queries.GetArtefactById;
@@ -8,6 +9,7 @@ using Genesis.AI.Domain.Queries.GetProjectById;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Genesis.AI.Api.Features.Projects;
 
@@ -20,17 +22,20 @@ public sealed class ProjectGitHubController : ControllerBase
     private readonly ILogger<ProjectGitHubController> _logger;
     private readonly IGitHubArtefactPushService _githubPushService;
     private readonly IGenesisStructureScaffolder? _scaffolder;
+    private readonly IServiceScopeFactory? _serviceScopeFactory;
 
     public ProjectGitHubController(
         IMediator mediator,
         ILogger<ProjectGitHubController> logger,
         IGitHubArtefactPushService githubPushService,
-        IGenesisStructureScaffolder? scaffolder = null)
+        IGenesisStructureScaffolder? scaffolder = null,
+        IServiceScopeFactory? serviceScopeFactory = null)
     {
         _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _githubPushService = githubPushService ?? throw new ArgumentNullException(nameof(githubPushService));
         _scaffolder = scaffolder;
+        _serviceScopeFactory = serviceScopeFactory;
     }
 
     [HttpPost("{id:guid}/push-all")]
@@ -39,7 +44,10 @@ public sealed class ProjectGitHubController : ControllerBase
     public async Task<IActionResult> PushAll(Guid id, CancellationToken ct)
     {
         var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
-        _ = PushAllBestEffortAsync(id, triggeredBy, ct);
+        if (_serviceScopeFactory is not null)
+        {
+            _ = PushAllBestEffortAsync(id, triggeredBy, _serviceScopeFactory);
+        }
 
         return await Task.FromResult<IActionResult>(
             Accepted(new PushActionResponse("GitHub sync started. Check push status for results.")));
@@ -73,12 +81,13 @@ public sealed class ProjectGitHubController : ControllerBase
             {
                 try
                 {
-                    await _scaffolder.ScaffoldAsync(id, triggeredBy, ct);
+                    var scaffoldResult = await _scaffolder.ScaffoldAsync(id, triggeredBy, ct);
+                    if (!scaffoldResult.IsSuccess)
+                    {
+                        _logger.LogWarning("Scaffold reported failure for project {ProjectId}: {FailureReason}", id, scaffoldResult.FailureReason);
+                    }
                 }
-                catch (Exception exception)
-                {
-                    _logger.LogWarning(exception, "Scaffold failed {ProjectId}", id);
-                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Scaffold failed {ProjectId}", id); }
             }
 
             await _githubPushService.PushAsync(
@@ -116,46 +125,79 @@ public sealed class ProjectGitHubController : ControllerBase
         }
     }
 
-    private async Task PushAllBestEffortAsync(Guid projectId, string triggeredBy, CancellationToken ct)
+    private async Task PushAllBestEffortAsync(Guid projectId, string triggeredBy, IServiceScopeFactory scopeFactory)
     {
         try
         {
-            if (_scaffolder is not null)
-            {
-                try
-                {
-                    await _scaffolder.ScaffoldAsync(projectId, triggeredBy, ct);
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogWarning(exception, "Scaffold failed {ProjectId}", projectId);
-                }
-            }
+            using var scope = scopeFactory.CreateScope();
+            var provider = scope.ServiceProvider;
+            var pushService = provider.GetRequiredService<IGitHubArtefactPushService>();
+            var mediator = provider.GetRequiredService<IMediator>();
+            var logger = provider.GetRequiredService<ILogger<ProjectGitHubController>>();
 
-            var artefacts = await _mediator.Send(new GetArtefactsByStageQuery(projectId), ct);
-            foreach (var artefact in artefacts)
+            await ScaffoldForBulkPushAsync(provider, projectId, triggeredBy, logger);
+
+            var artefacts = await mediator.Send(new GetArtefactsByStageQuery(projectId), CancellationToken.None);
+            await PushArtefactsBestEffortAsync(pushService, artefacts, projectId, triggeredBy, logger);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Bulk push failed for project {ProjectId}", projectId);
+        }
+    }
+
+    private static async Task ScaffoldForBulkPushAsync(
+        IServiceProvider provider, Guid projectId, string triggeredBy, ILogger logger)
+    {
+        var scaffolder = provider.GetService<IGenesisStructureScaffolder>();
+        if (scaffolder is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var scaffoldResult = await scaffolder.ScaffoldAsync(projectId, triggeredBy, CancellationToken.None);
+            if (!scaffoldResult.IsSuccess)
             {
-                try
-                {
-                    await _githubPushService.PushAsync(
-                        projectId,
-                        artefact.Id,
-                        artefact.FilePath,
-                        artefact.Version,
-                        artefact.ContentType,
-                        artefact.S3Key,
-                        triggeredBy,
-                        ct);
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogWarning(exception, "Bulk push failed for artefact {ArtefactId}", artefact.Id);
-                }
+                logger.LogWarning("Scaffold reported failure for project {ProjectId}: {FailureReason}", projectId, scaffoldResult.FailureReason);
             }
         }
-        catch (Exception exception)
+        catch (Exception ex)
         {
-            _logger.LogError(exception, "Bulk push failed for project {ProjectId}", projectId);
+            logger.LogWarning(ex, "Scaffold failed {ProjectId}", projectId);
+            var pushFailureLogRepo = provider.GetRequiredService<IPushFailureLogRepository>();
+            var timeProvider = provider.GetRequiredService<TimeProvider>();
+            var log = new PushFailureLog(projectId, Guid.Empty, ".genesis/scaffold", ex.Message, timeProvider);
+            await pushFailureLogRepo.AddAsync(log, CancellationToken.None);
+        }
+    }
+
+    private static async Task PushArtefactsBestEffortAsync(
+        IGitHubArtefactPushService pushService,
+        IReadOnlyList<Artefact> artefacts,
+        Guid projectId,
+        string triggeredBy,
+        ILogger logger)
+    {
+        foreach (var artefact in artefacts)
+        {
+            try
+            {
+                await pushService.PushAsync(
+                    projectId,
+                    artefact.Id,
+                    artefact.FilePath,
+                    artefact.Version,
+                    artefact.ContentType,
+                    artefact.S3Key,
+                    triggeredBy,
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Bulk push failed for artefact {ArtefactId}", artefact.Id);
+            }
         }
     }
 }

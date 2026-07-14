@@ -39,20 +39,6 @@ public sealed class ProjectGitHubConfigTests
     }
 
     [Fact]
-    public void SetGitHubConfig_NullApiRepoUrl_ThrowsArgumentException()
-    {
-        var project = CreateProject(TimeProvider.System);
-
-        Assert.ThrowsAny<ArgumentException>(() => project.SetGitHubConfig(
-            null!,
-            "https://github.com/emisgroup/emis-x-documents-app",
-            "emisgroup",
-            "emis-x-documents",
-            "12345678",
-            TimeProvider.System));
-    }
-
-    [Fact]
     public void SetGitHubConfig_NullInstallationId_ThrowsArgumentException()
     {
         var project = CreateProject(TimeProvider.System);

@@ -150,6 +150,34 @@ public sealed class GitHubContentsService : IGitHubContentsService
         return true;
     }
 
+    public async Task<bool> RepoExistsAsync(
+        string token,
+        string owner,
+        string repo,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+
+        var requestUri = new Uri($"https://api.github.com/repos/{owner}/{repo}");
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+        request.Headers.UserAgent.ParseAdd("genesis-ai");
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
     private async Task<string> GetCurrentShaAsync(Uri requestUri, string installationToken, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);

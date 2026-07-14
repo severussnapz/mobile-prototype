@@ -35,4 +35,15 @@ public interface IGitHubContentsService
         string repo,
         string path,
         CancellationToken ct);
+
+    /// <summary>
+    /// Returns true if the repository exists (HTTP 200).
+    /// Returns false if not found (HTTP 404).
+    /// Throws <see cref="System.Net.Http.HttpRequestException"/> for 403/401 or other errors.
+    /// </summary>
+    Task<bool> RepoExistsAsync(
+        string token,
+        string owner,
+        string repo,
+        CancellationToken cancellationToken);
 }

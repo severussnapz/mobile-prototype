@@ -641,3 +641,27 @@ Not lazy about: understanding the problem, input validation at trust boundaries,
 **Interrogate prompts before building.** Before writing implementation code for any prompt-dependent feature, run the prompt concept past a strong model and ask it to find failure modes first.
 
 **Structured decisions — AskUserQuestion.** When the agent reaches a decision point, surface a structured decision — never guess. Present 2-3 options plus Other, reasoning for each, and a recommendation. One question at a time. Never batch decisions. Other always opens free text. Recommendation always stated in one sentence. Applied across all pipeline stages P01-P10.
+
+---
+
+## Anti-Shortcut Rules — NON-NEGOTIABLE
+
+A passing build or green test run is NOT proof the implementation is honest. The following shortcuts are FORBIDDEN. Using any of them is a failure, even if everything compiles and all tests pass.
+
+1. **No optional/nullable dependencies to avoid updating call sites.**
+   When adding a new constructor dependency, it MUST be required — non-nullable, no default value. Do NOT add `IThing? thing = null`. Do NOT create a Null-Object fallback class (`NullThing.Instance`) so existing call sites compile unchanged. Update the real call sites instead. An optional dependency that silently no-ops when absent is a silent-seam defect — it works via DI and breaks invisibly anywhere it is constructed directly.
+
+2. **No warning suppression to get a green build.**
+   Do NOT add analyzer codes (CA1859, etc.) to `NoWarn` in any `Directory.Build.props`. Do NOT add blanket `#pragma warning disable` at file scope. `TreatWarningsAsErrors` is deliberate — the warning is a real signal. Fix the code the warning points at. If a suppression is genuinely justified, use a SCOPED `#pragma warning disable/restore` around only the affected lines, matching existing patterns in the repo.
+
+3. **No test changes to make production code pass.**
+   Do NOT modify test assertions, mocks, or expected values to turn a test green. Tests define the contract. If a test fails, fix the production code. The only permitted test edit during an implementation prompt is updating the SUT construction call site when a required dependency was added (Rule 1) — never an assertion.
+
+4. **Your own summary language is a confession.**
+   If you find yourself writing "no-op fallback", "to keep existing tests compiling without changing test code", "analyzer-only blocker resolved by config", or similar — STOP. That is an admission you took a forbidden shortcut. Reverse it and fix forward before reporting done.
+
+5. **No build-configuration edits to route around a compile error.**
+   Do NOT add `<Using Include="..." />`, global usings, `<Compile>` items, package references, or any other MSBuild directive to `Directory.Build.props` (root or tests/) to make code compile. If a test or source file references a type it cannot see, add the `using` to that file, or to the project's existing `GlobalUsings.cs` — the file that exists for shared usings. A missing using is fixed where usings live, never in build config. Any edit to `Directory.Build.props` that was not explicitly requested in the prompt is a forbidden shortcut. "Compile-only contract alignment", "test-project global using in build props", or similar phrasing in your summary is a confession — reverse it.
+
+**Every green must come from real code, not a bypass.** Before reporting completion, audit your own diff for the five rules above and confirm compliance explicitly.
+

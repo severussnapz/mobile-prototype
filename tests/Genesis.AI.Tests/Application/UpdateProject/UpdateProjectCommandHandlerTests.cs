@@ -26,6 +26,8 @@ public sealed class UpdateProjectCommandHandlerTests
 
         _projectRepository.SetupGet(repository => repository.UnitOfWork).Returns(_unitOfWork.Object);
         _unitOfWork.Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _scaffolder.Setup(scaffolder => scaffolder.ScaffoldAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ScaffoldResult.Success());
 
         _handler = new UpdateProjectCommandHandler(
             _projectRepository.Object,
@@ -140,7 +142,7 @@ public sealed class UpdateProjectCommandHandlerTests
         _projectRepository.Setup(repository => repository.GetByIdAsync(project.Id, It.IsAny<CancellationToken>())).ReturnsAsync(project);
         _scaffolder
             .Setup(scaffolder => scaffolder.ScaffoldAsync(project.Id, command.UpdatedBy, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("boom"));
+            .ThrowsAsync(new InvalidOperationException("boom"));
 
         var exception = await Record.ExceptionAsync(() => _handler.Handle(command, CancellationToken.None));
 

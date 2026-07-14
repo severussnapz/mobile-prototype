@@ -176,7 +176,7 @@ internal sealed class TestWebApplicationFactory : WebApplicationFactory<Genesis.
                         It.IsAny<Guid>(),
                         It.IsAny<string>(),
                         It.IsAny<CancellationToken>()))
-                    .Returns(Task.CompletedTask);
+                    .ReturnsAsync(ScaffoldResult.Success());
                 return mock.Object;
             });
 

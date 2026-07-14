@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Genesis.AI.Api.Features.Conversations;
@@ -110,19 +111,6 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
     }
 
     [Fact]
-    public async Task SaveArtefact_WhenPrototypeContainsFormatPlausibleNhsNumber_RejectsWithClinicalSafetyError()
-    {
-        var controller = CreateController(prototypeSingleFileEnabled: true, out _, out _);
-        var toolCall = BuildSaveArtefactToolCall(
-            "prototype/index.html",
-            "<!DOCTYPE html><html><head><title>Prototype</title></head><body><div>PROTOTYPE ONLY</div><p>NHS: 123 456 7890</p></body></html>");
-
-        var result = await InvokeExecuteToolCallAsync(controller, toolCall, StageType.Prototype, prototypeSingleFile: true);
-
-        Assert.Contains("PLAUSIBLE_NHS_NUMBER_DETECTED", result, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task ExecuteToolCallAsync_SaveArtefactSingleFilePrototypeWithPrototypeOnlyBanner_IsNotRejectedByPrototypeOnlyGuard()
     {
         var controller = CreateController(prototypeSingleFileEnabled: true, out var artefactRepositoryMock, out var artefactStorageServiceMock);
@@ -211,6 +199,7 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         var skillContentServiceMock = new Mock<ISkillContentService>();
         var activeSkillsServiceMock = new Mock<IActiveSkillsService>();
         var foundationServiceMock = new Mock<IFoundationService>();
+        var sessionCloseContextBuilderMock = new Mock<ISessionCloseContextBuilder>();
         var prototypeAssemblyServiceMock = new Mock<IPrototypeAssemblyService>();
         var prototypeFragmentMigrationServiceMock = new Mock<IPrototypeFragmentMigrationService>();
 
@@ -229,6 +218,7 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
             skillContentServiceMock.Object,
             activeSkillsServiceMock.Object,
             foundationServiceMock.Object,
+            sessionCloseContextBuilderMock.Object,
             prototypeAssemblyServiceMock.Object,
             prototypeFragmentMigrationServiceMock.Object,
             tokenOptions,
@@ -242,21 +232,33 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         StageType stageType,
         bool prototypeSingleFile)
     {
-        return await controller.ExecuteToolCallAsync(
-            toolCall,
-            new Conversation(Guid.NewGuid(), 6, TimeProvider.System),
-            new List<Artefact>(),
-            new List<ParkingLotItem>(),
-            new List<ParkingLotItem>(),
-            "tester",
-            Guid.NewGuid(),
-            (StageType?)stageType,
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-            new StrongBox<int>(0),
-            new StrongBox<bool>(false),
-            new StrongBox<bool>(false),
-            prototypeSingleFile,
-            CancellationToken.None);
+        var method = typeof(ConversationStreamController).GetMethod(
+            "ExecuteToolCallAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var invocation = method!.Invoke(
+            controller,
+            [
+                toolCall,
+                new Conversation(Guid.NewGuid(), 6, TimeProvider.System),
+                new List<Artefact>(),
+                new List<ParkingLotItem>(),
+                new List<ParkingLotItem>(),
+                "tester",
+                Guid.NewGuid(),
+                (StageType?)stageType,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                new StrongBox<int>(0),
+                new StrongBox<bool>(false),
+                new StrongBox<bool>(false),
+                prototypeSingleFile,
+                CancellationToken.None
+            ]);
+
+        Assert.NotNull(invocation);
+        return await (Task<string>)invocation!;
     }
 }

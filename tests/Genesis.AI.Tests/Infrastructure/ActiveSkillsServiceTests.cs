@@ -13,21 +13,24 @@ public sealed class ActiveSkillsServiceTests
     private ActiveSkillsService CreateSut() =>
         new(_skillContentServiceMock.Object, NullLogger<ActiveSkillsService>.Instance);
 
-    // ── Excluded stages ───────────────────────────────────────────────────────
+    // ── RequirementsDiscovery wiring ─────────────────────────────────────────
 
-    [Theory]
-    [InlineData(StageType.RequirementsDiscovery)]
-    public async Task BuildActiveSkillsAsync_ExcludedStage_ReturnsEmptyString(StageType stageType)
+    [Fact]
+    public async Task BuildActiveSkillsAsync_RequirementsDiscoveryStage_ReturnsMappedContent()
     {
         // Arrange
+        _skillContentServiceMock
+            .Setup(service => service.GetSkillContent(It.IsAny<string>()))
+            .Returns<string>(name => $"content-of-{name}");
+
         var sut = CreateSut();
 
         // Act
-        var result = await sut.BuildActiveSkillsAsync(stageType, 0, CancellationToken.None);
+        var result = await sut.BuildActiveSkillsAsync(StageType.RequirementsDiscovery, 0, CancellationToken.None);
 
         // Assert
-        Assert.Equal(string.Empty, result);
-        _skillContentServiceMock.Verify(service => service.GetSkillContent(It.IsAny<string>()), Times.Never);
+        Assert.Contains("content-of-requirements-elicitation", result);
+        _skillContentServiceMock.Verify(service => service.GetSkillContent("requirements-elicitation"), Times.Once);
     }
 
     // ── Happy path ────────────────────────────────────────────────────────────

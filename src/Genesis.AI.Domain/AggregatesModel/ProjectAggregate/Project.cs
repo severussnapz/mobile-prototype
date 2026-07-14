@@ -76,15 +76,13 @@ public class Project : Entity, IAggregateRoot
     }
 
     public void SetGitHubConfig(
-        string apiRepoUrl,
-        string appRepoUrl,
+        string? apiRepoUrl,
+        string? appRepoUrl,
         string owner,
         string name,
         string installationId,
         TimeProvider timeProvider)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiRepoUrl);
-        ArgumentException.ThrowIfNullOrWhiteSpace(appRepoUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(installationId);

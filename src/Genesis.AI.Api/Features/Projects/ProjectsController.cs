@@ -218,11 +218,27 @@ public class ProjectsController : ControllerBase
         try
         {
             var result = await _mediator.Send(command, ct);
-            return Ok(new UpdateProjectGitHubResponse(result.FigmaPatPlaintext));
+            return Ok(new UpdateProjectGitHubResponse(
+                result.FigmaPatPlaintext,
+                result.ApiRepoVerified,
+                result.ApiRepoError,
+                result.AppRepoVerified,
+                result.AppRepoError));
         }
         catch (NotFoundException ex)
         {
             return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
+        }
+        catch (GitHubScaffoldFailedException ex)
+        {
+            var problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Service unavailable",
+                Detail = "Failed to save GitHub configuration. Please try again."
+            };
+            problemDetails.Extensions["userMessage"] = ex.UserMessage;
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, problemDetails);
         }
         catch (Exception ex)
         {
@@ -296,4 +312,5 @@ public class ProjectsController : ControllerBase
 
         return Ok(new ApiResponse<List<ParkingLotItemResponse>> { Data = dtos });
     }
+
 }

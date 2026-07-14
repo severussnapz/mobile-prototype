@@ -72,7 +72,7 @@ suppressions:
     justification: "Child entity of Project aggregate — not an aggregate root"
   - id: ENG-003
     path: "src/Genesis.AI.Domain/AggregatesModel/ContractManifestAggregate/ContractManifestPin.cs"
-    justification: "ContractManifestPin is a child entity of ContractManifest aggregate — same established suppression pattern as HelpMessage, ParkingLotItem"
+    justification: "Child entity of ContractManifest aggregate — owned by the root, not an aggregate root"
   - id: ENG-003
     path: "src/Genesis.AI.Domain/AggregatesModel/KnowledgeAggregate/KnowledgeDocument.cs"
     justification: "KnowledgeDocument is a persistence entity not a domain aggregate — same established suppression pattern as HelpMessage, ParkingLotItem"
@@ -209,10 +209,15 @@ suppressions:
     path: "src/Genesis.AI.Api/Features/PrototypeDemo/PrototypeDemoEditController.cs"
     justification: "Locked contract — app-side editElement() expects 200 OK with { data: { status, updatedOuterHtml, rejectionReason } }. EditElement is a command that returns a four-valued result, not a resource creation; 201 + Location header would break the committed client."
 
-  - id: PG-008
-    path: "db/migrations/V18__enable_pgvector.sql"
-    justification: "pgvector extension approved for use via platform exception — required for Knowledge Service vector similarity search"
-
+  # SC-007: docker-compose.yml uses the pgvector/pgvector:pg17 floating tag for the
+  # local postgres and seed services. Docker Compose is a local-development-only
+  # concern — production runs on managed RDS Aurora PostgreSQL, not Compose.
   - id: SC-007
     path: "docker-compose.yml"
-    justification: "Local development only — floating tag intentional for local dev. Production uses managed RDS Aurora PostgreSQL"
+    justification: "Local development only — pgvector/pgvector:pg17 floating tag is intentional for local dev. Production uses managed RDS Aurora PostgreSQL — Docker Compose is not used in production."
+
+  # PG-008: the pgvector 'vector' extension is enabled in V18 for the Knowledge
+  # Service vector similarity search. Approved via platform exception.
+  - id: PG-008
+    path: "db/migrations/V18__enable_pgvector.sql"
+    justification: "pgvector extension approved for use via platform exception — required for Knowledge Service vector similarity search. Aurora PostgreSQL pgvector support confirmed with platform team."

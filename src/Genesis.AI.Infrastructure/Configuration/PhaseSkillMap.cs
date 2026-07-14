@@ -11,9 +11,9 @@ namespace Genesis.AI.Infrastructure.Configuration;
 ///   2. Stage skills                   — additional skills applied on every phase of a specific stage.
 ///   3. Phase overrides                — additional skills applied only at a specific phase number.
 ///
-/// Supported stages: Prototype (P02) through Planning (P10).
-/// RequirementsDiscovery (P01) is explicitly excluded — it is a pure interview
-/// stage with no guardrail-constrained outputs.
+/// Supported stages: Prototype (P01) through Planning (P10).
+/// RequirementsDiscovery (P01) injects requirements-elicitation skill only.
+/// Prototype (P02) skills are mapped via PhaseOverrides only.
 /// </summary>
 public static class PhaseSkillMap
 {
@@ -28,6 +28,7 @@ public static class PhaseSkillMap
         "bounded-clarification-budget",
         "carry-forward-contract",
         "tool-failure-policy",
+        "agent-discipline",
     ];
 
     /// <summary>
@@ -41,6 +42,10 @@ public static class PhaseSkillMap
     /// </summary>
     private static readonly Dictionary<StageType, string[]> StageSkills = new()
     {
+        [StageType.RequirementsDiscovery] =
+        [
+            "requirements-elicitation",
+        ],
         [StageType.Prototype] =
         [
             "emis-x-webapp-design-system",
@@ -114,7 +119,7 @@ public static class PhaseSkillMap
         [StageType.Design] = new()
         {
             [0] = ["context-loading-p04", "service-scope-verification"],
-            [1] = ["api-contract-design", "cross-requirement-chain"],
+            [1] = ["api-contract-design", "api-contract-design-craft", "cross-requirement-chain"],
             [2] = ["database-schema-design"],
             [3] = ["component-interface-design"],
             [4] = ["state-machine-design"],
@@ -203,16 +208,10 @@ public static class PhaseSkillMap
     /// <param name="phase">The current phase number within the stage (0-indexed).</param>
     /// <returns>
     /// Ordered skill names corresponding to embedded <c>.md</c> files under
-    /// <c>Genesis.AI.Infrastructure.Skills/</c>. Returns an empty list for
-    /// unsupported stages (RequirementsDiscovery, Prototype).
+    /// <c>Genesis.AI.Infrastructure.Skills/</c>. Returns an empty list for stages with no entry in StageSkills or PhaseOverrides.
     /// </returns>
     public static IReadOnlyList<string> GetSkillsForPhase(StageType stageType, int phase)
     {
-        if (stageType is StageType.RequirementsDiscovery)
-        {
-            return [];
-        }
-
         var skills = new List<string>(UniversalSkills);
 
         if (StageSkills.TryGetValue(stageType, out var stageLevel))

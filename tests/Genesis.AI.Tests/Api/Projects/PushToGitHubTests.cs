@@ -8,6 +8,7 @@ using Genesis.AI.Domain.Queries.GetArtefactById;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Genesis.AI.Tests.Api.Projects;
@@ -59,7 +60,7 @@ public class PushToGitHubTests
     }
 
     [Fact]
-    public async Task PushArtefact_Success_Returns201WithUserMessage()
+    public async Task PushArtefact_Success_Returns200WithUserMessage()
     {
         var projectId = Guid.NewGuid();
         var artefactId = Guid.NewGuid();
@@ -248,6 +249,12 @@ public class PushToGitHubTests
                 if (parameterType == typeof(IGenesisStructureScaffolder))
                 {
                     args[index] = scaffolder.Object;
+                    continue;
+                }
+
+                if (parameterType == typeof(IServiceScopeFactory))
+                {
+                    args[index] = null;  // Not used in tests; passed null for optional parameter
                     continue;
                 }
 
