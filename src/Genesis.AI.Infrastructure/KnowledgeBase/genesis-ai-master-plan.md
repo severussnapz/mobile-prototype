@@ -374,6 +374,12 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] Doubt-driven development gate — formalise CLAIM → EXTRACT → DOUBT → RECONCILE across all stages
 - [ ] LLM/script boundary audit — for each P01–P11 stage prompt, ask: "What is the LLM doing here that a script should do?" Flag any instance where the prompt asks the LLM to fetch, extract, parse, or construct something the stage handler could pre-process and inject as structured data. Known instance: P08→P09 pre-swarm assembly — open decisions to be queried from the artefact DB and injected as a formatted list, not mined from raw artefact text. Output: one findings note per flagged stage; fixes committed before Plan 5.
 
+**Known gap — large-artefact `get_artefact` returns outline, not full content (surfaced in use, July 2026):**
+- [ ] Observed live in a P06 Clinical Safety resume: `get_artefact` on `HAZARD-REGISTRY.md` returned only the ~2,251-char structural outline, not the full hazard cards. The agent could not load the complete registry and fell back to the SESSION-CLOSE record to proceed.
+- [ ] Root cause: the 50KB outline threshold that returns a structural summary for large files is bypassed ONLY for `prototype/index.html` in single-file mode (the `prototypeSingleFile` param on `BuildGetArtefactResult`). Every other artefact — including the clinical hazard registry — still receives the truncated outline once it exceeds the threshold.
+- [ ] Impact (clinical-safety, HIGH): the CSO agent scores hazards without being able to see all existing hazard cards — risk of duplicate HAZ-IDs and missed hazards. The agent itself flagged identifier integrity (OI-P06-004) as unresolvable without the full sequence.
+- [ ] Fix direction: proper resolution is the structure-aware chunker + small-to-big retrieval from the Knowledge Layer plan (match small, inject the parent section) so an agent pulls a specific hazard card by heading path rather than a whole-file outline. Interim option: extend the full-content bypass to registry-class artefacts the pipeline reads whole. Needs a real large-file retrieval test — not the InMemory-tested path.
+
 **Effort remaining:** ~2 weeks.
 **Owner:** Idris
 **Gate:** Plan 5 cannot start until all items above are checked off.
