@@ -8,12 +8,6 @@ name: Build
 
 on:
   workflow_dispatch:
-    inputs:
-      create_apim_pr:
-        description: "Create APIM PR for the generated OpenAPI spec"
-        required: false
-        type: boolean
-        default: false
   push:
     branches:
       - "main"
@@ -46,7 +40,6 @@ jobs:
 
   update-apim-spec:
     name: Update APIM Spec
-    if: ${{ github.event.inputs.create_apim_pr }}
     needs: build-and-push
     uses: emisgroup/emisx-platform-engineering/.github/workflows/pull-request-from-artifacts.yaml@bb01c9db204291901add2e3417bb029658a77e37 # shared-gha-workflow-templates v7.9.0
     with:
