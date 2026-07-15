@@ -52,6 +52,11 @@ env:
     value: AWS
   - name: AWS_REGION
     value: eu-west-2
+  # Swagger/OpenAPI explorer. The app only serves Swagger in Development or when
+  # this flag is set — enable it here so the dev cluster (which runs as
+  # Production) still exposes /swagger.
+  - name: Swagger__Enabled
+    value: "true"
   # S3 artefact storage — bucket provisioned by the ApplicationStack.
   # TODO: confirm the exact bucket name the composite derives from `instance`.
   - name: S3__ArtefactBucketName
