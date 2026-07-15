@@ -237,7 +237,12 @@ public static class DependencyInjection
             var rdsDbName = configuration["RDS_DB_NAME"] ?? "genesis_ai_requirements";
             var rdsUser = configuration["RDS_USER"] ?? "genesis_ai_app";
 
-            return $"Host={rdsHost};Port={rdsPort};Database={rdsDbName};Username={rdsUser};SSL Mode=Require;Trust Server Certificate=true";
+            // Keep a small warm pool so the hot path (readiness probe, requests)
+            // reuses an already-authenticated connection instead of paying the
+            // slow IAM cold-connect cost (token + SSL + IAM validation) every
+            // time. Keepalive stops NAT/server idle timeouts silently dropping
+            // the warm connections.
+            return $"Host={rdsHost};Port={rdsPort};Database={rdsDbName};Username={rdsUser};SSL Mode=Require;Trust Server Certificate=true;Minimum Pool Size=2;Keepalive=30";
         }
 
         return configuration.GetConnectionString("DefaultConnection")
