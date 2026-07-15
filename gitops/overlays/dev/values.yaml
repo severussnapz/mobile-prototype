@@ -19,7 +19,7 @@ flyway:
     # Aurora writer endpoint (ApplicationStack status `rdsClusterEndpoint`).
     # TODO: set once the stack provisions.
     - name: FLYWAY_URL
-      value: "jdbc:postgresql://genesis-ai-requirements-api-db-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com:5432/genesis_ai_requirements"
+      value: "jdbc:postgresql://genesis-ai-requirements-api-rds-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com:5432/genesis_ai_requirements"
     - name: FLYWAY_USER
       valueFrom:
         secretKeyRef:
@@ -33,11 +33,6 @@ flyway:
     # Aurora can briefly refuse connections immediately after provisioning/sync.
     - name: FLYWAY_CONNECT_RETRIES
       value: "60"
-  volumeMounts:
-    - mountPath: /mnt/secrets-store
-      name: db-master-secret
-      readOnly: true
-
 
 # Full application environment for dev.
 #
@@ -70,7 +65,7 @@ env:
   # RDS_HOST is the Aurora cluster writer endpoint (rdsClusterEndpoint status
   # output) — TODO: set once feat/kro-rds-definition is merged and the stack runs.
   - name: RDS_HOST
-    value: "genesis-ai-requirements-api-db-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com"
+    value: "genesis-ai-requirements-api-rds-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com"
   - name: RDS_PORT
     value: "5432"
   - name: RDS_DB_NAME
@@ -114,27 +109,27 @@ env:
 # into the `rds-credentials` K8s Secret (see secretProviderClass below). The
 # mount on the pod is what triggers the sync before the flyway initContainer runs.
 volumeMounts:
-  - name: db-master-secret
+  - name: secrets-store-inline
     mountPath: /mnt/secrets-store
     readOnly: true
 volumes:
-  - name: db-master-secret
+  - name: secrets-store-inline
     csi:
       driver: secrets-store.csi.k8s.io
       readOnly: true
       volumeAttributes:
-        secretProviderClass: db-master-spc
+        secretProviderClass: app-csi-store
 
 # Syncs the RDS-managed master secret into a `rds-credentials` K8s Secret that
 # the flyway initContainer reads via secretKeyRef.
 secretProviderClass:
   enabled: true
   region: eu-west-2
-  name: db-master-spc
+  name: app-csi-store
   objects:
     # ARN of the RDS-managed master secret (ApplicationStack status
     # `masterUserSecret`). TODO: set once the stack provisions.
-    - objectName: "arn:aws:secretsmanager:eu-west-2:442042551704:secret:rds!cluster-cd5d7697-3f98-4cad-85d9-5d216803d512-aPs50g"
+    - objectName: "arn:aws:secretsmanager:eu-west-2:442042551704:secret:rds!cluster-9df31198-19ce-421d-99f1-af2638266a33-uMMeko"
       objectType: secretsmanager
       jmesPath:
         - path: username
