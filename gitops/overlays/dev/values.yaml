@@ -92,7 +92,7 @@ env:
   # Dev OIDC settings for JWT bearer auth.
   # TODO: confirm the dev identity Authority + Audience values.
   - name: Authentication__Authority
-    value: https://identity.dev.emishealthsolutions.com/5eb0f67d-cfc5-418b-aad3-0c194267c1f2
+    value: https://identity.dev.emishealthsolutions.com/5eb0f67d-cfc5-418b-aad3-0c194267c1f2/v2.0/
   - name: Authentication__Audience
     value: 8a9616a7-f3ba-4626-8659-84d9cf272e0c
 
