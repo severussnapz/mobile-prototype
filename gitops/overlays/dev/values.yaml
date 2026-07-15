@@ -46,6 +46,12 @@ flyway:
 # `rds-db:connect` action for db user `genesis_ai_app` (provisioned by the KRO
 # RDS composite on branch feat/kro-rds-definition).
 env:
+  - name: "HTTP_PROXY"
+    value: "185.46.212.92:443"
+  - name: "HTTPS_PROXY"
+    value: "185.46.212.92:443"
+  - name: "NO_PROXY"
+    value: "100.69.64.0/18,10.100.0.0/16,2a05:d01c:494:6200::/56,fd00:5299:d428::/108,fd00:ec2::254,fd00:ec2::23,localhost,127.0.0.1,169.254.169.254,169.254.170.23,.svc,.svc.cluster.local,.cluster.local"
   - name: ASPNETCORE_ENVIRONMENT
     value: Production
   - name: HOSTING_ENVIRONMENT
