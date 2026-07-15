@@ -47,7 +47,16 @@ spec:
   rds:
     enabled: true
     databaseName: genesis_ai_requirements
-    username: genesis_ai_app
+    # Aurora MASTER user — used ONLY by the flyway initContainer (password auth
+    # from the RDS-managed secret). MUST be distinct from the application login:
+    # migration V26 creates `genesis_ai_app` and grants it `rds_iam`, which
+    # disables password auth for that role — so a shared identity would lock the
+    # migration user out.
+    username: dbadmin
+    # Application login for RDS IAM database authentication (passwordless). The
+    # composite creates an `rds-db:connect` policy for this user and attaches it
+    # to the pod identity role. The API authenticates as this user via IAM.
+    iamDbUsername: genesis_ai_app
     # vpcId / vpcCidr are sourced from the genesis-cluster-config ConfigMap by
     # the RGD — they are not fields on the rds spec block.
     databaseSubnetGroupName: genesis-net-vpc
@@ -58,7 +67,9 @@ spec:
     serverlessV2ScalingConfiguration:
       minCapacity: "0.5"
       maxCapacity: "8"
-    deletionProtection: true
+    # dev/onboarding: false so ACK can replace the cluster when the immutable
+    # masterUsername changes (genesis_ai_app -> dbadmin). Set true for stg/prd.
+    deletionProtection: false
     backupRetentionPeriod: 7
     enableDataApi: false
     # Performance Insights

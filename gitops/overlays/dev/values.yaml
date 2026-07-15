@@ -75,16 +75,13 @@ env:
     value: "5432"
   - name: RDS_DB_NAME
     value: genesis_ai_requirements
-  - name: RDS_USERNAME
-    valueFrom:
-      secretKeyRef:
-        key: username
-        name: rds-credentials
-  - name: RDS_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        key: password
-        name: rds-credentials
+  # RDS IAM database authentication: passwordless. The app builds the connection
+  # string from RDS_USER + RDS_HOST and signs short-lived IAM tokens; it never
+  # reads a password. `genesis_ai_app` is a least-privilege role created by
+  # migration V26 (granted `rds_iam`); the pod-identity role's `rds-db:connect`
+  # policy is provisioned by the KRO RDS composite (iamDbUsername).
+  - name: RDS_USER
+    value: genesis_ai_app
 
   # Dev OIDC settings for JWT bearer auth.
   # TODO: confirm the dev identity Authority + Audience values.
