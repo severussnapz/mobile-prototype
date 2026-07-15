@@ -61,6 +61,11 @@ readinessProbe:
     port: http
   initialDelaySeconds: 20
   periodSeconds: 20
+  # The readiness check opens an IAM-authenticated Aurora connection. A cold
+  # connect (IAM token + SSL + validation) can take ~2-3s, so the default 1s
+  # probe timeout flaps the pod on an otherwise-healthy DB. 5s tolerates a cold
+  # connect; failureThreshold still gates a genuine outage.
+  timeoutSeconds: 5
 
 nodeSelector:
   kubernetes.io/os: linux
