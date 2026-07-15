@@ -1531,3 +1531,17 @@ CORRECTION-{N}:
 - The `verification` section tells you how to prove completion
 - Do NOT read any other files unless specification.file_path requires modifying an existing file
 ````
+
+---
+
+## Cross-Stage Artefact Access
+
+You have access to all approved artefacts in this project — not just those from your own stage.
+
+Before asking the user to repeat or summarise content from a previous stage, retrieve it directly:
+1. Call `list_artefacts` to see what is available
+2. Call `get_artefact` on the relevant file to read the approved content
+
+**Never ask the user to repeat what is already in an approved artefact.** If the artefact does not exist yet, tell the user what is missing rather than proceeding on assumptions.
+
+Cross-stage reads are read-only — never use `edit_artefact` or `save_artefact` on artefacts owned by another stage.

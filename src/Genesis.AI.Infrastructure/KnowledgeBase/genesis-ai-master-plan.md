@@ -1,5 +1,5 @@
 # Genesis AI — Master Delivery Plan
-Version: 4.2 — Updated July 2026
+Version: 4.3 — Updated July 2026
 Owner: Idris Issa
 Stack: .NET 10, ASP.NET Core, MediatR, EF Core, Postgres + pgvector, React/TypeScript, AWS Bedrock (PrivateLink), AngleSharp, LocalStack, ClosedXML
 
@@ -285,11 +285,11 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 | Action 7 | P06 Excel export artefact | ✅ COMPLETE — on-demand via existing button |
 | Action 8 | P06 DB API integration | ⏸️ PARKED — CS team API schema not yet defined |
 | Action 9 | CODEOWNERS file + prompt governance | ✅ COMPLETE — Plan 4c D3/D8 |
-| Action 10 | Pipeline chat cross-stage artefact access | 📋 PENDING — prompt update per stage, after Plan 4c ships |
+| Action 10 | Pipeline chat cross-stage artefact access | ✅ COMPLETE — cross-stage artefact-access section added to all P01–P10 prompts (exp) |
 | Planned 1 | Project Dashboard (KPIs and OKRs) | 📋 PENDING — design session required (Idris, Yas, Roel) |
 | Planned 2 | Medical Device Pipeline (P09) | 📋 PENDING — design session with Indra required |
 
-9 of 10 engineering actions complete or in progress. Action 8 parked. Action 10 and design sessions pending.
+10 of 10 engineering actions complete or in progress. Action 8 parked (CS team API). Design sessions (Planned 1, 2) pending.
 
 ---
 
@@ -373,6 +373,19 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] Cross-stage traceability audit — HAZ-IDs → P06, ADRs → P03, CHECKs → P11
 - [ ] Doubt-driven development gate — formalise CLAIM → EXTRACT → DOUBT → RECONCILE across all stages
 - [ ] LLM/script boundary audit — for each P01–P11 stage prompt, ask: "What is the LLM doing here that a script should do?" Flag any instance where the prompt asks the LLM to fetch, extract, parse, or construct something the stage handler could pre-process and inject as structured data. Known instance: P08→P09 pre-swarm assembly — open decisions to be queried from the artefact DB and injected as a formatted list, not mined from raw artefact text. Output: one findings note per flagged stage; fixes committed before Plan 5.
+
+**Known gap — large-artefact `get_artefact` returns outline, not full content (surfaced in use, July 2026):**
+- [ ] Observed live in a P06 Clinical Safety resume: `get_artefact` on `HAZARD-REGISTRY.md` returned only the ~2,251-char structural outline, not the full hazard cards. The agent could not load the complete registry and fell back to the SESSION-CLOSE record to proceed.
+- [ ] Root cause: the 50KB outline threshold that returns a structural summary for large files is bypassed ONLY for `prototype/index.html` in single-file mode (the `prototypeSingleFile` param on `BuildGetArtefactResult`). Every other artefact — including the clinical hazard registry — still receives the truncated outline once it exceeds the threshold.
+- [ ] Impact (clinical-safety, HIGH): the CSO agent scores hazards without being able to see all existing hazard cards — risk of duplicate HAZ-IDs and missed hazards. The agent itself flagged identifier integrity (OI-P06-004) as unresolvable without the full sequence.
+- [ ] Fix direction: proper resolution is the structure-aware chunker + small-to-big retrieval from the Knowledge Layer plan (match small, inject the parent section) so an agent pulls a specific hazard card by heading path rather than a whole-file outline. Interim option: extend the full-content bypass to registry-class artefacts the pipeline reads whole. Needs a real large-file retrieval test — not the InMemory-tested path.
+
+**Known gap — help chat retrieves wrong chunk on vague follow-up queries (surfaced in use, July 2026):**
+- [ ] Observed live: "why are we doing it" (referencing the Artefact Scope Restructure in prior turn) retrieved DCB0129 Control Elicitation Method content instead. Wrong chunk scored highest because the query had no anchor — the help chat does not pass conversation history as retrieval context, so each query hits the vector store cold.
+- [ ] Root cause: two compounding factors — (1) vague follow-up queries ("why are we doing it", "what is the advantage of this") carry no subject anchor, so retrieval matches whatever chunk scores highest globally; (2) clinical safety content (P06/DCB0129) is densely indexed and wins on generic terms against design doc content. Namespace contamination in `genesis-tool`.
+- [ ] Impact: users asking natural follow-up questions in help chat get irrelevant or misleading answers. Trust in the help chat degrades; users stop using it.
+- [ ] Short-term workaround: instruct users to include the subject in every query ("why are we doing the artefact scope restructure?") — the retrieval model needs the anchor in the query, not just in conversational context.
+- [ ] Fix direction: (1) structure-aware chunker with heading-path prefixes (Knowledge Layer Phase 3) gives each chunk enough subject context that retrieval scores correctly even on short queries; (2) hybrid tsvector + vector (Phase 5) catches identifier queries like "artefact scope restructure" via lexical match when vector score is weak; (3) pass last N turns of help chat history as retrieval context so follow-up queries inherit the subject anchor from the conversation.
 
 **Effort remaining:** ~2 weeks.
 **Owner:** Idris
@@ -495,10 +508,10 @@ Sibling child artefact (build now — reuses `requirement_id`, per-requirement w
 **Owner:** Idris.
 **Positioning:** Not a Plan 5 blocker. Design now (alongside Plan 4d); build after the Plan 4 production flag flip (the render/edit surface must be proven in real sessions first), then run in parallel with the rest of Plan 4d and with Plan 5. The output enriches Plan 5 (flow paths → behavioural tests); Plan 5 does not hard-depend on it.
 **Effort (indicative, pre-build — not committed):** ~2–3 weeks for the backend model + validator + `draft_flow` and the render/audit/approve loop (Phases 1–2). Downstream projections land incrementally: P02 and P06 first, the TDD projection with Plan 5.
-**Open call:** `FLOW-{id}.md` co-located in `requirements/` vs a sibling `flows/` folder — confirm with Darren's team whether the nightly Knowledge Graph indexer prefers flows as their own node type before Phase 1.
+**Resolved:** `FLOW-{id}.md` is co-located in `requirements/` alongside `REQ-{id}.md`, `CHANGE-{id}.md` and `TEST-{id}.md`. No separate `flows/` folder.
 
 **Suggested phasing:**
-1. Flow model + migration + deterministic validator + `draft_flow` (backend, no UI).
+1. **AC stable IDs (Option 1 — built properly, no shortcut)** + flow model + migration + deterministic validator + `draft_flow` (backend, no UI). The parser assigns `AC-{req_id}-{seq}` IDs; a migration adds the AC table; P01 persists ACs with stable IDs on save. Prerequisite for decision-node `ac_ref` **and** for the functional-test AC references in `TEST-{id}.md` (Plan 5). A data-model change, done once, correctly — the product must sing at launch.
 2. Render surface + `edit_flow_node` + playback-before-save + approve (the user loop).
 3. Downstream projections — P02, then P06, then the TDD path-to-test projection with Plan 5.
 
@@ -517,6 +530,51 @@ Sibling child artefact (build now — reuses `requirement_id`, per-requirement w
 - TASK-NNN-CODE.can_start = false until TASK-NNN-TESTS is human_approved
 - `seam-testing` skill (already in Infrastructure/Skills/) wired into P11
 - `review-agent-discipline` skill wired into the Review Agent prompt at P11
+- **Artefact Scope Restructure** — the REQ becomes a thin index; each stage's output moves to a dedicated per-project / per-requirement artefact; `TEST-{id}.md` per requirement (see sub-section below and `artefact-scope-restructure-design.md`)
+
+### Plan 5 — Artefact Scope Restructure (REQ de-bloat + Test Registry)
+
+Full design: `artefact-scope-restructure-design.md` (KnowledgeBase).
+
+**The problem:** REQ files bloat because every stage (P03–P08) writes its full output into the REQ additively. Across twenty requirements this produces multi-thousand-line files that degrade retrieval, pressure downstream-agent context, and make change blast-radius opaque. The hazard registry already solved this for P06 (HAZ cards in `HAZARD-REGISTRY.md`, HAZ-ID references in the REQ). This generalises that pattern.
+
+**The change:** each stage's full content moves to a dedicated artefact; the REQ becomes a thin index of references.
+
+**Scope rule (the backbone):** a stage's output is **per-project** when one role ratifies it holistically across all requirements; **per-requirement** when it is scoped to one requirement's behaviour and consumed by an agent working on that requirement alone.
+
+```
+Per requirement:  REQ-{id}.md (index), FLOW-{id}.md, CHANGE-{id}.md, TEST-{id}.md
+Per project:      ARCH.md, DESIGN.md, PXD.md, HAZARD-REGISTRY.md,
+                  IG.md / DPIA.md, SECURITY-REGISTRY.md, PROJECT.md
+```
+
+**Load-bearing decisions:**
+1. The REQ is an index, not a container — summary + reference only; if a stage's content is only findable in the REQ, the extraction is incomplete.
+2. Scope is decided by who ratifies, not by convenience.
+3. Traceability is bidirectional — the REQ references the project artefact; the project artefact section references back the `REQ-{id}`s it serves. Missing back-reference = P09 normalisation failure.
+4. Staleness is section-scoped — a REQ change marks stale only the project-artefact sections that reference that requirement, not the whole file. The one new piece of machinery: a requirement-reference staleness resolver (extends the existing per-turn `stalenessNotice` — it is the same "this changed, re-check it" signal pointed at a referenced section instead of a whole file).
+5. `TEST-{id}.md` is generated from approved artefacts only, never from memory — an un-run stage yields an empty section; the agent never fabricates.
+
+**`TEST-{id}.md` schema (six sourced sections):**
+```
+Functional      — ACs (AC-{req_id}-{seq}) + FLOW-{id}.md paths     (P01 + P04e)
+Non-functional  — REQ NFRs + ARCH.md + DESIGN.md + API-CONTRACT     (P01 + P03 + P04)
+Clinical safety — HAZARD-REGISTRY.md HAZ-IDs                        (P06)
+Security        — SECURITY-REGISTRY.md controls                    (P08)
+IG              — IG.md / DPIA.md controls                         (P07)
+Evaluation      — Evaluation Function Specification CHECKs          (P01)
+```
+Every test references its source (AC/HAZ/SEC/IG/CHECK/flow-path). A test with no traceable source is a Review-Agent / P09 failure — it means invented behaviour.
+
+**Change management is baked in — no new mechanism.** `propose_requirement_change` (Plan 3d) + the per-turn `stalenessNotice`, extended by decision 4's section-scoped resolver. A requirement change marks the referencing sections + `TEST-{id}.md` stale; Agent A re-drafts; the `TASK-NNN-CODE.can_start` gate holds Agent B until the new tests are human-approved.
+
+**P09 Normalisation** shifts from section-presence checks to reference-integrity checks: every REQ reference resolves; every project-artefact section carries its back-references.
+
+**Mixed structure needs no migration.** New projects use the new structure from day one. Existing projects keep their current REQ files; the pipeline reads both shapes — a stage looks for its content whether it sits as a section inside the REQ or as a reference to a dedicated artefact, and resolves it either way. Old projects age out naturally as the migration programme completes them. No big-bang rewrite.
+
+**Depends on:** AC stable IDs (Plan 4e Phase 1). New build in Plan 5: per-stage prompt changes (summary + reference out, back-reference in), the requirement-reference staleness resolver, the `TEST-{id}.md` schema + Agent A generation, and the P09 rewrite.
+
+**Deferred (named):** concurrent-write contention on project-level files is a Plan 6 (swarm) concern, not a requirements-pipeline concern — the pipeline is sequential and human-gated, so two agents never write `ARCH.md` at once. Deferred to be informed by production evidence, not pre-engineered.
 
 ---
 
@@ -594,19 +652,31 @@ Flow Spec (Plan 4e) is an optional per-requirement artefact produced in P01 and 
 ```
 {feature-repo}/
   .genesis/
-    requirements/         REQ-{id}.md, CHANGE-{id}.md, FLOW-{id}.md
-    architecture/         ARCH-{id}.md
-    clinical-safety/      DCB0129-{id}.md, DCB0129-{id}.xlsx
-    ig/                   IG-{id}.md
-    security/             SEC-{id}.md
+    requirements/         REQ-{id}.md, CHANGE-{id}.md, FLOW-{id}.md, TEST-{id}.md
+    architecture/         ARCH.md
+    design/               DESIGN.md, API-CONTRACT.yaml, DB-SCHEMA.sql,
+                          DATA-MODELS.md, ERROR-CATALOGUE.md, CONTRACT.md
+    pxd/                  PXD.md
+    clinical-safety/      HAZARD-REGISTRY.md, HAZARD-REGISTRY.xlsx
+    ig/                   IG.md, DPIA.md
+    security/             SECURITY-REGISTRY.md
     prototype/            index.html
-    design/               API-CONTRACT.yaml, DB-SCHEMA.sql, DATA-MODELS.md, ERROR-CATALOGUE.md, CONTRACT.md
     session-close/        SESSION-CLOSE-P01.md … SESSION-CLOSE-P08.md
     review/               REVIEW-{id}.md
     project/              PROJECT.md
 ```
 
+**Scope:** the only per-requirement files (carrying a `{id}` suffix) are `REQ-{id}.md`, `FLOW-{id}.md`, `CHANGE-{id}.md` and `TEST-{id}.md` — what an agent loads for a single task. Every other artefact is per-project: one file, ratified once by the owning role, referenced by many requirements.
+
+**The REQ file is a thin index.** It holds P01-owned content only (requirements, ACs with stable `AC-{req_id}-{seq}` IDs, the Evaluation Function Specification, compliance anchors) plus a References block pointing into each downstream artefact. Downstream stages write their full output to their own artefact and only a summary + reference into the REQ. See `artefact-scope-restructure-design.md`.
+
 `FLOW-{id}.md` is the human-readable Mermaid rendering of a requirement's flow, for audit only. The structured flow model lives in the DB and is what downstream stages read — the rendering is never parsed.
+
+**Traceability is bidirectional:** the REQ references the project artefact; each project artefact section references back the `REQ-{id}`s it serves. P09 Normalisation enforces reference integrity in both directions.
+
+**Mixed structure needs no migration.** New projects use this structure; existing projects keep their current REQ files. The pipeline reads both shapes and resolves a stage's content whether it sits inline in the REQ or as a reference to a dedicated artefact. Old projects age out naturally.
+
+*Changes vs v4.2:* `architecture/ARCH-{id}.md` → `architecture/ARCH.md`; `ig/IG-{id}.md` → `ig/IG.md` (+ `DPIA.md`); `security/SEC-{id}.md` → `security/SECURITY-REGISTRY.md`; new `pxd/PXD.md`; new `requirements/TEST-{id}.md`; `clinical-safety/DCB0129-{id}.*` → `clinical-safety/HAZARD-REGISTRY.*`.
 
 ---
 
@@ -642,6 +712,9 @@ Project.SessionCloseEnabled                      ✅ LIVE — Plan 4c
 Swarm.ManifestGenerationEnabled                  📋 Plan 6
 Swarm.GitHubWebhookEnabled                       📋 Plan 6
 Swarm.SeparatedTddEnabled                        📋 Plan 5
+
+ArtefactRestructure.Enabled                      📋 Plan 5 (REQ-as-index + per-project artefacts)
+ArtefactRestructure.TestRegistryEnabled          📋 Plan 5 (TEST-{id}.md generation)
 
 Learning.SignalCollectionEnabled                 📋 Plan 9
 Learning.ProposalGenerationEnabled               📋 Plan 9

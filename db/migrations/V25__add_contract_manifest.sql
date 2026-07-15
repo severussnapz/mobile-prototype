@@ -5,7 +5,7 @@ CREATE TABLE contract_manifest (
     created_by TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT pk_contract_manifest PRIMARY KEY (contract_manifest_id),
-    CONSTRAINT fk_contract_manifest_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    CONSTRAINT fk_contract_manifest_project FOREIGN KEY (project_id) REFERENCES project(project_id) ON DELETE CASCADE,
     CONSTRAINT uq_contract_manifest_project_version UNIQUE (project_id, version)
 );
 
