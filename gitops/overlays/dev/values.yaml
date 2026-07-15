@@ -85,6 +85,19 @@ env:
   - name: Authentication__Audience
     value: 8a9616a7-f3ba-4626-8659-84d9cf272e0c
 
+  # CORS allowed origins for the frontend. Without these the app falls back to
+  # the localhost default and rejects the deployed frontend. The app applies the
+  # "AllowFrontend" policy (WithOrigins + AllowCredentials). Mirrors the origins
+  # configured for ai-scribe-eval-api in dev.
+  - name: Cors__AllowedOrigins__0
+    value: http://localhost:8080
+  - name: Cors__AllowedOrigins__1
+    value: http://localhost:8081
+  - name: Cors__AllowedOrigins__2
+    value: https://host.sbx.emishealthsolutions.com
+  - name: Cors__AllowedOrigins__3
+    value: https://app.dev.emishealthsolutions.com
+
 # --- Database migrations (EKS golden path) ----------------------------------
 # Flyway runs as an initContainer (chart `flyway:` block) in the API pod, before
 # the app container starts, applying db/migrations against the Aurora cluster.
