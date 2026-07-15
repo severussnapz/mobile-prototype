@@ -143,6 +143,15 @@ builder.Services.AddSwaggerGen(options =>
         Title = "Genesis.AI API",
         Version = "v1"
     });
+
+    // Publish /swagger/* into the spec so APIM path-based routing forwards the
+    // Swagger UI and OpenAPI JSON to the backend (APIM only routes declared
+    // operations).
+    options.DocumentFilter<Genesis.AI.Api.Swagger.SwaggerEndpointFilter>();
+
+    // Declare OPTIONS on every path so CORS pre-flight requests route through
+    // APIM to the app's CORS middleware.
+    options.DocumentFilter<Genesis.AI.Api.Swagger.CorsOptionsOperationFilter>();
 });
 
 var app = builder.Build();
