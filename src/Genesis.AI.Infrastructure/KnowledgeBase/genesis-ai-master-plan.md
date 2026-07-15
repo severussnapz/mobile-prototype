@@ -386,6 +386,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] Impact: users asking natural follow-up questions in help chat get irrelevant or misleading answers. Trust in the help chat degrades; users stop using it.
 - [ ] Short-term workaround: instruct users to include the subject in every query ("why are we doing the artefact scope restructure?") — the retrieval model needs the anchor in the query, not just in conversational context.
 - [ ] Fix direction: (1) structure-aware chunker with heading-path prefixes (Knowledge Layer Phase 3) gives each chunk enough subject context that retrieval scores correctly even on short queries; (2) hybrid tsvector + vector (Phase 5) catches identifier queries like "artefact scope restructure" via lexical match when vector score is weak; (3) pass last N turns of help chat history as retrieval context so follow-up queries inherit the subject anchor from the conversation.
+- [ ] Confirmed: help chat has vector retrieval only — no `get_artefact`, no direct file access. Each query hits the vector store independently with no conversation history. Interim fix (no chunker rewrite needed): in `HelpChatStreamService`, build the retrieval query as `{prior_turn_summary}: {current_message}` rather than just `{current_message}`. Small change, high impact on follow-up query precision.
 
 **Effort remaining:** ~2 weeks.
 **Owner:** Idris
