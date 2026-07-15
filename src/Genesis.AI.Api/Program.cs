@@ -147,8 +147,12 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Swagger in development
-if (app.Environment.IsDevelopment())
+// Swagger (OpenAPI) — served in Development, or in any environment when the
+// `Swagger:Enabled` flag is set (e.g. dev/int clusters that run as Production
+// but still want the API explorer). Off by default in deployed environments.
+var swaggerEnabled = app.Environment.IsDevelopment()
+    || app.Configuration.GetValue<bool>("Swagger:Enabled");
+if (swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
