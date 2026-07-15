@@ -60,7 +60,23 @@ RUN --mount=type=secret,id=JF_USER \
 
 FROM base AS final
 WORKDIR /app
+
+# Network tools for troubleshooting
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    netcat-openbsd \
+    net-tools \
+    iputils-ping \
+    dnsutils \
+    postgresql-client \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+
 COPY --from=publish /app/publish .
 COPY --from=public.ecr.aws/dynatrace/dynatrace-codemodules:1.329.67.20260112-133153-dotnet / /
 ENV LD_PRELOAD=/opt/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+
+USER app
 ENTRYPOINT ["dotnet", "Genesis.AI.Api.dll"]
