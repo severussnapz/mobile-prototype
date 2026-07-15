@@ -8,6 +8,37 @@ image:
   # release tags are used for int/stg/prd once those environments onboard.
   tag: latest
 
+flyway:
+  enabled: true
+  image:
+    repository: 442042551704.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
+    tag: latest
+    pullPolicy: Always
+  args: ["migrate"]
+  env:
+    # Aurora writer endpoint (ApplicationStack status `rdsClusterEndpoint`).
+    # TODO: set once the stack provisions.
+    - name: FLYWAY_URL
+      value: "jdbc:postgresql://genesis-ai-requirements-api-db-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com:5432/genesis_ai_requirements"
+    - name: FLYWAY_USER
+      valueFrom:
+        secretKeyRef:
+          name: rds-credentials
+          key: username
+    - name: FLYWAY_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: rds-credentials
+          key: password
+    # Aurora can briefly refuse connections immediately after provisioning/sync.
+    - name: FLYWAY_CONNECT_RETRIES
+      value: "60"
+  volumeMounts:
+    - mountPath: /mnt/secrets-store
+      name: db-master-secret
+      readOnly: true
+
+
 # Full application environment for dev.
 #
 # Declared in one place because Argo/Helm REPLACE list values across valueFiles
@@ -44,8 +75,17 @@ env:
     value: "5432"
   - name: RDS_DB_NAME
     value: genesis_ai_requirements
-  - name: RDS_USER
-    value: genesis_ai_app
+  - name: RDS_USERNAME
+    valueFrom:
+      secretKeyRef:
+        key: username
+        name: rds-credentials
+  - name: RDS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        key: password
+        name: rds-credentials
+
   # Dev OIDC settings for JWT bearer auth.
   # TODO: confirm the dev identity Authority + Audience values.
   - name: Authentication__Authority
@@ -72,31 +112,6 @@ env:
 # runs); the flyway initContainer reads username/password from it via secretKeyRef.
 # The running API itself uses RDS IAM auth (RDS_HOST above) and never reads this
 # secret.
-flyway:
-  enabled: true
-  image:
-    repository: 442042551704.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
-    tag: latest
-    pullPolicy: Always
-  args: ["migrate"]
-  env:
-    # Aurora writer endpoint (ApplicationStack status `rdsClusterEndpoint`).
-    # TODO: set once the stack provisions.
-    - name: FLYWAY_URL
-      value: "jdbc:postgresql://genesis-ai-requirements-api-db-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com:5432/genesis_ai_requirements"
-    - name: FLYWAY_USER
-      valueFrom:
-        secretKeyRef:
-          name: rds-credentials
-          key: username
-    - name: FLYWAY_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: rds-credentials
-          key: password
-    # Aurora can briefly refuse connections immediately after provisioning/sync.
-    - name: FLYWAY_CONNECT_RETRIES
-      value: "60"
 
 # CSI mount that drives the Secrets Store driver to sync the RDS master secret
 # into the `rds-credentials` K8s Secret (see secretProviderClass below). The
@@ -111,14 +126,14 @@ volumes:
       driver: secrets-store.csi.k8s.io
       readOnly: true
       volumeAttributes:
-        secretProviderClass: genesis-ai-requirements-api-db-master-spc
+        secretProviderClass: db-master-spc
 
 # Syncs the RDS-managed master secret into a `rds-credentials` K8s Secret that
 # the flyway initContainer reads via secretKeyRef.
 secretProviderClass:
   enabled: true
   region: eu-west-2
-  name: genesis-ai-requirements-api-db-master-spc
+  name: db-master-spc
   objects:
     # ARN of the RDS-managed master secret (ApplicationStack status
     # `masterUserSecret`). TODO: set once the stack provisions.
