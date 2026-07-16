@@ -14,31 +14,29 @@ public sealed class EmbeddedPromptService : IPromptService
     private static readonly FrozenDictionary<StageType, string[]> PhaseDefinitions = new Dictionary<StageType, string[]>
     {
         [StageType.RequirementsDiscovery] = [
-            "mode_selection",           // 0
-            "strategic_context",        // 1
-            "product_context",          // 2
-            "personas_users",           // 3
-            "core_workflow",            // 4
-            "requirements_elicitation", // 5
-            "non_functional",           // 6
-            "integration_points",       // 7
-            "assumptions_risks",        // 8
-            "constraints",              // 9
-            "success_metrics",          // 10
-            "finalise_and_polish",      // 11
-            "feedback"                  // 12
+            "business_context",         // 0
+            "classifier",               // 1
+            "users_and_personas",       // 2
+            "core_workflow",            // 3
+            "non_functional",           // 4
+            "compliance_anchoring",     // 5
+            "finalisation"              // 6
         ],
         [StageType.Architecture] = [
             "context_loading",          // 0
-            "cross_requirement_questions", // 1
+            "technology_stack",         // 1
             "bdat_analysis",            // 2
-            "adr_creation",             // 3
+            "platform_boundaries",      // 3
             "failure_modes",            // 4
             "integration_points",       // 5
-            "service_classification",   // 6
-            "evaluation_specs",         // 7
-            "verify_and_complete",      // 8
-            "feedback"                  // 9
+            "aws_well_architected",     // 6
+            "emis_principles",          // 7
+            "operations_monitoring",    // 8
+            "performance_cost",         // 9
+            "security_architecture",    // 10
+            "mermaid_diagrams",         // 11
+            "verify_and_gap_fill",      // 12
+            "feedback"                  // 13
         ],
         [StageType.Design] = [
             "context_loading",          // 0
@@ -75,15 +73,17 @@ public sealed class EmbeddedPromptService : IPromptService
         [StageType.ClinicalSafety] = [
             "context_loading",          // 0
             "hazard_identification",    // 1
-            "severity_assessment",      // 2
-            "likelihood_assessment",    // 3
-            "risk_evaluation",          // 4
-            "mitigation_design",        // 5
+            "hazard_severity",          // 2
+            "hazard_likelihood",        // 3
+            "risk_matrix",              // 4
+            "control_elicitation",      // 5
             "residual_risk",            // 6
-            "guardrail_mapping",        // 7
-            "cso_review",              // 8
-            "write_to_file",            // 9
-            "feedback"                  // 10
+            "hazard_cards",             // 7
+            "guardrail_mapping",        // 8
+            "dcb0129_check",            // 9
+            "cso_signoff",              // 10
+            "write_and_gate",           // 11
+            "cso_final_review"          // 12
         ],
         [StageType.InformationGovernance] = [
             "context_loading",          // 0
@@ -106,23 +106,17 @@ public sealed class EmbeddedPromptService : IPromptService
             "feedback"                  // 7
         ],
         [StageType.Normalisation] = [
-            "context_loading",          // 0
-            "incremental_check",        // 1
-            "extraction",               // 2
-            "cross_cutting",            // 3
-            "validation",               // 4
-            "output_generation",        // 5
-            "feedback"                  // 6
+            "intake_and_plan",          // 0
+            "per_requirement_gap_fill", // 1
+            "gate_verification",        // 2
+            "handoff"                   // 3
         ],
         [StageType.Planning] = [
-            "context_loading",          // 0
-            "dependency_analysis",      // 1
-            "task_generation",          // 2
-            "layer_ordering",           // 3
-            "gate_insertion",           // 4
-            "self_review",              // 5
-            "output_generation",        // 6
-            "feedback"                  // 7
+            "intake",                   // 0
+            "artefact_intake",          // 1
+            "task_plan_generation",     // 2
+            "em_review_gate",           // 3
+            "confirmed_ready"           // 4
         ],
         [StageType.Prototype] = [
             "context_loading",          // 0

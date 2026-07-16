@@ -24,11 +24,11 @@ public class EmbeddedPromptServiceTests
     }
 
     [Fact]
-    public void GetTotalPhases_ForRequirementsDiscovery_ReturnsTwelve()
+    public void GetTotalPhases_ForRequirementsDiscovery_ReturnsSix()
     {
         var totalPhases = _service.GetTotalPhases(StageType.RequirementsDiscovery);
 
-        Assert.Equal(12, totalPhases);
+        Assert.Equal(6, totalPhases);
     }
 
     [Fact]
@@ -36,8 +36,8 @@ public class EmbeddedPromptServiceTests
     {
         var phaseNames = _service.GetPhaseNames(StageType.RequirementsDiscovery);
 
-        Assert.Equal("mode_selection", phaseNames[0]);
-        Assert.Contains("feedback", phaseNames);
+        Assert.Equal("business_context", phaseNames[0]);
+        Assert.Contains("finalisation", phaseNames);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class EmbeddedPromptServiceTests
         var phaseNames = _service.GetPhaseNames(StageType.Architecture);
 
         Assert.Contains("bdat_analysis", phaseNames);
-        Assert.Contains("adr_creation", phaseNames);
+        Assert.Contains("technology_stack", phaseNames);
     }
 
     [Fact]
