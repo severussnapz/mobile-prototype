@@ -150,18 +150,16 @@ public class ConversationStreamController : ControllerBase
             await _conversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        // Build message history for AI — the system prompt already injects full session state
-        // (phase, parking lot, artefact manifest) so the LLM does not need the full conversation
-        // to re-orient. We only send the last 4 messages (2 exchanges) for immediate conversational
-        // context. Sending more causes linear input-token growth with no correctness benefit.
-        const int maxHistoryMessages = 4;
+        // Build full message history for AI.
+        // The conversation history is the work product — truncating it loses captured content
+        // that has not yet been saved as an artefact, breaking session continuity. If a session
+        // is interrupted, the DB holds the full history and it is reloaded on resume. Saved
+        // artefacts are re-injected via foundation, so completed phases do not inflate token cost.
         var orderedMessages = conversation.Messages
             .OrderBy(message => message.CreatedAt)
             .ToList();
 
-        var windowedMessages = orderedMessages.Count <= maxHistoryMessages
-            ? orderedMessages
-            : orderedMessages.Skip(orderedMessages.Count - maxHistoryMessages).ToList();
+        var windowedMessages = orderedMessages;
 
         var messages = windowedMessages
             .Select(message => new AiMessage(
