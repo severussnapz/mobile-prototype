@@ -344,8 +344,8 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [x] Bulk push button noop fixed ✅
 - [x] Session-close button noop fixed ✅
 - [x] BA validation session on a real feature requirement ✅
-- [ ] `PrototypeSingleFileEnabled: true` flipped in production
-- [ ] Anchor failure root cause resolved — surgical edit fingerprint mismatches, fix root cause not symptom
+- [x] `PrototypeSingleFileEnabled: true` flipped in production ✅ — committed to `appsettings.json` July 2026. BA validation session to follow.
+- [x] Anchor failure root cause resolved ✅ — Mode 2 `UntargetedChildrenChanged` guard incorrectly fired on leaf elements; guard now skips when `originalChildCount == 0`. SVG self-closing serialisation handled by fingerprint matching. Verified live in prototype session July 2026. All 26 unit + 12 integration tests passing.
 - [ ] Both PRs merged to main
 
 **Contract layer implementation (contract-layer-design.md §10 items 2–6):**
