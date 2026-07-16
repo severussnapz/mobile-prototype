@@ -1,0 +1,60 @@
+# Promotes a published release (cut by release-please) through int then stg.
+#
+# int deploys automatically. stg is gated: the `approve-stg` job binds the
+# `staging` GitHub Environment, so its required-reviewers protection rule pauses
+# the run until a human approves — only then does `applications-stg` run.
+# (A job that calls a reusable workflow cannot declare `environment:` itself,
+# so the gate is a separate job the stg deploy depends on.)
+name: GitOps Deploy INT & STG
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: gitops-int-stg
+  cancel-in-progress: false
+
+jobs:
+  # ── INT (automatic) ──────────────────────────────────────────
+  applications-int:
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/gitops-application-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      environment: int
+      gitops_project_name: genesis-ai-requirements-api
+      gitops_overlays_path: gitops/overlays
+      gitops_application_file_prefix: application
+    secrets:
+      GITOPS_URL: ${{ secrets.GITOPS_URL }}
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+
+  # ── STG approval gate ────────────────────────────────────────
+  # Binds the `staging` GitHub Environment; its required-reviewers rule holds
+  # the run here until approved. Configure reviewers in repo Settings →
+  # Environments → staging.
+  approve-stg:
+    needs: [applications-int]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Approved for STG
+        run: echo "STG deployment approved — proceeding."
+
+  # ── STG (after approval) ─────────────────────────────────────
+  applications-stg:
+    needs: [approve-stg]
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/gitops-application-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      environment: stg
+      gitops_project_name: genesis-ai-requirements-api
+      gitops_overlays_path: gitops/overlays
+      gitops_application_file_prefix: application
+    secrets:
+      GITOPS_URL: ${{ secrets.GITOPS_URL }}
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}

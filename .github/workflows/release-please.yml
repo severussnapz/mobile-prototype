@@ -1,0 +1,25 @@
+# Runs release-please on every push to main. Accumulates conventional commits
+# into a release PR; merging that PR tags a version and publishes a GitHub
+# release, which triggers build-release.yml (versioned image) and
+# gitops-deploy-int-stg.yaml (int -> stg promotion).
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/release-please-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      GIT_SIGNING_EMAIL: ${{ vars.GIT_SIGNING_EMAIL }}
+      GIT_SIGNING_NAME: ${{ vars.GIT_SIGNING_NAME }}
+    secrets:
+      GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+      GIT_SIGNING_KEY: ${{ secrets.GIT_SIGNING_KEY }}
+      GIT_SIGNING_PASSPHRASE: ${{ secrets.GIT_SIGNING_PASSPHRASE }}

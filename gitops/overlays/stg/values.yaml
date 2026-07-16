@@ -1,0 +1,38 @@
+# Stg environment overrides for the emisx-service chart.
+#
+# ⚠️ SCAFFOLD — not yet deployable. See gitops/overlays/int/values.yaml header:
+# the full application `env:`, `flyway:`, `volumes`, `secretProviderClass` and
+# `SecurityGroupPolicy` blocks must be copied from the dev overlay and populated
+# with stg-specific PROVISIONED values once the stg ApplicationStack is applied.
+#   • Confirm the stg ECR account id below (266735822099 mirrors the reference
+#     hello-world stg account — verify for this service).
+#   • stg deploy is human-gated via the `staging` GitHub Environment.
+replicaCount: 2
+
+image:
+  repository: 266735822099.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api
+  pullPolicy: IfNotPresent
+  # Immutable release tag — release-please rewrites this on every release.
+  tag: v0.0.0 # x-release-please-version
+
+flyway:
+  enabled: true
+  image:
+    repository: 266735822099.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
+    tag: v0.0.0 # x-release-please-version
+    pullPolicy: IfNotPresent
+  args: ["migrate"]
+  # TODO: add FLYWAY_URL / FLYWAY_USER / FLYWAY_PASSWORD (stg Aurora endpoint +
+  # rds-credentials secret) once the stg ApplicationStack is provisioned.
+
+labels:
+  emis-x.uk/hosting_location: aws.266735822099
+  emis-x.uk/portfolio: "266735822099"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+# TODO: full `env:` block — see header. Not deployable until provisioned.
