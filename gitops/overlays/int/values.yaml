@@ -1,0 +1,41 @@
+# Int environment overrides for the emisx-service chart.
+#
+# ⚠️ SCAFFOLD — this overlay is not yet deployable. The full application `env:`
+# block (RDS_HOST, Authentication__Authority/Audience, Cors__AllowedOrigins,
+# S3 bucket, secretProviderClass secret ARN, SecurityGroupPolicy groupIds) lives
+# in the dev overlay because those values are environment-specific and PROVISIONED.
+# The int ApplicationStack (gitops/overlays/int/manifests) has not been applied
+# yet, so those endpoints/ARNs/SG ids do not exist.
+#
+# To activate int:
+#   1. Provision the int ApplicationStack (creates RDS, ECR, secret, SG, S3).
+#   2. Copy the `env:`, `flyway:`, `volumes/volumeMounts`, `secretProviderClass`
+#      and `SecurityGroupPolicy` blocks from gitops/overlays/dev/values.yaml and
+#      replace every dev value (442042551704 account, RDS endpoint, secret ARN,
+#      sg-02895b4f…, identity Authority/Audience, CORS origins) with the int ones.
+#   3. Confirm the int ECR account id below (481665089315 mirrors the reference
+#      hello-world int account — verify it is correct for this service).
+replicaCount: 2
+
+image:
+  repository: 481665089315.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api
+  pullPolicy: IfNotPresent
+  # Immutable release tag — release-please rewrites this on every release, and
+  # Argo rolls int automatically when it changes (no restart hack).
+  tag: v0.0.0 # x-release-please-version
+
+flyway:
+  enabled: true
+  image:
+    repository: 481665089315.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
+    tag: v0.0.0 # x-release-please-version
+    pullPolicy: IfNotPresent
+  args: ["migrate"]
+  # TODO: add FLYWAY_URL / FLYWAY_USER / FLYWAY_PASSWORD (int Aurora endpoint +
+  # rds-credentials secret) once the int ApplicationStack is provisioned.
+
+labels:
+  emis-x.uk/hosting_location: aws.481665089315
+  emis-x.uk/portfolio: "481665089315"
+
+# TODO: full `env:` block — see header. Not deployable until provisioned.

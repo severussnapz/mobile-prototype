@@ -1,0 +1,78 @@
+# Builds immutable, versioned images for int & stg on a published GitHub release
+# (cut by release-please). Unlike build.yml (which pushes mutable `:latest` for
+# dev), this tags images with the release tag so Argo CD detects the change and
+# rolls int/stg automatically — no restart hack needed.
+name: Build Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_apim_pr:
+        description: "Create APIM PR for the generated OpenAPI spec"
+        required: false
+        type: boolean
+        default: false
+  release:
+    types:
+      - published
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-push:
+    name: "Build & Push"
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/docker-build-push-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      image-name: genesis-ai-requirements-api
+      dockerfile: Dockerfile
+      environments: "['int', 'stg']"
+      project_key: emis
+      tag: ${{ github.event.release.tag_name }}
+      artifact-paths: '[{"artifact": "openapi-spec", "path": "/app/docs/openapi/specification.json"}]'
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_ROLE_ARN: ${{ secrets.ECR_ROLE_ARN }}
+      GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+      ZSCALER_BASE64_ROOT_CA: ${{ secrets.ZSCALER_BASE64_ROOT_CA }}
+
+  flyway-build-and-push:
+    name: "Flyway (DB migration) Build & Push"
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/docker-build-push-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      image-name: genesis-ai-requirements-api-flyway
+      dockerfile: db/Dockerfile
+      environments: "['int', 'stg']"
+      project_key: emis
+      tag: ${{ github.event.release.tag_name }}
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_ROLE_ARN: ${{ secrets.ECR_ROLE_ARN }}
+      GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+      ZSCALER_BASE64_ROOT_CA: ${{ secrets.ZSCALER_BASE64_ROOT_CA }}
+
+  update-apim-spec:
+    name: Update APIM Spec
+    if: github.event_name == 'release' || github.event.inputs.create_apim_pr
+    needs: build-and-push
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/pull-request-from-artifacts.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      artifacts: '[{"artifact": "openapi-spec", "path": "apiops/artifacts/apis/genesis-ai-requirements-api/specification.json"}]'
+      target-repo: emisgroup/apim
+      target-branch-base: update-genesis-ai-requirements-api-spec
+      pr-title: "Update Genesis AI Requirements API OpenAPI spec"
+      pr-body: |
+        ## Auto-generated APIM Spec Update
+
+        **API:** `genesis-ai-requirements-api`
+        **Release:** `${{ github.event.release.tag_name }}`
+
+        - **Repository:** [${{ github.repository }}](${{ github.server_url }}/${{ github.repository }})
+        - **Commit:** [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+        - **Workflow Run:** [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+      pr-labels: '["automated", "apiops", "openapi-spec", "genesis-ai-requirements-api"]'
+    secrets:
+      GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
+      GIT_SIGNING_KEY: ${{ secrets.GIT_SIGNING_KEY }}
+      GIT_SIGNING_PASSPHRASE: ${{ secrets.GIT_SIGNING_PASSPHRASE }}
