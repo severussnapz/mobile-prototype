@@ -82,3 +82,20 @@ jobs:
       GIT_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
       GIT_SIGNING_KEY: ${{ secrets.GIT_SIGNING_KEY }}
       GIT_SIGNING_PASSPHRASE: ${{ secrets.GIT_SIGNING_PASSPHRASE }}
+
+  # Roll dev onto the freshly-pushed `:latest`. Because the image tag never
+  # changes, Argo sees no manifest diff and would otherwise leave the old pods
+  # running — gitops_restart forces a rollout so the new image is pulled.
+  deploy-dev:
+    name: Deploy DEV (restart)
+    needs: build-and-push
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/gitops-application-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      environment: dev
+      gitops_project_name: genesis-ai-requirements-api
+      gitops_overlays_path: gitops/overlays
+      gitops_application_file_prefix: application
+      gitops_restart: true
+    secrets:
+      GITOPS_URL: ${{ secrets.GITOPS_URL }}
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}

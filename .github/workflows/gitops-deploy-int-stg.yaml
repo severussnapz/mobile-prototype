@@ -1,0 +1,49 @@
+# Promotes a published release (cut by release-please) through int then stg.
+#
+# int deploys automatically. stg is gated: the shared gitops-application-template
+# job binds `environment: stg`, so the `stg` GitHub Environment's required-
+# reviewers protection rule pauses the run until a human approves. Configure
+# reviewers in repo Settings → Environments → stg.
+name: GitOps Deploy INT & STG
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: gitops-int-stg
+  cancel-in-progress: false
+
+jobs:
+  # ── INT (automatic) ──────────────────────────────────────────
+  applications-int:
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/gitops-application-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      environment: int
+      gitops_project_name: genesis-ai-requirements-api
+      gitops_overlays_path: gitops/overlays
+      gitops_application_file_prefix: application
+    secrets:
+      GITOPS_URL: ${{ secrets.GITOPS_URL }}
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+
+  # ── STG (gated by the `stg` GitHub Environment) ──────────────
+  # The shared template's job sets `environment: stg`, so the stg environment's
+  # required-reviewers rule holds the run until approved.
+  applications-stg:
+    needs: [applications-int]
+    uses: emisgroup/emisx-platform-engineering/.github/workflows/gitops-application-template.yaml@42848be98938c6decac1d6890763d2ed031c6f55 # shared-gha-workflow-templates v7.12.1
+    with:
+      environment: stg
+      gitops_project_name: genesis-ai-requirements-api
+      gitops_overlays_path: gitops/overlays
+      gitops_application_file_prefix: application
+    secrets:
+      GITOPS_URL: ${{ secrets.GITOPS_URL }}
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
