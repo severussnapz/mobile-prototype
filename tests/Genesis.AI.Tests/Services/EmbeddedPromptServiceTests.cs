@@ -24,11 +24,11 @@ public class EmbeddedPromptServiceTests
     }
 
     [Fact]
-    public void GetTotalPhases_ForRequirementsDiscovery_ReturnsSix()
+    public void GetTotalPhases_ForRequirementsDiscovery_ReturnsSeven()
     {
         var totalPhases = _service.GetTotalPhases(StageType.RequirementsDiscovery);
 
-        Assert.Equal(6, totalPhases);
+        Assert.Equal(7, totalPhases);
     }
 
     [Fact]

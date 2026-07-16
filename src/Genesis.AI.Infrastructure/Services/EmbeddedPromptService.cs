@@ -164,7 +164,7 @@ public sealed class EmbeddedPromptService : IPromptService
     public int GetTotalPhases(StageType stageType)
     {
         return PhaseDefinitions.TryGetValue(stageType, out var phases)
-            ? phases.Length - 1  // 0-indexed, so total = length - 1
+            ? phases.Length  // 1-indexed display: "Phase 1 of 7" not "Phase 0 of 6"
             : 12;
     }
 
