@@ -67,6 +67,9 @@ readinessProbe:
   # connect; failureThreshold still gates a genuine outage.
   timeoutSeconds: 5
 
+networkPolicy:
+  create: true
+
 nodeSelector:
   kubernetes.io/os: linux
   kubernetes.io/arch: arm64
