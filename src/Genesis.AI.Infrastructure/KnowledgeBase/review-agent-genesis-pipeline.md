@@ -142,6 +142,51 @@ In addition to the base APP rules, enforce:
 
 ---
 
+
+---
+
+### GENESIS-010 — Side-Effect Services Must Not Throw in Constructors (Critical)
+
+Services that implement optional side effects (GitHub push, notifications, analytics) must never throw in their constructors when optional configuration is absent.
+
+**Blocked patterns:**
+- Constructor reads an environment variable and throws `InvalidOperationException` when absent
+- Service registration that unconditionally registers a throwing implementation regardless of whether the feature is configured
+
+**Required pattern:** Check for the presence of optional configuration at DI registration time. When absent, register a no-op implementation that logs a warning and returns safely. The primary operation must always complete regardless of optional side-effect service availability.
+
+**Evidence:** `GitHubAppTokenService` and `AesSecretEncryptionService` threw in constructors when `GITHUB_APP_ID`/`SECRET_ENCRYPTION_KEY` were absent — crashed session-close endpoint with 500, preventing SESSION-CLOSE artefact from being written.
+
+---
+
+### GENESIS-011 — API Client HTTP Verb Must Match Controller HTTP Verb (High)
+
+Every API client method must use the HTTP verb that matches the controller action attribute.
+
+**Blocked patterns:**
+- `apiClient.put(...)` calling an endpoint decorated with `[HttpPatch]`
+- `apiClient.get(...)` calling an endpoint decorated with `[HttpPost]`
+
+**Required pattern:** Before writing any API client call, grep the controller to verify the HTTP verb attribute. Never rely on memory or assumption.
+
+**Why unit tests don't catch this:** The TypeScript client compiles against its own interface; the C# controller compiles against its own attributes. Nothing in either test suite verifies they agree. Only a real HTTP integration test making the call and asserting a non-405 response will catch this. Proved live: `projectNotesApi.update` and `projectDecisionsApi.update` used `PUT` but controllers used `[HttpPatch]` — 405 in production, zero unit test failures.
+
+---
+
+### GENESIS-012 — Scope-Level Load Must Carry Owning Identifier to Mutation (High)
+
+When data is loaded at a broader scope than the mutation endpoint, the item's owning identifier must be carried through to the mutation call.
+
+**Blocked patterns:**
+- Loading items at project level, then deleting using the current conversation ID
+- Any mutation that uses the current context's identifier instead of the item's own identifier
+
+**Required pattern:** Mutation handlers receive the full resource object and use the item's own owning identifier (e.g. `item.conversationId`), not the ambient context identifier.
+
+**Why this fails:** Items created in prior sessions belong to different conversations but are shown in the current session's UI (loaded at project scope). Mutations using the current conversation ID will 404 for any item not created in the current session.
+
+---
+
 ## Verdict Gate
 
 BLOCKED if any of GENESIS-001 through GENESIS-004, GENESIS-007, or a safety-relevant seam test (GENESIS-008 types 3/5) is violated.

@@ -24,6 +24,11 @@ A seam test asserts a specific handoff completes end to end. It only passes if t
 4. **Tool registration → wiring.** Every tool in the tool definitions has a wiring test proving the execution path handles it.
 5. **Pin → resolution.** Where a version-pinning mechanism exists, assert a pinned consumer receives the *pinned* version, not latest.
 
+
+6. **API client verb → controller HTTP verb match.** For every API client method (`apiClient.get/post/put/patch/delete`), assert the controller action uses the matching HTTP verb attribute (`[HttpGet]/[HttpPost]/[HttpPut]/[HttpPatch]/[HttpDelete]`). Unit tests on either side cannot catch this mismatch — the client compiles against the TypeScript interface, and the controller compiles against C# attributes, with nothing verifying they agree. Only a real HTTP integration test making the call and asserting a non-405 response will catch it. Proved live: `projectNotesApi.update` and `projectDecisionsApi.update` used `PUT` but controllers used `[HttpPatch]` — 405 in production, zero unit test failures.
+
+7. **Scope-level load → ownership-level mutation identity match.** When data is loaded at a broader scope than the mutation endpoint (e.g. project-level load of parking lot items, conversation-level delete), the item's owning identifier must be carried through to the mutation call. If the mutation uses the current context's identifier instead of the item's own identifier, the mutation will fail for any item not created in the current context. Proved live: parking lot items loaded at project level (`GET /projects/{id}/parking-lot`) but deleted using current `conversationId` — 404 for any item from a prior session. Fix: mutation receives the full resource object and uses `item.conversationId`, not the current conversation ID.
+
 ## Rules that keep the guard honest
 
 - **Opt-outs are governed.** Reflection-based completeness tests need escape hatches for genuinely internal fields — and an ungoverned escape hatch becomes the new silent gap. Every opt-out requires a reason string and is itself reviewed.
