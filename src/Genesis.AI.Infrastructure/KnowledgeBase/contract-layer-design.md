@@ -42,7 +42,7 @@ Each file is a normal Genesis artefact under `.genesis/design/`:
   DB-SCHEMA.sql
   DATA-MODELS.md
   ERROR-CATALOGUE.md
-  CONTRACT.md          ← the manifest (see §3)
+  CONTRACT-MANIFEST.md          ← the manifest (see §3)
 ```
 
 ---
@@ -59,7 +59,7 @@ Four files versioning independently means `API-CONTRACT.yaml` could be at v3 whi
 
 ### The manifest (chosen solution)
 
-A fifth artefact, `CONTRACT.md`, is a **manifest** that pins the exact version of each of the four files as a coherent set:
+A fifth artefact, `CONTRACT-MANIFEST.md`, is a **manifest** that pins the exact version of each of the four files as a coherent set:
 
 ```
 # Contract v3
@@ -190,7 +190,7 @@ The BA and the role-holders never see raw contract files. They see what Genesis 
 
 1. Contract = four plain-text files (`API-CONTRACT.yaml`, `DB-SCHEMA.sql`, `DATA-MODELS.md`, `ERROR-CATALOGUE.md`) under `.genesis/design/`.
 2. Versioned by the existing per-`(ProjectId, FilePath)` mechanism — no schema change, no new folder hierarchy.
-3. A `CONTRACT.md` manifest pins a coherent set of file versions; downstream stages pin the manifest version (one number).
+3. A `CONTRACT-MANIFEST.md` manifest pins a coherent set of file versions; downstream stages pin the manifest version (one number).
 4. Breaking changes reuse the existing CHANGE-record + domain-badge pattern.
 5. Resumption uses a pin (stage records approved-against manifest version) + a staleness check on resume; badge decides whether re-review is forced.
 6. Tagging: P04 drafts mechanically from upstream anchors (marked draft); P06/P07/P08 role-holders ratify as a by-product of their existing assessment; ratification is a hard gate.
