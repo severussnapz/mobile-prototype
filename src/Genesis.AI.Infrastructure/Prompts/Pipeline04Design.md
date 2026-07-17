@@ -497,7 +497,11 @@ At completion, save an updated `manifest.md` via `save_artefact`:
 2. Then update `design/CONTRACT-MANIFEST.md`.
 3. First REQ for this project: use `save_artefact` to create `design/CONTRACT-MANIFEST.md` with all six sections.
 4. Subsequent REQs: use `edit_artefact` for surgical updates only. Never rewrite `COMPLETE` rows from prior REQs.
-5. Update `## 1. Status Header`: bump manifest version, set last updated date, set last REQ processed.
+5. Update `## 1. Status Header`: bump manifest version, set last updated date, set last REQ processed. Immediately after the Status Header content, write these three HTML comments exactly, before `## 2. Pinned File Versions`:
+  `<!-- contract-manifest-version: {N} -->`
+  `<!-- req-provenance: {filePath}@v{version},{filePath}@v{version} -->`
+  `<!-- arch-provenance: architecture/ARCH.md@v{version} -->`
+  Rules: `contract-manifest-version` = the new manifest version number. `req-provenance` = comma-separated list of every `COMPLETE` REQ in `## 3. Requirement Ledger`, formatted `{full filePath}@v{REQ version at design}`. `arch-provenance` = the `architecture/ARCH.md` version from `## 2. Pinned File Versions`. These comments are machine-readable. Write them exactly as shown, with no extra spaces and no line breaks within a comment.
 6. Update `## 2. Pinned File Versions`: re-pin all five file versions to current versions.
 7. Update `## 3. Requirement Ledger`: mark this REQ `PENDING` → `COMPLETE`, stamp REQ version at design, stamp ARCH version at design.
 8. Update `## 4. Shared Element Index`: add newly owned elements, mark reused elements in `Also used by`.
