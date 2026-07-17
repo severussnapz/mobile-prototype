@@ -17,7 +17,6 @@ flyway:
   args: ["migrate"]
   env:
     # Aurora writer endpoint (ApplicationStack status `rdsClusterEndpoint`).
-    # TODO: set once the stack provisions.
     - name: FLYWAY_URL
       value: "jdbc:postgresql://genesis-ai-requirements-api-rds-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com:5432/genesis_ai_requirements"
     - name: FLYWAY_USER
@@ -44,7 +43,7 @@ flyway:
 # passwordless connection string and signs short-lived IAM tokens
 # (DependencyInjection.AddPersistence). The pod-identity role needs the
 # `rds-db:connect` action for db user `genesis_ai_app` (provisioned by the KRO
-# RDS composite on branch feat/kro-rds-definition).
+# RDS composite in the ApplicationStack).
 env:
   - name: "HTTP_PROXY"
     value: "185.46.212.92:443"
@@ -82,8 +81,7 @@ env:
   - name: Bedrock__ModelId
     value: anthropic.claude-sonnet-4-6
   # RDS (IAM auth). RDS_USER / RDS_DB_NAME mirror the ApplicationStack rds block.
-  # RDS_HOST is the Aurora cluster writer endpoint (rdsClusterEndpoint status
-  # output) — TODO: set once feat/kro-rds-definition is merged and the stack runs.
+  # RDS_HOST is the Aurora cluster writer endpoint (rdsClusterEndpoint status output).
   - name: RDS_HOST
     value: "genesis-ai-requirements-api-rds-dbc-aurora.cluster-ch0ckkyo8j17.eu-west-2.rds.amazonaws.com"
   - name: RDS_PORT
@@ -128,9 +126,9 @@ env:
 # the dedicated `genesis-ai-requirements-api-flyway` repo as `:latest`
 # (db/migrations baked in).
 #
-# Credentials: the initial schema — including V13, which grants `rds_iam` to
+# Credentials: the initial schema — including V26, which grants `rds_iam` to
 # genesis_ai_app — must run as the Aurora MASTER user, because IAM database auth
-# is not usable until V13 has been applied. genesis_ai_app is the cluster master
+# is not usable until V26 has been applied. `dbadmin` is the cluster master
 # username with an RDS-managed password in Secrets Manager. The top-level
 # `secretProviderClass` below syncs that secret into a `rds-credentials` K8s
 # Secret (the CSI volume mount on the pod drives the sync before the initContainer
@@ -161,7 +159,7 @@ secretProviderClass:
   name: app-csi-store
   objects:
     # ARN of the RDS-managed master secret (ApplicationStack status
-    # `masterUserSecret`). TODO: set once the stack provisions.
+    # `masterUserSecret`).
     - objectName: "arn:aws:secretsmanager:eu-west-2:442042551704:secret:rds!cluster-9df31198-19ce-421d-99f1-af2638266a33-uMMeko"
       objectType: secretsmanager
       jmesPath:
