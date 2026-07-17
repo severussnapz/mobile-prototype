@@ -130,6 +130,23 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
         return $"You are the Genesis AI help assistant. {contextInstruction}\n\n## Project Context\n{projectContent}\n\n## Genesis AI Knowledge\n{toolContent}";
     }
 
+    internal static string BuildRetrievalQuery(HelpConversation conversation, string currentMessage)
+    {
+        ArgumentNullException.ThrowIfNull(conversation);
+
+        var priorUserMessage = conversation.Messages
+            .Select((messageItem, index) => new { Message = messageItem, Index = index })
+            .Where(item => string.Equals(item.Message.Role, "user", StringComparison.Ordinal))
+            .OrderByDescending(item => item.Message.CreatedAt)
+            .ThenByDescending(item => item.Index)
+            .Select(item => item.Message)
+            .FirstOrDefault();
+
+        return priorUserMessage is null
+            ? currentMessage
+            : $"{priorUserMessage.Content}: {currentMessage}";
+    }
+
     private static bool TryReadStringProperty(object source, string propertyName, out string value)
     {
         var property = source.GetType().GetProperty(propertyName);

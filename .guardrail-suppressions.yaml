@@ -221,3 +221,10 @@ suppressions:
   - id: PG-008
     path: "db/migrations/V18__enable_pgvector.sql"
     justification: "pgvector extension approved for use via platform exception — required for Knowledge Service vector similarity search. Aurora PostgreSQL pgvector support confirmed with platform team."
+
+  # API-007: ReindexKnowledge returns 200 OK intentionally — this is a command that triggers
+  # a process and returns its result (indexed/skipped/failed counts), not a resource creation.
+  # 201 Created with a Location header is semantically wrong for a re-index operation.
+  - id: API-007
+    path: "src/Genesis.AI.Api/Features/Artefacts/ArtefactController.cs"
+    justification: "ReindexKnowledge is a process command returning a result, not a resource creation. 200 OK is the correct status code."

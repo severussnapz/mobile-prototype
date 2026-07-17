@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.Commands.CreateArtefacts;
+using Genesis.AI.Domain.Commands.ReindexProjectArtefacts;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Domain.Queries.GetArtefactById;
 using Genesis.AI.Domain.Queries.GetArtefactsByStage;
@@ -194,6 +195,30 @@ public class ArtefactController : ControllerBase
         });
 
         return Created(string.Empty, dtos);
+    }
+
+    [HttpPost("reindex")]
+    [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
+    public async Task<ActionResult<ReindexProjectArtefactsResponse>> ReindexKnowledge(
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var command = new ReindexProjectArtefactsCommand(projectId, User.GetUserErn() ?? "system");
+
+        ReindexProjectArtefactsResult result;
+        try
+        {
+            result = await _mediator.Send(command, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reindex knowledge for project {ProjectId}", projectId);
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                ApiErrorResponse.Create("503", "Service unavailable", "Unable to reindex artefacts. Please try again."));
+        }
+
+        return Ok(new ReindexProjectArtefactsResponse(result.Indexed, result.Skipped, result.Failed));
     }
 
 }
