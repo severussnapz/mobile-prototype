@@ -120,6 +120,31 @@ public class ConversationsApiTests : IDisposable
         Assert.Equal(HttpStatusCode.Created, saveArtefactResponse.StatusCode);
     }
 
+    private static async Task AdvanceToDesignStageAsync(
+        HttpClient client,
+        string requirementsStageId,
+        string prototypeStageId,
+        string projectId)
+    {
+        await SeedRequirementArtefactAsync(
+            client,
+            projectId,
+            "requirements/REQ-001.md",
+            "# Requirement");
+
+        var requirementsConversationId = await CreateConversationAsync(client, requirementsStageId);
+        Assert.NotNull(requirementsConversationId);
+
+        var completeRequirementsResponse = await client.PostAsync($"/api/v1/stages/{requirementsStageId}/complete", content: null);
+        Assert.Equal(HttpStatusCode.OK, completeRequirementsResponse.StatusCode);
+
+        var prototypeConversationId = await CreateConversationAsync(client, prototypeStageId);
+        Assert.NotNull(prototypeConversationId);
+
+        var completePrototypeResponse = await client.PostAsync($"/api/v1/stages/{prototypeStageId}/complete", content: null);
+        Assert.Equal(HttpStatusCode.OK, completePrototypeResponse.StatusCode);
+    }
+
     private static async IAsyncEnumerable<AiStreamEvent> CreateStreamEvents(
         IReadOnlyList<AiStreamEvent> events,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -606,23 +631,7 @@ public class ConversationsApiTests : IDisposable
                 StringComparison.OrdinalIgnoreCase));
         var designStageId = designStage.GetProperty("id").GetString()!;
 
-        await SeedRequirementArtefactAsync(
-            client,
-            projectId,
-            "requirements/REQ-001.md",
-            "# Requirement");
-
-        var requirementsConversationId = await CreateConversationAsync(client, requirementsStageId);
-        Assert.NotNull(requirementsConversationId);
-
-        var completeRequirementsResponse = await client.PostAsync($"/api/v1/stages/{requirementsStageId}/complete", content: null);
-        Assert.Equal(HttpStatusCode.OK, completeRequirementsResponse.StatusCode);
-
-        var prototypeConversationId = await CreateConversationAsync(client, prototypeStageId);
-        Assert.NotNull(prototypeConversationId);
-
-        var completePrototypeResponse = await client.PostAsync($"/api/v1/stages/{prototypeStageId}/complete", content: null);
-        Assert.Equal(HttpStatusCode.OK, completePrototypeResponse.StatusCode);
+        await AdvanceToDesignStageAsync(client, requirementsStageId, prototypeStageId, projectId);
 
         await SeedRequirementArtefactAsync(
             client,
