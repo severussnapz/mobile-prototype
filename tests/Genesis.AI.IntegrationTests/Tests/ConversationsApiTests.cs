@@ -570,4 +570,117 @@ public class ConversationsApiTests : IDisposable
             capturedMessages,
             message => message.Content.Contains("Question 1", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task StreamAiResponse_ContractManifestArtefactExists_ManifestContentPresentInPrompt()
+    {
+        var client = _factory.CreateAdminClient();
+        var projectContent = new StringContent(
+            """{"code":"P04","name":"Pipeline04 Test","description":"Test","timeSheetCode":"PORTASK0001045","complianceDomain":"Generic"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var projectResponse = await client.PostAsync("/api/v1/projects", projectContent);
+        var projectBody = await projectResponse.Content.ReadAsStringAsync();
+        using var projectDocument = JsonDocument.Parse(projectBody);
+        var projectData = projectDocument.RootElement.GetProperty("data");
+        var projectId = projectData.GetProperty("id").GetString()!;
+        var pipelineStages = projectData.GetProperty("pipelineStages").EnumerateArray().ToArray();
+        var requirementsStageId = pipelineStages
+            .First(stage => string.Equals(
+                stage.GetProperty("stageType").GetString(),
+                "requirements_discovery",
+                StringComparison.OrdinalIgnoreCase))
+            .GetProperty("id")
+            .GetString()!;
+        var prototypeStageId = pipelineStages
+            .First(stage => string.Equals(
+                stage.GetProperty("stageType").GetString(),
+                "prototype",
+                StringComparison.OrdinalIgnoreCase))
+            .GetProperty("id")
+            .GetString()!;
+        var designStage = pipelineStages
+            .First(stage => string.Equals(
+                stage.GetProperty("stageType").GetString(),
+                "design",
+                StringComparison.OrdinalIgnoreCase));
+        var designStageId = designStage.GetProperty("id").GetString()!;
+
+        await SeedRequirementArtefactAsync(
+            client,
+            projectId,
+            "requirements/REQ-001.md",
+            "# Requirement");
+
+        var requirementsConversationId = await CreateConversationAsync(client, requirementsStageId);
+        Assert.NotNull(requirementsConversationId);
+
+        var completeRequirementsResponse = await client.PostAsync($"/api/v1/stages/{requirementsStageId}/complete", content: null);
+        Assert.Equal(HttpStatusCode.OK, completeRequirementsResponse.StatusCode);
+
+        var prototypeConversationId = await CreateConversationAsync(client, prototypeStageId);
+        Assert.NotNull(prototypeConversationId);
+
+        var completePrototypeResponse = await client.PostAsync($"/api/v1/stages/{prototypeStageId}/complete", content: null);
+        Assert.Equal(HttpStatusCode.OK, completePrototypeResponse.StatusCode);
+
+        await SeedRequirementArtefactAsync(
+            client,
+            projectId,
+            "design/CONTRACT-MANIFEST.md",
+            """
+            # Contract Manifest
+
+            <!-- contract-manifest-version: 1 -->
+            <!-- req-provenance: requirements/REQ-001.md@v1 -->
+            <!-- arch-provenance: architecture/ARCH.md@v1 -->
+
+            ## 1. Status Header
+            Manifest version: 1
+
+            ## 2. Pinned File Versions
+            ...
+
+            ## 3. Requirement Ledger
+            ...
+
+            ## 4. Shared Element Index
+            ...
+
+            ## 5. Reuse Log
+            ...
+
+            ## 6. TDD Gate (Plan 5)
+            Gate open: NO
+            """);
+
+        var conversationId = await CreateConversationAsync(client, designStageId);
+
+        AiSystemPrompt? capturedPrompt = null;
+
+        _factory.AiServiceMock
+            .Setup(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<AiSystemPrompt, IReadOnlyList<AiMessage>, IReadOnlyList<AiToolDefinition>, CancellationToken>(
+                (prompt, _, _, _) => capturedPrompt = prompt)
+            .Returns(CreateStreamEvents(
+            [
+                new AiTextChunk("ok")
+            ]));
+
+        var streamRequest = new StringContent(
+            """{"content":"design this requirement"}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var streamResponse = await client.PostAsync($"/api/v1/conversations/{conversationId}/stream", streamRequest);
+        _ = await streamResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        Assert.NotNull(capturedPrompt);
+        Assert.Contains("Contract Manifest", capturedPrompt!.MutablePart, StringComparison.Ordinal);
+        Assert.Contains("contract-manifest-version: 1", capturedPrompt.MutablePart, StringComparison.Ordinal);
+    }
 }
