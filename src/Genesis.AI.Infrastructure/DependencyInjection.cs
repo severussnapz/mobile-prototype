@@ -157,6 +157,7 @@ public static class DependencyInjection
         services.AddScoped<IPlanningGateService, PlanningGateService>();
         services.AddScoped<IFoundationService, FoundationService>();
         services.AddScoped<ISessionCloseContextBuilder, SessionCloseContextBuilder>();
+        services.AddScoped<IContractManifestContextBuilder, ContractManifestContextBuilder>();
         services.AddScoped<IPrototypeAssemblyService, PrototypeAssemblyService>();
         services.AddScoped<IPrototypeDomSearchService, PrototypeDomSearchService>();
         services.AddScoped<IPrototypeDemoEditService, BedrockPrototypeDemoEditService>();
