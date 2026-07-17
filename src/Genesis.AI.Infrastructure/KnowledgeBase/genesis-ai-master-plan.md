@@ -316,7 +316,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - Three Copilot cheats caught and reversed live (null-object bypass, CA1859 suppression, build-props global-using hack) — all GREEN, none shipped.
 
 **Seam guardrail set — designed and documented**
-- Five seam-test types defined: result→HTTP body, command→route, artefact write→read-back (stronger form), tool registration→wiring, pin→resolution.
+- Eight seam-test types defined: result→HTTP body, command→route, artefact write→read-back (stronger form), tool registration→wiring, pin→resolution, API client verb→controller HTTP verb match, scope-level load→ownership-level mutation identity match, implementation→call-site.
 - Standing rule: a new class of seam failure means a new seam-test type in the family — never just fixing the instance.
 
 **SDLC skills library — committed to KnowledgeBase and Infrastructure/Skills/**
@@ -328,6 +328,12 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
   - `seam-testing` — in folder, unwired (ready for Plan 5)
   - `review-agent-discipline` — in folder, unwired (injected via Review Agent prompt)
 - P01 early-return exclusion removed from PhaseSkillMap — RequirementsDiscovery now receives skills.
+
+**Help chat retrieval query fix — complete (July 2026, PR #54)**
+- `BuildRetrievalQuery` existed, was unit-tested with 6 passing tests, and was never called from `StreamAsync`. Both `QueryAsync` calls passed the raw message, dropping conversational context on follow-up turns.
+- Fix: one local variable + two argument swaps in `StreamAsync`. 4 wiring tests added pinning the seam (SEAM-008).
+- Note: fix is partial — query format is `{prior_user_message}: {current_message}`, not `{prior_turn_summary}` as specced. Seventh silent seam instance; earns implementation→call-site seam type (type 8).
+- Seam-testing.md (KB + Skills): type 8 / SEAM-008 added, SEAM-007 backfilled into skills file.
 
 **Both PRs fixed and re-reviewed**
 - API PR: IAiService `StreamWithToolsAsync` collapsed to single optional-param method; 7 integration mocks updated; NHS guard error message fixed.
@@ -351,7 +357,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - Tab buttons in settings panel use `@emisgroup/ui-button` Button component.
 
 **Test counts (verified July 2026):**
-- API: 942 unit + 128 integration
+- API: 978 unit + 128 integration
 - App: 362 tests, tsc clean, lint clean
 
 ### Remaining items (all must be checked before Plan 5 starts)
@@ -370,7 +376,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] Error catalogue — `ERROR-CATALOGUE.md` as P04 output, versioned, frontend reads from it
 - [ ] Tagging — P04 draft pass, traceability section, P06/P07/P08 ratification worklist
 - [ ] TDD gate — strict form, REQ+ARCH provenance, blocks Plan 5 start
-- [ ] Guardrail suite — five seam-test types
+- [ ] Guardrail suite — eight seam-test types
 - [ ] PR Review Agent wired into pipeline pre-commit gate (see Plan 4d-R)
 
 **Engineering hygiene:**
