@@ -60,46 +60,20 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
-        var conversation = helpConversationId.HasValue
-            ? await _helpConversationRepository.GetByIdWithMessagesAsync(helpConversationId.Value, cancellationToken)
-            : await _helpConversationRepository.GetMostRecentByUserAndProjectAsync(userErn, projectId, cancellationToken);
-
-        if (conversation is null)
-        {
-            conversation = HelpConversation.Create(projectId, userErn, _timeProvider);
-            await _helpConversationRepository.AddAsync(conversation, cancellationToken);
-            await _helpConversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
-        }
+        var conversation = await ResolveConversationAsync(helpConversationId, userErn, projectId, cancellationToken);
 
         var retrievalQuery = BuildRetrievalQuery(conversation, message);
-
-        var toolChunks = await _knowledgeService.QueryAsync(
+        _logger.LogInformation(
+            "HelpChat retrieval query built: {Query} for conversation {ConversationId}, projectId present: {HasProjectId}",
             retrievalQuery,
-            KnowledgeNamespace.GenesisTool,
-            null,
-            3,
-            cancellationToken);
+            conversation.Id,
+            projectId.HasValue);
 
-        var projectChunks = projectId.HasValue
-            ? await _knowledgeService.QueryAsync(
-                retrievalQuery,
-                KnowledgeNamespace.ProjectArtefact,
-                projectId,
-                5,
-                cancellationToken)
-            : Array.Empty<KnowledgeChunk>();
+        var (toolChunks, projectChunks) = await RetrieveKnowledgeAsync(retrievalQuery, projectId, cancellationToken);
 
         var systemPromptText = BuildSystemPrompt(toolChunks, projectChunks);
         var systemPrompt = new AiSystemPrompt(systemPromptText, string.Empty);
-
-        var messages = conversation.Messages
-            .OrderBy(messageItem => messageItem.CreatedAt)
-            .Select(messageItem => new AiMessage(
-                messageItem.Role == "user" ? MessageRole.User : MessageRole.Assistant,
-                messageItem.Content))
-            .ToList();
-
-        messages.Add(new AiMessage(MessageRole.User, message));
+        var messages = BuildAiMessages(conversation, message);
 
         conversation.AddMessage("user", message, _timeProvider);
         await _helpConversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
@@ -113,6 +87,68 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
 
         conversation.AddMessage("assistant", responseBuilder.ToString(), _timeProvider);
         await _helpConversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<HelpConversation> ResolveConversationAsync(
+        Guid? helpConversationId,
+        string userErn,
+        Guid? projectId,
+        CancellationToken cancellationToken)
+    {
+        var conversation = helpConversationId.HasValue
+            ? await _helpConversationRepository.GetByIdWithMessagesAsync(helpConversationId.Value, cancellationToken)
+            : await _helpConversationRepository.GetMostRecentByUserAndProjectAsync(userErn, projectId, cancellationToken);
+
+        if (conversation is not null)
+        {
+            return conversation;
+        }
+
+        conversation = HelpConversation.Create(projectId, userErn, _timeProvider);
+        await _helpConversationRepository.AddAsync(conversation, cancellationToken);
+        await _helpConversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+        return conversation;
+    }
+
+    private async Task<(IReadOnlyList<KnowledgeChunk> ToolChunks, IReadOnlyList<KnowledgeChunk> ProjectChunks)> RetrieveKnowledgeAsync(
+        string retrievalQuery,
+        Guid? projectId,
+        CancellationToken cancellationToken)
+    {
+        var toolChunks = await _knowledgeService.QueryAsync(
+            retrievalQuery,
+            KnowledgeNamespace.GenesisTool,
+            null,
+            3,
+            cancellationToken);
+        LogRetrievalResults(_logger, "genesis-tool", toolChunks);
+
+        IReadOnlyList<KnowledgeChunk> projectChunks = Array.Empty<KnowledgeChunk>();
+        if (projectId.HasValue)
+        {
+            projectChunks = await _knowledgeService.QueryAsync(
+                retrievalQuery,
+                KnowledgeNamespace.ProjectArtefact,
+                projectId,
+                5,
+                cancellationToken);
+            LogRetrievalResults(_logger, "project-artefact", projectChunks);
+        }
+
+        return (toolChunks, projectChunks);
+    }
+
+    private static List<AiMessage> BuildAiMessages(HelpConversation conversation, string message)
+    {
+        var messages = conversation.Messages
+            .OrderBy(messageItem => messageItem.CreatedAt)
+            .Select(messageItem => new AiMessage(
+                messageItem.Role == "user" ? MessageRole.User : MessageRole.Assistant,
+                messageItem.Content))
+            .ToList();
+
+        messages.Add(new AiMessage(MessageRole.User, message));
+        return messages;
     }
 
     private static string BuildSystemPrompt(
@@ -130,6 +166,23 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
             : "Answer questions about the Genesis AI pipeline and how it works. Be direct and concise.";
 
         return $"You are the Genesis AI help assistant. {contextInstruction}\n\n## Project Context\n{projectContent}\n\n## Genesis AI Knowledge\n{toolContent}";
+    }
+
+    private static void LogRetrievalResults(ILogger logger, string knowledgeNamespace, IReadOnlyList<KnowledgeChunk> chunks)
+    {
+        logger.LogInformation(
+            "HelpChat retrieval returned {ChunkCount} chunks from namespace {Namespace}",
+            chunks.Count,
+            knowledgeNamespace);
+
+        foreach (var chunk in chunks)
+        {
+            logger.LogInformation(
+                "HelpChat retrieval chunk from {Namespace}: {SourcePath} (score: {Score})",
+                knowledgeNamespace,
+                chunk.SourcePath,
+                chunk.Score);
+        }
     }
 
     internal static string BuildRetrievalQuery(HelpConversation conversation, string currentMessage)

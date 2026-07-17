@@ -2,6 +2,7 @@ using Genesis.AI.Domain.AggregatesModel.HelpChatAggregate;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Infrastructure.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
@@ -268,6 +269,70 @@ public sealed class HelpChatStreamServiceRetrievalWiringTests
                 null,
                 3,
                 It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task StreamAsync_LogsRetrievalQuery_WithConstructedQueryString()
+    {
+        var unitOfWorkMock = new Mock<Genesis.AI.Core.Data.IUnitOfWork>();
+        unitOfWorkMock.Setup(unitOfWork => unitOfWork.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var timeProvider = new FakeTimeProvider();
+        var conversation = HelpConversation.Create(Guid.NewGuid(), "user-1", TimeProvider.System);
+        conversation.AddMessage("user", "prior turn", timeProvider);
+
+        var helpConversationRepositoryMock = new Mock<IHelpConversationRepository>();
+        helpConversationRepositoryMock.SetupGet(repository => repository.UnitOfWork)
+            .Returns(unitOfWorkMock.Object);
+        helpConversationRepositoryMock
+            .Setup(repository => repository.GetByIdWithMessagesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(conversation);
+
+        var knowledgeServiceMock = new Mock<IKnowledgeService>();
+        knowledgeServiceMock
+            .Setup(service => service.QueryAsync(
+                It.IsAny<string>(),
+                It.IsAny<KnowledgeNamespace>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var aiServiceMock = new Mock<IAiService>();
+        aiServiceMock
+            .Setup(service => service.StreamResponseAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(AsAsyncEnumerable("ok"));
+
+        var loggerMock = new Mock<ILogger<HelpChatStreamService>>();
+
+        var sut = new HelpChatStreamService(
+            helpConversationRepositoryMock.Object,
+            knowledgeServiceMock.Object,
+            aiServiceMock.Object,
+            TimeProvider.System,
+            loggerMock.Object);
+
+        await foreach (var _ in sut.StreamAsync(
+                           "current turn",
+                           Guid.NewGuid(),
+                           Guid.NewGuid(),
+                           "user-1",
+                           CancellationToken.None))
+        {
+        }
+
+        loggerMock.Verify(
+            logger => logger.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("prior turn: current turn", StringComparison.Ordinal)),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 
