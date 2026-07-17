@@ -56,6 +56,15 @@ env:
     value: Production
   - name: HOSTING_ENVIRONMENT
     value: AWS
+  # Dynatrace release metadata — enriches Serilog logs (DynatraceTextFormatter)
+  # and OneAgent release tracking. HOSTING_ENVIRONMENT=AWS above activates the
+  # Dynatrace-format structured logging (Core/Logging/LoggingConfigurationExtensions).
+  - name: DT_RELEASE_STAGE
+    value: dev
+  - name: DT_RELEASE_PRODUCT
+    value: genesis-ai-requirements-api
+  - name: DT_RELEASE_VERSION
+    value: latest
   - name: AWS_REGION
     value: eu-west-2
   # Swagger/OpenAPI explorer. The app only serves Swagger in Development or when
