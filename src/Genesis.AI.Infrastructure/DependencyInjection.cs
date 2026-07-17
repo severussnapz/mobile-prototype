@@ -97,6 +97,20 @@ public static class DependencyInjection
 
     private static void AddGitHubIntegration(IServiceCollection services, IConfiguration configuration)
     {
+        var gitHubConfigured = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_APP_ID"));
+
+        if (!gitHubConfigured)
+        {
+            services.AddSingleton<ISecretEncryptionService, NoOpSecretEncryptionService>();
+            services.AddSingleton<IGitHubTokenService, NoOpGitHubTokenService>();
+            services.AddScoped<IGitHubArtefactPushService, NoOpGitHubArtefactPushService>();
+            services.AddSingleton<IAssemblyVersionProvider, AssemblyVersionProvider>();
+            services.AddSingleton<ICodeownersGenerator, CodeownersGenerator>();
+            services.AddScoped<IProjectMarkdownGenerator, ProjectMarkdownGenerator>();
+            services.AddScoped<IGenesisStructureScaffolder, GenesisStructureScaffolder>();
+            return;
+        }
+
         services.AddSingleton<ISecretEncryptionService, AesSecretEncryptionService>();
         services.AddSingleton<IAssemblyVersionProvider, AssemblyVersionProvider>();
         services.AddSingleton<ICodeownersGenerator, CodeownersGenerator>();

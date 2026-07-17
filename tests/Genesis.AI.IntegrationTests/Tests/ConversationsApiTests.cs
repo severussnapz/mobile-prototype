@@ -526,4 +526,48 @@ public class ConversationsApiTests : IDisposable
         Assert.Contains("event: requirement_complete", streamBody, StringComparison.Ordinal);
         Assert.DoesNotContain("requirement_completion_gate_failed", streamBody, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task StreamAiResponse_FullConversationHistory_AllMessagesPassedToAiService()
+    {
+        var client = _factory.CreateAdminClient();
+        var (_, stageId) = await CreateProjectAndGetFirstStageAsync(client);
+        var conversationId = await CreateConversationAsync(client, stageId);
+
+        IReadOnlyList<AiMessage>? capturedMessages = null;
+
+        _factory.AiServiceMock
+            .Setup(service => service.StreamWithToolsAsync(
+                It.IsAny<AiSystemPrompt>(),
+                It.IsAny<IReadOnlyList<AiMessage>>(),
+                It.IsAny<IReadOnlyList<AiToolDefinition>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<AiSystemPrompt, IReadOnlyList<AiMessage>, IReadOnlyList<AiToolDefinition>, CancellationToken>(
+                (_, messages, _, _) => capturedMessages = messages)
+            .Returns(CreateStreamEvents(
+            [
+                new AiTextChunk("Understood.")
+            ]));
+
+        for (var questionNumber = 1; questionNumber <= 6; questionNumber++)
+        {
+            var streamRequest = new StringContent(
+                $"{{\"content\":\"Question {questionNumber}\"}}",
+                System.Text.Encoding.UTF8,
+                "application/json");
+
+            var streamResponse = await client.PostAsync(
+                $"/api/v1/conversations/{conversationId}/stream",
+                streamRequest);
+            _ = await streamResponse.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.OK, streamResponse.StatusCode);
+        }
+
+        Assert.NotNull(capturedMessages);
+        Assert.True(capturedMessages!.Count >= 6);
+        Assert.Contains(
+            capturedMessages,
+            message => message.Content.Contains("Question 1", StringComparison.Ordinal));
+    }
 }

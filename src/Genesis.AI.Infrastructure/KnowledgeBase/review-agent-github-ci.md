@@ -117,6 +117,27 @@ A PR whose commits don't follow this format is a medium finding — not a blocke
 
 ---
 
+
+---
+
+### GENESIS-010 — Side-Effect Services Must Not Throw in Constructors (Critical)
+
+Same as pipeline variant. Optional side-effect services must register no-op implementations when configuration is absent, never throw in constructors.
+
+---
+
+### GENESIS-011 — API Client HTTP Verb Must Match Controller HTTP Verb (High)
+
+Any new or modified API client method must use the HTTP verb matching the controller action attribute. CI can catch this statically: if a client method uses `put`/`patch`/`post` and the corresponding controller action in the diff uses a different verb attribute, flag as high. Proved live: `PUT` client calling `[HttpPatch]` controller — 405 in production, zero unit test failures.
+
+---
+
+### GENESIS-012 — Scope-Level Load Must Carry Owning Identifier to Mutation (High)
+
+When data is loaded at a broader scope than the mutation endpoint, the item's owning identifier must be passed to the mutation, not the ambient context identifier. If a mutation handler receives only a context ID (e.g. current conversationId) but the resource was loaded at project scope, flag as high.
+
+---
+
 ## CI Integration Notes
 
 **Model:** AWS Bedrock via the existing PrivateLink boundary. No direct Anthropic API calls from CI. The same sovereignty constraint that governs the pipeline governs CI.

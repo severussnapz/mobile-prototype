@@ -334,6 +334,22 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - App PR: lint clean; aria-label i18n; emoji removed from visually-hidden spans; sandbox iframe test split.
 - Re-review comments posted on both PRs. Awaiting merge.
 
+
+**Production hotfixes deployed July 2026 (hotfix/github-optional):**
+- GitHub integration made optional — `AddGitHubIntegration` checks `GITHUB_APP_ID` at DI registration time. When absent, registers `NoOpGitHubArtefactPushService`, `NoOpGitHubTokenService`, `NoOpSecretEncryptionService`. Session-close no longer crashes when GitHub not configured. 5 unit tests. GENESIS-010 rule added.
+- Conversation history cap removed — `maxHistoryMessages = 4` removed from `ConversationStreamController`. Full conversation history now sent to Bedrock on every turn for all stages. Cap was written for Prototype stage only but applied globally, causing agents to ask users to repeat captured requirements. Integration test added proving all messages passed. GENESIS-011 rule added.
+- Phase definitions aligned with live prompts — `PhaseDefinitions` in `EmbeddedPromptService` was stale (13 phases for P01, wrong names for P03/P06/P09/P10). Updated to match live prompt structures. 9 `PhaseDefinitionAccuracyTests` added with evidence chain back to prompt file greps. Phase display changed to 1-indexed ("Phase 1 of 7" not "Phase 0 of 6").
+- Three new Review Agent rules added: GENESIS-010 (side-effect constructor), GENESIS-011 (API verb mismatch), GENESIS-012 (scope/ownership mismatch). Two new seam types added to `seam-testing.md` (types 6 and 7).
+
+**App fixes deployed July 2026 (fix/help-chat-reindex-knowledge):**
+- Parking lot delete used wrong `conversationId` — items loaded at project level but deleted using current conversation ID. Fix: `onDelete` receives full `ParkingLotItemResource` and uses `item.conversationId`. Confirmation dialog added (consistent with defer/resolve pattern).
+- Notes and decisions update used `PUT` instead of `PATCH` — 405 Method Not Allowed. Fixed in `projects.ts` for both. Tests and mock updated.
+- Usage tab stages now sorted by canonical pipeline order (P01→P10).
+- Re-index knowledge button added to artefacts tab — self-service recovery when artefacts fail to index on publish.
+- Phase counter 1-indexed in progress sidebar.
+- Clinical UK display label corrected (was "ClinicalUk").
+- Tab buttons in settings panel use `@emisgroup/ui-button` Button component.
+
 **Test counts (verified July 2026):**
 - API: 942 unit + 128 integration
 - App: 362 tests, tsc clean, lint clean
