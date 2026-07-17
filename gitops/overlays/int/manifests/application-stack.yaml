@@ -1,6 +1,6 @@
-# Per-env KRO ApplicationStack for INT. Diverged from gitops/base/manifests so
-# int can evolve independently. Currently mirrors base (Serverless v2 min sizing,
-# deletionProtection off for easy teardown during onboarding).
+# Per-env KRO ApplicationStack for INT. Each env keeps its own copy under
+# gitops/overlays/<env>/manifests so it can evolve independently. Currently mirrors
+# the dev variant (Serverless v2 min sizing, deletionProtection off for easy teardown).
 apiVersion: kro.run/v1alpha1
 kind: ApplicationStack
 metadata:
