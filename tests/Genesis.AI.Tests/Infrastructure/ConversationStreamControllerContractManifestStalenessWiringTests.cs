@@ -19,10 +19,10 @@ using Microsoft.Extensions.Options;
 
 namespace Genesis.AI.Tests.Infrastructure;
 
-public class ConversationStreamControllerContractManifestWiringTests
+public class ConversationStreamControllerContractManifestStalenessWiringTests
 {
     [Fact]
-    public async Task ExecuteStreamAsync_WhenStageTypePresent_CallsBuildContractManifestContextAsync_WithCorrectArgs()
+    public async Task ExecuteStreamAsync_WhenContractManifestContextNonEmpty_CallsCheckStalenessAsync()
     {
         var controller = CreateController(
             foundationPrefixEnabled: true,
@@ -31,7 +31,57 @@ public class ConversationStreamControllerContractManifestWiringTests
             out var aiServiceMock,
             out _,
             out _,
-            out var contractManifestContextBuilderMock);
+            out var contractManifestContextBuilderMock,
+            out var contractManifestStalenessCheckerMock);
+
+        var projectId = Guid.NewGuid();
+        var conversation = CreateConversation();
+        var request = new StreamMessageRequest
+        {
+            Content = "Continue design",
+            Retry = true
+        };
+        const string manifestContent = "## Contract Manifest\nManifest version: 3";
+
+        SetupStreamDependencies(
+            conversationRepositoryMock,
+            aiServiceMock,
+            conversation,
+            projectId,
+            StageType.Design);
+
+        contractManifestContextBuilderMock
+            .Setup(builder => builder.BuildContractManifestContextAsync(
+                projectId,
+                StageType.Design,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(manifestContent);
+        contractManifestStalenessCheckerMock
+            .Setup(checker => checker.CheckStalenessAsync(
+                projectId,
+                manifestContent,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        await InvokeExecuteStreamAsync(controller, conversation.Id, request);
+
+        contractManifestStalenessCheckerMock.Verify(
+            checker => checker.CheckStalenessAsync(projectId, manifestContent, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteStreamAsync_WhenContractManifestContextEmpty_DoesNotCallCheckStalenessAsync()
+    {
+        var controller = CreateController(
+            foundationPrefixEnabled: true,
+            out var conversationRepositoryMock,
+            out _,
+            out var aiServiceMock,
+            out _,
+            out _,
+            out var contractManifestContextBuilderMock,
+            out var contractManifestStalenessCheckerMock);
 
         var projectId = Guid.NewGuid();
         var conversation = CreateConversation();
@@ -57,50 +107,16 @@ public class ConversationStreamControllerContractManifestWiringTests
 
         await InvokeExecuteStreamAsync(controller, conversation.Id, request);
 
-        contractManifestContextBuilderMock.Verify(
-            builder => builder.BuildContractManifestContextAsync(projectId, StageType.Design, It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task ExecuteStreamAsync_WhenStageTypeAbsent_DoesNotCallBuildContractManifestContextAsync()
-    {
-        var controller = CreateController(
-            foundationPrefixEnabled: true,
-            out var conversationRepositoryMock,
-            out _,
-            out var aiServiceMock,
-            out _,
-            out _,
-            out var contractManifestContextBuilderMock);
-
-        var projectId = Guid.NewGuid();
-        var conversation = CreateConversation();
-        var request = new StreamMessageRequest
-        {
-            Content = "Continue",
-            Retry = true
-        };
-
-        SetupStreamDependencies(
-            conversationRepositoryMock,
-            aiServiceMock,
-            conversation,
-            projectId,
-            stageType: null);
-
-        await InvokeExecuteStreamAsync(controller, conversation.Id, request);
-
-        contractManifestContextBuilderMock.Verify(
-            builder => builder.BuildContractManifestContextAsync(
+        contractManifestStalenessCheckerMock.Verify(
+            checker => checker.CheckStalenessAsync(
                 It.IsAny<Guid>(),
-                It.IsAny<StageType>(),
+                It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task ExecuteStreamAsync_WhenContractManifestContextNonEmpty_IncludesInMutablePart()
+    public async Task ExecuteStreamAsync_WhenStalenesWarningsReturned_WarningsAppendedToPrompt()
     {
         var controller = CreateController(
             foundationPrefixEnabled: true,
@@ -109,7 +125,8 @@ public class ConversationStreamControllerContractManifestWiringTests
             out var aiServiceMock,
             out _,
             out _,
-            out var contractManifestContextBuilderMock);
+            out var contractManifestContextBuilderMock,
+            out var contractManifestStalenessCheckerMock);
 
         var projectId = Guid.NewGuid();
         var conversation = CreateConversation();
@@ -118,6 +135,8 @@ public class ConversationStreamControllerContractManifestWiringTests
             Content = "Continue design",
             Retry = true
         };
+        const string manifestContent = "## Contract Manifest\nManifest version: 3";
+        const string warning = "⚠️ CONTRACT STALE: CONTRACT-MANIFEST.md was produced against requirements/REQ-001.md@v6 but current approved version is v8. Re-run P04 for this requirement before proceeding.";
         AiSystemPrompt? capturedPrompt = null;
 
         SetupStreamDependencies(
@@ -133,16 +152,22 @@ public class ConversationStreamControllerContractManifestWiringTests
                 projectId,
                 StageType.Design,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync("## Contract Manifest\nManifest version: 3");
+            .ReturnsAsync(manifestContent);
+        contractManifestStalenessCheckerMock
+            .Setup(checker => checker.CheckStalenessAsync(
+                projectId,
+                manifestContent,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([warning]);
 
         await InvokeExecuteStreamAsync(controller, conversation.Id, request);
 
         Assert.NotNull(capturedPrompt);
-        Assert.Contains("## Contract Manifest\nManifest version: 3", capturedPrompt!.MutablePart, StringComparison.Ordinal);
+        Assert.Contains(warning, capturedPrompt!.MutablePart, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task ExecuteStreamAsync_WhenContractManifestContextEmpty_DoesNotAppendToMutablePart()
+    public async Task ExecuteStreamAsync_WhenNoStalenessWarnings_NothingExtraAppendedToPrompt()
     {
         var controller = CreateController(
             foundationPrefixEnabled: true,
@@ -151,7 +176,8 @@ public class ConversationStreamControllerContractManifestWiringTests
             out var aiServiceMock,
             out _,
             out _,
-            out var contractManifestContextBuilderMock);
+            out var contractManifestContextBuilderMock,
+            out var contractManifestStalenessCheckerMock);
 
         var projectId = Guid.NewGuid();
         var conversation = CreateConversation();
@@ -160,6 +186,7 @@ public class ConversationStreamControllerContractManifestWiringTests
             Content = "Continue design",
             Retry = true
         };
+        const string manifestContent = "## Contract Manifest\nManifest version: 3";
         AiSystemPrompt? capturedPrompt = null;
 
         SetupStreamDependencies(
@@ -175,12 +202,18 @@ public class ConversationStreamControllerContractManifestWiringTests
                 projectId,
                 StageType.Design,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(string.Empty);
+            .ReturnsAsync(manifestContent);
+        contractManifestStalenessCheckerMock
+            .Setup(checker => checker.CheckStalenessAsync(
+                projectId,
+                manifestContent,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
 
         await InvokeExecuteStreamAsync(controller, conversation.Id, request);
 
         Assert.NotNull(capturedPrompt);
-        Assert.DoesNotContain("## Contract Manifest", capturedPrompt!.MutablePart, StringComparison.Ordinal);
+        Assert.DoesNotContain("CONTRACT STALE", capturedPrompt!.MutablePart, StringComparison.Ordinal);
     }
 
     private static Conversation CreateConversation()
@@ -195,7 +228,8 @@ public class ConversationStreamControllerContractManifestWiringTests
         out Mock<IAiService> aiServiceMock,
         out Mock<IPromptService> promptServiceMock,
         out Mock<IFoundationService> foundationServiceMock,
-        out Mock<IContractManifestContextBuilder> contractManifestContextBuilderMock)
+        out Mock<IContractManifestContextBuilder> contractManifestContextBuilderMock,
+        out Mock<IContractManifestStalenessChecker> contractManifestStalenessCheckerMock)
     {
         var requirementChangeRepositoryMock = new Mock<IRequirementChangeRepository>();
         requirementChangeRepositoryMock
@@ -209,8 +243,7 @@ public class ConversationStreamControllerContractManifestWiringTests
         promptServiceMock = new Mock<IPromptService>();
         foundationServiceMock = new Mock<IFoundationService>();
         contractManifestContextBuilderMock = new Mock<IContractManifestContextBuilder>();
-        var contractManifestStalenessCheckerMock = new Mock<IContractManifestStalenessChecker>();
-        contractManifestStalenessCheckerMock.Setup(checker => checker.CheckStalenessAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<string>());
+        contractManifestStalenessCheckerMock = new Mock<IContractManifestStalenessChecker>();
         var artefactStorageServiceMock = new Mock<IArtefactStorageService>();
         var skillContentServiceMock = new Mock<ISkillContentService>();
         var activeSkillsServiceMock = new Mock<IActiveSkillsService>();

@@ -45,6 +45,7 @@ public class ConversationStreamController : ControllerBase
     private readonly IFoundationService _foundationService;
     private readonly ISessionCloseContextBuilder _sessionCloseContextBuilder;
     private readonly IContractManifestContextBuilder _contractManifestContextBuilder;
+    private readonly IContractManifestStalenessChecker _contractManifestStalenessChecker;
     private readonly IPrototypeAssemblyService _prototypeAssemblyService;
     private readonly IPrototypeFragmentMigrationService _prototypeFragmentMigrationService;
     private readonly IPrototypeDomSearchService? _prototypeDomSearchService;
@@ -66,6 +67,7 @@ public class ConversationStreamController : ControllerBase
         IFoundationService foundationService,
         ISessionCloseContextBuilder sessionCloseContextBuilder,
         IContractManifestContextBuilder contractManifestContextBuilder,
+        IContractManifestStalenessChecker contractManifestStalenessChecker,
         IPrototypeAssemblyService prototypeAssemblyService,
         IPrototypeFragmentMigrationService prototypeFragmentMigrationService,
         IOptions<TokenOptimisationOptions> tokenOptimisationOptions,
@@ -84,6 +86,7 @@ public class ConversationStreamController : ControllerBase
         _foundationService = foundationService ?? throw new ArgumentNullException(nameof(foundationService));
         _sessionCloseContextBuilder = sessionCloseContextBuilder ?? throw new ArgumentNullException(nameof(sessionCloseContextBuilder));
         _contractManifestContextBuilder = contractManifestContextBuilder ?? throw new ArgumentNullException(nameof(contractManifestContextBuilder));
+        _contractManifestStalenessChecker = contractManifestStalenessChecker ?? throw new ArgumentNullException(nameof(contractManifestStalenessChecker));
         _prototypeAssemblyService = prototypeAssemblyService ?? throw new ArgumentNullException(nameof(prototypeAssemblyService));
         _prototypeFragmentMigrationService = prototypeFragmentMigrationService ?? throw new ArgumentNullException(nameof(prototypeFragmentMigrationService));
         _prototypeDomSearchService = prototypeDomSearchService;
@@ -330,6 +333,14 @@ public class ConversationStreamController : ControllerBase
         var contractManifestContext = stageType.HasValue
             ? await _contractManifestContextBuilder.BuildContractManifestContextAsync(projectId, stageType.Value, cancellationToken)
             : string.Empty;
+        IReadOnlyList<string> stalenessWarnings = [];
+        if (!string.IsNullOrEmpty(contractManifestContext) && stageType.HasValue)
+        {
+            stalenessWarnings = await _contractManifestStalenessChecker.CheckStalenessAsync(
+                projectId,
+                contractManifestContext,
+                cancellationToken);
+        }
 
         AiSystemPrompt aiSystemPrompt;
         if (_tokenOptimisationOptions.FoundationPrefixEnabled && stageType.HasValue)
@@ -374,6 +385,11 @@ public class ConversationStreamController : ControllerBase
                 mutablePart += $"\n\n---\n\n{contractManifestContext}";
             }
 
+            foreach (var warning in stalenessWarnings)
+            {
+                mutablePart += $"\n\n{warning}";
+            }
+
             mutablePart += stalenessNotice;
             mutablePart += handoverBlock;
 
@@ -408,6 +424,11 @@ public class ConversationStreamController : ControllerBase
             if (!string.IsNullOrEmpty(contractManifestContext))
             {
                 systemPrompt += $"\n\n---\n\n{contractManifestContext}";
+            }
+
+            foreach (var warning in stalenessWarnings)
+            {
+                systemPrompt += $"\n\n{warning}";
             }
 
             systemPrompt += stalenessNotice;
@@ -1386,7 +1407,7 @@ public class ConversationStreamController : ControllerBase
 
             case PipelineToolDefinitions.ListArtefacts:
             {
-                var manifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken);
+                var manifest = await _artefactRepository.GetProjectArtefactManifestAsync(projectId, cancellationToken) ?? [];
 
                 if (manifest.Count == 0)
                 {
