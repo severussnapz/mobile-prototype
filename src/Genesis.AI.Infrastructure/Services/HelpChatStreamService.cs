@@ -71,8 +71,10 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
             await _helpConversationRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
         }
 
+        var retrievalQuery = BuildRetrievalQuery(conversation, message);
+
         var toolChunks = await _knowledgeService.QueryAsync(
-            message,
+            retrievalQuery,
             KnowledgeNamespace.GenesisTool,
             null,
             3,
@@ -80,7 +82,7 @@ public sealed class HelpChatStreamService : IHelpChatStreamService
 
         var projectChunks = projectId.HasValue
             ? await _knowledgeService.QueryAsync(
-                message,
+                retrievalQuery,
                 KnowledgeNamespace.ProjectArtefact,
                 projectId,
                 5,

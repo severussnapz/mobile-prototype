@@ -12,6 +12,8 @@ The most dangerous recurring defect in agent-built (and human-built) systems is 
 - An artefact is generated, stored, and pushed → nothing ever reads it back. **A write-only artefact wearing a feature's name.**
 - A command and handler are built → the controller route is never added. **"Unknown tool call" in production logs.**
 
+- Logic is extracted, unit-tested, and correct → the entry point never calls it, passing the raw input instead. **Six passing tests, all in the test file. Zero production effect.**
+
 The common shape: **producer and consumer are built in separate places (often separate sessions), each is internally correct and independently tested, and nothing tests the seam between them.** Unit tests pass on both sides because each side is coherent alone. The failure lives in the join — exactly what falls between two definitions of "done".
 
 ## Seam tests, not more unit tests
@@ -29,6 +31,8 @@ A seam test asserts a specific handoff completes end to end. It only passes if t
 
 7. **Scope-level load → ownership-level mutation identity match.** When data is loaded at a broader scope than the mutation endpoint (e.g. project-level load of parking lot items, conversation-level delete), the item's owning identifier must be carried through to the mutation call. If the mutation uses the current context's identifier instead of the item's own identifier, the mutation will fail for any item not created in the current context. Proved live: parking lot items loaded at project level (`GET /projects/{id}/parking-lot`) but deleted using current `conversationId` — 404 for any item from a prior session. Fix: mutation receives the full resource object and uses `item.conversationId`, not the current conversation ID.
 
+8. **Implementation → call-site.** Where logic is extracted into a helper, builder, or separate method and consumed by an entry point, assert the *entry point* produces the implementation's output — not just that the implementation is correct in isolation. Mock the collaborator the entry point calls, invoke the entry point, assert the captured argument matches what the implementation produces. Unlike type 4, there is no registry to enumerate: caught at review time by asking "what calls this?" of every new unit of logic. Proved live: `BuildRetrievalQuery` (July 2026) — six passing tests, all in the test file, zero production effect. `StreamAsync` passed the raw message instead.
+
 ## Rules that keep the guard honest
 
 - **Opt-outs are governed.** Reflection-based completeness tests need escape hatches for genuinely internal fields — and an ungoverned escape hatch becomes the new silent gap. Every opt-out requires a reason string and is itself reviewed.
@@ -37,4 +41,4 @@ A seam test asserts a specific handoff completes end to end. It only passes if t
 
 ## Design-time application
 
-When reviewing a design, hunt for write-only artefacts and orphaned producers: anything that is "generated", "stored", "recorded", or "committed" must have a named consumer and a named moment of consumption. "Who reads this, and when?" is the question that found a real production gap (an artefact generated on session close and never re-injected on resume). If the design cannot answer it, the design has a seam hole.
+When reviewing a design, hunt for write-only artefacts and orphaned producers: anything that is "generated", "stored", "recorded", or "committed" must have a named consumer and a named moment of consumption. "Who reads this, and when?" and "What calls this?" are the questions that found a real production gap (an artefact generated on session close and never re-injected on resume). If the design cannot answer it, the design has a seam hole.
