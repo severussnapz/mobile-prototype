@@ -1,3 +1,7 @@
+# Per-env KRO ApplicationStack for DEV. Each environment keeps its own copy under
+# gitops/overlays/<env>/manifests so they can diverge (RDS sizing, deletionProtection,
+# model id, etc.). This is the dev variant: Serverless v2 min sizing, no deletion guard.
+#
 # KRO ApplicationStack — provisions this service's AWS resources via ACK controllers.
 #
 # Resources requested:

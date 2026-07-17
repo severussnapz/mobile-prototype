@@ -23,9 +23,10 @@ spec:
 
     # Raw manifests — the KRO ApplicationStack (provisions this service's AWS
     # resources). DB access uses RDS IAM auth, so there is no ExternalSecret.
+    # Per-env manifest — dev can differ from int/stg.
     - repoURL: https://github.com/emisgroup/genesis-ai-requirements-api
       targetRevision: main
-      path: gitops/base/manifests
+      path: gitops/overlays/dev/manifests
 
   destination:
     namespace: genesis-ai-requirements-api-ns

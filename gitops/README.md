@@ -44,8 +44,9 @@ Only `dev` is onboarded at this stage.
 
 - **Workload** — the shared Helm chart `centraluk.jfrog.io/genesis-helm-rel-loc/emisx-service`,
   pinned to `0.3.6`. We ship values, not a bespoke chart.
-- **AWS resources** — a single KRO `ApplicationStack` instance
-  ([base/manifests/application-stack.yaml](base/manifests/application-stack.yaml)):
+- **AWS resources** — a single KRO `ApplicationStack` instance, one per env under
+  `gitops/overlays/<env>/manifests`
+  ([overlays/dev/manifests/application-stack.yaml](overlays/dev/manifests/application-stack.yaml)):
   S3 artefact bucket, Aurora PostgreSQL Serverless v2, a scoped Bedrock invoke
   policy, the ECR repository, and the pod-identity IAM role.
 - **Schema migrations** — the chart's `flyway-migration` Job (configured in

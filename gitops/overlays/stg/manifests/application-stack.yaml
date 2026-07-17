@@ -1,5 +1,5 @@
-# Per-env KRO ApplicationStack for STG. Diverged from gitops/base/manifests so
-# stg can carry stricter, more production-like settings:
+# Per-env KRO ApplicationStack for STG. Each env keeps its own copy under
+# gitops/overlays/<env>/manifests. stg carries stricter, more production-like settings:
 #   • deletionProtection: true (guard the stg database).
 #   • larger RDS scaling headroom + backups.
 # Review these before first stg provisioning.
