@@ -379,8 +379,8 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] Error catalogue frontend — ERROR-CATALOGUE.md already instructed as P04 output. Frontend reading from it deferred — not a Plan 5 gate.
 - [ ] Tagging — deferred (Decision E, July 2026 session).
 - [ ] TDD gate API enforcement — gate lives in CONTRACT-MANIFEST.md §6 as agent-readable text. API-side enforcement deferred to Plan 5 day-one. Pipeline fully operational without it.
-- [ ] Guardrail suite — seam types 1, 2, 3 (strong form for CONTRACT-MANIFEST write→resume→prompt), 5 not yet written. Seam type 4 (ToolCallWiringTests) exists ✅.
-- [ ] PR Review Agent wired into pipeline pre-commit gate (see Plan 4d-R)
+- [ ] Guardrail suite — seam types 1, 2, 5 not yet written. Seam type 3 strong form ✅ (CONTRACT-MANIFEST write→resume→prompt integration test, be66360). Seam type 4 (ToolCallWiringTests) ✅.
+- [ ] PR Review Agent wired into pipeline pre-commit gate — moved to Plan 5/Workstream E (Code Swarm). Review Agent gates AI-generated swarm commits; no swarm exists yet so wiring here has no target. Point 2 (GitHub CI/CD, Shantanu) remains a Workstream G item.
 
 **Engineering hygiene:**
 - [ ] DTO mapping completeness structural fix — vertical slice from UpdateProjectGitHub as reference implementation; every result field requires response DTO + controller mapping + mapping test; backfill all existing response models
