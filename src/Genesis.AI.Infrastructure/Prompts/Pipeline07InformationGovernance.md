@@ -160,6 +160,14 @@ use `get_artefact` to load it — do not assume earlier turn summaries are prese
 Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
 Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
 
+## CONTRACT-MANIFEST.md — Phase 0 Read Protocol
+
+1. If `CONTRACT-MANIFEST.md` content is present in this system context, read `## 4. Shared Element Index` before performing data flow analysis.
+2. Identify all endpoints, tables, data models, and error codes in scope from `## 4. Shared Element Index`.
+3. Use this index to ensure data flow analysis and DPIA coverage includes all tables and data models introduced across all requirements — not just what is visible in the REQ file alone.
+4. Do NOT call `get_artefact` for `CONTRACT-MANIFEST.md` — the content is already injected.
+5. Do NOT modify `CONTRACT-MANIFEST.md`.
+
 ---
 
 ## ⛔ PRE-START CHECK

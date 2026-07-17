@@ -129,6 +129,14 @@ use `get_artefact` to load it — do not assume earlier turn summaries are prese
 Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
 Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
 
+## CONTRACT-MANIFEST.md — Phase 0 Read Protocol
+
+1. If `CONTRACT-MANIFEST.md` content is present in this system context, read `## 4. Shared Element Index` before performing hazard analysis.
+2. Identify all endpoints, tables, data models, and error codes in scope from `## 4. Shared Element Index`.
+3. Use this index to ensure hazard analysis covers the full API surface and data model — not just what is visible in the REQ file alone.
+4. Do NOT call `get_artefact` for `CONTRACT-MANIFEST.md` — the content is already injected.
+5. Do NOT modify `CONTRACT-MANIFEST.md`.
+
 **`edit_artefact` — surgical edits to REQ files:** For changes affecting less than ~30% of a `requirements/REQ-*.md` file, use `edit_artefact` instead of rewriting the whole file. Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor and verify you are editing the correct occurrence (never assume the first match is correct). Never use `edit_artefact` on clinical safety outputs (HAZARD-REGISTRY.md, DPIA.md, or any standalone clinical safety report).
 
 Layered retry policy for anchor matching (mandatory):
