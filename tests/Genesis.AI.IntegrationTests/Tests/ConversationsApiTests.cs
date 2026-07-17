@@ -234,7 +234,7 @@ public class ConversationsApiTests : IDisposable
             """
             {
               "file_path": "prototype/index.html",
-              "content": "<!doctype html><html><head><title>Prototype</title></head><body><h1>Prototype</h1><script id=\"prototype-metadata\" type=\"application/json\">{\"contractVersion\":\"1.0\",\"stageCode\":\"prototype\",\"generatedAtUtc\":\"2026-06-08T10:00:00Z\",\"prototypeOnly\":true,\"requirementsCovered\":[\"REQ-001\"],\"flows\":[\"Primary flow\"],\"privacySafetyConstraints\":[\"No real patient data\"]}</script></body></html>"
+                            "content": "<!doctype html><html><head><title>Prototype</title></head><body><div>PROTOTYPE ONLY</div><h1>Prototype</h1><script id=\"prototype-metadata\" type=\"application/json\">{\"contractVersion\":\"1.0\",\"stageCode\":\"prototype\",\"generatedAtUtc\":\"2026-06-08T10:00:00Z\",\"prototypeOnly\":true,\"requirementsCovered\":[\"REQ-001\"],\"flows\":[\"Primary flow\"],\"privacySafetyConstraints\":[\"No real patient data\"]}</script></body></html>"
             }
             """);
 
