@@ -38,4 +38,10 @@ labels:
   emis-x.uk/hosting_location: aws.481665089315
   emis-x.uk/portfolio: "481665089315"
 
-# TODO: full `env:` block — see header. Not deployable until provisioned.
+env:
+  - name: DT_RELEASE_STAGE
+    value: int
+  - name: DT_RELEASE_PRODUCT
+    value: genesis-ai-requirements-api
+  - name: DT_RELEASE_VERSION
+    value: v0.0.0 # x-release-please-version
