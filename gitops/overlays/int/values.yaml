@@ -22,13 +22,13 @@ image:
   pullPolicy: IfNotPresent
   # Immutable release tag — release-please rewrites this on every release, and
   # Argo rolls int automatically when it changes (no restart hack).
-  tag: v0.0.0 # x-release-please-version
+  tag: v1.0.0 # x-release-please-version
 
 flyway:
   enabled: true
   image:
     repository: 481665089315.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
-    tag: v0.0.0 # x-release-please-version
+    tag: v1.0.0 # x-release-please-version
     pullPolicy: IfNotPresent
   args: ["migrate"]
   # TODO: add FLYWAY_URL / FLYWAY_USER / FLYWAY_PASSWORD (int Aurora endpoint +
@@ -44,4 +44,4 @@ env:
   - name: DT_RELEASE_PRODUCT
     value: genesis-ai-requirements-api
   - name: DT_RELEASE_VERSION
-    value: v0.0.0 # x-release-please-version
+    value: v1.0.0 # x-release-please-version

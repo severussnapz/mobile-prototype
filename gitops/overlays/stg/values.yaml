@@ -13,13 +13,13 @@ image:
   repository: 266735822099.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api
   pullPolicy: IfNotPresent
   # Immutable release tag — release-please rewrites this on every release.
-  tag: v0.0.0 # x-release-please-version
+  tag: v1.0.0 # x-release-please-version
 
 flyway:
   enabled: true
   image:
     repository: 266735822099.dkr.ecr.eu-west-2.amazonaws.com/genesis-ai-requirements-api-flyway
-    tag: v0.0.0 # x-release-please-version
+    tag: v1.0.0 # x-release-please-version
     pullPolicy: IfNotPresent
   args: ["migrate"]
   # TODO: add FLYWAY_URL / FLYWAY_USER / FLYWAY_PASSWORD (stg Aurora endpoint +
@@ -41,4 +41,4 @@ env:
   - name: DT_RELEASE_PRODUCT
     value: genesis-ai-requirements-api
   - name: DT_RELEASE_VERSION
-    value: v0.0.0 # x-release-please-version
+    value: v1.0.0 # x-release-please-version
