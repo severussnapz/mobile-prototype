@@ -230,7 +230,7 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 | `emis-x-api-data-access` | DATA-001 to DATA-005, repository pattern |
 | `emis-x-api-postgres` | PG-001 to PG-006, Flyway migrations |
 | `emis-x-api-security` | SEC/AUTH rules |
-| `emis-x-api-observability` | OBS rules, Dockerfile APM |
+| `emis-x-api-observability` | OBS-001 to OBS-004, Dockerfile APM Agent, Serilog, exception filter, health checks |
 
 ---
 
