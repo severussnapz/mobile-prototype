@@ -107,7 +107,7 @@ public static class DependencyInjection
             services.AddSingleton<IAssemblyVersionProvider, AssemblyVersionProvider>();
             services.AddSingleton<ICodeownersGenerator, CodeownersGenerator>();
             services.AddScoped<IProjectMarkdownGenerator, ProjectMarkdownGenerator>();
-            services.AddScoped<IGenesisStructureScaffolder, GenesisStructureScaffolder>();
+            services.AddScoped<IGenesisStructureScaffolder, GenesisStructureScaffolderStub>();
             return;
         }
 

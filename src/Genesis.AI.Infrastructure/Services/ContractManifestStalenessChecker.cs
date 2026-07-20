@@ -142,7 +142,13 @@ public sealed class ContractManifestStalenessChecker : IContractManifestStalenes
         }
 
         var filePath = match.Groups[1].Value.Trim();
-        var pinnedVersion = int.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        if (!int.TryParse(match.Groups[2].Value,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var pinnedVersion))
+        {
+            return null;
+        }
         return (filePath, pinnedVersion);
     }
 }
