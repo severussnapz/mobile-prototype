@@ -1,4 +1,5 @@
 using Genesis.AI.Api.Authentication;
+using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate;
 using Genesis.AI.Domain.Exceptions;
@@ -40,7 +41,7 @@ public sealed class ProjectGitHubController : ControllerBase
 
     [HttpPost("{id:guid}/push-all")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ApiResponse<PushActionResponse>), StatusCodes.Status202Accepted)]
     public async Task<IActionResult> PushAll(Guid id, CancellationToken ct)
     {
         var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
@@ -50,12 +51,12 @@ public sealed class ProjectGitHubController : ControllerBase
         }
 
         return await Task.FromResult<IActionResult>(
-            Accepted(new PushActionResponse("GitHub sync started. Check push status for results.")));
+            Accepted(new ApiResponse<PushActionResponse> { Data = new PushActionResponse("GitHub sync started. Check push status for results.") }));
     }
 
     [HttpPost("{id:guid}/artefacts/{artefactId:guid}/push")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<PushActionResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PushArtefact(Guid id, Guid artefactId, CancellationToken ct)
@@ -102,7 +103,7 @@ public sealed class ProjectGitHubController : ControllerBase
 
             return Created(
                 $"/api/v1/projects/{id}/artefacts/{artefactId}",
-                new PushActionResponse("Pushed to GitHub successfully."));
+                new ApiResponse<PushActionResponse> { Data = new PushActionResponse("Pushed to GitHub successfully.") });
         }
         catch (GitHubAuthenticationException)
         {

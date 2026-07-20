@@ -14,6 +14,10 @@ public sealed class SwaggerEndpointFilter : IDocumentFilter
 {
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
+        // The "types" document is for NSwag client generation — APIM routing paths
+        // must not appear in it or NSwag will generate spurious methods.
+        if (swaggerDoc.Info?.Version == "types") return;
+
         // Drop any Swagger paths Swashbuckle may have emitted so we control the
         // single wildcard entry.
         var existingSwaggerPaths = swaggerDoc.Paths

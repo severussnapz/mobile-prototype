@@ -29,6 +29,16 @@ public class ProducesResponseTypeEnvelopeTests
         "HazardLogController",
         "SecurityReviewReportController",
         "DataProtectionImpactAssessmentController",
+        "ArtefactController",
+    ];
+
+    // Controllers that return bare JSON objects by design — the app
+    // consumes them without the ApiResponse<T> envelope and wrapping
+    // would be a breaking change.
+    private static readonly HashSet<string> BareResponseControllers =
+    [
+        "ArtefactVersionController",
+        "PrototypeStructuralEditsController",
     ];
 
     private static readonly Assembly ApiAssembly =
@@ -50,7 +60,8 @@ public class ProducesResponseTypeEnvelopeTests
             .Where(type =>
                 typeof(ControllerBase).IsAssignableFrom(type)
                 && !type.IsAbstract
-                && !FileDownloadControllers.Contains(type.Name));
+                && !FileDownloadControllers.Contains(type.Name)
+                && !BareResponseControllers.Contains(type.Name));
 
         foreach (var controllerType in controllerTypes)
         {

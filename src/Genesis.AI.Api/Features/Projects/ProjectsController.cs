@@ -44,7 +44,7 @@ public class ProjectsController : ControllerBase
     /// </summary>
     [HttpPost]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(ProjectResource), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<ProjectResource>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateProject(
@@ -99,7 +99,7 @@ public class ProjectsController : ControllerBase
     /// </summary>
     [HttpGet]
     [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
-    [ProducesResponseType(typeof(IEnumerable<ProjectResource>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ProjectResource>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProjects(
         [FromQuery] string? status,
         CancellationToken cancellationToken)
@@ -116,7 +116,7 @@ public class ProjectsController : ControllerBase
     /// </summary>
     [HttpGet("{id:guid}")]
     [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
-    [ProducesResponseType(typeof(ProjectResource), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ProjectResource>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetProject(Guid id, CancellationToken cancellationToken)
     {

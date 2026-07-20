@@ -144,6 +144,17 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1"
     });
 
+    // Clean document for NSwag client/type generation — no APIM routing artefacts.
+    options.SwaggerDoc("types", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "Genesis.AI API Types",
+        Version = "types"
+    });
+
+    // Emit nullable annotations for string? properties so NSwag generates correct
+    // TypeScript nullability (e.g. description: string | null, not string).
+    options.SupportNonNullableReferenceTypes();
+
     // Publish /swagger/* into the spec so APIM path-based routing forwards the
     // Swagger UI and OpenAPI JSON to the backend (APIM only routes declared
     // operations).
@@ -156,10 +167,9 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Swagger (OpenAPI) — served in Development, or in any environment when the
-// `Swagger:Enabled` flag is set (e.g. dev/int clusters that run as Production
-// but still want the API explorer). Off by default in deployed environments.
-var swaggerEnabled = app.Environment.IsDevelopment()
+// Swagger (OpenAPI) — served in any non-Production environment (Development,
+// Testing, Staging) or when `Swagger:Enabled` is explicitly set to true.
+var swaggerEnabled = !app.Environment.IsProduction()
     || app.Configuration.GetValue<bool>("Swagger:Enabled");
 if (swaggerEnabled)
 {

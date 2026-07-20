@@ -1,4 +1,5 @@
 using Genesis.AI.Api.Authentication;
+using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.Queries.GetPushStatus;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -20,10 +21,10 @@ public sealed class ProjectPushStatusController : ControllerBase
 
     [HttpGet("{projectId:guid}/push-status")]
     [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
-    [ProducesResponseType(typeof(PushStatusResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PushStatusResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPushStatus(Guid projectId, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(new GetPushStatusQuery(projectId), cancellationToken);
-        return Ok(new PushStatusResponse(result.UnresolvedCount, result.FailedArtefactIds));
+        return Ok(new ApiResponse<PushStatusResponse> { Data = new PushStatusResponse(result.UnresolvedCount, result.FailedArtefactIds) });
     }
 }
