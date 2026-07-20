@@ -286,7 +286,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 | Action 8 | P06 DB API integration | ⏸️ PARKED — CS team API schema not yet defined |
 | Action 9 | CODEOWNERS file + prompt governance | ✅ COMPLETE — Plan 4c D3/D8 |
 | Action 10 | Pipeline chat cross-stage artefact access | ✅ COMPLETE — cross-stage artefact-access section added to all P01–P10 prompts (exp) |
-| Planned 1 | Project Dashboard (KPIs and OKRs) | 📋 PENDING — design session required (Idris, Yas, Roel) |
+| Planned 1 | Project Dashboard (KPIs and OKRs) | 📋 PENDING — design input drafted (`genesis-ai-roi-metrics-design.md` v0.2: output/outcome split, Plandek+GitHub+Genesis DB join, 5 decisions closed). Session still needed with Idris/Yas/Roel. |
 | Planned 2 | Medical Device Pipeline (P09) | 📋 PENDING — design session with Indra required |
 
 10 of 10 engineering actions complete or in progress. Action 8 parked (CS team API). Design sessions (Planned 1, 2) pending.
