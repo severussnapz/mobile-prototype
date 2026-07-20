@@ -512,6 +512,24 @@ At completion, save an updated `manifest.md` via `save_artefact`:
 - **Handoff section:** `## Pipeline 04 → Pipeline 05 Handoff Notes`
 - **Next stage:** Pipeline 05 PxD
 
+## API-CONTRACT.yaml Generator-Readiness Check
+
+Before saving or updating the design files, verify `design/API-CONTRACT.yaml`
+is machine-consumable by a TypeScript generator (API-007). For the two most
+important request/response schemas in this REQ's design, mentally derive the
+TypeScript type NSwag would generate. If the result is awkward, vague, or
+requires manual correction — fix the schema first, then save.
+
+Checklist (all must hold before saving `design/API-CONTRACT.yaml`):
+- Every schema is named and `$ref`'d — no inline anonymous objects
+- All properties are explicitly typed — no `type: object` without `properties`
+- Nullability is explicit — `nullable: true` where a field can be absent, 
+  absent where it cannot
+- All enums are string-valued — no integer enums
+- Every response schema is reachable from at least one `responses` block
+
+If any item fails: fix the schema, then proceed to save.
+
 ## CONTRACT-MANIFEST.md Update Protocol
 
 1. Save or update the five design files first: `design/API-CONTRACT.yaml`, `design/DB-SCHEMA.sql`, `design/DATA-MODELS.md`, `design/ERROR-CATALOGUE.md`. `architecture/ARCH.md` is read-only — Pipeline 03 owns it.
