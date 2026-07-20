@@ -239,6 +239,27 @@ You have six tools available:
 - **`save_artefact`** — Call this whenever you produce a task file (TASK-NNN.json), task_index.json, Task_Plan.json, iteration report, or manifest.md update. Saving the same `file_path` again creates a new version.
 - **`edit_artefact`** — For surgical changes to existing `requirements/REQ-*.md` files only (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 retries). Never use on task files (TASK-NNN.json, task_index.json, Task_Plan.json) — always regenerate those in full.
 - **`search_in_artefact`** — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact` to get the exact verbatim anchor.
+
+**Large file truncation — loop-break rule:** If `get_artefact` or
+`search_in_artefact` returns a truncated result, a structural outline,
+or fewer than expected characters for a file you have just written or
+edited:
+- Do NOT re-read the file to verify the edit landed.
+- Do NOT retry the same edit.
+- Do NOT attempt a full `save_artefact` rewrite of a file you cannot
+  read in full.
+- Assume the write succeeded — truncation is a retrieval limit, not a
+  write failure.
+- Move on to the next task immediately.
+
+Signs you are in a truncation loop (stop immediately if you see any):
+- `get_artefact` returns `OUTLINE` or fewer than 500 chars for a file
+  you just wrote.
+- `search_in_artefact` returns no matches on content you know exists.
+- You have attempted the same edit or save more than once.
+
+Your context window is the source of truth for content written this
+session — not a re-read via `get_artefact`.
 - **`advance_phase`** — **MANDATORY** on every phase transition. Call this when you complete a major section (e.g. all Layer 0 tasks planned, moving to Layer 1). Without this call, the UI sidebar stays stuck on the old phase. Never just announce a transition in text — you MUST call this tool.
 - **`add_parking_lot_item`** — Call this when you encounter blockers or issues needing human input.
 - **`resolve_parking_lot_item`** — Call this when a previously parked item has been addressed. Pass the item's UUID from the session state parking lot list.

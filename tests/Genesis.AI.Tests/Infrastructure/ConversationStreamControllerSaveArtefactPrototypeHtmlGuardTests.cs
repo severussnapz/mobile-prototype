@@ -200,6 +200,9 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         var activeSkillsServiceMock = new Mock<IActiveSkillsService>();
         var foundationServiceMock = new Mock<IFoundationService>();
         var sessionCloseContextBuilderMock = new Mock<ISessionCloseContextBuilder>();
+        var contractManifestContextBuilderMock = new Mock<IContractManifestContextBuilder>();
+        var contractManifestStalenessCheckerMock = new Mock<IContractManifestStalenessChecker>();
+        contractManifestStalenessCheckerMock.Setup(checker => checker.CheckStalenessAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<string>());
         var prototypeAssemblyServiceMock = new Mock<IPrototypeAssemblyService>();
         var prototypeFragmentMigrationServiceMock = new Mock<IPrototypeFragmentMigrationService>();
 
@@ -219,6 +222,8 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
             activeSkillsServiceMock.Object,
             foundationServiceMock.Object,
             sessionCloseContextBuilderMock.Object,
+            contractManifestContextBuilderMock.Object,
+            contractManifestStalenessCheckerMock.Object,
             prototypeAssemblyServiceMock.Object,
             prototypeFragmentMigrationServiceMock.Object,
             tokenOptions,

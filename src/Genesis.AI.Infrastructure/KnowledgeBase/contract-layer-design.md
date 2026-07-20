@@ -1,6 +1,6 @@
 # Contract Layer — Design
 
-**Status:** Design complete. All decisions settled — conceptual model, enforcement, guardrails, TDD gate, and tag vocabulary. Implementation-ready pending sign-off.
+**Status:** Partially implemented — artefact pattern adopted July 2026. Tool-layer backstop, TDD gate API enforcement, and guardrail suite remain.
 **Plan reference:** Plan 4d, item 1 (Contract enforcement) and item 17 (Contract layer design session — no implementation before this design is signed off).
 **Owner:** Idris Issa.
 **Prerequisite for:** Plan 5 (TDD Agent). This design is the sign-off gate; implementation may proceed once approved.
@@ -42,7 +42,7 @@ Each file is a normal Genesis artefact under `.genesis/design/`:
   DB-SCHEMA.sql
   DATA-MODELS.md
   ERROR-CATALOGUE.md
-  CONTRACT.md          ← the manifest (see §3)
+  CONTRACT-MANIFEST.md          ← the manifest (see §3)
 ```
 
 ---
@@ -53,28 +53,28 @@ Each file is a normal Genesis artefact under `.genesis/design/`:
 
 The artefact model already versions per `(ProjectId, FilePath)`. `GetArtefactVersionsQuery(ProjectId, FilePath)` returns all versions of one artefact; the latest version for a filePath is "the artefact." Each contract file is versioned by this existing mechanism — exactly like `REQ-001.md` is today. **No schema change, no new `v1/`/`v2/` directory hierarchy.**
 
-### The coherence problem
+### Built pattern: CONTRACT-MANIFEST.md as the coherence anchor
 
-Four files versioning independently means `API-CONTRACT.yaml` could be at v3 while `DB-SCHEMA.sql` is at v1. A downstream stage pinning "the contract" would have to track four version numbers and reason about which combination is coherent — reintroducing drift risk through the back door.
+PROVEN (implemented in prompt/runtime contract, not DB aggregate): contract coherence is represented by a versioned artefact, `design/CONTRACT-MANIFEST.md`, following a six-section structure:
 
-### The manifest (chosen solution)
+1. `Status Header` (includes provenance comments)
+2. `Pinned File Versions`
+3. `Requirement Ledger`
+4. `Shared Element Index` (Endpoints, Tables, Data Models, Error Codes)
+5. `Reuse Log`
+6. `TDD Gate (Plan 5)`
 
-A fifth artefact, `CONTRACT.md`, is a **manifest** that pins the exact version of each of the four files as a coherent set:
+PROVEN comment format in use:
 
+```html
+<!-- contract-manifest-version: {N} -->
+<!-- req-provenance: {filePath}@v{version},... -->
+<!-- arch-provenance: architecture/ARCH.md@v{version} -->
 ```
-# Contract v3
-API-CONTRACT.yaml   @ v3
-DB-SCHEMA.sql       @ v1
-DATA-MODELS.md      @ v2
-ERROR-CATALOGUE.md  @ v2
-```
 
-- The manifest itself is a versioned artefact (its own filePath, its own version history).
-- When any contract file changes in a breaking way, the manifest is bumped, snapshotting the new coherent set.
-- Downstream stages pin **one number** — the manifest version — which resolves to four specific file versions.
-- Each contract file stays in its native format, so NSwag and other tooling consume the real `.yaml`/`.sql` without tripping over anything.
+This replaces the earlier CONTRACT.md-style "pin file" description with the concrete artefact pattern aligned to the existing HAZARD-REGISTRY style: plain text, versioned per file path, and directly consumable in prompt context.
 
-**Rejected alternative:** one single artefact containing all four sections inline. Simpler to pin, but couples YAML + SQL + Markdown into one blob, breaks clean NSwag input, and makes diffing a single concern harder. The manifest is the ponytail answer — reuse the versioning that exists, add the minimum (one index file), keep each file native.
+ASSUMED until tool backstop lands: downstream contract reads are expected to stay aligned to the pinned set via prompt injection and warnings; hard enforcement at tool resolution is specified but not yet implemented (see §9a).
 
 ---
 
@@ -91,31 +91,20 @@ A contract version bump is **not new machinery**. It reuses the existing CHANGE-
 
 ## 5. Resumption and staleness
 
-The problem: a stage approved days ago against Contract v3; since then P04 issued v4. On reopening, the stage must not silently pick up v4 and quietly invalidate the approval.
+PROVEN (implemented): staleness is checked from manifest provenance comments, not from a DB contract aggregate.
 
-### The pin
+`ContractManifestStalenessChecker`:
 
-At approval, a stage records **which contract (manifest) version it was approved against**. This is the one genuinely new field required (on the stage/conversation).
+- Parses HTML provenance comments in `CONTRACT-MANIFEST.md`:
+  - `contract-manifest-version`
+  - `req-provenance`
+  - `arch-provenance`
+- Resolves each pinned entry against current approved artefact versions via `IArtefactRepository.GetByProjectAndFilePathAsync(...)`.
+- Emits targeted warnings when a pinned artefact is missing or drifted.
 
-### The staleness check on resume
+PROVEN (implemented): `ConversationStreamController` runs this check per turn and appends warnings into the mutable prompt part so drift is visible in runtime context, not just documented.
 
-On session resume, the stage compares its pinned manifest version against the latest manifest version. Three outcomes:
-
-| Condition | Behaviour |
-|---|---|
-| Pinned == latest | Resume silently against the pinned version. |
-| Pinned < latest, **no** domain badge for this stage | Resume against pinned version. Quiet note: "design has advanced to vN (no [domain] impact)." Human informed, not forced to act. |
-| Pinned < latest, **domain badge hits this stage** | Open in re-review state. Banner: "Contract changed from vX to vN with a [domain] impact. Previous approval is stale. Review the delta." Show the CHANGE record — not the whole contract. |
-
-This check runs on the existing per-turn prompt rebuild and feeds the existing `stalenessNotice` contributor (see §9a). Because the prompt rebuilds on every entry — including a resume after any elapsed time — the comparison re-runs whenever the user opens the chat. There is no persisted day-0 prompt to go stale.
-
-### Why the badge is load-bearing
-
-Without the badge, every contract bump would force every downstream stage to re-review. People drown in false alarms and start rubber-stamping — worse than no gate. The badge means a stage is pulled back **only** when the contract change actually touches its domain. A typo in the error catalogue does not drag six stages into re-review.
-
-### Re-approval policy (open sub-decision)
-
-When a stale-with-badge stage reopens, does re-approval require re-doing the stage or just acknowledging the delta? Proposed: **per-stage policy.** Clinical safety (P06) requires the CSO to actively re-approve against the new version — DCB0129 sign-off is personal and non-repudiable, so a diff acknowledgement is not enough; a lighter stage (e.g. P05) may accept acknowledgement. This mirrors the "which stages need assurance" policy already captured in P00.
+ASSUMED until tool backstop lands: prompt-level warnings reduce silent drift risk, but do not yet force tool resolution to pinned versions if a later tool call asks for a contract artefact explicitly (see §9a NOT YET BUILT).
 
 ---
 
@@ -190,7 +179,7 @@ The BA and the role-holders never see raw contract files. They see what Genesis 
 
 1. Contract = four plain-text files (`API-CONTRACT.yaml`, `DB-SCHEMA.sql`, `DATA-MODELS.md`, `ERROR-CATALOGUE.md`) under `.genesis/design/`.
 2. Versioned by the existing per-`(ProjectId, FilePath)` mechanism — no schema change, no new folder hierarchy.
-3. A `CONTRACT.md` manifest pins a coherent set of file versions; downstream stages pin the manifest version (one number).
+3. A `CONTRACT-MANIFEST.md` manifest pins a coherent set of file versions; downstream stages pin the manifest version (one number).
 4. Breaking changes reuse the existing CHANGE-record + domain-badge pattern.
 5. Resumption uses a pin (stage records approved-against manifest version) + a staleness check on resume; badge decides whether re-review is forced.
 6. Tagging: P04 drafts mechanically from upstream anchors (marked draft); P06/P07/P08 role-holders ratify as a by-product of their existing assessment; ratification is a hard gate.
@@ -200,45 +189,23 @@ The BA and the role-holders never see raw contract files. They see what Genesis 
 
 ---
 
-## 9a. Enforcement — DECIDED
+## 9a. Enforcement
 
-**Decision: injection via the existing per-turn prompt rebuild, plus an optional cheap tool-layer backstop on the contract specifically.**
+### DONE (PROVEN)
 
-### What the codebase already does (verified, not assumed)
+1. `ContractManifestContextBuilder` injects `design/CONTRACT-MANIFEST.md` content into prompt context for consuming stages:
+  - Design
+  - ClinicalSafety
+  - InformationGovernance
+  - Security
+2. `ContractManifestStalenessChecker` parses manifest provenance comments and emits targeted staleness warnings.
+3. `ConversationStreamController` appends those warnings into the mutable prompt part per turn.
 
-`ConversationStreamController.cs` rebuilds the system prompt **on every stream turn**, not once at conversation creation. The prompt is split into a stable/cached part and a mutable/fresh-each-turn part (for prompt-caching efficiency). The mutable part already has two contributors of exactly the shape this design needs: `stalenessNotice` and `handoverBlock` (both appended fresh each turn). The `get_artefact` tool call is already intercepted in a loop that extracts `file_path`, branches on path prefix, and can substitute its own tool result (currently used for read-budget enforcement).
+### NOT YET BUILT (ASSUMED DESIGN INTENT)
 
-This checks the two assumptions the earlier draft got wrong:
-- **"Injection pattern doesn't exist" — false.** The per-turn rebuild with mutable contributors is robust and already live. Injection is real, not vapour.
-- **"Contract-aware tool is heavy to build" — false.** The interception point exists; contract-awareness is one more branch in a loop that already inspects `file_path`.
+1. Tool-layer backstop: when the agent calls `get_artefact` for contract files, enforce pinned-version resolution rather than latest.
 
-### The mechanism
-
-1. **Contract content → stable/cached part of the prompt**, injected at the *pinned* manifest version. Large, changes only on version bump — belongs in the cached part.
-2. **Contract staleness → the existing `stalenessNotice`** (mutable part), computed during the per-turn rebuild. Because the prompt rebuilds on *every* entry — including a resume after 10 days — the pinned-vs-latest comparison runs every time the user opens the chat. A returning user whose contract moved to a new version with a domain badge gets the staleness banner on re-entry. There is no stale-prompt-replay risk: nothing persists a day-0 prompt.
-3. **Tool-layer backstop — LOCKED IN.** Extend the existing `get_artefact` interception: when a `design/` path is requested inside a stage with a pinned manifest, resolve to the pinned version rather than latest. With the pinned contract already injected fresh every turn, the bypass this closes (agent ignores the in-context contract and calls the tool anyway) is low-probability rather than structural. Cost is near-zero (one branch on an existing loop); benefit is turning "low-probability" into "impossible" for the one artefact whose drift is a patient-safety issue. Adopted because the contract is the one artefact whose drift hurts a patient — the trivial cost is justified.
-
-### The 10-day resume case (the test that drove this)
-
-Come back after 10 days and reopen the chat. The prompt rebuilds on the next message regardless of whether this spawns a fresh conversation or continues an existing thread. The pinned contract is re-injected at its pinned version; the staleness check re-runs and fires the banner if the contract moved with a relevant badge. The point-of-use tool backstop (if adopted) guarantees the pinned version even if the agent reaches for the tool mid-session. All three entry/use points are covered.
-
-### Related finding — SESSION-CLOSE re-injection gap (Plan 4d item)
-
-While verifying the injection pattern, confirmed that the SESSION-CLOSE artefact is **generated, stored, and pushed to GitHub, but never read back into the prompt on resume.** Every code reference is generation/storage/push; `ConversationStreamController.cs` has no reference to it. The resume-summary that is purpose-built to tell the agent where to pick up is a write-only artefact.
-
-This is the same shape as the DTO completeness failure: produced at one end, silently dropped at the other, all green. **Fix:** add a session-close contributor to the mutable part of the prompt (beside `stalenessNotice` and `handoverBlock`) that reads the latest SESSION-CLOSE artefact for the stage and injects it on resume. Small — one contributor, alongside two that already exist. Logged as a Plan 4d item, to be fixed before Plan 5 (the pipeline leans on clean session resume).
-
-This finding also strengthens the argument for a **round-trip guardrail** (see §9b.2): for every artefact type meant to be re-consumed, a test proving it is actually read back, not just written.
-
-**Scoped into this work.** The SESSION-CLOSE fix is not deferred to a separate task — it is the first, lowest-risk instance of the same injection-contributor pattern the contract enforcement uses. Building it first proves the pattern before the higher-stakes contract rides on it.
-
-### Implementation sequence (within this work, once §9b resolved)
-
-1. **SESSION-CLOSE contributor first.** Smallest, self-contained. Proves the "mutable-part contributor that reads an artefact and injects it on resume" pattern. Acceptance test: resume a stage, assert the session-close summary is present in the rebuilt prompt. Its own round-trip guardrail is the test that would have caught the original gap. Depends only on the round-trip guardrail being defined (§9b.2) — otherwise unblocked.
-2. **Contract injection second.** Same pattern, now proven. Pinned contract in the stable/cached part; staleness in the mutable `stalenessNotice`. Depends on the round-trip guardrail *and* the TDD gate definition (§9b.1).
-3. **Tool-layer backstop third.** The branch on the existing `get_artefact` interception.
-
-All three follow TDD: tests first (RED), then the contributor/branch (GREEN), verified counts before commit.
+Current enforcement is prompt-layer plus warning-layer. Hard pin enforcement at tool resolution remains outstanding.
 
 ---
 
@@ -280,91 +247,69 @@ This reuses the diff machinery that already exists for staleness — not a new s
 
 ---
 
-## 9b-i. TDD gate — DECIDED
+## 9b-i. TDD gate
 
-**The gate is the stricter form: the contract must be provably consistent with the upstream artefacts it was produced from, and its tags must be ratified, before Plan 5 (TDD) can start for a feature.**
+### DONE (PROVEN)
 
-Rationale for strict-from-day-one: retrofitting a gate onto a system already in flight means every artefact produced under a loose gate becomes suspect and must be re-validated. At ~500 engineers that is a mass correction exercise across live work, not a code change. The complexity is cheaper to carry from the start, when there is nothing to correct.
+The TDD gate definition now lives in `CONTRACT-MANIFEST.md` section 6 as agent-readable text:
 
-### Provenance field
+- Gate open = `YES` only when all REQ rows are `COMPLETE` and provenance is current.
+- Gate open = `NO` when any REQ remains pending or provenance drifts.
 
-The manifest carries a provenance field pinning **both** the REQ version and the ARCH version the contract was produced from. Both, not REQ alone — a P03 architecture change (e.g. splitting one service into two) changes the API contract as much as a requirement change does. Pinning only the REQ would miss architecture drift.
+### NOT YET BUILT (ASSUMED DESIGN INTENT)
 
-### The gate checks (all must hold)
-
-1. Contract manifest exists and is approved for this feature.
-2. Manifest's pinned REQ version == current approved REQ version **and** pinned ARCH version == current approved ARCH version.
-3. Manifest's tags are ratified, not draft (§6) — the TDD agent consumes the contract including its safety tags; starting TDD against unratified tags would generate tests against classifications the role-holders have not confirmed.
-
-Any failure blocks Plan 5 start for that feature.
-
-### On mismatch — the hard rule (proportionate, no gate-level human judgement)
-
-A REQ or ARCH mismatch is not an error; it signals the upstream moved after the contract was designed. The gate blocks and reports which upstream moved and to what version. What happens next is governed by a **hard rule keyed off the existing domain badges** on the upstream CHANGE record:
-
-- **Badged change (material** — new AC, changed interface, service split): a full P04 re-run is forced. The contract must be re-produced against the new upstream version.
-- **Unbadged change (cosmetic** — typo, clarification with no AC/interface impact): a fast-path contract re-approval is allowed.
-
-The badge already encodes materiality, so the gate needs no human judgement to decide fast-path vs full-re-run. This is what keeps the strict gate *proportionate*: without it, every trivial upstream edit would force a full contract re-run, breeding frustration and eventually a bypass. With it, the gate blocks hard on real drift and fast-paths cosmetic change.
-
-### Audit consequence
-
-The strict gate makes the chain non-repudiable: tests were written against contract vN, produced from REQ vX and ARCH vY, approved by named role-holders on given dates. Unbroken provenance from requirement to test.
+API/runtime enforcement of this gate is not yet implemented. Today, the gate is documented and injected for agent guidance, but not yet hard-blocked by backend policy checks.
 
 ---
 
-## 9c. Guardrail set — DECIDED
+## 9c. Guardrail suite status
 
-**Scope: the broader silent-seam failure class, not only the contract layer.** Chosen deliberately as the better investment — the failure has bitten three times in one session and treating the root pattern is worth more than patching the contract instance alone.
+### DONE (PROVEN)
 
-### The failure class this targets
+1. Seam type 4 (tool registration → wiring): `ToolCallWiringTests` coverage exists.
+2. `ContractManifestContextBuilder` unit tests exist (write/read context path to prompt injection input).
+3. `ContractManifestStalenessChecker` unit tests exist (provenance parsing and warning behaviour).
 
-Three failures share one shape:
+### NOT YET BUILT (ASSUMED DESIGN INTENT)
 
-- **DTO gap:** handler computes a field → result carries it → response DTO omits it → HTTP body drops it. Green, because nothing tested the handler→HTTP seam.
-- **SESSION-CLOSE gap:** artefact generated → stored → pushed → never read back into the prompt. Green, because nothing tested the write→resume seam.
-- **Controller-completeness gap:** command + handler built → controller route never added. Green, because nothing tested the mediator→route seam.
-
-The common shape is **not** "mapping" or "artefacts." It is: *a producer and a consumer are built in separate places (often separate sessions), each is internally correct and independently tested, and nothing tests the seam between them.* Unit tests pass on both sides because each side is coherent alone. The failure lives in the join — exactly what falls between two definitions of "done."
-
-The guardrails are therefore **seam tests**: each asserts a specific producer→consumer handoff completes end to end. Not more unit tests on either side — tests that only pass if the connection holds.
-
-### The minimum seam-test set
-
-1. **Result → HTTP body completeness** (DTO seam). For every command/query result field, a test asserts it appears in the serialised HTTP response. Reflect over the result type; assert each property is present in the response contract. Catches the DTO gap as a class — a new result field with no DTO mapping fails automatically.
-
-2. **Command → route existence** (controller seam). For every command/query type, a test asserts a controller route dispatches to it. Catches the missing-endpoint class.
-
-3. **Artefact write → read-back** (re-consumption seam) — **stronger form (decided).** For every re-consumed artefact type, an integration test that *writes the artefact, resumes the stage, and asserts it is present in the rebuilt prompt.* Not the weaker "a read path exists" form — the stronger form is chosen because this is the class that just bit (SESSION-CLOSE), and the weak form can pass while the read path is broken in a way it never exercises. The set of re-consumed types is a **hard-coded list (decided)**, not a registry — ponytail-minimal for the ~4 current types (session-close, contract manifest, contract files, REQ). Revisit only if the list grows materially.
-
-4. **Tool registration → wiring** (tool seam). Already exists as `ToolCallWiringTests` (every tool in `PipelineToolDefinitions` must have a wiring test proving `ExecuteToolCallAsync` handles it). Named here explicitly as a member of this family — it is the same class, and it shows the pattern already had one member before the family was named.
-
-5. **Pin → resolution** (contract enforcement seam). For a stage with a pinned manifest version, a test asserts reading a contract file returns the *pinned* version, not latest. Proves the injection + backstop actually binds.
-
-### Honest limitations (do not oversell)
-
-- **A seam test only catches seams that have been enumerated.** This set closes the known recurring classes. It does not catch a novel seam type nobody has thought of. The value is converting a recurring surprise into a named pattern with a standard countermeasure — the standing rule is: *discovering a new class of seam failure means adding a new seam-test type to this set, not just fixing the instance.*
-- **Reflection-based completeness tests (1, 2) need opt-outs for genuinely internal fields — and the opt-out becomes the new leak if ungoverned.** Rule: any completeness opt-out requires a reason string and is itself reviewed. Otherwise the leak has moved, not sealed.
-- **Test 3 (stronger form) is the most expensive** — a full write-resume integration test per re-consumed type. Justified for this class; not a trivial add.
-
-### The standing principle
-
-Every producer→consumer seam in the pipeline has a test that fails if the handoff is incomplete. Discovering a new class of seam failure means adding a new seam-test type — not just fixing the instance. The five above are the starting members; the DTO and SESSION-CLOSE failures are why two of them exist; the wiring-test convention shows the family already had a member before it was named.
+1. Seam type 1: result → HTTP body, class-level completeness tests.
+2. Seam type 2: command → route existence checks.
+3. Seam type 3 (strong form for contract manifest): write → resume → assert in rebuilt prompt, as an integration seam.
+4. Seam type 5: pin → resolution end-to-end tests proving pinned-version retrieval, not latest.
 
 ---
 
 ## 10. Sequencing note
 
-The contract layer is Plan 4d item 1 and its design (item 17). **The design is now complete** — all five decision areas settled (conceptual model, enforcement §9a, guardrail set §9c, TDD gate §9b-i, tag vocabulary §9b). This document is the sign-off gate; contract implementation may proceed once approved.
+Implementation status and remaining order:
 
-**Already done:** the SESSION-CLOSE re-injection fix (found during this design, §9a) is implemented, tested (write→resume→present-in-prompt round trip), and committed — the first, lowest-risk instance of the injection-contributor pattern the contract enforcement reuses.
+1. ✅ Item 1 — `CONTRACT-MANIFEST.md` artefact pattern (replaces DB aggregate as runtime contract source).
+2. ✅ Item 2 — pin + staleness check (`ContractManifestStalenessChecker`).
+3. ✅ Item 3 — contract injection (`ContractManifestContextBuilder` + P04/P06/P07/P08 prompt consumption blocks).
+4. ⬜ Item 3 (partial outstanding) — tool-layer backstop for pinned-resolution at tool-call time.
+5. ⬜ Item 4 — tagging implementation deferred (Decision E).
+6. ⬜ Item 5 — TDD gate API enforcement.
+7. ⬜ Item 6 — guardrail seam suite completion (types 1, 2, 3, 5).
 
-**Implementation order once signed off:**
-1. Contract artefacts + manifest (reuse existing per-filePath versioning; add manifest with REQ+ARCH provenance).
-2. Pin + staleness check (feeds existing `stalenessNotice`; the SESSION-CLOSE fix proved the contributor pattern).
-3. Contract injection + tool-layer backstop (§9a).
-4. Tagging: P04 draft pass, traceability section, role-holder ratification worklist (§6, §9b vocabulary).
-5. TDD gate (§9b-i) — the Plan 5 entry condition.
-6. Guardrail suite (§9c) — built alongside, not after.
+PROVEN vs ASSUMED: items marked ✅ are implemented in code/prompt assets; ⬜ items are intended architecture and remain open work.
 
-Plan 5 (TDD Agent) begins only when the gate (§9b-i) is in place and green.
+## 11. Architectural decision: DB aggregate -> artefact pattern
+
+Decision (July 2026): move runtime contract coherence from the proposed DB-first aggregate path to the artefact-first path (`CONTRACT-MANIFEST.md`), following the existing versioned artefact operating model.
+
+Rationale:
+
+1. The DB aggregate proposal (`ContractManifest` + `ContractManifestPin`) reliably represented version pins (§2), but did not carry the full anti-drift operating surface used by the agent flow:
+  - requirement ledger progression,
+  - shared element index,
+  - reuse log,
+  - TDD gate declaration.
+2. The artefact pattern keeps those controls in one readable, versioned, prompt-consumable file and matches established stage patterns.
+
+What happens to the DB aggregate work:
+
+1. `ContractManifest` / `ContractManifestPin` entities and migration V25 remain committed.
+2. They are kept dormant for now and are not the active runtime source of truth.
+3. Planned activation point: when API-level Plan 5 gate enforcement is implemented, parse `CONTRACT-MANIFEST.md` section 2 and materialise the existing aggregate as the machine-checkable pin record.
+
+ASSUMED until that activation work lands: dormant aggregate persistence remains intentionally unused by runtime orchestration.

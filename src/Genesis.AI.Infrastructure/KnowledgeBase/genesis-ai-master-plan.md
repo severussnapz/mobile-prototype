@@ -286,7 +286,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 | Action 8 | P06 DB API integration | ⏸️ PARKED — CS team API schema not yet defined |
 | Action 9 | CODEOWNERS file + prompt governance | ✅ COMPLETE — Plan 4c D3/D8 |
 | Action 10 | Pipeline chat cross-stage artefact access | ✅ COMPLETE — cross-stage artefact-access section added to all P01–P10 prompts (exp) |
-| Planned 1 | Project Dashboard (KPIs and OKRs) | 📋 PENDING — design session required (Idris, Yas, Roel) |
+| Planned 1 | Project Dashboard (KPIs and OKRs) | 📋 PENDING — design input drafted (`genesis-ai-roi-metrics-design.md` v0.2: output/outcome split, Plandek+GitHub+Genesis DB join, 5 decisions closed). Session still needed with Idris/Yas/Roel. |
 | Planned 2 | Medical Device Pipeline (P09) | 📋 PENDING — design session with Indra required |
 
 10 of 10 engineering actions complete or in progress. Action 8 parked (CS team API). Design sessions (Planned 1, 2) pending.
@@ -316,7 +316,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - Three Copilot cheats caught and reversed live (null-object bypass, CA1859 suppression, build-props global-using hack) — all GREEN, none shipped.
 
 **Seam guardrail set — designed and documented**
-- Five seam-test types defined: result→HTTP body, command→route, artefact write→read-back (stronger form), tool registration→wiring, pin→resolution.
+- Eight seam-test types defined: result→HTTP body, command→route, artefact write→read-back (stronger form), tool registration→wiring, pin→resolution, API client verb→controller HTTP verb match, scope-level load→ownership-level mutation identity match, implementation→call-site.
 - Standing rule: a new class of seam failure means a new seam-test type in the family — never just fixing the instance.
 
 **SDLC skills library — committed to KnowledgeBase and Infrastructure/Skills/**
@@ -328,6 +328,12 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
   - `seam-testing` — in folder, unwired (ready for Plan 5)
   - `review-agent-discipline` — in folder, unwired (injected via Review Agent prompt)
 - P01 early-return exclusion removed from PhaseSkillMap — RequirementsDiscovery now receives skills.
+
+**Help chat retrieval query fix — complete (July 2026, PR #54)**
+- `BuildRetrievalQuery` existed, was unit-tested with 6 passing tests, and was never called from `StreamAsync`. Both `QueryAsync` calls passed the raw message, dropping conversational context on follow-up turns.
+- Fix: one local variable + two argument swaps in `StreamAsync`. 4 wiring tests added pinning the seam (SEAM-008).
+- Note: fix is partial — query format is `{prior_user_message}: {current_message}`, not `{prior_turn_summary}` as specced. Seventh silent seam instance; earns implementation→call-site seam type (type 8).
+- Seam-testing.md (KB + Skills): type 8 / SEAM-008 added, SEAM-007 backfilled into skills file.
 
 **Both PRs fixed and re-reviewed**
 - API PR: IAiService `StreamWithToolsAsync` collapsed to single optional-param method; 7 integration mocks updated; NHS guard error message fixed.
@@ -350,8 +356,8 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - Clinical UK display label corrected (was "ClinicalUk").
 - Tab buttons in settings panel use `@emisgroup/ui-button` Button component.
 
-**Test counts (verified July 2026):**
-- API: 942 unit + 128 integration
+**Test counts (verified July 2026, post contract-manifest session):**
+- API: 1001 unit + 128 integration
 - App: 362 tests, tsc clean, lint clean
 
 ### Remaining items (all must be checked before Plan 5 starts)
@@ -364,14 +370,17 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [x] Anchor failure root cause resolved ✅ — Mode 2 `UntargetedChildrenChanged` guard incorrectly fired on leaf elements; guard now skips when `originalChildCount == 0`. SVG self-closing serialisation handled by fingerprint matching. Verified live in prototype session July 2026. All 26 unit + 12 integration tests passing.
 - [ ] Both PRs merged to main
 
-**Contract layer implementation (contract-layer-design.md §10 items 2–6):**
-- [ ] Create command — reads current approved REQ + ARCH versions, validates pinned artefacts exist, writes manifest
-- [ ] Staleness check + injection — per-turn rebuild, feeds existing `stalenessNotice`
-- [ ] Error catalogue — `ERROR-CATALOGUE.md` as P04 output, versioned, frontend reads from it
-- [ ] Tagging — P04 draft pass, traceability section, P06/P07/P08 ratification worklist
-- [ ] TDD gate — strict form, REQ+ARCH provenance, blocks Plan 5 start
-- [ ] Guardrail suite — five seam-test types
-- [ ] PR Review Agent wired into pipeline pre-commit gate (see Plan 4d-R)
+**Contract layer implementation:**
+- [x] CONTRACT-MANIFEST.md artefact pattern — six-section structure, replaces DB aggregate approach. P04 writes it, P06/P07/P08 read it. ContractManifestContextBuilder injects content per turn for consuming stages. ✅ July 2026
+- [x] Staleness check + injection — ContractManifestStalenessChecker parses HTML provenance comments, compares pinned versions against current approved artefact versions via IArtefactRepository, injects targeted warnings into mutable prompt part per turn. ✅ July 2026
+- [x] P04 prompt — Phase 0 read protocol (check §4 before designing), completion write protocol (update §1–§6, emit log line), HTML provenance comments in §1. ✅ July 2026
+- [x] P06/P07/P08 prompts — read-only CONTRACT-MANIFEST.md consumption blocks added (read §4 Shared Element Index before stage work). ✅ July 2026
+- [ ] Tool-layer backstop — deferred to Plan 5 day-one. When agent calls get_artefact for contract files, enforce pinned-version resolution not latest. Low-probability gap: content injected per turn reduces need to call get_artefact directly.
+- [ ] Error catalogue frontend — ERROR-CATALOGUE.md already instructed as P04 output. Frontend reading from it deferred — not a Plan 5 gate.
+- [ ] Tagging — deferred (Decision E, July 2026 session).
+- [ ] TDD gate API enforcement — gate lives in CONTRACT-MANIFEST.md §6 as agent-readable text. API-side enforcement deferred to Plan 5 day-one. Pipeline fully operational without it.
+- [ ] Guardrail suite — seam types 1, 2, 5 not yet written. Seam type 3 strong form ✅ (CONTRACT-MANIFEST write→resume→prompt integration test, be66360). Seam type 4 (ToolCallWiringTests) ✅.
+- [ ] PR Review Agent wired into pipeline pre-commit gate — moved to Plan 5/Workstream E (Code Swarm). Review Agent gates AI-generated swarm commits; no swarm exists yet so wiring here has no target. Point 2 (GitHub CI/CD, Shantanu) remains a Workstream G item.
 
 **Engineering hygiene:**
 - [ ] DTO mapping completeness structural fix — vertical slice from UpdateProjectGitHub as reference implementation; every result field requires response DTO + controller mapping + mapping test; backfill all existing response models

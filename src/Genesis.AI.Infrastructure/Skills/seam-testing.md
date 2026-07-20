@@ -118,3 +118,40 @@ Test helper methods must declare concrete return types matching the element they
 ```csharp
 ✅ private static IReadOnlyList<ContractManifestPin> CreateAllPins() { ... }
 ```
+
+---
+
+## SEAM-007 — API Client Verb Must Match Controller HTTP Verb (Guardrail)
+
+**Severity:** Critical
+
+For every API client method (`apiClient.get/post/put/patch/delete`), the controller action must use the matching HTTP verb attribute. Unit tests on either side cannot catch this — the client compiles against the TypeScript interface, the controller compiles against C# attributes, nothing verifies they agree.
+
+**Required:** a real HTTP integration test that makes the call and asserts a non-405 response.
+
+**Proved live:** `projectNotesApi.update` and `projectDecisionsApi.update` used `PUT` but controllers used `[HttpPatch]` — 405 in production, zero unit test failures.
+
+---
+
+## SEAM-008 — Implementation Must Be Called From Its Entry Point (Guardrail)
+
+**Severity:** Critical
+
+A method that is extracted, unit-tested, and correct is not done until it is called from its production entry point. An orphaned implementation is indistinguishable from a missing one at runtime.
+
+**Required:** mock the collaborator the entry point calls, invoke the entry point, assert the captured argument matches what the implementation produces.
+
+**Anti-pattern:**
+```csharp
+// ❌ BuildRetrievalQuery tested with 6 unit tests
+// ❌ StreamAsync passes raw message to QueryAsync — BuildRetrievalQuery never called
+// ❌ Result: green build, passing tests, zero production effect
+```
+
+**Required:**
+```csharp
+// ✅ Mock IKnowledgeService, invoke StreamAsync
+// ✅ Assert captured query == BuildRetrievalQuery output
+```
+
+Ask at review time: "What calls this?" If the answer is "only tests", the implementation is orphaned.

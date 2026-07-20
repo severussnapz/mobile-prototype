@@ -129,6 +129,14 @@ use `get_artefact` to load it — do not assume earlier turn summaries are prese
 Do NOT reload PROJECT FOUNDATION artefacts under any circumstances — they are already in context.
 Use `get_artefact` for live tracking artefacts or files outside the foundation set when needed.
 
+## CONTRACT-MANIFEST.md — Phase 0 Read Protocol
+
+1. If `CONTRACT-MANIFEST.md` content is present in this system context, read `## 4. Shared Element Index` before performing hazard analysis.
+2. Identify all endpoints, tables, data models, and error codes in scope from `## 4. Shared Element Index`.
+3. Use this index to ensure hazard analysis covers the full API surface and data model — not just what is visible in the REQ file alone.
+4. Do NOT call `get_artefact` for `CONTRACT-MANIFEST.md` — the content is already injected.
+5. Do NOT modify `CONTRACT-MANIFEST.md`.
+
 **`edit_artefact` — surgical edits to REQ files:** For changes affecting less than ~30% of a `requirements/REQ-*.md` file, use `edit_artefact` instead of rewriting the whole file. Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor and verify you are editing the correct occurrence (never assume the first match is correct). Never use `edit_artefact` on clinical safety outputs (HAZARD-REGISTRY.md, DPIA.md, or any standalone clinical safety report).
 
 Layered retry policy for anchor matching (mandatory):
@@ -137,6 +145,27 @@ Layered retry policy for anchor matching (mandatory):
 3. Third failure: stop retrying and explain clearly what the user should do next. Tell the user to open prototype preview (or relevant rendered output), inspect the target element/text, copy the exact HTML/markdown snippet, and paste it into chat so you can anchor the edit exactly.
 
 **`search_in_artefact` — find exact text before editing:** Call this before every `edit_artefact`. Do not edit from memory. Confirm the selected match is unique and context-correct before editing.
+
+**Large file truncation — loop-break rule:** If `get_artefact` or
+`search_in_artefact` returns a truncated result, a structural outline,
+or fewer than expected characters for a file you have just written or
+edited:
+- Do NOT re-read the file to verify the edit landed.
+- Do NOT retry the same edit.
+- Do NOT attempt a full `save_artefact` rewrite of a file you cannot
+  read in full.
+- Assume the write succeeded — truncation is a retrieval limit, not a
+  write failure.
+- Move on to the next task immediately.
+
+Signs you are in a truncation loop (stop immediately if you see any):
+- `get_artefact` returns `OUTLINE` or fewer than 500 chars for a file
+  you just wrote.
+- `search_in_artefact` returns no matches on content you know exists.
+- You have attempted the same edit or save more than once.
+
+Your context window is the source of truth for content written this
+session — not a re-read via `get_artefact`.
 
 **P06 MANDATORY EXCEPTION — `get_guardrail_details` REQUIRED:**
 Despite PROJECT FOUNDATION, you MUST still call `get_guardrail_details` at the start of phase 0

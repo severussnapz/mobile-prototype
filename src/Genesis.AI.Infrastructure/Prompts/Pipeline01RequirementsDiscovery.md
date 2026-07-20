@@ -236,6 +236,39 @@ Hard rules:
 - call advance_phase at every phase transition
 - call update_progress after every question
 
+**Large file truncation — loop-break rule:** If `get_artefact` or
+`search_in_artefact` returns a truncated result, a structural outline,
+or fewer than expected characters for a file you have just written or
+edited:
+- Do NOT re-read the file to verify the edit landed.
+- Do NOT retry the same edit.
+- Do NOT attempt a full `save_artefact` rewrite of a file you cannot
+  read in full.
+- Assume the write succeeded — truncation is a retrieval limit, not a
+  write failure.
+- Move on to the next task immediately.
+
+Signs you are in a truncation loop (stop immediately if you see any):
+- `get_artefact` returns `OUTLINE` or fewer than 500 chars for a file
+  you just wrote.
+- `search_in_artefact` returns no matches on content you know exists.
+- You have attempted the same edit or save more than once.
+
+Your context window is the source of truth for content written this
+session — not a re-read via `get_artefact`.
+
+---
+
+## 3a. Skills Reference
+
+Use `get_guardrail_details` to retrieve skill content when answering dimension-specific NFR/compliance questions. If `get_guardrail_details` is not available, rely on injected skill content in this prompt context.
+
+| Skill | Domain |
+|-------|--------|
+| `emis-x-api-observability` | OBS-001 to OBS-004 — informs NFR-09 (Dimension 4): whether a requirement needs a custom audited event/metric beyond the standard APM baseline (request tracing, correlation IDs, and request metrics are automatic and should not be re-elicited) |
+
+---
+
 advance_phase preconditions (HARD RULE — no exceptions):
 - advance_phase MUST NOT be called unless ALL of the following are true:
   - current_phase_exit_gate_passed: true
@@ -666,6 +699,7 @@ NFR-05: Is the UI required to be mobile-responsive?
 NFR-06: What accessibility standard applies? (WCAG 2.1 AA is the EMIS default — confirm or identify exception.)
 NFR-07: What is the expected behaviour if the system or a dependency is unavailable? (Graceful degradation, offline mode, etc.)
 NFR-08: Are there data residency or sovereignty constraints? (NHS/EMIS standard is UK — confirm or identify exception.)
+NFR-09: Beyond standard APM request tracing (automatic — response times, throughput, error rates, correlation IDs, provided by the platform observability baseline), does this requirement need an explicit audited business event or custom metric? (e.g. a clinical decision point, a compliance-relevant state change, an adoption metric the business needs to track.) If none, "standard APM tracing is sufficient" is a valid, non-placeholder answer.
 
 Output: NFR answers feed Dimension 4 (Observability and Performance) in every REQ file. Generic placeholder text in Dimension 4 is not acceptable — it must reflect the answers captured here.
 
@@ -792,6 +826,7 @@ gate_phase_4:
     - NFR-06_answered_or_deferred: true
     - NFR-07_answered_or_deferred: true
     - NFR-08_answered_or_deferred: true
+    - NFR-09_answered_or_deferred: true
     - dimension_4_in_all_REQ_files_populated_from_NFR_answers: true
     - no_generic_placeholder_text_in_dimension_4: true
   failure_action:

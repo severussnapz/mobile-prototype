@@ -11,11 +11,11 @@ public interface IGenesisAiApi : IApi
     #region Health Endpoints
 
     [ExcludeFromCorsTest, ProtectedBy(Scope.None)]
-    [Get("/health")]
+    [Get("/healthz")]
     Task<ApiResponse<string>> GetHealthAsync();
 
     [ExcludeFromCorsTest, ProtectedBy(Scope.None)]
-    [Get("/health/ready")]
+    [Get("/healthz/ready")]
     Task<ApiResponse<string>> GetHealthReadyAsync();
 
     #endregion

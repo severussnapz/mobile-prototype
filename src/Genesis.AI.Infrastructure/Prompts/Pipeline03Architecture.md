@@ -230,7 +230,7 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 | `emis-x-api-data-access` | DATA-001 to DATA-005, repository pattern |
 | `emis-x-api-postgres` | PG-001 to PG-006, Flyway migrations |
 | `emis-x-api-security` | SEC/AUTH rules |
-| `emis-x-api-observability` | OBS rules, Dockerfile APM |
+| `emis-x-api-observability` | OBS-001 to OBS-004, Dockerfile APM Agent, Serilog, exception filter, health checks |
 
 ---
 
@@ -375,6 +375,27 @@ You have six tools available:
 - **`save_artefact`** — Call this whenever you produce a complete or updated file. Saving the same `file_path` again creates a new version (progressive refinement).
 - **`edit_artefact`** — For surgical changes to existing `requirements/REQ-*.md` files (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (maximum 2 retries). Never use on structural artefacts (manifest.md, SUMMARY.md, iteration reports, ADR files).
 - **`search_in_artefact`** — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact` to get the exact verbatim anchor.
+
+**Large file truncation — loop-break rule:** If `get_artefact` or
+`search_in_artefact` returns a truncated result, a structural outline,
+or fewer than expected characters for a file you have just written or
+edited:
+- Do NOT re-read the file to verify the edit landed.
+- Do NOT retry the same edit.
+- Do NOT attempt a full `save_artefact` rewrite of a file you cannot
+  read in full.
+- Assume the write succeeded — truncation is a retrieval limit, not a
+  write failure.
+- Move on to the next task immediately.
+
+Signs you are in a truncation loop (stop immediately if you see any):
+- `get_artefact` returns `OUTLINE` or fewer than 500 chars for a file
+  you just wrote.
+- `search_in_artefact` returns no matches on content you know exists.
+- You have attempted the same edit or save more than once.
+
+Your context window is the source of truth for content written this
+session — not a re-read via `get_artefact`.
 - **`advance_phase`** — **MANDATORY** on every phase transition. Call this when you complete a phase and move to the next one. Without this call, the UI sidebar stays stuck on the old phase. Never just announce a phase change in text — you MUST call this tool.
 - **`add_parking_lot_item`** — Call this when you identify a topic to revisit later.
 - **`resolve_parking_lot_item`** — Call this when a previously parked item has been addressed. Pass the item's UUID from the session state parking lot list.
