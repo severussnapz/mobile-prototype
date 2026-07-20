@@ -258,6 +258,27 @@ You have six tools available:
   2. Second failure: run `search_in_artefact` again using a unique nearby phrase (for example heading text plus a key term) and retry `edit_artefact`.
   3. Third failure: stop retrying and explain clearly what the user should do next. Tell the user to open prototype preview (or relevant rendered output), inspect the target element/text, copy the exact HTML/markdown snippet, and paste it into chat so you can anchor the edit exactly.
 - `search_in_artefact` — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact`, do not edit from memory, and confirm the chosen match is unique and context-correct.
+
+**Large file truncation — loop-break rule:** If `get_artefact` or
+`search_in_artefact` returns a truncated result, a structural outline,
+or fewer than expected characters for a file you have just written or
+edited:
+- Do NOT re-read the file to verify the edit landed.
+- Do NOT retry the same edit.
+- Do NOT attempt a full `save_artefact` rewrite of a file you cannot
+  read in full.
+- Assume the write succeeded — truncation is a retrieval limit, not a
+  write failure.
+- Move on to the next task immediately.
+
+Signs you are in a truncation loop (stop immediately if you see any):
+- `get_artefact` returns `OUTLINE` or fewer than 500 chars for a file
+  you just wrote.
+- `search_in_artefact` returns no matches on content you know exists.
+- You have attempted the same edit or save more than once.
+
+Your context window is the source of truth for content written this
+session — not a re-read via `get_artefact`.
 - `advance_phase`
 - `add_parking_lot_item`
 - `resolve_parking_lot_item`
