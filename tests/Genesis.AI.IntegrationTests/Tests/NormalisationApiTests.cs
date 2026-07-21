@@ -102,7 +102,7 @@ public class NormalisationApiTests : IDisposable
             .ToList();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("completed", runStatus);
+        Assert.Equal("prerequisites_met", runStatus);
         Assert.False(gatePassed);
         Assert.Contains(errors, error => error.Contains("output/SECURITY_ASSURANCE_DATA.json", StringComparison.Ordinal));
         Assert.Contains(errors, error => error.Contains("output/SDP_EVIDENCE.json", StringComparison.Ordinal));

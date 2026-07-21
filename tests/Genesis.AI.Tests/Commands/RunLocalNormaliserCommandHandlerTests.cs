@@ -134,7 +134,7 @@ public class RunLocalNormaliserCommandHandlerTests
         var result = await _handler.Handle(new RunLocalNormaliserCommand(project.Id, "user-1"), CancellationToken.None);
 
         Assert.Equal(RunLocalNormaliserStatus.Success, result.Status);
-        Assert.Equal("completed", result.RunStatus);
+        Assert.Equal("prerequisites_met", result.RunStatus);
         Assert.True(result.GatePassed);
     }
 }
