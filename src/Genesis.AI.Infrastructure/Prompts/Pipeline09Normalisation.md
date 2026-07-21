@@ -74,8 +74,8 @@ stage_map_consistency_check:
 
 ### 1.1 Stage-First Execution (Mandatory)
 - Always enforce this exact flow:
-  1. Run Extract Requirements stage action (C# process action)
-  2. Optional gap-fill chat
+  1. Run Extract Requirements prerequisites check (confirms manifest.md and REQ files exist — does NOT produce output files)
+  2. Gap-fill: agent reads source REQ files and produces all output JSON files via save_artefact
   3. Verify Pipeline 09 Complete gate
 - Never skip step 1 and never claim stage completion before step 3 passes.
 - Do not require Python runtime execution in this stage.
@@ -86,7 +86,7 @@ stage_map_consistency_check:
   - `output/cross_cutting/traceability.json`
   - `output/cross_cutting/dependency_graph.json`
   - `output/cross_cutting/last_extracted.json`
-- These are deterministic extractor outputs and are read-only in this stage.
+- These are produced by a separate process and must not be overwritten by gap-fill. If they do not exist, record as dependency gaps.
 
 ### 1.3 Tool Failure Policy
 - Retry failed tool call at most 2 times.
@@ -103,7 +103,7 @@ stage_map_consistency_check:
 
 ### 1.5 Completion Gate Policy
 Pipeline 09 cannot complete until all are true:
-- Normaliser run status is `completed`
+- Extract Requirements prerequisites check has been run (`output/NORMALISATION_RUN_STATUS.json` exists)
 - Pipeline 09 completeness gate passes
 - Required source artefacts exist:
   - `output/SECURITY_ASSURANCE_DATA.json`
@@ -165,7 +165,7 @@ If conflict exists with CorePolicy, fail closed and request clarification.
 Before any gap-fill:
 1. Confirm `manifest.md` exists.
 2. Confirm at least one `requirements/REQ-*.md` exists.
-3. Confirm Extract Requirements stage action has run.
+3. Check whether per-requirement output files already exist in the artefact store (output/REQ-XXX/checks.json etc.). If they exist, read them and fill only missing fields. If they do not exist, create them from scratch using source REQ files.
 4. If `output/SECURITY_ASSURANCE_DATA.json` or `output/SDP_EVIDENCE.json` are missing, continue with a warning and record dependency gaps for the Pipeline 09 completeness gate.
 5. If 1 or 2 are missing: STOP and list exact missing artefacts.
 
@@ -215,7 +215,7 @@ Rules:
 
 ### Phase 0 - Intake and Plan
 - Read `manifest.md` and in-scope requirement list.
-- Read all `_gaps_manifest.json` files.
+- For each REQ file, check whether `output/REQ-XXX/` files already exist. If they exist, identify which fields are empty or missing (these are the gaps). If they do not exist, the full output set needs to be created.
 - Present per-requirement gap-fill plan and stop for explicit approval.
 
 ### Phase 1 - Per-Requirement Gap Fill
