@@ -383,7 +383,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] PR Review Agent wired into pipeline pre-commit gate — moved to Plan 5/Workstream E (Code Swarm). Review Agent gates AI-generated swarm commits; no swarm exists yet so wiring here has no target. Point 2 (GitHub CI/CD, Shantanu) remains a Workstream G item.
 
 **Engineering hygiene:**
-- [ ] DTO mapping completeness structural fix — vertical slice from UpdateProjectGitHub as reference implementation; every result field requires response DTO + controller mapping + mapping test; backfill all existing response models
+- [x] DTO mapping completeness structural fix — 14 response models covered: 10 AutoMapper-mapped (map→serialise→TryGetProperty pattern), 4 direct-construct (serialise→TryGetProperty pattern). Seam type 1 enforced. ✅ July 2026
 - [ ] Systemic error handling audit — every existing endpoint audited for silent failures; two-tier pattern (Tier 1 ProblemDetails + userMessage, Tier 2 push_failure_log) enforced by default not by exception; guardrail tests added
 - [ ] NSwag type generation configured
 - [ ] Controller completeness check in all Copilot prompt templates
