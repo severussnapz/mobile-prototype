@@ -386,7 +386,7 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [x] DTO mapping completeness structural fix — 14 response models covered: 10 AutoMapper-mapped (map→serialise→TryGetProperty pattern), 4 direct-construct (serialise→TryGetProperty pattern). Seam type 1 enforced. ✅ July 2026
 - [ ] Systemic error handling audit — every existing endpoint audited for silent failures; two-tier pattern (Tier 1 ProblemDetails + userMessage, Tier 2 push_failure_log) enforced by default not by exception; guardrail tests added
 - [ ] NSwag type generation configured
-- [ ] Controller completeness check in all Copilot prompt templates
+- [x] Controller completeness check in all Copilot prompt templates — Rule 21 added to Important Rules, Rule 6 added to Anti-Shortcut Rules in .github/copilot-instructions.md. Seam type 2 enforced. ✅ July 2026
 - [ ] JSON field name integration tests for all response models
 - [ ] Behavioural tests for same-turn edit guard, post-search read block, zero-match block (ToolExecutionContext prerequisite)
 - [ ] ToolExecutionContext extraction
