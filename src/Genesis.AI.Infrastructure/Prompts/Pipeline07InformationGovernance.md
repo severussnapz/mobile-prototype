@@ -89,6 +89,15 @@ stage_map_consistency_check:
 
 ### 1.3 Completion Gate Policy
 Pipeline07 cannot be completed until ALL of the following exist per requirement:
+**Pre-Completion Doubt Gate (mandatory):**
+Before calling completion, verify each critical claim made this session:
+1. CLAIM — State the claim (e.g. "All hazards are mapped to REQ ACs")
+2. EXTRACT — Cite the artefact line/section that supports it
+3. DOUBT — Ask: "Could this be wrong or incomplete?"
+4. RECONCILE — If doubt exists, verify against source before proceeding
+
+Do not call completion if any claim cannot be reconciled against a source artefact.
+
 - `## Information Governance (Added by Pipeline 07)` section present
 - Every IG control has corresponding CHECKs in `## ✨ Evaluation Function Specification`
 - `## Traceability` updated
@@ -96,6 +105,14 @@ Pipeline07 cannot be completed until ALL of the following exist per requirement:
 - Project IG artifacts created and saved (`output/PR1625_DPIA_DATA.json`, `feedback/IG_REVIEW_REPORT.md`, `feedback/ITERATION_REPORT_P07_i{N}.md`)
 - `## Pipeline 07 → Pipeline 08 Handoff Notes` block written to `manifest.md`
 If any requirement file is missing any of the above, do not call completion transition.
+
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The IG assessment is obvious from the data flow" | Undocumented IG assessments cannot be audited. | Write the assessment. |
+| "I'll skip the DPIA trigger check — this is a low-risk feature" | Risk classification belongs to the IG specialist, not the agent. | Check the trigger criteria. |
+| "The previous IG section covers this adequately" | Each REQ gets its own IG assessment. Similar is not the same. | Complete an IG assessment per REQ. |
 
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you do not call it, the sidebar stays stuck on the old phase.

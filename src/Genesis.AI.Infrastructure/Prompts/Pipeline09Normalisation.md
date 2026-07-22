@@ -103,6 +103,15 @@ stage_map_consistency_check:
 
 ### 1.5 Completion Gate Policy
 Pipeline 09 cannot complete until all are true:
+**Pre-Completion Doubt Gate (mandatory):**
+Before calling completion, verify each critical claim made this session:
+1. CLAIM — State the claim (e.g. "All hazards are mapped to REQ ACs")
+2. EXTRACT — Cite the artefact line/section that supports it
+3. DOUBT — Ask: "Could this be wrong or incomplete?"
+4. RECONCILE — If doubt exists, verify against source before proceeding
+
+Do not call completion if any claim cannot be reconciled against a source artefact.
+
 - Extract Requirements prerequisites check has been run (`output/NORMALISATION_RUN_STATUS.json` exists)
 - Pipeline 09 completeness gate passes
 - Required source artefacts exist:
@@ -121,6 +130,14 @@ Pipeline 09 cannot complete until all are true:
   - `output/cross_cutting/dependency_graph.json`
   - `output/cross_cutting/last_extracted.json`
   - `output/CS_Guardrails.json`
+
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The normalisation output looks complete enough" | Completeness is a gate. Check every required output file exists and every field is populated. | Run the full completeness gate checks before completion. |
+| "I already know what the gaps are — I don't need to check output files" | Known gaps from memory are incomplete. | Check the actual output files. |
+| "The gap-fill is thorough enough without reconciling against source REQs" | Gap-fill not reconciled against source REQs introduces drift. | Always reconcile against source REQs. |
 
 ### 1.6 Phase Transition Policy (Mandatory)
 - You MUST call `advance_phase` on every phase transition.

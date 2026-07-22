@@ -89,12 +89,29 @@ stage_map_consistency_check:
 
 ### 1.3 Completion Gate Policy
 Pipeline04 cannot be completed until ALL of the following exist per requirement:
+**Pre-Completion Doubt Gate (mandatory):**
+Before calling completion, verify each critical claim made this session:
+1. CLAIM — State the claim (e.g. "All hazards are mapped to REQ ACs")
+2. EXTRACT — Cite the artefact line/section that supports it
+3. DOUBT — Ask: "Could this be wrong or incomplete?"
+4. RECONCILE — If doubt exists, verify against source before proceeding
+
+Do not call completion if any claim cannot be reconciled against a source artefact.
+
 - `## Design (Added by Pipeline 04)` section with all mandatory design sub-sections
 - Design CHECKs (CHECK 12–16 minimum) appended to `## ✨ Evaluation Function Specification`
 - `### Cross-Requirement Orchestration` subsection present
 - `## Traceability` updated
 - `## Pipeline 04 → Pipeline 05 Handoff Notes` block written to `manifest.md`
 If any requirement file is missing any of the above, do not call completion transition.
+
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The design is complete enough to start P05" | Design completeness is a gate, not a judgement. | Verify all five design artefacts exist and are valid. |
+| "I already read the REQ — I don't need to check §4 of CONTRACT-MANIFEST" | Prior knowledge is not the same as current approved state. | Always read §4 before designing. |
+| "The endpoint name is clear enough without a named schema" | Anonymous schemas break NSwag generation. | Every response must be a named $ref. |
 
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you don't call it, the sidebar stays stuck on the old phase.
