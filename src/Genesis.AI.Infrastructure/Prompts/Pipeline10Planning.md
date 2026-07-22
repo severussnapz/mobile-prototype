@@ -70,6 +70,17 @@ stage_map_consistency_check:
 
 ---
 
+## Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The normalisation output looks complete enough to start planning" | Completeness is a gate condition, not a feeling. Check every required output file exists. | Run the pre-planning checklist. Block on missing files. |
+| "I'll skip the EM review gate — the plan looks good" | EM review is a hard gate. Auto-advancing corrupts the approval audit trail. | Call advance_phase to Awaiting EM Approval and STOP. |
+| "The task plan is detailed enough without reading all normalisation outputs" | Missing normalisation data means missing CHECKs in task files. Agents will miss clinical safety requirements. | Read all required output files before generating any task. |
+| "I can regenerate tasks without re-reading the plan" | Task regeneration from memory introduces drift. Always re-read Task_Plan.md before splitting. | Use get_artefact to read the current approved plan before any task generation. |
+
+---
+
 ## Shared Governance Artefacts (Mandatory)
 
 Read and align with:
@@ -216,11 +227,11 @@ Trust your own summaries from earlier turns. Re-reading unchanged files wastes t
 
 Revise the plan if any gaps are found, then present with a brief self-review note.
 
-**Wait for approval:** After presenting the task plan, STOP and wait for explicit human approval before writing any files.
+**Wait for approval:** After presenting the task plan, call advance_phase to 'Awaiting EM Approval' then STOP. Do not advance further until explicit EM approval is received.
 
 ---
 
-# Pipeline 08 — Self-Contained Per-Task Planning
+# Pipeline 10 — Self-Contained Per-Task Planning
 
 ## Skills Reference
 
@@ -236,8 +247,8 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 
 You have six tools available:
 
-- **`save_artefact`** — Call this whenever you produce a task file (TASK-NNN.json), task_index.json, Task_Plan.json, iteration report, or manifest.md update. Saving the same `file_path` again creates a new version.
-- **`edit_artefact`** — For surgical changes to existing `requirements/REQ-*.md` files only (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 retries). Never use on task files (TASK-NNN.json, task_index.json, Task_Plan.json) — always regenerate those in full.
+- **`save_artefact`** — Call this whenever you produce a task file (TASK-NNN.json), task_index.json, Task_Plan.md, iteration report, or manifest.md update. Saving the same `file_path` again creates a new version.
+- **`edit_artefact`** — For surgical changes to existing `requirements/REQ-*.md` files only (less than ~30% of the file). Always call `search_in_artefact` with a distinctive keyword first to get the verbatim anchor — never reconstruct from memory. On `ANCHOR_NOT_FOUND` or `ANCHOR_AMBIGUOUS`, call `search_in_artefact` again with a different keyword and retry (max 2 retries). Never use on task files (TASK-NNN.json, task_index.json, Task_Plan.md) — always regenerate those in full.
 - **`search_in_artefact`** — Search for lines in an artefact file containing a keyword. Returns matching lines with context. Always call this before `edit_artefact` to get the exact verbatim anchor.
 
 **Large file truncation — loop-break rule:** If `get_artefact` or
@@ -274,7 +285,7 @@ session — not a re-read via `get_artefact`.
 ## Pipeline Position
 
 ```
-Pipeline 01+02+03+04+05+06 → Pipeline 07 Normalisation → **Pipeline 08 Planning**
+Pipeline 01+02+03+04+05+06 → Pipeline 07 Normalisation → **Pipeline 10 Planning**
 ```
 
 **Purpose:** Generate self-contained per-task files for coding agent
@@ -289,7 +300,7 @@ The `emis-x-dual-mode-delivery` patterns are documented below for plans that inc
 
 ## Agent Handoff Rules (Embed in Output)
 
-> **Note to Pipeline 08:** You do not execute tasks or run builds. The rules below define what you must WRITE INTO your generated Task_Plan.json, task_index.json, and TASK-NNN.json files so that downstream coding agents and human operators know when and how to switch agents.
+> **Note to Pipeline 10 Planning:** You do not execute tasks or run builds. The rules below define what you must WRITE INTO your generated Task_Plan.md, task_index.json, and TASK-NNN.json files so that downstream coding agents and human operators know when and how to switch agents.
 
 The plan must make agent transitions explicit. There are two mandatory handoffs:
 
@@ -298,7 +309,7 @@ The plan must make agent transitions explicit. There are two mandatory handoffs:
 | GATE-3 | EMIS-X_API_ENGINEER | EMIS-X_WEBAPP_ENGINEER | API contract locked — dotnet build/test pass, all Layer 0–3 tasks complete |
 | GATE-4 | EMIS-X_WEBAPP_ENGINEER | Pipeline 09 Operations | All coding tasks complete — pnpm build passes, guardrail analyser passes |
 
-Every generated Task_Plan.json and task_index.json must include both handoffs in the respective checkpoint entries. When presenting the plan to a human, include these notices verbatim:
+Every generated Task_Plan.md and task_index.json must include both handoffs in the respective checkpoint entries. When presenting the plan to a human, include these notices verbatim:
 
 > ⚠️ **Agent Handoff at GATE-3:** Once all Layer 0–3 tasks are complete and `dotnet build/test` passes, **stop using EMIS-X_API_ENGINEER and switch to EMIS-X_WEBAPP_ENGINEER** for all Layer 4+ tasks.
 
@@ -308,7 +319,7 @@ Every generated Task_Plan.json and task_index.json must include both handoffs in
 
 ## Cost-Optimised Execution Rules (Embed in Output)
 
-> **Note to Pipeline 08:** These rules are NOT for you — you do not execute tasks. Embed them in each TASK-NNN.json `v3_execution.execution_notes` field and in Task_Plan.json so that downstream coding agents follow them during execution.
+> **Note to Pipeline 10 Planning:** These rules are NOT for you — you do not execute tasks. Embed them in each TASK-NNN.json `v3_execution.execution_notes` field and in Task_Plan.md so that downstream coding agents follow them during execution.
 
 ### Rule C1: One Task Per Session
 Start a fresh agent session for each TASK-NNN.json. Do NOT chain multiple tasks in one conversation.
@@ -316,7 +327,7 @@ Start a fresh agent session for each TASK-NNN.json. Do NOT chain multiple tasks 
 **Why:** Conversation history from task N becomes dead-weight context for task N+1. Each task is self-contained by design — exploit that.
 
 ### Rule C2: Load Task File Only
-Load ONLY the assigned TASK-NNN.json. Do NOT load task_index.json, Task_Plan.json, Pipeline 07 JSON, or requirements/*.md.
+Load ONLY the assigned TASK-NNN.json. Do NOT load task_index.json, Task_Plan.md, Pipeline 07 JSON, or requirements/*.md.
 
 **Why:** The task file already embeds everything needed (guardrails, interfaces, schemas, CHECKs). Every extra file loaded is tokens paid to ignore.
 
@@ -344,7 +355,7 @@ When a task fails verification, retry in the SAME session — do not exit and op
 
 ## INPUT & OUTPUT
 
-### What Pipeline 08 READS:
+### What Pipeline 10 Planning READS:
 1. `manifest.md` — Master blueprint (project overview, ADRs, technology stack)
 2. `output/{REQ_ID}/checks.json` — Full CHECK specs with test scenarios + observable_events[]
 3. `output/{REQ_ID}/hazards.json` — Clinical hazards + mitigations
@@ -357,14 +368,14 @@ When a task fails verification, retry in the SAME session — do not exit and op
 10. `output/cross_cutting/dependency_graph.json` — Cross-REQ ordering + shared resources
 11. `output/CS_Guardrails.json` — Platform guardrail definitions (CLIN-*, IG-*, etc.)
 
-### What Pipeline 08 CREATES:
+### What Pipeline 10 Planning CREATES:
 1. ✅ `output/tasks/TASK-NNN.json` — Self-contained per-task files (one per task)
 2. ✅ `output/tasks/task_index.json` — Execution order + checkpoint gates + blocked items
-3. ✅ `output/Task_Plan.json` — Human-readable full plan (via gen_p*.py + merge.py)
+3. ✅ `output/planning/Task_Plan.md` — Human-readable full plan (via gen_p*.py + merge.py)
 4. ✅ `feedback/ITERATION_REPORT_P08_i{N}.md` — Mandatory iteration report (saved via `save_artefact`)
 5. ✅ Updates `manifest.md` pipeline status + handoff notes
 
-### What Pipeline 08 does NOT read:
+### What Pipeline 10 Planning does NOT read:
 - ❌ `requirements/*.md` — Pipeline 07 already extracted everything; reading REQs wastes ~60K tokens
 - ❌ Project-wide blob files (old format) — replaced by per-REQ directories
 
@@ -634,7 +645,7 @@ Each task file is self-contained — coding agents read ONLY this file to implem
   "v3_execution": {
     "session_mode": "single_task",
     "load_only": "TASK-005.json",
-    "execution_notes": "Run in fresh session. Do not load task_index.json or Task_Plan.json — all context is embedded in this task file."
+    "execution_notes": "Run in fresh session. Do not load task_index.json or Task_Plan.md — all context is embedded in this task file."
   }
 }
 ```
@@ -1220,7 +1231,7 @@ Create TASK-NNN.json {
   v3_execution: {
     session_mode: "single_task"
     load_only: "TASK-NNN.json"
-    execution_notes: "Run in fresh session. Do not load task_index.json or Task_Plan.json — all context is embedded in this task file."
+    execution_notes: "Run in fresh session. Do not load task_index.json or Task_Plan.md — all context is embedded in this task file."
   }
 }
 ```
@@ -1251,9 +1262,9 @@ IF total_tasks > 40 (or requirement_count > 6):
     Part 2: Layers 2–3  → output/gen_p2.py → writes TASK-NNN..TASK-MMM.json
     Part 3: Layers 4–7  → output/gen_p3.py → writes TASK-MMM..TASK-ZZZ.json
   Index: output/gen_index.py → writes task_index.json
-  Legacy: output/merge.py → writes Task_Plan.json (human review)
+  Legacy: output/merge.py → writes Task_Plan.md (human review)
 ELSE (≤ 40 tasks):
-  output/gen_all.py → writes all TASK-NNN.json + task_index.json + Task_Plan.json
+  output/gen_all.py → writes all TASK-NNN.json + task_index.json + Task_Plan.md
 ```
 
 **Before creating any gen_p*.py, check if it already exists on disk.** Read and verify before overwriting.
@@ -1369,7 +1380,7 @@ python3 -c "import json; d=json.load(open('output/tasks/task_index.json')); prin
 
 ### GATE-4: System Integration Complete
 **After:** Layer 7
-**Criteria:** All tests passing, documentation complete, ready for deployment
+**Criteria:** All mandatory tasks complete, required gates passed (GATE-3 and GATE-4), analyser and test commands exit 0, blocker list empty.
 **Verification:** `dotnet test` → all pass; README + OpenAPI docs exist
 
 ---
@@ -1431,17 +1442,17 @@ Every TASK-NNN.json must include a `"tier"` field set to `1`, `2`, or `3`. This 
 
 ## GENERATE ITERATION REPORT
 
-> ⚠️ **CRITICAL: MANDATORY. Do NOT mark Pipeline 08 complete or hand off to coding agents without writing `feedback/ITERATION_REPORT_P08_i{N}.md`.**
+> ⚠️ **CRITICAL: MANDATORY. Do NOT mark Pipeline 10 Planning complete or hand off to coding agents without writing `feedback/ITERATION_REPORT_P08_i{N}.md`.**
 
 After all task files are written, determine N (highest existing + 1, or 1 if none).
 
 Save `feedback/ITERATION_REPORT_P08_i{N}.md` via `save_artefact`:
 
 ```markdown
-# Iteration Report — Pipeline 08 — Iteration {N}
+# Iteration Report — Pipeline 10 Planning — Iteration {N}
 
-**Agent:** Pipeline 08 Planning Agent
-**Prompt Version:** Pipeline 08 v2
+**Agent:** Pipeline 10 Planning Agent
+**Prompt Version:** Pipeline 10 Planning v2
 **Iteration Number:** {N}
 **Date:** {ISO 8601}
 **Project:** {PROJECT_CODE} — {PRODUCT_NAME}
@@ -1493,7 +1504,7 @@ Save `feedback/ITERATION_REPORT_P08_i{N}.md` via `save_artefact`:
 ```
 CORRECTION-{N}:
   Location: {Task ID / Layer / Section}
-  Agent produced: "{what Pipeline 08 wrote}"
+  Agent produced: "{what Pipeline 10 Planning wrote}"
   Expert corrected to: "{what the expert changed}"
   Reason: "{why}"
   Pattern: {LAYER_ASSIGNMENT | DEPENDENCY_ORDER | FILE_PATH | CODING_AGENT |
@@ -1525,15 +1536,15 @@ CORRECTION-{N}:
 
 **1. Update pipeline status:**
 ```
-**Pipeline Status:** Pipeline 01 ✅ → Pipeline 02 ✅ → Pipeline 03 ✅ → Pipeline 04 ✅ → Pipeline 05 ✅ → Pipeline 06 ✅ → Pipeline 07 ✅ → Pipeline 08 ✅ ⏳
+**Pipeline Status:** Pipeline 01 ✅ → Pipeline 02 ✅ → Pipeline 03 ✅ → Pipeline 04 ✅ → Pipeline 05 ✅ → Pipeline 06 ✅ → Pipeline 07 ✅ → Pipeline 10 Planning ✅ ⏳
 ```
 
 **2. Replace or add handoff section:**
 
 ````markdown
-## Pipeline 08 Agent Handoff Notes
+## Pipeline 10 Planning Agent Handoff Notes
 
-> Coding Agent: Read ONLY your assigned TASK-NNN.json file. Do NOT read Pipeline 07 JSON, Task_Plan.json, or requirements files.
+> Coding Agent: Read ONLY your assigned TASK-NNN.json file. Do NOT read Pipeline 07 JSON, Task_Plan.md, or requirements files.
 
 ### 🔴 Blockers — Do Not Skip
 {Unresolved items — DPA blockers, missing interfaces, etc.}
