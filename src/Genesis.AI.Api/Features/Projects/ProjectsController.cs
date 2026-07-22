@@ -184,13 +184,23 @@ public class ProjectsController : ControllerBase
         }
         catch (NotFoundException ex)
         {
-            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
+            _logger.LogWarning(ex, "Project not found while updating details {ProjectId}", id);
+            return NotFound(CreateProblemDetails(
+                StatusCodes.Status404NotFound,
+                "Not Found",
+                "Project not found.",
+                "Project not found."));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update project details {ProjectId}", id);
-            return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save project details. Please try again."));
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                CreateProblemDetails(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Service unavailable",
+                    "Failed to save project details. Please try again.",
+                    "Failed to save project details. Please try again."));
         }
     }
 
@@ -227,7 +237,12 @@ public class ProjectsController : ControllerBase
         }
         catch (NotFoundException ex)
         {
-            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
+            _logger.LogWarning(ex, "Project not found while updating GitHub config {ProjectId}", id);
+            return NotFound(CreateProblemDetails(
+                StatusCodes.Status404NotFound,
+                "Not Found",
+                "Project not found.",
+                "Project not found."));
         }
         catch (GitHubScaffoldFailedException ex)
         {
@@ -243,8 +258,13 @@ public class ProjectsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update GitHub config {ProjectId}", id);
-            return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save GitHub configuration. Please try again."));
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                CreateProblemDetails(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Service unavailable",
+                    "Failed to save GitHub configuration. Please try again.",
+                    "Failed to save GitHub configuration. Please try again."));
         }
     }
 
@@ -277,13 +297,23 @@ public class ProjectsController : ControllerBase
         }
         catch (NotFoundException ex)
         {
-            return NotFound(ApiErrorResponse.Create("404", "Project not found", ex.Message));
+            _logger.LogWarning(ex, "Project not found while updating P00 config {ProjectId}", id);
+            return NotFound(CreateProblemDetails(
+                StatusCodes.Status404NotFound,
+                "Not Found",
+                "Project not found.",
+                "Project not found."));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update P00 config {ProjectId}", id);
-            return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                ApiErrorResponse.Create("503", "Service unavailable", "Failed to save project configuration. Please try again."));
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                CreateProblemDetails(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Service unavailable",
+                    "Failed to save project configuration. Please try again.",
+                    "Failed to save project configuration. Please try again."));
         }
     }
 
@@ -311,6 +341,19 @@ public class ProjectsController : ControllerBase
         });
 
         return Ok(new ApiResponse<List<ParkingLotItemResponse>> { Data = dtos });
+    }
+
+    private static ProblemDetails CreateProblemDetails(int status, string title, string detail, string userMessage)
+    {
+        var problemDetails = new ProblemDetails
+        {
+            Status = status,
+            Title = title,
+            Detail = detail
+        };
+
+        problemDetails.Extensions["userMessage"] = userMessage;
+        return problemDetails;
     }
 
 }
