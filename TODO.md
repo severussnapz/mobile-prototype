@@ -10,6 +10,8 @@
 
 - [ ] **API test coverage for scope restrictions** — 23 API tests skipped (`ExcludeFromScopeTest`) that verify per-scope auth (arch, pxd, clin). Need per-scope token request support in test framework.
 
+- [ ] **Conversation control UX during AI turns** — The chat composer is locked while the AI is thinking/tool-running, which prevents users from stopping drift or steering the turn. Add support for `Stop generating`, queued follow-up instructions while streaming and interrupt-and-steer flow that aborts the current turn and sends corrected direction immediately.
+
 - [ ] **ConversationStreamController complexity** — Suppressed ENG-009. The SSE streaming + tool-loop orchestration is ~350 lines. Consider extracting tool execution into a separate service class.
 
 - [ ] **BedrockAiService complexity** — Suppressed ENG-009. `StreamWithToolsAsync` handles the multi-turn tool loop with `yield return`. Difficult to decompose but could benefit from a tool dispatcher pattern.
