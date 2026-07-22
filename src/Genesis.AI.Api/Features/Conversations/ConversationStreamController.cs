@@ -27,6 +27,13 @@ namespace Genesis.AI.Api.Features.Conversations;
 [Consumes("application/json")]
 public class ConversationStreamController : ControllerBase
 {
+    internal sealed record ToolExecutionContext(
+        HashSet<string> FilesReadThisRequest,
+        HashSet<string> FilesReadThisTurn,
+        StrongBox<int> SearchCountThisTurn,
+        StrongBox<bool> PostSearchReadBlocked,
+        StrongBox<bool> ZeroMatchToolBlocked);
+
     private const int ToolExecutionRetryCount = 2;
     private const int Pipeline02CompletionPhaseNumber = 6;
     private const string PrototypeHtmlArtefactPath = "prototype/index.html";
@@ -580,6 +587,13 @@ public class ConversationStreamController : ControllerBase
                     .Select(path => path!)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+                var toolExecutionContext = new ToolExecutionContext(
+                    filesReadThisRequest,
+                    filesReadThisTurn,
+                    searchCountThisTurn,
+                    postSearchReadBlocked,
+                    zeroMatchToolBlocked);
+
                 foreach (var toolCall in toolCallsThisTurn)
                 {
                     // Enforce read budget inline — block get_artefact on non-prototype files
@@ -622,11 +636,7 @@ public class ConversationStreamController : ControllerBase
                             createdBy,
                             projectId,
                             stageType,
-                            filesReadThisRequest,
-                            filesReadThisTurn,
-                            searchCountThisTurn,
-                            postSearchReadBlocked,
-                            zeroMatchToolBlocked,
+                            toolExecutionContext,
                             prototypeSingleFile,
                             cancellationToken);
                     }
@@ -1042,11 +1052,7 @@ public class ConversationStreamController : ControllerBase
         string createdBy,
         Guid projectId,
         StageType? stageType,
-        HashSet<string> filesReadThisRequest,
-        HashSet<string> filesReadThisTurn,
-        StrongBox<int> searchCountThisTurn,
-        StrongBox<bool> postSearchReadBlocked,
-        StrongBox<bool> zeroMatchToolBlocked,
+        ToolExecutionContext context,
         bool prototypeSingleFile,
         CancellationToken cancellationToken)
     {
@@ -1063,11 +1069,7 @@ public class ConversationStreamController : ControllerBase
                     createdBy,
                     projectId,
                     stageType,
-                    filesReadThisRequest,
-                    filesReadThisTurn,
-                    searchCountThisTurn,
-                    postSearchReadBlocked,
-                    zeroMatchToolBlocked,
+                    context,
                     prototypeSingleFile,
                     cancellationToken);
             }
@@ -1103,11 +1105,7 @@ public class ConversationStreamController : ControllerBase
         string createdBy,
         Guid projectId,
         StageType? stageType,
-        HashSet<string> filesReadThisRequest,
-        HashSet<string> filesReadThisTurn,
-        StrongBox<int> searchCountThisTurn,
-        StrongBox<bool> postSearchReadBlocked,
-        StrongBox<bool> zeroMatchToolBlocked,
+        ToolExecutionContext context,
         bool prototypeSingleFile,
         CancellationToken cancellationToken)
     {
@@ -1116,12 +1114,12 @@ public class ConversationStreamController : ControllerBase
 
         _logger.LogInformation(
             "Tool guard check: zeroMatchToolBlocked={ZeroMatchToolBlocked}, tool={ToolName}",
-            zeroMatchToolBlocked.Value,
+            context.ZeroMatchToolBlocked.Value,
             toolCall.ToolName);
 
         // Zero-match hard block: after a DOM zero-match result, block apply_to_scope calls.
         // Other tools are allowed to pass through.
-        if (zeroMatchToolBlocked.Value && toolCall.ToolName == PipelineToolDefinitions.ApplyToScope)
+        if (context.ZeroMatchToolBlocked.Value && toolCall.ToolName == PipelineToolDefinitions.ApplyToScope)
         {
             return "HARD STOP ALREADY TRIGGERED: DOM search returned zero matches. " +
                    "Do not call more tools in this turn. Ask the user for the exact CSS class " +
@@ -1265,10 +1263,10 @@ public class ConversationStreamController : ControllerBase
                     "Tool save_artefact: saved {FilePath} v{Version} ({Length} chars, {ContentType})",
                     filePath, nextVersion, content.Length, contentType);
 
-                searchCountThisTurn.Value = 0; // Reset after successful mutation
+                context.SearchCountThisTurn.Value = 0; // Reset after successful mutation
                 // Clear post-search read block after successful save (a form of mutation)
-                postSearchReadBlocked.Value = false;
-                zeroMatchToolBlocked.Value = false;
+                context.PostSearchReadBlocked.Value = false;
+                context.ZeroMatchToolBlocked.Value = false;
 
                 return $"Saved {filePath} (version {nextVersion}, {content.Length} chars, {contentType})";
             }
@@ -1433,7 +1431,7 @@ public class ConversationStreamController : ControllerBase
                 // Post-search read block: after DOM search found matches, prevent re-reading fragments
                 // and REQ files until a mutation succeeds. This stops the agent from burning budget
                 // on reads it shouldn't be making.
-                if (postSearchReadBlocked.Value)
+                if (context.PostSearchReadBlocked.Value)
                 {
                     var isFragmentOrReq = filePath.StartsWith("prototype/fragments/", StringComparison.OrdinalIgnoreCase) ||
                                          filePath.StartsWith("requirements/", StringComparison.OrdinalIgnoreCase);
@@ -1502,10 +1500,10 @@ public class ConversationStreamController : ControllerBase
                 // are exempt from the read budget, so a repeated full read within one request is
                 // replaced by a pointer back to the agent's existing context.
                 const int largeFileThreshold = 50_000;
-                var alreadyReadThisRequest = filesReadThisRequest.Contains(filePath);
+                var alreadyReadThisRequest = context.FilesReadThisRequest.Contains(filePath);
                 var getArtefactResult = BuildGetArtefactResult(
                     filePath, artefactContent, artefact.Version, alreadyReadThisRequest, largeFileThreshold, prototypeSingleFile);
-                filesReadThisRequest.Add(filePath);
+                context.FilesReadThisRequest.Add(filePath);
 
                 _logger.LogInformation(
                     "Tool get_artefact: returned {FilePath} v{Version} ({Length} chars, alreadyRead={AlreadyRead})",
@@ -1611,7 +1609,7 @@ public class ConversationStreamController : ControllerBase
 
                     if (domResult.Matches.Count == 0)
                     {
-                        zeroMatchToolBlocked.Value = true;
+                        context.ZeroMatchToolBlocked.Value = true;
                         return $"No elements found matching '{query}' in prototype fragments. " +
                                "STOP — do not guess a selector or retry with variations. Tell the user you " +
                                "could not find a matching element, and ask them to provide the exact CSS class " +
@@ -1622,7 +1620,7 @@ public class ConversationStreamController : ControllerBase
 
                     // Post-search read block: set flag after successful search with matches
                     // This prevents re-reads and REQ reads until a mutation completes
-                    postSearchReadBlocked.Value = true;
+                    context.PostSearchReadBlocked.Value = true;
 
                     if (domResult.Matches.Count == 1)
                     {
@@ -1652,9 +1650,9 @@ public class ConversationStreamController : ControllerBase
 
                 // Enforce non-DOM search limit — after 5 non-DOM searches without a mutation,
                 // return a hard stop to force the agent to act rather than keep searching.
-                searchCountThisTurn.Value++;
-                if (searchCountThisTurn.Value > maxSearchesPerTurn)
-                    return $"HARD STOP: You have called search_in_artefact {searchCountThisTurn.Value} non-DOM times in this turn without making an edit. " +
+                context.SearchCountThisTurn.Value++;
+                if (context.SearchCountThisTurn.Value > maxSearchesPerTurn)
+                    return $"HARD STOP: You have called search_in_artefact {context.SearchCountThisTurn.Value} non-DOM times in this turn without making an edit. " +
                            "Stop searching. You already have the anchor text you need. " +
                            "Call edit_artefact or save_artefact now. Do not search again.";
 
@@ -1678,7 +1676,7 @@ public class ConversationStreamController : ControllerBase
                     searchResult.Length > 300 ? searchResult[..300] : searchResult);
 
                 // Unblock edit_artefact for this file — the result contains real verbatim snippets
-                filesReadThisRequest.Add(filePath);
+                context.FilesReadThisRequest.Add(filePath);
 
                 return searchResult;
             }
@@ -1697,7 +1695,7 @@ public class ConversationStreamController : ControllerBase
 
                 // Require get_artefact to be called first this request so Claude anchors against
                 // the real file content, not memory or a previous cached version.
-                if (!filesReadThisRequest.Contains(filePath) &&
+                if (!context.FilesReadThisRequest.Contains(filePath) &&
                     !(prototypeSingleFile && !string.IsNullOrEmpty(oldStr)))
                 {
                     _logger.LogWarning(
@@ -1709,7 +1707,7 @@ public class ConversationStreamController : ControllerBase
 
                 // Block edits where get_artefact was called in the same turn — the file content
                 // is not yet in Claude's context window and the anchor will fail.
-                if (filesReadThisTurn.Contains(filePath))
+                if (context.FilesReadThisTurn.Contains(filePath))
                 {
                     _logger.LogWarning(
                         "Tool edit_artefact blocked: {FilePath} was read in the same turn — must wait for next turn",
@@ -1745,8 +1743,8 @@ public class ConversationStreamController : ControllerBase
                         "Tool edit_artefact: ANCHOR_NOT_FOUND for {FilePath} (old_str length {Length})",
                         filePath, oldStr.Length);
 
-                    // Remove the file from filesReadThisRequest so Claude is forced to search again
-                    filesReadThisRequest.Remove(filePath);
+                    // Remove the file from FilesReadThisRequest so Claude is forced to search again
+                    context.FilesReadThisRequest.Remove(filePath);
 
                     return $"Error: ANCHOR_NOT_FOUND: The anchor string was not found in '{filePath}'. " +
                            "Do NOT retry with a different guess. Instead: call search_in_artefact with a distinctive keyword " +
@@ -1817,7 +1815,7 @@ public class ConversationStreamController : ControllerBase
                     await _prototypeAssemblyService.AssemblePrototypeAsync(projectId, cancellationToken);
                 }
 
-                searchCountThisTurn.Value = 0; // Reset after successful mutation
+                context.SearchCountThisTurn.Value = 0; // Reset after successful mutation
 
                 return $"Edited {filePath} (version {nextVersion}, {bytesChanged} bytes changed, total {System.Text.Encoding.UTF8.GetByteCount(updatedContent)} bytes)";
             }
@@ -1959,9 +1957,9 @@ public class ConversationStreamController : ControllerBase
 
                 if (batchResult.SuccessfulMutations == batchResult.TotalMutations)
                 {
-                    searchCountThisTurn.Value = 0; // Reset after successful mutation
-                    postSearchReadBlocked.Value = false; // Clear post-search read block after mutation completes
-                    zeroMatchToolBlocked.Value = false;
+                    context.SearchCountThisTurn.Value = 0; // Reset after successful mutation
+                    context.PostSearchReadBlocked.Value = false; // Clear post-search read block after mutation completes
+                    context.ZeroMatchToolBlocked.Value = false;
                     return $"Applied {batchResult.SuccessfulMutations} of {batchResult.TotalMutations} mutations successfully.";
                 }
 

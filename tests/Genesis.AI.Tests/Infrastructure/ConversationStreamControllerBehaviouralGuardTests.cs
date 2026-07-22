@@ -233,8 +233,22 @@ public class ConversationStreamControllerBehaviouralGuardTests
         var method = typeof(ConversationStreamController).GetMethod(
             "ExecuteToolCallAsync",
             BindingFlags.Instance | BindingFlags.NonPublic);
+        var contextType = typeof(ConversationStreamController).GetNestedType(
+            "ToolExecutionContext",
+            BindingFlags.NonPublic | BindingFlags.Public);
 
         Assert.NotNull(method);
+        Assert.NotNull(contextType);
+
+        var context = Activator.CreateInstance(
+            contextType!,
+            filesReadThisRequest,
+            filesReadThisTurn,
+            new StrongBox<int>(0),
+            postSearchReadBlocked,
+            zeroMatchToolBlocked);
+
+        Assert.NotNull(context);
 
         var invocation = method!.Invoke(
             controller,
@@ -247,11 +261,7 @@ public class ConversationStreamControllerBehaviouralGuardTests
                 "tester",
                 Guid.NewGuid(),
                 (StageType?)StageType.Prototype,
-                filesReadThisRequest,
-                filesReadThisTurn,
-                new StrongBox<int>(0),
-                postSearchReadBlocked,
-                zeroMatchToolBlocked,
+                context,
                 false,
                 CancellationToken.None
             ]);

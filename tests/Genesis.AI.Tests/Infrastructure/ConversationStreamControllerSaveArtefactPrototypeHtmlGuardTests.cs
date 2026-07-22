@@ -240,8 +240,22 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
         var method = typeof(ConversationStreamController).GetMethod(
             "ExecuteToolCallAsync",
             BindingFlags.Instance | BindingFlags.NonPublic);
+        var contextType = typeof(ConversationStreamController).GetNestedType(
+            "ToolExecutionContext",
+            BindingFlags.NonPublic | BindingFlags.Public);
 
         Assert.NotNull(method);
+        Assert.NotNull(contextType);
+
+        var context = Activator.CreateInstance(
+            contextType!,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new StrongBox<int>(0),
+            new StrongBox<bool>(false),
+            new StrongBox<bool>(false));
+
+        Assert.NotNull(context);
 
         var invocation = method!.Invoke(
             controller,
@@ -254,11 +268,7 @@ public class ConversationStreamControllerSaveArtefactPrototypeHtmlGuardTests
                 "tester",
                 Guid.NewGuid(),
                 (StageType?)stageType,
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                new StrongBox<int>(0),
-                new StrongBox<bool>(false),
-                new StrongBox<bool>(false),
+                context,
                 prototypeSingleFile,
                 CancellationToken.None
             ]);

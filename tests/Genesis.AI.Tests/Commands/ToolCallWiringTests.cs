@@ -214,7 +214,7 @@ public class ToolCallWiringTests
                 "Features", "Conversations", "ConversationStreamController.cs"));
 
         Assert.Contains(
-            "if (!filesReadThisRequest.Contains(filePath) &&",
+            "if (!context.FilesReadThisRequest.Contains(filePath) &&",
             controllerSource,
             StringComparison.Ordinal);
     }
