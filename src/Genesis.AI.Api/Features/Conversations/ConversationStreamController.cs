@@ -1094,7 +1094,7 @@ public class ConversationStreamController : ControllerBase
             $"Tool '{toolCall.ToolName}' failed after {ToolExecutionRetryCount + 1} attempts.");
     }
 
-    private async Task<string> ExecuteToolCallAsync(
+    internal async Task<string> ExecuteToolCallAsync(
         AiToolCall toolCall,
         Conversation conversation,
         List<Artefact> savedArtefacts,
