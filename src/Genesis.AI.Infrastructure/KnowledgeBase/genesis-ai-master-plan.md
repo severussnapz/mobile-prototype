@@ -388,8 +388,8 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [ ] NSwag type generation configured
 - [x] Controller completeness check in all Copilot prompt templates — Rule 21 added to Important Rules, Rule 6 added to Anti-Shortcut Rules in .github/copilot-instructions.md. Seam type 2 enforced. ✅ July 2026
 - [ ] JSON field name integration tests for all response models
-- [ ] Behavioural tests for same-turn edit guard, post-search read block, zero-match block (ToolExecutionContext prerequisite)
-- [ ] ToolExecutionContext extraction
+- [x] Behavioural tests for same-turn edit guard, post-search read block, zero-match block — 6 tests, all GREEN. ✅ July 2026
+- [x] ToolExecutionContext extraction — record replaces 5 guard-state parameters, eliminates same-typed swap risk. ✅ July 2026
 
 **Pipeline Prompt Quality Review — full P01–P11 audit:**
 - [ ] Anti-rationalization tables added to every Skills file (ref: https://github.com/addyosmani/agent-skills)
