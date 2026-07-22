@@ -391,13 +391,14 @@ Smart search and edit reliability hardening. Merged. Fragment pipeline stable be
 - [x] Behavioural tests for same-turn edit guard, post-search read block, zero-match block — 6 tests, all GREEN. ✅ July 2026
 - [x] ToolExecutionContext extraction — record replaces 5 guard-state parameters, eliminates same-typed swap risk. ✅ July 2026
 
-**Pipeline Prompt Quality Review — full P01–P11 audit:**
-- [ ] Anti-rationalization tables added to every Skills file (ref: https://github.com/addyosmani/agent-skills)
-- [ ] Binary stop conditions — replace all subjective exit criteria with checkable binary conditions
-- [ ] Stage-by-stage optimisation — P01–P11, prompt structure, phase sequencing, question quality, output template completeness, token efficiency
-- [ ] Cross-stage traceability audit — HAZ-IDs → P06, ADRs → P03, CHECKs → P11
-- [ ] Doubt-driven development gate — formalise CLAIM → EXTRACT → DOUBT → RECONCILE across all stages
-- [ ] LLM/script boundary audit — for each P01–P11 stage prompt, ask: "What is the LLM doing here that a script should do?" Flag any instance where the prompt asks the LLM to fetch, extract, parse, or construct something the stage handler could pre-process and inject as structured data. Known instance: P08→P09 pre-swarm assembly — open decisions to be queried from the artefact DB and injected as a formatted list, not mined from raw artefact text. Output: one findings note per flagged stage; fixes committed before Plan 5.
+**Pipeline Prompt Quality Review — full P01–P11 audit ✅ SUBSTANTIALLY COMPLETE July 2026:**
+- [x] Anti-rationalization tables — stage-specific tables added to all 10 prompts (P01-P10). ✅ July 2026
+- [x] Binary stop conditions — subjective exit criteria replaced with checkable binary gates (P02, P10). ✅ July 2026
+- [x] CLAIM→EXTRACT→DOUBT→RECONCILE — pre-completion doubt gate added to completion gate section of all 10 prompts. ✅ July 2026
+- [x] Cross-stage traceability — HAZ-IDs → P06 with req_id/ac_ids mandatory; ADRs → P03 with source_req_ids/ac_ids; CHECKs → P10 with source_checks on every TASK. ✅ July 2026
+- [x] LLM/script boundary — P08 handoff now references parking lot only; P10 planning bundle conflicts resolved; P02/P09 backend injection deferred to Plan 5 (requires FoundationService changes). ✅ July 2026
+- [x] Critical prompt conflicts resolved — P10 stage identity drift, output contract conflict, approval flow contradiction; P03/P04 phase gate contradiction; P06 phase index gap; P02 read/edit mode conflict. ✅ July 2026
+- [ ] Stage-by-stage optimisation (1.4.6) — deferred to Plan 5. Incremental quality improvement; critical correctness issues resolved above.
 
 **Known gap — large-artefact `get_artefact` returns outline, not full content (surfaced in use, July 2026):**
 - [ ] Observed live in a P06 Clinical Safety resume: `get_artefact` on `HAZARD-REGISTRY.md` returned only the ~2,251-char structural outline, not the full hazard cards. The agent could not load the complete registry and fell back to the SESSION-CLOSE record to proceed.
