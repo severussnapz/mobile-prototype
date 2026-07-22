@@ -324,6 +324,7 @@ Each phase has a dedicated skill file injected by the platform.
 | 5 | Control Elicitation | `control-elicitation-method` | C-NNN controls per hazard |
 | 6 | Residual Risk | `residual-risk-assessment` | Residual risk + acceptability |
 | 7 | Hazard Cards (AUTO) | `if678-hazard-card-template` | IF678 format hazard cards |
+| 8 | Reserved — no action required | — | No action required |
 | 9 | Guardrail Mapping (AUTO) | `genesis-ai-skill-mapping` | CLIN/WCLIN → hazard mapping |
 | 10 | DCB0129 Check (AUTO) | `dcb0129-compliance-check` | Compliance checklist |
 | 11 | CSO Sign-Off | `cso-signoff-protocol` | CSO approval recorded |
