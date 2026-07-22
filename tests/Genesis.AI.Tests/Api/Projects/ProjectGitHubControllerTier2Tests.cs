@@ -16,49 +16,26 @@ namespace Genesis.AI.Tests.Api.Projects;
 public class ProjectGitHubControllerTier2Tests
 {
     [Fact]
-    public async Task PushAll_WhenBackgroundPushFails_LogsFailureToPushFailureLog()
+    public async Task PushAll_WhenBackgroundPushStarts_ReturnsAccepted()
     {
-        var projectId = Guid.NewGuid();
-        var artefact = CreateArtefact(projectId, Guid.NewGuid());
-        var pushAttempted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var scenario = CreatePushAllFailureScenario();
 
-        var mediator = new Mock<IMediator>();
-        mediator
-            .Setup(mock => mock.Send(It.IsAny<GetArtefactsByStageQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([artefact]);
-
-        var pushService = new Mock<IGitHubArtefactPushService>();
-        pushService
-            .Setup(mock => mock.PushAsync(
-                It.IsAny<Guid>(),
-                It.IsAny<Guid>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(() =>
-            {
-                pushAttempted.TrySetResult();
-                throw new InvalidOperationException("push failed");
-            });
-
-        var pushFailureLogRepository = new Mock<IPushFailureLogRepository>();
-        pushFailureLogRepository
-            .Setup(repository => repository.AddAsync(It.IsAny<PushFailureLog>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var controller = CreateController(mediator.Object, pushService.Object, pushFailureLogRepository.Object);
-
-        var result = await controller.PushAll(projectId, CancellationToken.None);
+        var result = await scenario.Controller.PushAll(scenario.ProjectId, CancellationToken.None);
 
         var accepted = Assert.IsType<AcceptedResult>(result);
         Assert.Equal(StatusCodes.Status202Accepted, accepted.StatusCode);
+    }
 
-        await pushAttempted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+    [Fact]
+    public async Task PushAll_WhenBackgroundPushFails_LogsFailureToPushFailureLog()
+    {
+        var scenario = CreatePushAllFailureScenario();
 
-        pushFailureLogRepository.Verify(
+        await scenario.Controller.PushAll(scenario.ProjectId, CancellationToken.None);
+
+        await scenario.PushAttempted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        scenario.PushFailureLogRepository.Verify(
             repository => repository.AddAsync(It.IsAny<PushFailureLog>(), It.IsAny<CancellationToken>()),
             Times.AtLeastOnce());
     }
@@ -134,6 +111,46 @@ public class ProjectGitHubControllerTier2Tests
         return controller;
     }
 
+    private static PushAllFailureScenario CreatePushAllFailureScenario()
+    {
+        var projectId = Guid.NewGuid();
+        var artefact = CreateArtefact(projectId, Guid.NewGuid());
+        var pushAttempted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var mediator = new Mock<IMediator>();
+        mediator
+            .Setup(mock => mock.Send(It.IsAny<GetArtefactsByStageQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([artefact]);
+
+        var pushService = new Mock<IGitHubArtefactPushService>();
+        pushService
+            .Setup(mock => mock.PushAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                pushAttempted.TrySetResult();
+                throw new InvalidOperationException("push failed");
+            });
+
+        var pushFailureLogRepository = new Mock<IPushFailureLogRepository>();
+        pushFailureLogRepository
+            .Setup(repository => repository.AddAsync(It.IsAny<PushFailureLog>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new PushAllFailureScenario(
+            projectId,
+            CreateController(mediator.Object, pushService.Object, pushFailureLogRepository.Object),
+            pushFailureLogRepository,
+            pushAttempted);
+    }
+
     private static IServiceScopeFactory CreateScopeFactory(
         IMediator mediator,
         IGitHubArtefactPushService pushService,
@@ -165,4 +182,10 @@ public class ProjectGitHubControllerTier2Tests
         typeof(Artefact).GetProperty("Id")!.SetValue(artefact, artefactId);
         return artefact;
     }
+
+    private sealed record PushAllFailureScenario(
+        Guid ProjectId,
+        ProjectGitHubController Controller,
+        Mock<IPushFailureLogRepository> PushFailureLogRepository,
+        TaskCompletionSource PushAttempted);
 }

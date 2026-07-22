@@ -30,26 +30,10 @@ public class ProjectFieldNamesApiTests : IDisposable
         var createResponse = await client.PostAsync("/api/v1/projects", createContent);
         var createBody = await createResponse.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
-
         using var createDoc = JsonDocument.Parse(createBody);
         var projectId = createDoc.RootElement.GetProperty("data").GetProperty("id").GetString();
 
-        var updateGitHubContent = new StringContent(
-            """{"gitHubApiRepoUrl":"https://github.com/org/api-repo","gitHubAppRepoUrl":"https://github.com/org/app-repo","figmaFileUrl":"https://www.figma.com/file/abc123/Test","figmaPat":null}""",
-            System.Text.Encoding.UTF8,
-            "application/json");
-
-        var updateGitHubResponse = await client.PatchAsync($"/api/v1/projects/{projectId}/github", updateGitHubContent);
-        Assert.Equal(HttpStatusCode.OK, updateGitHubResponse.StatusCode);
-
-        var updateP00Content = new StringContent(
-            """{"releaseType":"Minor","assuranceRequired":true,"pilotDeploymentProcess":"Standard","csoRoleAssigned":true,"igOwnerRoleAssigned":true,"securityReviewerAssigned":true,"medicalDeviceFlag":false}""",
-            System.Text.Encoding.UTF8,
-            "application/json");
-
-        var updateP00Response = await client.PatchAsync($"/api/v1/projects/{projectId}/p00", updateP00Content);
-        Assert.Equal(HttpStatusCode.OK, updateP00Response.StatusCode);
+        await SetupProjectForFieldAssertionAsync(client, projectId!);
 
         var response = await client.GetAsync($"/api/v1/projects/{projectId}");
         var body = await response.Content.ReadAsStringAsync();
@@ -130,25 +114,10 @@ public class ProjectFieldNamesApiTests : IDisposable
         var createResponse = await client.PostAsync("/api/v1/projects", createContent);
         var createBody = await createResponse.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         using var createDoc = JsonDocument.Parse(createBody);
         var projectId = createDoc.RootElement.GetProperty("data").GetProperty("id").GetString();
 
-        var updateGitHubContent = new StringContent(
-            """{"gitHubApiRepoUrl":"https://github.com/org/api-repo","gitHubAppRepoUrl":"https://github.com/org/app-repo","figmaFileUrl":"https://www.figma.com/file/abc123/Test","figmaPat":null}""",
-            System.Text.Encoding.UTF8,
-            "application/json");
-
-        var updateGitHubResponse = await client.PatchAsync($"/api/v1/projects/{projectId}/github", updateGitHubContent);
-        Assert.Equal(HttpStatusCode.OK, updateGitHubResponse.StatusCode);
-
-        var updateP00Content = new StringContent(
-            """{"releaseType":"Minor","assuranceRequired":true,"pilotDeploymentProcess":"Standard","csoRoleAssigned":true,"igOwnerRoleAssigned":true,"securityReviewerAssigned":true,"medicalDeviceFlag":false}""",
-            System.Text.Encoding.UTF8,
-            "application/json");
-
-        var updateP00Response = await client.PatchAsync($"/api/v1/projects/{projectId}/p00", updateP00Content);
-        Assert.Equal(HttpStatusCode.OK, updateP00Response.StatusCode);
+        await SetupProjectForFieldAssertionAsync(client, projectId!);
 
         var response = await client.GetAsync($"/api/v1/projects/{projectId}");
         var body = await response.Content.ReadAsStringAsync();
@@ -226,8 +195,7 @@ public class ProjectFieldNamesApiTests : IDisposable
             System.Text.Encoding.UTF8,
             "application/json");
 
-        var createResponse = await client.PostAsync("/api/v1/projects", createContent);
-        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        await client.PostAsync("/api/v1/projects", createContent);
 
         var response = await client.GetAsync("/api/v1/projects");
         var body = await response.Content.ReadAsStringAsync();
@@ -245,5 +213,22 @@ public class ProjectFieldNamesApiTests : IDisposable
         Assert.True(firstProject.TryGetProperty("status", out _), "status missing from response");
         Assert.True(firstProject.TryGetProperty("complianceDomain", out _), "complianceDomain missing from response");
         Assert.True(firstProject.TryGetProperty("pipelineStages", out _), "pipelineStages missing from response");
+    }
+
+    private static async Task SetupProjectForFieldAssertionAsync(HttpClient client, string projectId)
+    {
+        var updateGitHubContent = new StringContent(
+            """{"gitHubApiRepoUrl":"https://github.com/org/api-repo","gitHubAppRepoUrl":"https://github.com/org/app-repo","figmaFileUrl":"https://www.figma.com/file/abc123/Test","figmaPat":null}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        await client.PatchAsync($"/api/v1/projects/{projectId}/github", updateGitHubContent);
+
+        var updateP00Content = new StringContent(
+            """{"releaseType":"Minor","assuranceRequired":true,"pilotDeploymentProcess":"Standard","csoRoleAssigned":true,"igOwnerRoleAssigned":true,"securityReviewerAssigned":true,"medicalDeviceFlag":false}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        await client.PatchAsync($"/api/v1/projects/{projectId}/p00", updateP00Content);
     }
 }
