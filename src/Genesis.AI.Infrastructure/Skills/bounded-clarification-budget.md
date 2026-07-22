@@ -58,3 +58,13 @@ Stop for blocker (Path B) when:
 - The unknown determines a DCB0129 mandatory step
 - The unknown is a lawful basis or data classification decision
 - Being wrong could produce clinically unsafe output
+
+---
+
+## Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| I have more questions - I'll ask them even though I've hit the budget | The budget exists to protect session time. | Exceed it only for genuine blockers, not curiosity. |
+| I'll ask a clarifying question disguised as a statement | Implicit questions still consume budget and confuse the user. | Be explicit or park it. |
+| This clarification is important enough to justify going over budget | Every question feels important. The budget forces prioritisation. | Park non-blockers. |

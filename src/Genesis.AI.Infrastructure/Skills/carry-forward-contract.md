@@ -62,3 +62,13 @@ Gaps are expected and normal. An empty "Gaps identified" section does not mean t
 
 Always call `get_artefact` on `feedback/VALUE_CHAIN.md` before appending.
 Never overwrite the file. Append only. The file is the cumulative cross-stage audit trail.
+
+---
+
+## Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| The previous stage output is obvious - I don't need to read it | Obvious-from-memory is a hallucination risk. | Read the actual artefact. |
+| I'll summarise the carry-forward from what I remember | Memory summaries drift from the source. | Read and quote, never reconstruct. |
+| The VALUE_CHAIN section is optional for this stage | Carry-forward is mandatory. | Silent omission breaks downstream traceability. |

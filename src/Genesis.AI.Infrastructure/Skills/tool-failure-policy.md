@@ -49,3 +49,13 @@ Never advance the phase if the artefact write failed.
 
 Before retrying `save_artefact`, call `list_artefacts` to check whether the file was actually written despite the error.
 If it exists with the expected content, the failure was a false negative — proceed without retry.
+
+---
+
+## Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| The tool failed but I'll proceed anyway - the output was probably fine | A failed tool call means no output was saved. | Do not proceed on assumption. |
+| I already retried twice - I'll try a third time | The retry limit is two. | On third failure, emit the reason and stop. Infinite retries corrupt state. |
+| I'll advance the phase even though the last tool call failed | Phase advance after tool failure skips the gate. The gate exists because the output is needed. | Stop and report. |

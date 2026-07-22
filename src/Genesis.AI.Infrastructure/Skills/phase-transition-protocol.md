@@ -55,3 +55,13 @@ Then call `advance_phase` after receiving confirmation (or after a reasonable ti
 ## Rule 5 — Phase 0 is always Phase 0
 
 Every stage begins at Phase 0 (context loading). Never advance past Phase 0 without completing context loading, manifest read, and routing context acknowledgement.
+
+---
+
+## Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| I announced the phase transition in text - that counts | Text announcements do not update the UI or audit trail. | Only advance_phase tool call counts. |
+| I'll skip advance_phase - the user knows we moved on | The platform tracks progress from the tool call. Silent transitions break the sidebar and audit trail. | Use the tool call at every phase transition. |
+| I'll call advance_phase after I finish writing - it's just a formality | advance_phase is the gate, not the receipt. | Call it at the transition point, not after. |
