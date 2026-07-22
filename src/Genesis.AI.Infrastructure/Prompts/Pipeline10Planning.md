@@ -633,6 +633,10 @@ Each task file is self-contained — coding agents read ONLY this file to implem
     }
   ],
 
+  "source_checks": [
+    "CHECK-8"
+  ],
+
   "verification": {
     "analyser_command": "docker run --rm -v $(pwd):/source guardrail-analyser:latest --include PG",
     "expected_guardrails_pass": ["PG-001", "PG-002"],
@@ -649,6 +653,12 @@ Each task file is self-contained — coding agents read ONLY this file to implem
   }
 }
 ```
+
+Mandatory task field:
+- `source_checks`: Array of CHECK IDs from normalisation output that
+  this task implements. Every CHECK from the normalisation output must
+  appear in exactly one task's source_checks array. Block task
+  generation if any CHECK is unassigned.
 
 ### Cache Prefix Rules
 

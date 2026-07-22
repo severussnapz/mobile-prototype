@@ -106,6 +106,14 @@ Do not call completion if any claim cannot be reconciled against a source artefa
 - Every ADR includes `source_req_ids` and `source_ac_ids`
 If any requirement file is missing any of the above, do not call completion transition.
 
+**Cross-stage traceability check (mandatory before completion):**
+- Every ADR that introduces a constraint affecting P04 design must be
+  listed in manifest.md under a 'Design Constraints from ADRs' section
+- Every ADR affecting P06 clinical safety must include a
+  clinical_safety_note field
+- Block completion if any ADR lacks source_req_ids already added
+  earlier in this session
+
 ### Anti-Rationalization Table
 
 | Excuse | Why it is wrong | What to do instead |

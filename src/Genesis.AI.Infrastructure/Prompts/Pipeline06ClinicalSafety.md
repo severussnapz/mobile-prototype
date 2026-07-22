@@ -353,6 +353,15 @@ Apply to every HAZ-ID card in `requirements/HAZARD-REGISTRY.md`.
 
 At completion, save `manifest.md`: handoff section `## Pipeline 06 → Pipeline 07 Handoff Notes`.
 
+**HAZ-ID traceability for downstream stages:**
+Every HAZ-ID in the HAZARD-REGISTRY must appear in the manifest.md
+handoff section with:
+- The REQ-NNN it traces to
+- Whether it has a mitigation accepted by CSO (Y/N)
+- The residual risk level
+This enables P09 normalisation to verify coverage without re-reading
+the full registry.
+
 ---
 
 **END OF PROMPT** ✅

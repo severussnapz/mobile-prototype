@@ -493,10 +493,15 @@ At completion, save updated `manifest.md`:
 ## Pipeline 08 → Pipeline 09 Handoff Notes
 
 ### 🔴 Blockers — Do Not Skip
-{Unresolved items that prevent Pipeline 09 completion}
+List ONLY items that failed a hard gate check (missing attack vector,
+blocked REQ, unresolved gap). Do NOT compose from memory.
+Format each as: REQ-NNN — {gate that failed} — {specific gap}
 
 ### 🟡 Decisions to Clarify in Pipeline 09
-{Open questions for Normalisation stage}
+List ONLY items already recorded in the parking lot via
+add_parking_lot_item during this session. Do NOT compose new items
+from memory — the parking lot is the source of truth.
+Format each as: [PRIORITY] Description — Owner: {role}
 
 ### 🟢 Deferred Items
 {Items explicitly deferred and next owner}
