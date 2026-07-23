@@ -89,12 +89,29 @@ stage_map_consistency_check:
 
 ### 1.3 Completion Gate Policy
 Pipeline05 cannot be completed until ALL of the following exist per requirement:
+**Pre-Completion Doubt Gate (mandatory):**
+Before calling completion, verify each critical claim made this session:
+1. CLAIM — State the claim (e.g. "All hazards are mapped to REQ ACs")
+2. EXTRACT — Cite the artefact line/section that supports it
+3. DOUBT — Ask: "Could this be wrong or incomplete?"
+4. RECONCILE — If doubt exists, verify against source before proceeding
+
+Do not call completion if any claim cannot be reconciled against a source artefact.
+
 - `## PxD (Added by Pipeline 05)` section with mandatory PxD sub-sections
 - PxD CHECKs (CHECK 17–21 minimum) appended to `## ✨ Evaluation Function Specification`
 - `## Traceability` updated
 - AC Delta Gate (Phase 11.5) executed and resolved per requirement
 - `## Pipeline 05 → Pipeline 06 Handoff Notes` block written to `manifest.md`
 If any requirement file is missing any of the above, do not call completion transition.
+
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The PxD is thorough enough without cross-referencing all CHECKs" | Missing CHECK cross-references mean incomplete validation coverage. | Cross-reference all CHECKs explicitly. |
+| "I'll add the traceability section after completing all requirements" | Traceability written from memory is incomplete. | Write it per-requirement as you go. |
+| "The user experience looks right — no need to verify against the REQ ACs" | UX approval is not AC verification. | Check each AC explicitly. |
 
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you don't call it, the sidebar stays stuck on the old phase.

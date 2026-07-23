@@ -48,7 +48,7 @@ public sealed class RunLocalNormaliserCommandHandler
             project.Code,
             cancellationToken);
 
-        var runStatus = evaluation.RunPrerequisitesMet ? "completed" : "failed";
+        var runStatus = evaluation.RunPrerequisitesMet ? "prerequisites_met" : "failed";
         var status = evaluation.RunPrerequisitesMet
             ? RunLocalNormaliserStatus.Success
             : RunLocalNormaliserStatus.PrerequisitesMissing;

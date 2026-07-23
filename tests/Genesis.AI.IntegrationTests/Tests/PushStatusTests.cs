@@ -24,7 +24,7 @@ public sealed class PushStatusTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var document = JsonDocument.Parse(body);
-        Assert.Equal(0, document.RootElement.GetProperty("unresolvedCount").GetInt32());
+        Assert.Equal(0, document.RootElement.GetProperty("data").GetProperty("unresolvedCount").GetInt32());
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class PushStatusTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var document = JsonDocument.Parse(body);
-        Assert.Equal(3, document.RootElement.GetProperty("unresolvedCount").GetInt32());
+        Assert.Equal(3, document.RootElement.GetProperty("data").GetProperty("unresolvedCount").GetInt32());
     }
 
     [Fact]

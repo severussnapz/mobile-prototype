@@ -1,6 +1,7 @@
 using Genesis.AI.Core.Data;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.ProjectAggregate;
+using Genesis.AI.Domain.AggregatesModel.RequirementChangeAggregate;
 using Genesis.AI.Domain.Commands.CompleteStage;
 using Genesis.AI.Domain.Enums;
 using Genesis.AI.Domain.Interfaces;
@@ -12,6 +13,7 @@ public class CompleteStageCommandHandlerTests
 {
     private readonly Mock<IProjectRepository> _projectRepositoryMock;
     private readonly Mock<IArtefactRepository> _artefactRepositoryMock;
+    private readonly Mock<IRequirementChangeRepository> _requirementChangeRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly TimeProvider _timeProvider;
     private readonly CompleteStageCommandHandler _handler;
@@ -20,6 +22,7 @@ public class CompleteStageCommandHandlerTests
     {
         _projectRepositoryMock = new Mock<IProjectRepository>();
         _artefactRepositoryMock = new Mock<IArtefactRepository>();
+        _requirementChangeRepositoryMock = new Mock<IRequirementChangeRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _timeProvider = TimeProvider.System;
 
@@ -34,6 +37,7 @@ public class CompleteStageCommandHandlerTests
         _handler = new CompleteStageCommandHandler(
             _projectRepositoryMock.Object,
             _artefactRepositoryMock.Object,
+            _requirementChangeRepositoryMock.Object,
             _timeProvider);
     }
 

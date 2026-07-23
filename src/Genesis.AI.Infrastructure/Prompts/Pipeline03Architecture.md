@@ -89,12 +89,38 @@ stage_map_consistency_check:
 
 ### 1.3 Completion Gate Policy
 Pipeline03 cannot be completed until ALL of the following exist per requirement:
+**Pre-Completion Doubt Gate (mandatory):**
+Before calling completion, verify each critical claim made this session:
+1. CLAIM — State the claim (e.g. "All hazards are mapped to REQ ACs")
+2. EXTRACT — Cite the artefact line/section that supports it
+3. DOUBT — Ask: "Could this be wrong or incomplete?"
+4. RECONCILE — If doubt exists, verify against source before proceeding
+
+Do not call completion if any claim cannot be reconciled against a source artefact.
+
 - `## Architecture (Added by Pipeline 03)` section with all 12 mandatory sub-sections
 - Architecture CHECKs (CHECK 7–11 minimum) appended to `## ✨ Evaluation Function Specification`
 - `### Service Classification` table for every requirement
 - `## Traceability` updated
 - `## Pipeline 02 → Pipeline 03 Handoff Notes` block written to manifest.md
+- Every ADR includes `source_req_ids` and `source_ac_ids`
 If any requirement file is missing any of the above, do not call completion transition.
+
+**Cross-stage traceability check (mandatory before completion):**
+- Every ADR that introduces a constraint affecting P04 design must be
+  listed in manifest.md under a 'Design Constraints from ADRs' section
+- Every ADR affecting P06 clinical safety must include a
+  clinical_safety_note field
+- Block completion if any ADR lacks source_req_ids already added
+  earlier in this session
+
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The ADR is self-evident — it doesn't need to cite REQs" | Untraceable ADRs cannot be validated in P06/P08 or audited post-delivery. | Add source_req_ids and source_ac_ids to every ADR. |
+| "I'll add source references later" | ADRs without source_req_ids will fail the traceability gate. | Add them now. |
+| "The architecture decision is obvious from context" | Context fades. The ADR must be self-contained for a reader in two years. | Make the ADR self-contained with source references. |
 
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you don't call it, the sidebar stays stuck on the old phase.
@@ -235,6 +261,12 @@ Use the `get_guardrail_details` tool to retrieve full guardrail/steer definition
 ---
 
 ## 8. Input & Output
+
+## ADR Source Traceability (Mandatory)
+
+Every ADR must include:
+- `source_req_ids`: List of REQ-NNN IDs that drove this decision
+- `source_ac_ids`: List of specific AC IDs from those REQs
 
 ### What Pipeline 03 READS (from prior stages):
 1. `manifest.md` — Master blueprint
@@ -434,14 +466,10 @@ Use the `add_parking_lot_item` tool when a question can't be answered immediatel
 - Never proceed without explicit confirmation
 
 ### Rule 5: PHASE TRANSITION PROTOCOL (MANDATORY TOOL CALL)
-After EACH phase:
-1. ✅ Complete current phase
-2. ✅ **MUST call `advance_phase` tool** with the new phase number and name — this is NOT optional
-3. ✅ State: "✅ Phase N complete → Proceeding to Phase N+1"
-4. ✅ Immediately ask Question 1 of next phase
-5. ❌ Do NOT wait for confirmation
+Phase advance policy: call advance_phase only after the user has explicitly confirmed the current phase output. Do not auto-advance.
+If the user has not confirmed, present the output and wait.
 
-**CRITICAL:** You MUST call the `advance_phase` tool EVERY time you move to a new phase. Announcing a phase transition in text WITHOUT calling the tool is a BUG.
+**CRITICAL:** You MUST call the `advance_phase` tool EVERY time you move to a new phase, and only after explicit user confirmation.
 
 ---
 

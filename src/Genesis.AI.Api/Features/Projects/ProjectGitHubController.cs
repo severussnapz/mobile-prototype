@@ -1,4 +1,5 @@
 using Genesis.AI.Api.Authentication;
+using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.AggregatesModel.PushFailureLogAggregate;
 using Genesis.AI.Domain.Exceptions;
@@ -40,7 +41,7 @@ public sealed class ProjectGitHubController : ControllerBase
 
     [HttpPost("{id:guid}/push-all")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ApiResponse<PushActionResponse>), StatusCodes.Status202Accepted)]
     public async Task<IActionResult> PushAll(Guid id, CancellationToken ct)
     {
         var triggeredBy = User.GetEmail() ?? User.GetUserErn() ?? "unknown";
@@ -50,12 +51,12 @@ public sealed class ProjectGitHubController : ControllerBase
         }
 
         return await Task.FromResult<IActionResult>(
-            Accepted(new PushActionResponse("GitHub sync started. Check push status for results.")));
+            Accepted(new ApiResponse<PushActionResponse> { Data = new PushActionResponse("GitHub sync started. Check push status for results.") }));
     }
 
     [HttpPost("{id:guid}/artefacts/{artefactId:guid}/push")]
     [Authorize(Policy = AuthorisationPolicies.ProjectWrite)]
-    [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<PushActionResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(PushActionResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PushArtefact(Guid id, Guid artefactId, CancellationToken ct)
@@ -102,7 +103,7 @@ public sealed class ProjectGitHubController : ControllerBase
 
             return Created(
                 $"/api/v1/projects/{id}/artefacts/{artefactId}",
-                new PushActionResponse("Pushed to GitHub successfully."));
+                new ApiResponse<PushActionResponse> { Data = new PushActionResponse("Pushed to GitHub successfully.") });
         }
         catch (GitHubAuthenticationException)
         {
@@ -127,10 +128,13 @@ public sealed class ProjectGitHubController : ControllerBase
 
     private async Task PushAllBestEffortAsync(Guid projectId, string triggeredBy, IServiceScopeFactory scopeFactory)
     {
+        using var scope = scopeFactory.CreateScope();
+        var provider = scope.ServiceProvider;
+        var pushFailureLogRepo = provider.GetRequiredService<IPushFailureLogRepository>();
+        var timeProvider = provider.GetRequiredService<TimeProvider>();
+
         try
         {
-            using var scope = scopeFactory.CreateScope();
-            var provider = scope.ServiceProvider;
             var pushService = provider.GetRequiredService<IGitHubArtefactPushService>();
             var mediator = provider.GetRequiredService<IMediator>();
             var logger = provider.GetRequiredService<ILogger<ProjectGitHubController>>();
@@ -138,10 +142,19 @@ public sealed class ProjectGitHubController : ControllerBase
             await ScaffoldForBulkPushAsync(provider, projectId, triggeredBy, logger);
 
             var artefacts = await mediator.Send(new GetArtefactsByStageQuery(projectId), CancellationToken.None);
-            await PushArtefactsBestEffortAsync(pushService, artefacts, projectId, triggeredBy, logger);
+            await PushArtefactsBestEffortAsync(
+                pushService,
+                pushFailureLogRepo,
+                timeProvider,
+                artefacts,
+                projectId,
+                triggeredBy,
+                logger);
         }
         catch (Exception ex)
         {
+            var log = new PushFailureLog(projectId, Guid.Empty, ".genesis/push-all", ex.Message, timeProvider);
+            await pushFailureLogRepo.AddAsync(log, CancellationToken.None);
             _logger.LogError(ex, "Bulk push failed for project {ProjectId}", projectId);
         }
     }
@@ -175,6 +188,8 @@ public sealed class ProjectGitHubController : ControllerBase
 
     private static async Task PushArtefactsBestEffortAsync(
         IGitHubArtefactPushService pushService,
+        IPushFailureLogRepository pushFailureLogRepository,
+        TimeProvider timeProvider,
         IReadOnlyList<Artefact> artefacts,
         Guid projectId,
         string triggeredBy,
@@ -196,6 +211,8 @@ public sealed class ProjectGitHubController : ControllerBase
             }
             catch (Exception ex)
             {
+                var log = new PushFailureLog(projectId, artefact.Id, artefact.FilePath, ex.Message, timeProvider);
+                await pushFailureLogRepository.AddAsync(log, CancellationToken.None);
                 logger.LogWarning(ex, "Bulk push failed for artefact {ArtefactId}", artefact.Id);
             }
         }

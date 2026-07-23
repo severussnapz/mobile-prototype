@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using AutoMapper;
 using Genesis.AI.Api.Features.Projects;
+using Genesis.AI.Api.Http;
 using Genesis.AI.Domain.AggregatesModel.ArtefactAggregate;
 using Genesis.AI.Domain.Exceptions;
 using Genesis.AI.Domain.Interfaces;
@@ -294,5 +295,5 @@ public class PushToGitHubTests
     }
 
     private static string ExtractUserMessage(object? responseBody)
-        => responseBody is PushActionResponse response ? response.UserMessage : string.Empty;
+        => responseBody is ApiResponse<PushActionResponse> wrapped ? wrapped.Data?.UserMessage ?? string.Empty : responseBody is PushActionResponse response ? response.UserMessage : string.Empty;
 }

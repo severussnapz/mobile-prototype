@@ -23,7 +23,7 @@ public sealed class ProjectTokenUsageController : ControllerBase
     /// </summary>
     [Authorize(Policy = AuthorisationPolicies.ProjectRead)]
     [HttpGet("{id:guid}/token-usage")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ProjectTokenUsageResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProjectTokenUsage(Guid id, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(

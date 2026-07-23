@@ -13,6 +13,10 @@ public sealed class CorsOptionsOperationFilter : IDocumentFilter
 {
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
     {
+        // The "types" document is for NSwag client generation — OPTIONS pre-flight
+        // operations must not appear in it or NSwag will generate spurious methods.
+        if (swaggerDoc.Info?.Version == "types") return;
+
         foreach (var path in swaggerDoc.Paths)
         {
             // Leave paths that already declare OPTIONS untouched (e.g. the

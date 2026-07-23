@@ -61,3 +61,13 @@ When an earlier-parked item becomes answerable in a later phase:
 
 Before adding a new item, check whether an equivalent item already exists in the current parking lot.
 Duplicate items inflate the count and confuse resolution tracking. If equivalent: update the existing item's priority if the new context warrants escalation.
+
+---
+
+## Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| This item is too small to park - I'll just remember it | Items not in the parking lot are lost when context resets. | Park everything uncertain. |
+| I'll resolve this parking lot item myself | Parking lot items require human decision. | You propose, they ratify. |
+| The parking lot has too many items - I'll skip this one | The cap exists to force prioritisation, not to justify omission. | Raise the cap question to the user. |

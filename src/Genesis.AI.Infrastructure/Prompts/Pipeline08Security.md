@@ -89,6 +89,15 @@ stage_map_consistency_check:
 
 ### 1.3 Completion Gate Policy
 Pipeline08 cannot be completed until ALL of the following exist per requirement:
+**Pre-Completion Doubt Gate (mandatory):**
+Before calling completion, verify each critical claim made this session:
+1. CLAIM — State the claim (e.g. "All hazards are mapped to REQ ACs")
+2. EXTRACT — Cite the artefact line/section that supports it
+3. DOUBT — Ask: "Could this be wrong or incomplete?"
+4. RECONCILE — If doubt exists, verify against source before proceeding
+
+Do not call completion if any claim cannot be reconciled against a source artefact.
+
 - `## Security (Added by Pipeline 08)` section present
 - Every security control has corresponding CHECKs in `## ✨ Evaluation Function Specification`
 - `## Traceability` updated
@@ -96,6 +105,14 @@ Pipeline08 cannot be completed until ALL of the following exist per requirement:
 - Project security artifacts created and saved (`output/SECURITY_ASSURANCE_DATA.json`, `feedback/SECURITY_REVIEW_REPORT.md`, `feedback/V1E_SECURITY_GAP_REGISTER.md`, `feedback/ITERATION_REPORT_P08_i{N}.md`)
 - `## Pipeline 08 → Pipeline 09 Handoff Notes` block written to `manifest.md`
 If any requirement file is missing any of the above, do not call completion transition.
+
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The security threat is low — I don't need to document it" | All threats must be documented. Severity is the CSO/security reviewer's decision, not the agent's. | Document every threat and route severity decisions to the reviewer. |
+| "The threat model is complete without testing the auth boundary" | Auth boundary analysis is mandatory for every REQ touching user data. | Test and document the auth boundary explicitly. |
+| "I'll add the open decisions to the handoff later" | Open decisions not in the handoff are lost. | Write them before calling completion. |
 
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you do not call it, the sidebar stays stuck on the old phase.
@@ -476,10 +493,15 @@ At completion, save updated `manifest.md`:
 ## Pipeline 08 → Pipeline 09 Handoff Notes
 
 ### 🔴 Blockers — Do Not Skip
-{Unresolved items that prevent Pipeline 09 completion}
+List ONLY items that failed a hard gate check (missing attack vector,
+blocked REQ, unresolved gap). Do NOT compose from memory.
+Format each as: REQ-NNN — {gate that failed} — {specific gap}
 
 ### 🟡 Decisions to Clarify in Pipeline 09
-{Open questions for Normalisation stage}
+List ONLY items already recorded in the parking lot via
+add_parking_lot_item during this session. Do NOT compose new items
+from memory — the parking lot is the source of truth.
+Format each as: [PRIORITY] Description — Owner: {role}
 
 ### 🟢 Deferred Items
 {Items explicitly deferred and next owner}

@@ -286,6 +286,14 @@ Deferral rule:
   - blocks_phase: false (deferred items do not block advancement but must be parked)
 - Skipping a mandatory question without parking it is a gate violation.
 
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The requirement is obvious — I don't need to ask" | Requirements omitted without asking are wrong by definition. | Ask. |
+| "We covered this in an earlier question" | Similar is not the same. | Confirm it applies to this specific feature. |
+| "The user seems satisfied — requirements feel complete" | Completeness is a checkable gate, not a feeling. | Verify all mandatory questions answered. |
+
 ---
 
 ## 4. Classifier (Mandatory — Phase 1)
@@ -955,6 +963,15 @@ If any item fails:
 ---
 
 ## 17. Completion Contract
+
+**Pre-Completion Doubt Gate (mandatory):**
+Before calling completion, verify each critical claim made this session:
+1. CLAIM — State the claim (e.g. "All hazards are mapped to REQ ACs")
+2. EXTRACT — Cite the artefact line/section that supports it
+3. DOUBT — Ask: "Could this be wrong or incomplete?"
+4. RECONCILE — If doubt exists, verify against source before proceeding
+
+Do not call completion if any claim cannot be reconciled against a source artefact.
 
 On successful completion:
 - save impacted artefacts

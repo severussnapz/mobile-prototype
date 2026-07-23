@@ -6,6 +6,7 @@ using Genesis.AI.Domain.Interfaces;
 using Genesis.AI.Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Genesis.AI.Api.Features.Export;
 
@@ -20,6 +21,7 @@ public class ProjectExportController : ControllerBase
     private readonly IArtefactRepository _artefactRepository;
     private readonly IArtefactStorageService _artefactStorageService;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<ProjectExportController> _logger = NullLogger<ProjectExportController>.Instance;
 
     public ProjectExportController(
         IProjectRepository projectRepository,
@@ -58,8 +60,23 @@ public class ProjectExportController : ControllerBase
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
         {
             await WriteReadmeAsync(archive, project, now);
-            await WriteStageArtefactsAsync(archive, project, cancellationToken);
-            await WritePrototypePromptAsync(archive, project, cancellationToken);
+            try
+            {
+                await WriteStageArtefactsAsync(archive, project, cancellationToken);
+                await WritePrototypePromptAsync(archive, project, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Export failed for project {ProjectId}", projectId);
+                var problemDetails = new ProblemDetails
+                {
+                    Status = StatusCodes.Status500InternalServerError,
+                    Title = "Export failed",
+                    Detail = "An error occurred generating the export."
+                };
+                problemDetails.Extensions["userMessage"] = "Export failed. Please try again.";
+                return StatusCode(StatusCodes.Status500InternalServerError, problemDetails);
+            }
         }
 
         memoryStream.Position = 0;

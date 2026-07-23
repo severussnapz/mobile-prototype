@@ -48,3 +48,13 @@ Phase [N] complete. Established:
 
 Any corrections before I advance to [next phase name]?
 ```
+
+---
+
+## Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| I'll ask two questions at once to save time | Bundled questions get bundled answers - ambiguous and untrackable. | Ask one, wait, then ask the next. |
+| The user's answer was close enough - I'll infer the rest | Inference is assumption. | If the answer was incomplete, ask the follow-up. |
+| We've been talking long enough - I'll move on | Session length is not a completion criterion. | The phase gate is. |

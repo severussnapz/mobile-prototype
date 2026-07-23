@@ -593,6 +593,12 @@ Suppressions are documented in `.guardrail-suppressions.yaml` with justification
 18. **Conversation continuation** — `Conversation.ContinuedFromConversationId` links to a predecessor conversation for handover context injection
 19. **Project timesheet code** — `Project.TimesheetCode` is a tracked property on the project aggregate
 20. **Prototype UI kit** — `Infrastructure/Resources/emis-x-base.css` and `Infrastructure/Resources/emis-x-ui-kit.md` are the authoritative EMIS-X design system assets. Always reference these when building or modifying the prototype stage. Do not hardcode hex colours — use `var(--token-*)` tokens. Do not use native HTML elements where an `@emisgroup/ui-*` component exists (DS-001).
+21. **Controller completeness check** — before closing any deliverable that adds a new command or query, verify the controller action exists. Grep the relevant controller for the HTTP verb attribute before reporting done:
+    ```bash
+    grep -n "HttpPost\|HttpPatch\|HttpGet\|HttpDelete\|HttpPut" \
+       src/Genesis.AI.Api/Features/{Feature}/{Feature}Controller.cs
+    ```
+    If the route is missing, add it. A command/handler without a controller action is a silent gap — the endpoint does not exist at the HTTP layer even though everything compiles green. (Seam type 2 — proved live.)
 
 ---
 
@@ -663,5 +669,8 @@ A passing build or green test run is NOT proof the implementation is honest. The
 5. **No build-configuration edits to route around a compile error.**
    Do NOT add `<Using Include="..." />`, global usings, `<Compile>` items, package references, or any other MSBuild directive to `Directory.Build.props` (root or tests/) to make code compile. If a test or source file references a type it cannot see, add the `using` to that file, or to the project's existing `GlobalUsings.cs` — the file that exists for shared usings. A missing using is fixed where usings live, never in build config. Any edit to `Directory.Build.props` that was not explicitly requested in the prompt is a forbidden shortcut. "Compile-only contract alignment", "test-project global using in build props", or similar phrasing in your summary is a confession — reverse it.
 
-**Every green must come from real code, not a bypass.** Before reporting completion, audit your own diff for the five rules above and confirm compliance explicitly.
+6. **No missing controller route when a command is implemented.**
+   When implementing a new command + handler, the corresponding controller action MUST exist before reporting done. A green build does not confirm the route exists — grep the controller. If the action is missing, add it before closing.
+
+**Every green must come from real code, not a bypass.** Before reporting completion, audit your own diff for the six rules above and confirm compliance explicitly.
 

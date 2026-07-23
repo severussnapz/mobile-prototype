@@ -94,7 +94,18 @@ Pipeline06 cannot be completed until ALL of the following exist per requirement:
 - Clinical safety CHECKs appended to `## ✨ Evaluation Function Specification`
 - `## Traceability` updated
 - `## Pipeline 06 → Pipeline 07 Handoff Notes` block written to `manifest.md`
+- Every HAZ-ID in `HAZARD-REGISTRY.md` includes a `req_id` field identifying the source requirement
+- Every HAZ-ID in `HAZARD-REGISTRY.md` includes at least one `ac_id` from the REQ acceptance criteria that the hazard traces to
 If any requirement file is missing any of the above, do not call completion transition.
+If any HAZ-ID is missing `req_id` or `ac_id`, do not call completion transition.
+
+### Anti-Rationalization Table
+
+| Excuse | Why it is wrong | What to do instead |
+|---|---|---|
+| "The hazard is obvious enough without citing a specific AC" | Unmapped hazards cannot be traced in P09 normalisation or P11 validation. Clinical safety audit fails without the link. | Identify the specific AC or raise a CLARIFICATION if none exists. |
+| "I'll add the req_id and ac_ids later" | Later means after completion gate — it will never happen. The gate blocks completion until the fields are present. | Add traceability fields to every hazard card before calling completion. |
+| "The CSO can decide if traceability is needed" | Traceability is a DCB0129 structural requirement, not a clinical judgement. The CSO decides severity and mitigation — not whether to trace. | Always include req_id and ac_ids. Route severity questions to CSO. |
 
 ### 1.4 Phase Transition Policy (MANDATORY TOOL CALL)
 You MUST call the `advance_phase` tool on EVERY phase transition. Announcing a phase transition in text WITHOUT calling the tool is a BUG. The UI tracks progress from the tool call — if you don't call it, the sidebar stays stuck on the old phase.
@@ -313,11 +324,22 @@ Each phase has a dedicated skill file injected by the platform.
 | 5 | Control Elicitation | `control-elicitation-method` | C-NNN controls per hazard |
 | 6 | Residual Risk | `residual-risk-assessment` | Residual risk + acceptability |
 | 7 | Hazard Cards (AUTO) | `if678-hazard-card-template` | IF678 format hazard cards |
+| 8 | Reserved — no action required | — | No action required |
 | 9 | Guardrail Mapping (AUTO) | `genesis-ai-skill-mapping` | CLIN/WCLIN → hazard mapping |
 | 10 | DCB0129 Check (AUTO) | `dcb0129-compliance-check` | Compliance checklist |
 | 11 | CSO Sign-Off | `cso-signoff-protocol` | CSO approval recorded |
 | 12 | Write + Gate | `completeness-gate-p06`, `output-write-protocol`, `no-placeholder-enforcement` | Clinical Safety sections written |
 | 13 | CSO Final Review | `cso-review-final`, `iteration-report` | CLINICAL_SAFETY_SUMMARY.md |
+
+---
+
+## Hazard Card Traceability Rule (Mandatory)
+
+Apply to every HAZ-ID card in `requirements/HAZARD-REGISTRY.md`.
+
+**Traceability (mandatory):**
+- `req_id`: The REQ-NNN this hazard was identified from
+- `ac_ids`: The specific AC IDs from that REQ that this hazard relates to (e.g. AC-001, AC-003). At least one required. If no specific AC applies, raise a CLARIFICATION — do not leave blank.
 
 ---
 
@@ -330,6 +352,15 @@ Each phase has a dedicated skill file injected by the platform.
 ## Manifest Update & Handoff
 
 At completion, save `manifest.md`: handoff section `## Pipeline 06 → Pipeline 07 Handoff Notes`.
+
+**HAZ-ID traceability for downstream stages:**
+Every HAZ-ID in the HAZARD-REGISTRY must appear in the manifest.md
+handoff section with:
+- The REQ-NNN it traces to
+- Whether it has a mitigation accepted by CSO (Y/N)
+- The residual risk level
+This enables P09 normalisation to verify coverage without re-reading
+the full registry.
 
 ---
 

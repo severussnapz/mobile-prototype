@@ -35,7 +35,7 @@ public class ConversationsController : ControllerBase
     /// </summary>
     [HttpPost]
     [Authorize(Policy = AuthorisationPolicies.ConversationWrite)]
-    [ProducesResponseType(typeof(ConversationResource), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<ConversationResource>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateConversation(
@@ -80,7 +80,7 @@ public class ConversationsController : ControllerBase
     /// </summary>
     [HttpGet("{id:guid}")]
     [Authorize(Policy = AuthorisationPolicies.ConversationRead)]
-    [ProducesResponseType(typeof(ConversationResource), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ConversationResource>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetConversation(Guid id, CancellationToken cancellationToken)
     {
@@ -106,7 +106,7 @@ public class ConversationsController : ControllerBase
     /// </summary>
     [HttpGet("by-stage/{stageId:guid}")]
     [Authorize(Policy = AuthorisationPolicies.ConversationRead)]
-    [ProducesResponseType(typeof(IEnumerable<ConversationResource>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ConversationResource>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetConversationsByStage(Guid stageId, CancellationToken cancellationToken)
     {
         var conversations = await _mediator.Send(
@@ -130,7 +130,7 @@ public class ConversationsController : ControllerBase
     /// </summary>
     [HttpGet("by-stage/{stageId:guid}/requirements")]
     [Authorize(Policy = AuthorisationPolicies.ConversationRead)]
-    [ProducesResponseType(typeof(IReadOnlyList<ConversationResource>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ConversationResource>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetConversationsByStageRequirements(Guid stageId, CancellationToken cancellationToken)
     {
         var conversations = await _conversationRepository.GetByStageIdWithRequirementIdsAsync(
@@ -152,7 +152,7 @@ public class ConversationsController : ControllerBase
     /// </summary>
     [HttpPost("{id:guid}/messages")]
     [Authorize(Policy = AuthorisationPolicies.ConversationWrite)]
-    [ProducesResponseType(typeof(MessageResource), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<MessageResource>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SendMessage(
         Guid id,
