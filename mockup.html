@@ -11,13 +11,18 @@
       --text: #16171a;
       --muted: #676a74;
       --border: #d6d8df;
-      --accent: #cf2d81;
-      --accent-soft: #fdeaf3;
+      --accent: #6f1b8b;
+      --accent-soft: #f2e7fb;
       --success: #34c759;
       --warning: #ff9500;
       --danger: #ef4444;
       --radius: 24px;
       --shadow: 0 20px 44px rgba(12, 14, 20, 0.18);
+      --btn-height: 44px;
+      --btn-radius: 12px;
+      --btn-padding-x: 16px;
+      --btn-primary-start: #7b2cbf;
+      --btn-primary-end: #5d1678;
     }
 
     * { box-sizing: border-box; }
@@ -80,8 +85,12 @@
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 10px;
+    }
+
+    .header.hidden {
+      display: none;
     }
 
     .logo {
@@ -92,8 +101,55 @@
     }
 
     .logo.micro {
-      width: 84px;
+      width: 78px;
       height: 22px;
+    }
+
+    .dashboard-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+      margin-top: 2px;
+      min-height: 40px;
+    }
+
+    .dashboard-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .dashboard-menu {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      border: 1px solid #e3e5ea;
+      background: #fff;
+      color: #24262c;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .dashboard-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: #1f2024;
+    }
+
+    .connection-pill.online {
+      background: #c6f0cd;
+      border-color: #c6f0cd;
+      color: #1f4325;
+      font-weight: 700;
     }
 
     .connection-pill {
@@ -102,10 +158,17 @@
       gap: 6px;
       border: 1px solid var(--border);
       border-radius: 999px;
-      padding: 7px 10px;
-      font-size: 12px;
+      padding: 6px 12px;
+      font-size: 11px;
       font-weight: 800;
       white-space: nowrap;
+    }
+
+    .global-connection-pill {
+      position: absolute;
+      top: 38px;
+      right: 16px;
+      z-index: 12;
     }
 
     .dot { width: 8px; height: 8px; border-radius: 99px; }
@@ -185,6 +248,580 @@
       max-width: 340px;
     }
 
+    .app-chooser-shell {
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 690px;
+    }
+
+    .app-chooser-card {
+      width: 100%;
+      max-width: 342px;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .app-chooser-options {
+      width: 100%;
+      max-width: 342px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .app-chooser-option {
+      min-height: 96px;
+      width: 100%;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 12px;
+      text-align: left;
+      align-items: center;
+      place-items: unset;
+      justify-items: stretch;
+    }
+
+    .app-chooser-option + .app-chooser-option {
+      margin-top: 2px;
+    }
+
+    .app-chooser-option-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+
+    .app-chooser-option-copy-wrap {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .app-chooser-option-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+    }
+
+    .app-chooser-option-copy {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .app-chooser-option.portfolio {
+      background: linear-gradient(180deg, #7b2cbf 0%, #5d1678 100%);
+      border-color: #7b2cbf;
+      color: #fff;
+    }
+
+    .app-chooser-option.portfolio .app-chooser-option-icon {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+
+    .app-chooser-option.education {
+      background: #f7f8fc;
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .app-chooser-option.education .app-chooser-option-copy {
+      color: var(--muted);
+    }
+
+    .app-chooser-option.education .app-chooser-option-icon {
+      background: #fff;
+      color: #5d1678;
+      border: 1px solid var(--border);
+    }
+
+    .app-chooser-signout {
+      width: 100%;
+      max-width: 342px;
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      background: #fff;
+      color: #5d1678;
+      border-color: var(--border);
+    }
+
+    .app-chooser-identity {
+      width: 100%;
+      max-width: 342px;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      background: #fff;
+      box-shadow: 0 14px 30px rgba(12, 14, 20, 0.08);
+      padding: 12px 14px 12px;
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .app-chooser-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      position: relative;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #f4d9ca 0%, #d6ad98 100%);
+      color: #5d1678;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.55);
+    }
+
+    .app-chooser-avatar-badge {
+      position: absolute;
+      right: 2px;
+      bottom: 2px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #1f2024;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      box-shadow: 0 4px 10px rgba(12, 14, 20, 0.2);
+    }
+
+    .app-chooser-name {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #1f2024;
+    }
+
+    .app-chooser-role {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .auth-shell {
+      position: relative;
+      padding: 18px 0 0;
+      display: grid;
+      gap: 14px;
+      min-height: 690px;
+    }
+
+    .auth-shell::before,
+    .auth-shell::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .auth-shell::before {
+      width: 210px;
+      height: 210px;
+      right: -84px;
+      top: -30px;
+      background: rgba(207, 45, 129, 0.12);
+      filter: blur(4px);
+    }
+
+    .auth-shell::after {
+      width: 260px;
+      height: 260px;
+      left: -120px;
+      bottom: -110px;
+      background: rgba(74, 144, 226, 0.08);
+      filter: blur(2px);
+    }
+
+    .auth-shell > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .auth-shell-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      align-self: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #f0f9ea;
+      color: #4f6a4b;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .auth-shell-brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .auth-shell-card {
+      max-width: 384px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 22px 18px 18px;
+      border-radius: 28px;
+      background: var(--surface);
+      border: 1px solid rgba(214, 216, 223, 0.9);
+      box-shadow: 0 26px 60px rgba(12, 14, 20, 0.12);
+    }
+
+    .auth-shell-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .auth-shell-copy {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .auth-shell-microcopy {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: center;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .auth-shell-note {
+      margin: 10px 0 0;
+      color: #51606d;
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .auth-shell-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(214, 216, 223, 0.95), transparent);
+      margin: 8px 0 2px;
+    }
+
+    .auth-shell-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .auth-shell-actions button,
+    .auth-shell-actions a {
+      width: 100%;
+    }
+
+    .auth-shell-actions button.secondary {
+      background: #f7f8fc;
+      color: var(--accent);
+      border-color: var(--border);
+    }
+
+    .auth-shell-inputs {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .auth-shell-list {
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+    }
+
+    .auth-shell-list li {
+      position: relative;
+      padding-left: 18px;
+      color: #51606d;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .auth-shell-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 7px;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+
+    .auth-shell-status {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .auth-shell-status span {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      background: #f7f8fc;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .auth-shell-auth {
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      min-height: 690px;
+    }
+
+    .auth-logo {
+      width: 156px;
+      height: 40px;
+      object-fit: contain;
+      object-position: center;
+    }
+
+    .auth-card-auth {
+      max-width: 300px;
+      width: 100%;
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      display: grid;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .auth-shell-auth .auth-card-auth {
+      max-width: 342px;
+      padding: 16px;
+      gap: 16px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .auth-card-auth--sent {
+      gap: 14px;
+      padding-top: 8px;
+    }
+
+    .auth-card-copy {
+      margin-top: -2px;
+      font-size: 12px;
+      color: #7a7d84;
+    }
+
+    .auth-auth-inputs {
+      margin-top: 4px;
+      gap: 8px;
+    }
+
+    .auth-input {
+      min-height: 34px;
+      border-radius: 10px;
+      background: #fff;
+      border-color: #dbdee5;
+      font-size: 12px;
+      color: #1f2024;
+    }
+
+    .auth-input::placeholder {
+      color: #b2b5bb;
+      opacity: 1;
+    }
+
+    .auth-auth-actions {
+      gap: 6px;
+      margin-top: 4px;
+      justify-content: center;
+    }
+
+    .auth-shell-auth .auth-auth-inputs {
+      margin-top: 0;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .auth-shell-auth .field {
+      margin: 0;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-shell-auth .field-label {
+      text-align: center;
+      width: 100%;
+    }
+
+    .auth-shell-auth .input {
+      text-align: center;
+    }
+
+    .auth-shell-auth .auth-shell-actions {
+      margin-top: auto;
+      padding-top: 8px;
+      gap: 12px;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-shell-auth .auth-auth-actions button,
+    .auth-shell-auth .button-inline {
+      width: 342px;
+    }
+
+    .auth-shell-auth .auth-code-grid {
+      width: 100%;
+      margin-top: 0;
+    }
+
+    .auth-shell-auth .auth-code-input {
+      min-height: 55px;
+      border-radius: 12px;
+    }
+
+    .auth-login-actions {
+      justify-items: center;
+    }
+
+    .auth-login-shell {
+      padding-top: 0;
+      gap: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 690px;
+    }
+
+    .auth-login-shell .auth-card-auth {
+      max-width: 342px;
+      padding: 16px;
+      gap: 16px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .auth-login-shell .auth-auth-inputs {
+      margin-top: 0;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .auth-login-shell .field {
+      margin: 0;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-login-shell .field-label {
+      text-align: center;
+      width: 100%;
+    }
+
+    .auth-login-shell .input {
+      text-align: center;
+    }
+
+    .auth-login-shell .auth-shell-actions {
+      margin-top: auto;
+      padding-top: 8px;
+      gap: 12px;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-login-shell .auth-forgot-link {
+      width: 100%;
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      margin-top: 2px;
+      border: none;
+    }
+
+    .auth-login-shell .auth-shell-copy {
+      margin-top: 0;
+    }
+
+    .auth-auth-actions button {
+      width: 100%;
+    }
+
+    .auth-login-actions button {
+      width: 342px;
+    }
+
+    .auth-login-actions .ghost {
+      border: none;
+    }
+
+    .auth-code-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .auth-code-input {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid #dbdee5;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      background: #fff;
+      color: #1f2024;
+    }
+
+    .auth-code-input.active {
+      border-color: #8b3aa9;
+      box-shadow: 0 0 0 1px rgba(139, 58, 169, 0.18);
+    }
+
     .chooser-card {
       max-width: 392px;
       width: 100%;
@@ -221,8 +858,8 @@
     }
 
     .chooser-option.portfolio {
-      background: var(--accent);
-      border-color: var(--accent);
+      background: linear-gradient(180deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
+      border-color: var(--btn-primary-end);
       color: #fff;
     }
 
@@ -282,33 +919,47 @@
 
     button {
       border: 1px solid transparent;
-      border-radius: 14px;
-      min-height: 40px;
-      padding: 0 14px;
+      border-radius: var(--btn-radius);
+      min-height: var(--btn-height);
+      padding: 0 var(--btn-padding-x);
       font-weight: 800;
       cursor: pointer;
       font-size: 13px;
       transition: 0.2s ease;
-      background: var(--accent);
+      background: linear-gradient(180deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
       color: #fff;
     }
 
     button:hover { transform: translateY(-1px); }
-    button.secondary { background: #f3ecf8; color: var(--accent); border-color: #dfcaec; }
-    button.ghost { background: transparent; color: var(--accent); border-color: var(--border); }
+    button.secondary { background: #f3ecf8; color: #5d1678; border-color: #e0d1ea; }
+    button.ghost { background: transparent; color: #5d1678; border-color: #d9dde4; }
     button.warn { background: var(--warning); color: #1f1400; }
+
+    .button-inline {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 var(--btn-padding-x);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .button-inline.gray {
+      background: #eeeeef;
+      color: #7d7f84;
+      border-color: #eeeeef;
+    }
 
     .banner {
       border-radius: 14px;
-      border: 1px solid #e8cad9;
-      background: var(--accent-soft);
+      border: 1px solid #dde0e7;
+      background: #fff;
       padding: 10px 12px;
       font-size: 12px;
       line-height: 1.45;
     }
 
-    .banner.success { background: #e7f8ee; border-color: #c3e7d0; }
-    .banner.warning { background: #fff4de; border-color: #f1cb86; }
+    .banner.success { background: #edf9ef; border-color: #d1ead5; }
+    .banner.warning { background: #fff; border-color: #dde0e7; }
     .banner.error { background: #feeceb; border-color: #f3b3ad; }
 
     .stats {
@@ -318,7 +969,7 @@
     }
 
     #view-dashboard {
-      gap: 16px;
+      gap: 14px;
     }
 
     #view-dashboard .stats {
@@ -337,164 +988,6 @@
       flex: 0 1 180px;
     }
 
-    .notifications {
-      display: grid;
-      gap: 8px;
-    }
-
-    .notification-summary {
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      padding: 10px 12px;
-      display: grid;
-      gap: 5px;
-      background: #fff;
-      cursor: pointer;
-    }
-
-    .notification-summary.success {
-      background: #e7f8ee;
-      border-color: #c3e7d0;
-    }
-
-    .notification-summary.warning {
-      background: #fff4de;
-      border-color: #f1cb86;
-    }
-
-    .notification-summary.info {
-      background: var(--accent-soft);
-      border-color: #e1cbe8;
-    }
-
-    .notification-summary-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .notification-count {
-      min-width: 28px;
-      border-radius: 999px;
-      border: 1px solid var(--accent);
-      background: #fff;
-      color: var(--accent);
-      font-size: 11px;
-      font-weight: 900;
-      line-height: 1;
-      text-align: center;
-      padding: 4px 6px;
-    }
-
-    .notification-cycle-title {
-      margin: 0;
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--text);
-    }
-
-    .notification-hint {
-      margin: 0;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--accent);
-    }
-
-    .notification {
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      padding: 10px 12px;
-      display: grid;
-      gap: 4px;
-      background: #fff;
-    }
-
-    .notification.success {
-      background: #e7f8ee;
-      border-color: #c3e7d0;
-    }
-
-    .notification.warning {
-      background: #fff4de;
-      border-color: #f1cb86;
-    }
-
-    .notification.info {
-      background: var(--accent-soft);
-      border-color: #e1cbe8;
-    }
-
-    .notification-title {
-      margin: 0;
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--text);
-    }
-
-    .notification-title-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .notification-bell {
-      font-size: 16px;
-      line-height: 1;
-    }
-
-    .notification-alert-mark {
-      color: var(--danger);
-      font-size: 18px;
-      line-height: 1;
-      font-weight: 900;
-    }
-
-    .notification-success-mark {
-      color: var(--success);
-      font-size: 18px;
-      line-height: 1;
-      font-weight: 900;
-    }
-
-    .notification-copy {
-      margin: 0;
-      font-size: 12px;
-      line-height: 1.4;
-      color: var(--muted);
-    }
-
-    .notification-action {
-      margin-top: 4px;
-      width: 120px;
-      min-height: 36px;
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .notification-actions-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 4px;
-      flex-wrap: wrap;
-    }
-
-    .sync-all-inline {
-      background: #f4f4f4;
-      color: #8a8f98;
-      border-color: #d8dde4;
-      cursor: not-allowed;
-    }
-
-    .sync-all-inline.enabled {
-      background: #ffca80;
-      color: #5f3900;
-      border-color: #e9a949;
-      cursor: pointer;
-    }
-
     .button-row.settings-actions {
       justify-content: center;
       align-items: center;
@@ -503,10 +996,10 @@
     }
 
     .button-row.settings-actions button {
-      min-height: 52px;
+      min-height: var(--btn-height);
       min-width: 230px;
       flex: 0 1 280px;
-      font-size: 15px;
+      font-size: 13px;
     }
 
     .stat {
@@ -515,6 +1008,205 @@
       background: #fff;
       padding: 10px;
       min-height: 80px;
+    }
+
+    #view-dashboard {
+      display: grid;
+      gap: 15px;
+      align-content: start;
+      justify-items: stretch;
+    }
+
+    .sync-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid #dde0e7;
+      background: #fff;
+    }
+
+    .sync-card-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .sync-card-check {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: #eaf7ed;
+      color: #2d8a4a;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+
+    .sync-card-copy {
+      min-width: 0;
+    }
+
+    .sync-card-copy .row-title {
+      font-size: 13px;
+    }
+
+    .sync-card-copy .row-sub {
+      font-size: 11px;
+    }
+
+    .dashboard-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 2px;
+    }
+
+    #view-dashboard #nextActionButton {
+      min-width: 118px;
+    }
+
+    #view-dashboard #dashboardAddNewButton {
+      min-width: 118px;
+    }
+
+    .entries-card,
+    .progress-card {
+      border: 1px solid #dde0e7;
+      border-radius: 14px;
+      background: #fff;
+      padding: 16px;
+      width: 100%;
+    }
+
+    .entries-card .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 92px 56px;
+      column-gap: 14px;
+      padding: 11px 0;
+      min-height: 48px;
+      align-items: center;
+    }
+
+    .entry-chip {
+      border: 1px solid #7a7d84;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #44474d;
+      background: #fff;
+    }
+
+    .entry-date {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #1f2024;
+      text-align: right;
+      justify-self: end;
+    }
+
+    .entry-chip {
+      justify-self: end;
+    }
+
+    .entries-add-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+
+    .entries-add-row button {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 var(--btn-padding-x);
+      font-size: 13px;
+      background: linear-gradient(180deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
+      border-color: var(--btn-primary-end);
+      color: #fff;
+    }
+
+    .progress-card .title {
+      font-size: 14px;
+      line-height: 1.25;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .progress-card .progress-pie-card,
+    .progress-card .progress-trend-card {
+      background: transparent;
+      border: none;
+      padding: 0;
+    }
+
+    .progress-card .progress-layout {
+      justify-items: center;
+    }
+
+    .progress-card .progress-pie {
+      width: 128px;
+      height: 128px;
+    }
+
+    .progress-card .progress-pie-hole {
+      width: 80px;
+      height: 80px;
+    }
+
+    .progress-card .progress-pie-value {
+      font-size: 24px;
+      color: #6f1b8b;
+    }
+
+    .progress-card .progress-stats {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-top: 4px;
+    }
+
+    .progress-card .progress-stat {
+      border: none;
+      background: transparent;
+      padding: 0;
+      display: grid;
+      justify-items: center;
+      gap: 1px;
+      min-width: 96px;
+      text-align: center;
+    }
+
+    .progress-card .progress-stat-label {
+      font-size: 11px;
+      color: #6e727a;
+      font-weight: 500;
+    }
+
+    .progress-card .progress-stat-value {
+      font-size: 18px;
+      color: #1f2024;
+    }
+
+    .progress-card .progress-stat-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-bottom: 2px;
+      background: #d8dce3;
+    }
+
+    .progress-card .progress-stat-dot.primary {
+      background: #6f1b8b;
     }
 
     .stat-value { margin: 0 0 4px; font-size: 22px; font-weight: 900; letter-spacing: -0.04em; }
@@ -534,6 +1226,160 @@
     .row-title { margin: 0 0 2px; font-size: 13px; font-weight: 800; }
     .row-sub { margin: 0; font-size: 12px; color: var(--muted); }
 
+    .all-entries-shell {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .all-entries-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .all-entries-toolbar .button-inline {
+      min-width: 94px;
+      min-height: var(--btn-height);
+    }
+
+    .all-entries-shell .copy {
+      margin: 2px 0 0;
+    }
+
+    .all-entries-summary {
+      border: 1px solid #dedee8;
+      border-radius: 14px;
+      background: #f2edf8;
+      color: #4e4560;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+
+    .all-entries-list {
+      border: 1px solid #e2e4eb;
+      border-radius: 14px;
+      background: #fff;
+      overflow: hidden;
+      max-height: 562px;
+      overflow-y: auto;
+    }
+
+    .all-entries-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 11px 12px 10px;
+      min-height: 58px;
+      border-bottom: 1px solid #edeff5;
+      align-items: center;
+      background: #fff;
+    }
+
+    .all-entries-side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .all-entries-view {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 var(--btn-padding-x);
+      border: 1px solid #ccb8df;
+      background: #f5edff;
+      color: #5f2578;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .all-entries-view:hover {
+      background: #ecdfff;
+    }
+
+    .all-entries-item:last-child {
+      border-bottom: none;
+    }
+
+    .all-entries-main {
+      min-width: 0;
+    }
+
+    .all-entries-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      color: #222429;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .all-entries-meta {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: #666b76;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .all-entries-type {
+      border: 1px solid #d8c8e8;
+      border-radius: 999px;
+      background: #f7f0ff;
+      color: #632080;
+      padding: 4px 9px;
+      min-width: 76px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .entry-sync-status {
+      border: 1px solid #d3d7de;
+      border-radius: 999px;
+      background: #f7f8fa;
+      color: #6a707a;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .entry-sync-status.synced {
+      border-color: #c8e8d1;
+      background: #edf9f1;
+      color: #277846;
+    }
+
+    .entry-sync-status.queued {
+      border-color: #f1cb86;
+      background: #fff4de;
+      color: #7d5200;
+    }
+
+    .entry-sync-status.draft {
+      border-color: #d8c8e8;
+      background: #f7f0ff;
+      color: #632080;
+    }
+
     .status { font-size: 11px; text-transform: uppercase; font-weight: 900; letter-spacing: 0.07em; color: var(--accent); }
     .status.ok { color: var(--success); }
     .status.queue { color: var(--warning); }
@@ -546,6 +1392,78 @@
 
     #view-entry-detail {
       gap: 14px;
+    }
+
+    #view-view-entry {
+      gap: 14px;
+    }
+
+    .view-entry-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .view-entry-lock {
+      border: 1px solid #d8c8e8;
+      border-radius: 999px;
+      background: #f7f0ff;
+      color: #632080;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      line-height: 1;
+    }
+
+    .view-entry-meta {
+      gap: 8px;
+    }
+
+    .view-entry-facts {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .view-entry-fact {
+      border: 1px solid #dddfea;
+      border-radius: 999px;
+      background: #f7f8fc;
+      color: #545b67;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .view-entry-fact.status-synced {
+      border-color: #c8e8d1;
+      background: #edf9f1;
+      color: #277846;
+      text-transform: uppercase;
+    }
+
+    .view-entry-fact.status-queued {
+      border-color: #f1cb86;
+      background: #fff4de;
+      color: #7d5200;
+      text-transform: uppercase;
+    }
+
+    .view-entry-fields .detail-field-value {
+      color: #4f5663;
+      font-weight: 600;
+    }
+
+    .view-entry-actions {
+      justify-content: center;
     }
 
     .detail-meta {
@@ -721,10 +1639,10 @@
     }
 
     .next-action-card {
-      border: 1px solid #dfcaec;
+      border: 1px solid #dde0e7;
       border-radius: 18px;
       padding: 14px;
-      background: linear-gradient(180deg, #fff, #faf6fd);
+      background: linear-gradient(180deg, #fff, #fbfbfd);
       display: grid;
       gap: 10px;
     }
@@ -735,7 +1653,7 @@
       font-weight: 900;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: #6f1b8b;
     }
 
     .next-action-title {
@@ -743,14 +1661,38 @@
       font-size: 18px;
       font-weight: 900;
       letter-spacing: -0.02em;
-      color: var(--text);
+      color: #1f2024;
     }
 
     .next-action-copy {
       margin: 0;
       font-size: 13px;
       line-height: 1.45;
-      color: var(--muted);
+      color: #656a72;
+    }
+
+    .dashboard-greeting {
+      display: grid;
+      gap: 10px;
+    }
+
+    .dashboard-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .dashboard-actions-row button {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 14px;
+      font-size: 13px;
+    }
+
+    .dashboard-actions-row .button-inline {
+      border-radius: 10px;
     }
 
     .user-type-selector {
@@ -1003,113 +1945,208 @@
   <div class="page">
     <section class="phone">
       <div class="screen">
-        <div class="header">
+        <div id="globalConnectionPill" class="connection-pill online global-connection-pill"><span class="dot"></span><span>Online</span></div>
+
+        <div class="header hidden">
           <img class="logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
-          <div id="connectionPill" class="connection-pill online"><span class="dot"></span><span>Online</span></div>
+          <div class="connection-pill online"><span class="dot"></span><span>Online</span></div>
         </div>
 
         <div id="view-login" class="view">
-          <div class="chooser-hero" style="margin-bottom:2px;">
-            <img class="logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
-            <p class="chooser-eyebrow">Log in</p>
-            <h1 class="title chooser-title">Welcome to the FourteenFish Portfolio</h1>
-            <p class="copy chooser-copy">Sign in to sync your Portfolio and add entries.</p>
-          </div>
-          <div class="card">
-            <div class="field">
-              <p class="field-label">Email</p>
-              <input id="emailInput" class="input" value="lee@example.com" />
+          <div class="auth-shell auth-shell-auth auth-login-shell chooser-enter">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Welcome!</h1>
+              <div class="auth-shell-inputs auth-auth-inputs">
+                <div class="field">
+                  <input id="emailInput" class="input auth-input" placeholder="Email Address" value="lee@example.com" />
+                </div>
+                <div class="field">
+                  <input class="input auth-input" type="password" placeholder="Password" value="password123" />
+                </div>
+                <button class="ghost button-inline auth-forgot-link" data-nav="recover-account">Forgot password?</button>
+              </div>
             </div>
-            <div class="field">
-              <p class="field-label">Password</p>
-              <input class="input" type="password" value="password123" />
-            </div>
-            <div class="button-row">
-              <button data-nav="otp">Sign in</button>
+            <div class="auth-shell-actions auth-auth-actions auth-login-actions">
+              <button class="button-inline" data-nav="otp">Login</button>
             </div>
           </div>
         </div>
 
         <div id="view-otp" class="view hidden">
-          <div class="chooser-hero" style="margin-bottom:2px;">
-            <img class="logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
-            <p class="chooser-eyebrow">Authentication</p>
-            <h1 class="title chooser-title">Verify one-time code</h1>
-            <p class="copy chooser-copy">Enter the 6-digit OTP sent to your device.</p>
-          </div>
-          <div class="card">
-            <div class="field">
-              <p class="field-label">OTP</p>
-              <input id="otpInput" class="input" value="123456" maxlength="6" />
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Enter confirmation code</h1>
+              <p class="auth-shell-copy auth-card-copy">A 4-digit code was sent to johnsmith@email.com</p>
+              <div class="auth-code-grid" aria-label="Confirmation code digits">
+                <input class="auth-code-input" value="1" maxlength="1" />
+                <input class="auth-code-input active" value="" maxlength="1" />
+                <input class="auth-code-input" value="" maxlength="1" />
+                <input class="auth-code-input" value="" maxlength="1" />
+              </div>
             </div>
-            <div class="button-row">
-              <button data-nav="app-chooser">Verify</button>
-              <button class="ghost" data-nav="login">Back to login</button>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="app-chooser">Submit</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-recover-account" class="view hidden">
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Forgot your password?</h1>
+              <p class="auth-shell-copy auth-card-copy">Enter your email address below and we’ll send you password reset instructions.</p>
+              <div class="auth-shell-inputs auth-auth-inputs">
+                <div class="field">
+                  <input class="input auth-input" placeholder="Email Address" value="lee@example.com" />
+                </div>
+              </div>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="password-reset-sent">Submit</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-password-reset" class="view hidden">
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Set a new password</h1>
+              <div class="auth-shell-inputs auth-auth-inputs">
+                <div class="field">
+                  <input class="input auth-input" type="password" placeholder="New password" value="new-password-1" />
+                </div>
+                <div class="field">
+                  <input class="input auth-input" type="password" placeholder="Confirm new password" value="new-password-1" />
+                </div>
+              </div>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="password-reset-sent">Submit</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-password-reset-sent" class="view hidden">
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth auth-card-auth--sent">
+              <h1 class="auth-shell-title">Password reset complete</h1>
+              <p class="auth-shell-copy auth-card-copy">Your password has been reset successfully. You can now log in using your new password.</p>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="login">Log on</button>
             </div>
           </div>
         </div>
 
         <div id="view-app-chooser" class="view hidden">
-          <div class="chooser-hero">
-            <h1 class="title chooser-title">Where would you like to continue?</h1>
-            <p class="copy chooser-copy">Choose Portfolio to continue in app, or Education to open the FourteenFish web app.</p>
-          </div>
-          <div class="card chooser-card">
-            <div class="chooser-options">
-              <button class="chooser-option portfolio" data-nav="dashboard">
-                <p class="chooser-option-title">Portfolio</p>
-                <p class="chooser-option-copy">Continue your in-app portfolio workflow.</p>
-              </button>
-              <button id="openEducationButton" class="chooser-option education">
-                <p class="chooser-option-title">Education</p>
-                <p class="chooser-option-copy">Open FourteenFish Education in your browser.</p>
-              </button>
+          <div class="auth-shell app-chooser-shell chooser-enter">
+            <div class="auth-shell-card app-chooser-card">
+              <h1 class="auth-shell-title">Where would you like to continue?</h1>
+              <p class="auth-shell-copy">Choose Portfolio to continue in app, or Education to open the FourteenFish web app.</p>
+
+              <div class="app-chooser-identity">
+                <div class="app-chooser-avatar">
+                  RJ
+                  <div class="app-chooser-avatar-badge">✎</div>
+                </div>
+                <div>
+                  <p class="app-chooser-name">Robert Jones</p>
+                  <p class="app-chooser-role">Practice Manager</p>
+                </div>
+              </div>
+
+              <div class="app-chooser-options">
+                <button class="app-chooser-option portfolio" data-nav="dashboard">
+                  <span class="app-chooser-option-icon">▣</span>
+                  <span class="app-chooser-option-copy-wrap">
+                    <p class="app-chooser-option-title">Portfolio</p>
+                    <p class="app-chooser-option-copy">Work on your Appraisal or Training Portfolio any time, anywhere.</p>
+                  </span>
+                </button>
+
+                <button id="openEducationButton" class="app-chooser-option education">
+                  <span class="app-chooser-option-icon">🎓</span>
+                  <span class="app-chooser-option-copy-wrap">
+                    <p class="app-chooser-option-title">Education</p>
+                    <p class="app-chooser-option-copy">Do your learning in your own time, whenever it suits you.</p>
+                  </span>
+                </button>
+              </div>
             </div>
-            <button class="ghost chooser-signout" data-nav="login" style="margin-top:10px; width:100%;">Sign out</button>
           </div>
         </div>
 
         <div id="view-dashboard" class="view hidden">
-          <div class="header" style="align-items:center;">
-            <div>
-              <p class="copy" style="margin:0; font-weight:700; color:var(--accent);">Portfolio app</p>
-            </div>
-            <img class="logo micro" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
-          </div>
-
-          <div id="offlineBanner" class="banner warning hidden">You are offline. New entries will be queued and synced when online.</div>
-
-          <div class="next-action-card">
-            <p class="next-action-eyebrow">Next best action</p>
-            <p id="nextActionTitle" class="next-action-title">Sync your pending notifications</p>
-            <p id="nextActionCopy" class="next-action-copy">2 notifications still need action. Clearing them will keep your dashboard tidy and move you closer to up to date.</p>
-            <div class="button-row">
-              <button id="nextActionButton">Go to notifications</button>
-              <button class="ghost" data-nav="new-entry">+ New entry</button>
+          <div class="dashboard-header">
+            <div class="dashboard-title-wrap">
+              <button class="dashboard-menu" aria-label="Open menu">≡</button>
+              <h1 class="dashboard-title">Portfolio</h1>
             </div>
           </div>
 
-          <div class="card">
-            <h2 class="title" style="font-size:22px; margin:0 0 6px 0;">Portfolio progress</h2>
-            <p id="progressIntroCopy" class="copy" style="margin-top:0;">Track your progress across the portfolio with entry totals and outstanding appraisal actions.</p>
+          <div id="offlineBanner" class="dashboard-top-actions">
+            <button class="button-inline" id="nextActionButton">All entries</button>
+            <button class="button-inline" id="dashboardAddNewButton" data-nav="new-entry">✎ Add new</button>
+          </div>
+
+          <div class="entries-card">
+            <h2 class="title" style="font-size:18px; margin:0 0 8px 0;">Recent entries</h2>
+            <div class="row">
+              <p class="row-title">Training course</p>
+              <p class="entry-date">26/06/26</p>
+              <span class="entry-chip">CPD</span>
+            </div>
+            <div class="row">
+              <p class="row-title">Training video</p>
+              <p class="entry-date">03/05/26</p>
+              <span class="entry-chip">CPD</span>
+            </div>
+            <div class="row">
+              <p class="row-title">Event</p>
+              <p class="entry-date">01/05/26</p>
+              <span class="entry-chip">CPD</span>
+            </div>
+          </div>
+
+          <div class="progress-card">
+            <h2 class="title">Entries recorded since 21/03/2025</h2>
             <div class="progress-layout">
               <div class="progress-pie-card">
-                <p class="row-title" style="margin:0;">Total entries added</p>
                 <div id="progressPie" class="progress-pie">
                   <div class="progress-pie-hole">
-                    <p id="progressPieValue" class="progress-pie-value">26</p>
-                    <p id="progressPieMeta" class="progress-pie-meta">of 40</p>
+                    <p id="progressPieValue" class="progress-pie-value">71%</p>
                   </div>
                 </div>
-                <p id="progressPieCaption" class="copy" style="margin:0;">65% of current portfolio goal</p>
               </div>
-
-              <div class="progress-trend-card">
-                <p id="progressSummaryTitle" class="row-title" style="margin:0;">Appraisal progress summary</p>
-                <p id="progressDueDateText" class="copy" style="margin:0;">60 days until due date</p>
-                <div id="progressOutstandingList" class="progress-outstanding-list"></div>
+              <div class="progress-stats">
+                <div class="progress-stat">
+                  <span class="progress-stat-dot"></span>
+                  <p class="progress-stat-value">38</p>
+                  <p class="progress-stat-label">Hours remaining</p>
+                </div>
+                <div class="progress-stat">
+                  <span class="progress-stat-dot primary"></span>
+                  <p class="progress-stat-value">150</p>
+                  <p class="progress-stat-label">Hours logged</p>
+                </div>
               </div>
             </div>
+          </div>
+
+          <div class="hidden">
+            <p id="progressIntroCopy">Track your progress across the portfolio with entry totals and outstanding appraisal actions.</p>
+            <p id="progressSummaryTitle">Appraisal progress summary</p>
+            <p id="progressDueDateText">60 days until due date</p>
+            <p id="progressPieMeta">of 40</p>
+            <p id="progressPieCaption">65% of current portfolio goal</p>
+            <div id="progressOutstandingList"></div>
+            <p id="nextActionTitle">Review your queued entries</p>
+            <p id="nextActionCopy">Entries created while offline will appear here and can be synced from All entries.</p>
           </div>
 
         </div>
@@ -1135,18 +2172,6 @@
           </div>
         </div>
 
-        <div id="view-notifications" class="view hidden">
-          <h1 class="title">Notifications</h1>
-          <p class="copy">All current notifications for your portfolio activity.</p>
-          <div class="button-row" style="justify-content:flex-end; margin-top:2px;">
-            <button id="clearReadButton" class="ghost">Clear</button>
-          </div>
-          <div id="notificationsList" class="notifications"></div>
-          <div class="button-row">
-            <button class="ghost" data-nav="dashboard">Back</button>
-          </div>
-        </div>
-
         <div id="view-entry-detail" class="view hidden">
           <h1 class="title">Entry detail</h1>
           <div class="detail-meta">
@@ -1156,9 +2181,33 @@
           </div>
           <div id="entryDetailFields"></div>
           <div class="button-row detail-actions">
-            <button>Submit</button>
-            <button class="secondary">Save as draft</button>
+            <button id="submitEntryButton">Submit</button>
+            <button id="saveDetailDraftButton" class="secondary">Save as draft</button>
+            <button id="cancelEntryButton" class="warn">Cancel entry</button>
             <button data-nav="dashboard">Back to dashboard</button>
+          </div>
+        </div>
+
+        <div id="view-view-entry" class="view hidden">
+          <div class="view-entry-head">
+            <h1 class="title">View entry</h1>
+          </div>
+          <div class="detail-meta view-entry-meta">
+            <p class="detail-kicker">Form type</p>
+            <p class="detail-type" id="viewEntryType">Learning event reflection</p>
+            <p class="detail-subtitle" id="viewEntrySubtitle">Completed entry.</p>
+            <div class="view-entry-facts">
+              <span class="view-entry-lock">Read only</span>
+              <span id="viewEntryDateChip" class="view-entry-fact">Date</span>
+              <span id="viewEntryStatusChip" class="view-entry-fact status-synced">Synced</span>
+              <span id="viewEntryCategoryChip" class="view-entry-fact">Type</span>
+            </div>
+          </div>
+          <div id="viewEntryFields" class="view-entry-fields"></div>
+          <div class="button-row detail-actions view-entry-actions">
+            <button id="submitViewedEntryButton">Submit</button>
+            <button id="editViewedEntryButton">Edit entry</button>
+            <button class="secondary" data-nav="all-entries">Back to all entries</button>
           </div>
         </div>
 
@@ -1174,22 +2223,14 @@
         </div>
 
         <div id="view-all-entries" class="view hidden">
-          <div class="chooser-hero">
-            <img class="logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
-            <h1 class="title chooser-title">All entries</h1>
-          </div>
-          <div class="card chooser-card">
-            <div class="banner warning">you're now leaving the fourteenfish app and this will open fourteenfish in your browser</div>
-            <div class="chooser-options" style="margin-top:10px;">
-              <button id="continueAllEntriesButton" class="chooser-option portfolio">
-                <p class="chooser-option-title">Continue to browser</p>
-                <p class="chooser-option-copy">Open All entries in your FourteenFish browser experience.</p>
-              </button>
-              <button class="chooser-option education" data-nav="dashboard">
-                <p class="chooser-option-title">Back to Portfolio</p>
-                <p class="chooser-option-copy">Return to your in-app Portfolio dashboard.</p>
-              </button>
+          <div class="all-entries-shell">
+            <h1 class="title" style="font-size:30px;">All entries</h1>
+            <p class="copy">Your 50 most recent portfolio entries.</p>
+            <div class="all-entries-toolbar">
+              <div class="all-entries-summary" id="allEntriesSummary">Showing 50 of 50 entries</div>
+              <button id="syncAllEntriesButton" class="button-inline secondary">Sync all</button>
             </div>
+            <div id="allEntriesList" class="all-entries-list"></div>
           </div>
         </div>
 
@@ -1197,7 +2238,6 @@
           <button class="tab" data-nav="dashboard" data-tab="dashboard">Portfolio</button>
           <button class="tab" data-nav="new-entry" data-tab="new-entry">+ New entry</button>
           <button class="tab" data-nav="all-entries" data-tab="all-entries">All entries</button>
-          <button class="tab" data-nav="notifications" data-tab="notifications">Notifications <span id="notificationsTabBadge" class="tab-badge hidden">0</span></button>
           <button class="tab" data-nav="settings" data-tab="settings">Settings</button>
           <button class="tab" data-nav="education" data-tab="education">Education</button>
         </div>
@@ -1223,7 +2263,7 @@
 
       <div class="banner">
         Flow includes:
-        login -> OTP -> app chooser -> dashboard -> all entries -> new entry -> entry detail -> queue replay -> settings.
+        login -> OTP -> app chooser -> dashboard -> all entries -> view entry -> new entry -> entry detail -> settings.
       </div>
     </aside>
   </div>
@@ -1254,11 +2294,14 @@
 
     const routes = [
       'login',
+      'recover-account',
+      'password-reset',
+      'password-reset-sent',
       'otp',
       'app-chooser',
       'dashboard',
       'all-entries',
-      'notifications',
+      'view-entry',
       'new-entry',
       'entry-detail',
       'settings',
@@ -1268,24 +2311,66 @@
       route: 'login',
       online: true,
       queue: [],
-      dismissedReadNotifications: [],
       lastEntryStatus: 'synced',
       signedInEmail: 'lee@example.com',
       userType: 'gp-appraisal',
       currentEntryTitle: 'Learning event reflection',
+      currentViewedEntryIndex: 0,
+      currentEditingEntryIndex: null,
+      pendingEntrySnapshot: null,
       totalEntries: 26,
-      notificationEntries: [
-        { title: 'Safeguarding reflection', status: 'synced', updatedAt: '2h ago' },
-        { title: 'New patient interaction', status: 'synced', updatedAt: '10m ago' },
-        { title: 'Clinical supervision note', status: 'synced', updatedAt: 'Yesterday' },
-        { title: 'Prescribing audit', status: 'synced', updatedAt: '2d ago' },
-        { title: 'Significant event review', status: 'queued', updatedAt: '3d ago' },
-        { title: 'CPD webinar reflection', status: 'synced', updatedAt: '4d ago' },
-        { title: 'Team feedback summary', status: 'synced', updatedAt: '5d ago' },
-        { title: 'Appraisal preparation note', status: 'queued', updatedAt: '6d ago' },
-      ],
       entriesLast30Days: Array.from({ length: 30 }, (_, index) => (index % 6 === 0 ? 2 : index % 5 === 0 ? 1 : 0)),
+      allEntries: [],
     };
+
+    function createRecentEntries(seedCount = 50) {
+      const types = ['CPD', 'Reflection', 'Event', 'Audit', 'Feedback'];
+      const titles = [
+        'Learning event reflection',
+        'Training course',
+        'Clinical case reflection',
+        'Quality improvement activity',
+        'Team feedback summary',
+        'Appraisal preparation note',
+        'Significant event review',
+        'CPD webinar reflection',
+      ];
+
+      const today = new Date();
+      return Array.from({ length: seedCount }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - index * 2);
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yy = String(date.getFullYear()).slice(-2);
+        const status = index < 2 ? 'queued' : 'synced';
+        return {
+          title: titles[index % titles.length],
+          type: types[index % types.length],
+          date: `${dd}/${mm}/${yy}`,
+          status,
+        };
+      });
+    }
+
+    function parseEntryDate(dateText) {
+      const [day, month, year] = String(dateText || '').split('/').map((part) => Number(part));
+      if (!day || !month || Number.isNaN(year)) {
+        return Number.NEGATIVE_INFINITY;
+      }
+
+      const fullYear = year >= 70 ? 1900 + year : 2000 + year;
+      return new Date(fullYear, month - 1, day).getTime();
+    }
+
+    function getEntriesSortedByDateDesc(entries) {
+      return [...entries].sort((left, right) => parseEntryDate(right.date) - parseEntryDate(left.date));
+    }
+
+    state.allEntries = createRecentEntries(50);
+    state.queue = state.allEntries
+      .filter((entry) => entry.status === 'queued')
+      .map((entry) => ({ title: entry.title, attempts: 1 }));
 
     const entryFormTemplates = {
       'Learning event reflection': [
@@ -1359,13 +2444,21 @@
     const viewMap = Object.fromEntries(routes.map((route) => [route, document.getElementById(`view-${route}`)]));
 
     const flowNav = document.getElementById('flowNav');
-    const connectionPill = document.getElementById('connectionPill');
+    const globalConnectionPill = document.getElementById('globalConnectionPill');
     const kpiRoute = document.getElementById('kpiRoute');
     const kpiQueue = document.getElementById('kpiQueue');
     const kpiNetwork = document.getElementById('kpiNetwork');
     const entryDetailType = document.getElementById('entryDetailType');
     const entryDetailFields = document.getElementById('entryDetailFields');
     const entryDetailSubtitle = document.getElementById('entryDetailSubtitle');
+    const viewEntryType = document.getElementById('viewEntryType');
+    const viewEntrySubtitle = document.getElementById('viewEntrySubtitle');
+    const viewEntryFields = document.getElementById('viewEntryFields');
+    const submitViewedEntryButton = document.getElementById('submitViewedEntryButton');
+    const editViewedEntryButton = document.getElementById('editViewedEntryButton');
+    const viewEntryDateChip = document.getElementById('viewEntryDateChip');
+    const viewEntryStatusChip = document.getElementById('viewEntryStatusChip');
+    const viewEntryCategoryChip = document.getElementById('viewEntryCategoryChip');
     const offlineBanner = document.getElementById('offlineBanner');
     const progressPie = document.getElementById('progressPie');
     const progressPieValue = document.getElementById('progressPieValue');
@@ -1378,18 +2471,12 @@
     const nextActionTitle = document.getElementById('nextActionTitle');
     const nextActionCopy = document.getElementById('nextActionCopy');
     const nextActionButton = document.getElementById('nextActionButton');
-    const notificationSummary = document.getElementById('notificationSummary');
-    const notificationCount = document.getElementById('notificationCount');
-    const notificationCurrentTitle = document.getElementById('notificationCurrentTitle');
-    const notificationCurrentBody = document.getElementById('notificationCurrentBody');
-    const notificationsList = document.getElementById('notificationsList');
-    const clearReadButton = document.getElementById('clearReadButton');
+    const allEntriesList = document.getElementById('allEntriesList');
+    const allEntriesSummary = document.getElementById('allEntriesSummary');
+    const syncAllEntriesButton = document.getElementById('syncAllEntriesButton');
     const openEducationButton = document.getElementById('openEducationButton');
-    const continueAllEntriesButton = document.getElementById('continueAllEntriesButton');
     const myAccountButton = document.getElementById('myAccountButton');
-    const notificationsTabBadge = document.getElementById('notificationsTabBadge');
     const educationUrl = 'https://www.fourteenfish.com/educationpackages';
-    const allEntriesUrl = 'https://www.fourteenfish.com/entries';
     const myAccountUrl = 'https://www.fourteenfish.com/account/myaccount';
     const appraisalDueDate = new Date('2026-09-26T00:00:00.000Z');
 
@@ -1465,6 +2552,11 @@
       render();
     }
 
+    function getCurrentViewedEntry() {
+      const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
+      return sortedEntries[state.currentViewedEntryIndex] || sortedEntries[0] || null;
+    }
+
     function renderEntryDetailFields() {
       const sections = entryFormTemplates[state.currentEntryTitle] || defaultEntryTemplate;
       entryDetailType.textContent = state.currentEntryTitle;
@@ -1498,11 +2590,6 @@
         wrapper.appendChild(sectionElement);
       });
 
-      const statusCard = document.createElement('div');
-      statusCard.className = 'card list';
-      statusCard.innerHTML = '<div class="row"><div><p class="row-title">Draft state</p><p class="row-sub">Preserved until sync</p></div><span id="draftState" class="status ok">synced</span></div>';
-      wrapper.appendChild(statusCard);
-
       entryDetailFields.innerHTML = '';
       entryDetailFields.appendChild(wrapper);
     }
@@ -1516,16 +2603,28 @@
       const remainingToGoal = Math.max(0, completionTarget - totalEntries);
       const progressProfile = getProgressProfile(state.userType);
 
-      progressPie.style.background = `conic-gradient(var(--accent) 0deg, var(--accent) ${completionPercent * 3.6}deg, #ebd9f1 ${completionPercent * 3.6}deg, #ebd9f1 360deg)`;
-      progressPieValue.textContent = String(totalEntries);
-      progressPieMeta.textContent = `of ${completionTarget}`;
-      progressPieCaption.textContent = `${completionPercent}% of current portfolio goal`;
-      progressSummaryTitle.textContent = progressProfile.summaryTitle;
-      progressIntroCopy.textContent = progressProfile.intro;
+      if (progressPie) {
+        progressPie.style.background = `conic-gradient(var(--accent) 0deg, var(--accent) ${completionPercent * 3.6}deg, #ebd9f1 ${completionPercent * 3.6}deg, #ebd9f1 360deg)`;
+      }
+      if (progressPieValue) {
+        progressPieValue.textContent = String(totalEntries);
+      }
+      if (progressPieMeta) {
+        progressPieMeta.textContent = `of ${completionTarget}`;
+      }
+      if (progressPieCaption) {
+        progressPieCaption.textContent = `${completionPercent}% of current portfolio goal`;
+      }
+      if (progressSummaryTitle) {
+        progressSummaryTitle.textContent = progressProfile.summaryTitle;
+      }
+      if (progressIntroCopy) {
+        progressIntroCopy.textContent = progressProfile.intro;
+      }
 
       const outstandingItems = [];
       if (state.queue.length > 0) {
-        outstandingItems.push(`Sync ${state.queue.length} pending entr${state.queue.length === 1 ? 'y' : 'ies'} from notifications.`);
+        outstandingItems.push(`Sync ${state.queue.length} pending entr${state.queue.length === 1 ? 'y' : 'ies'} from All entries.`);
       }
 
       if (remainingToGoal > 0) {
@@ -1540,181 +2639,137 @@
       const dueUtc = Date.UTC(appraisalDueDate.getUTCFullYear(), appraisalDueDate.getUTCMonth(), appraisalDueDate.getUTCDate());
       const daysUntilDue = Math.max(0, Math.ceil((dueUtc - nowUtc) / msPerDay));
 
-      progressDueDateText.textContent = `${daysUntilDue} days until ${progressProfile.dueLabel}`;
-      progressOutstandingList.innerHTML = '';
-      outstandingItems.forEach((item) => {
-        const row = document.createElement('div');
-        row.className = 'progress-outstanding-item';
-        row.innerHTML = `<span class="progress-outstanding-dot"></span><p class="progress-outstanding-text">${item}</p>`;
-        progressOutstandingList.appendChild(row);
-      });
-
-    }
-
-    function buildNotifications() {
-      const now = new Date();
-      const msPerDay = 24 * 60 * 60 * 1000;
-      const nowUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-      const dueUtc = Date.UTC(appraisalDueDate.getUTCFullYear(), appraisalDueDate.getUTCMonth(), appraisalDueDate.getUTCDate());
-      const daysUntil = Math.max(0, Math.ceil((dueUtc - nowUtc) / msPerDay));
-
-      const notifications = state.notificationEntries.map((entry) => {
-        if (entry.status === 'synced') {
-          return {
-            id: `${entry.title}:${entry.updatedAt}:synced`,
-            title: entry.title,
-            body: `Entry synced - ${entry.updatedAt}`,
-            tone: 'success',
-          };
-        }
-
-        return {
-          id: `${entry.title}:${entry.updatedAt}:sync`,
-          title: entry.title,
-          body: `Entry not synced - ${entry.updatedAt}. Use Sync now or Sync all.`,
-          tone: 'warning',
-          route: 'sync',
-        };
-      });
-
-      if (state.lastEntryStatus === 'queued') {
-        notifications.unshift({
-          id: `${state.currentEntryTitle}:queued-now:sync`,
-          title: state.currentEntryTitle,
-          body: 'Entry not synced - queued now. Use Sync now or Sync all.',
-          tone: 'warning',
-          route: 'sync',
+      if (progressDueDateText) {
+        progressDueDateText.textContent = `${daysUntilDue} days until ${progressProfile.dueLabel}`;
+      }
+      if (progressOutstandingList) {
+        progressOutstandingList.innerHTML = '';
+        outstandingItems.forEach((item) => {
+          const row = document.createElement('div');
+          row.className = 'progress-outstanding-item';
+          row.innerHTML = `<span class="progress-outstanding-dot"></span><p class="progress-outstanding-text">${item}</p>`;
+          progressOutstandingList.appendChild(row);
         });
       }
 
-      notifications.push({
-        id: 'appraisal-due-date',
-        title: 'Appraisal due date',
-        body: `${daysUntil} days until appraisal is due.`,
-        tone: 'info',
-      });
-
-      const dismissedIds = new Set(state.dismissedReadNotifications);
-      return notifications.filter((notification) => notification.route === 'sync' || !dismissedIds.has(notification.id));
     }
 
-    function renderNotifications(notifications) {
-      if (notifications.length === 0) {
-        if (notificationCount) {
-          notificationCount.textContent = '0';
-        }
-        if (notificationCurrentTitle) {
-          notificationCurrentTitle.textContent = 'Notifications';
-        }
-        if (notificationCurrentBody) {
-          notificationCurrentBody.textContent = 'No notifications right now.';
-        }
-        notificationsList.innerHTML = '<div class="card notifications"><div class="notification"><p class="notification-title">No notifications</p><p class="notification-copy">You are all caught up.</p></div></div>';
+    function renderViewEntryFields() {
+      if (!viewEntryType || !viewEntrySubtitle || !viewEntryFields) {
         return;
       }
 
-      if (notificationSummary && notificationCount && notificationCurrentTitle && notificationCurrentBody) {
-        const current = notifications[0];
-        notificationCount.textContent = String(notifications.length);
-        notificationCurrentTitle.textContent = current.title;
-        notificationCurrentBody.textContent = current.body;
-        notificationSummary.className = `notification-summary ${current.tone}`;
-        notificationSummary.setAttribute('data-nav', 'notifications');
+      const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
+      const selectedEntry = sortedEntries[state.currentViewedEntryIndex] || sortedEntries[0];
+      if (!selectedEntry) {
+        viewEntryType.textContent = 'No entry selected';
+        viewEntrySubtitle.textContent = 'Choose an entry from All entries.';
+        viewEntryFields.innerHTML = '';
+        return;
       }
 
-      const actionableNotifications = notifications.filter((notification) => notification.route === 'sync');
-      const completedNotifications = notifications.filter((notification) => notification.route !== 'sync');
-      const readIds = completedNotifications.map((notification) => notification.id);
-      if (clearReadButton) {
-        clearReadButton.disabled = readIds.length === 0;
-      }
-      const actionableCount = actionableNotifications.length;
-      const canSyncAll = actionableCount > 1;
-      const sectionWrappers = [
-        { title: 'Needs action', count: actionableCount, items: actionableNotifications },
-        { title: 'Completed', count: completedNotifications.length, items: completedNotifications },
-      ];
+      state.currentEntryTitle = selectedEntry.title;
+      const sections = entryFormTemplates[selectedEntry.title] || defaultEntryTemplate;
+      viewEntryType.textContent = selectedEntry.title;
+      viewEntrySubtitle.textContent = selectedEntry.status === 'draft' ? `Draft saved on ${selectedEntry.date}.` : `Completed on ${selectedEntry.date}.`;
 
-      notificationsList.innerHTML = '';
-      sectionWrappers.forEach((section) => {
-        if (section.items.length === 0) {
-          return;
+      if (viewEntryDateChip) {
+        viewEntryDateChip.textContent = selectedEntry.date;
+      }
+
+      if (viewEntryCategoryChip) {
+        viewEntryCategoryChip.textContent = selectedEntry.type;
+      }
+
+      if (viewEntryStatusChip) {
+        viewEntryStatusChip.textContent = selectedEntry.status === 'queued' ? 'unsynced' : selectedEntry.status;
+        viewEntryStatusChip.className = `view-entry-fact status-${selectedEntry.status}`;
+      }
+
+      if (editViewedEntryButton) {
+        editViewedEntryButton.classList.toggle('hidden', selectedEntry.status !== 'draft');
+      }
+
+      if (submitViewedEntryButton) {
+        submitViewedEntryButton.classList.toggle('hidden', selectedEntry.status !== 'draft');
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'detail-sections';
+
+      sections.forEach((section) => {
+        const sectionElement = document.createElement('section');
+        sectionElement.className = 'detail-section';
+
+        const heading = document.createElement('p');
+        heading.className = 'detail-section-title';
+        heading.textContent = section.title;
+        sectionElement.appendChild(heading);
+
+        if (section.description) {
+          const description = document.createElement('p');
+          description.className = 'detail-section-copy';
+          description.textContent = section.description;
+          sectionElement.appendChild(description);
         }
 
-        const group = document.createElement('div');
-        group.className = 'card section-group';
-
-        const groupTitle = document.createElement('p');
-        groupTitle.className = 'section-group-title';
-        groupTitle.textContent = `${section.title} (${section.count})`;
-        group.appendChild(groupTitle);
-
-        section.items.forEach((notification) => {
-          const item = document.createElement('div');
-          item.className = `notification ${notification.tone}`;
-          if (notification.route) {
-            item.innerHTML = `<div class="notification-title-row"><p class="notification-title">${notification.title}</p><span class="notification-bell" aria-label="Action required">🔔</span></div><p class="notification-copy">${notification.body}</p>`;
-          } else if (notification.tone === 'success') {
-            item.innerHTML = `<div class="notification-title-row"><p class="notification-title">${notification.title}</p><span class="notification-success-mark" aria-label="Completed">✓</span></div><p class="notification-copy">${notification.body}</p>`;
-          } else if (notification.title === 'Appraisal due date') {
-            item.innerHTML = `<div class="notification-title-row"><p class="notification-title">${notification.title}</p><span class="notification-alert-mark" aria-label="Due date alert">!</span></div><p class="notification-copy">${notification.body}</p>`;
-          } else {
-            item.innerHTML = `<p class="notification-title">${notification.title}</p><p class="notification-copy">${notification.body}</p>`;
-          }
-          if (notification.route) {
-            const actions = document.createElement('div');
-            actions.className = 'notification-actions-row';
-
-            const actionButton = document.createElement('button');
-            actionButton.className = 'notification-action ghost';
-            actionButton.textContent = 'Sync now';
-            actionButton.addEventListener('click', (event) => {
-              event.preventDefault();
-              event.stopPropagation();
-
-              const unsyncedIndex = state.notificationEntries.findIndex((entry) => entry.status !== 'synced');
-              if (unsyncedIndex < 0) {
-                return;
-              }
-
-              state.lastEntryStatus = 'synced';
-              state.notificationEntries = state.notificationEntries.map((entry, index) =>
-                index === unsyncedIndex
-                  ? {
-                      ...entry,
-                      status: 'synced',
-                      updatedAt: 'just now',
-                    }
-                  : entry,
-              );
-              if (state.queue.length > 0) {
-                state.queue = state.queue.slice(1);
-              }
-              render();
-            });
-            actions.appendChild(actionButton);
-
-            const syncAllInlineButton = document.createElement('button');
-            syncAllInlineButton.className = `notification-action sync-all-inline${canSyncAll ? ' enabled' : ''}`;
-            syncAllInlineButton.textContent = 'Sync all';
-            syncAllInlineButton.disabled = !canSyncAll;
-            syncAllInlineButton.addEventListener('click', (event) => {
-              event.preventDefault();
-              event.stopPropagation();
-
-              state.queue = [];
-              state.lastEntryStatus = 'synced';
-              state.notificationEntries = state.notificationEntries.map((entry) => (entry.status === 'synced' ? entry : { ...entry, status: 'synced', updatedAt: 'just now' }));
-              render();
-            });
-            actions.appendChild(syncAllInlineButton);
-
-            item.appendChild(actions);
-          }
-          group.appendChild(item);
+        section.fields.forEach((field) => {
+          const fieldElement = document.createElement('div');
+          fieldElement.className = 'detail-field';
+          fieldElement.innerHTML = `<p class="detail-field-label">${field}</p><p class="detail-field-value">Read-only response captured in this completed entry.</p>`;
+          sectionElement.appendChild(fieldElement);
         });
 
-        notificationsList.appendChild(group);
+        wrapper.appendChild(sectionElement);
+      });
+
+      const statusCard = document.createElement('div');
+      statusCard.className = 'card list';
+      statusCard.innerHTML = `<div class="row"><div><p class="row-title">Sync state</p><p class="row-sub">Entry status in your local portfolio</p></div><span class="entry-sync-status ${selectedEntry.status}">${selectedEntry.status === 'queued' ? 'unsynced' : selectedEntry.status}</span></div>`;
+      wrapper.appendChild(statusCard);
+
+      viewEntryFields.innerHTML = '';
+      viewEntryFields.appendChild(wrapper);
+    }
+
+    function renderAllEntries() {
+      if (!allEntriesList || !allEntriesSummary) {
+        return;
+      }
+
+      const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
+      const recentEntries = sortedEntries.slice(0, 50);
+      const unsyncedEntriesCount = recentEntries.filter((entry) => entry.status === 'queued' || entry.status === 'draft').length;
+      const queuedEntriesCount = recentEntries.filter((entry) => entry.status === 'queued').length;
+      allEntriesSummary.textContent = `Showing ${recentEntries.length} of ${state.allEntries.length} entries${unsyncedEntriesCount > 0 ? ` (${unsyncedEntriesCount} unsynced)` : ''}`;
+
+      if (syncAllEntriesButton) {
+        const canSync = queuedEntriesCount > 0 && state.online;
+        syncAllEntriesButton.disabled = !canSync;
+        syncAllEntriesButton.className = `button-inline ${canSync ? '' : 'gray'}`;
+        if (!state.online && queuedEntriesCount > 0) {
+          syncAllEntriesButton.textContent = 'Offline';
+        } else {
+          syncAllEntriesButton.textContent = 'Sync all';
+        }
+      }
+
+      allEntriesList.innerHTML = '';
+      recentEntries.forEach((entry, index) => {
+        const row = document.createElement('div');
+        row.className = 'all-entries-item';
+        const statusText = entry.status === 'queued' ? 'unsynced' : entry.status;
+        row.innerHTML = `
+          <div class="all-entries-main">
+            <p class="all-entries-title">${index + 1}. ${entry.title}</p>
+            <p class="all-entries-meta">${entry.date}<span class="entry-sync-status ${entry.status}">${statusText}</span></p>
+          </div>
+          <div class="all-entries-side">
+            <span class="all-entries-type">${entry.type}</span>
+            <button class="all-entries-view" data-entry-index="${index}">View</button>
+          </div>
+        `;
+        allEntriesList.appendChild(row);
       });
     }
 
@@ -1736,7 +2791,9 @@
         tab.classList.toggle('active', tab.dataset.tab === state.route || (state.route === 'dashboard' && tab.dataset.tab === 'dashboard'));
       });
 
-      tabbar.classList.toggle('hidden', state.route === 'login' || state.route === 'otp' || state.route === 'app-chooser');
+      const authRoutes = ['login', 'recover-account', 'password-reset', 'password-reset-sent', 'otp', 'app-chooser'];
+      tabbar.classList.toggle('hidden', authRoutes.includes(state.route));
+      document.querySelector('.header')?.classList.add('hidden');
 
       if (state.route === 'app-chooser') {
         appChooserView.classList.remove('chooser-enter');
@@ -1747,53 +2804,49 @@
         appChooserView.classList.remove('chooser-enter');
       }
 
-      connectionPill.className = `connection-pill ${state.online ? 'online' : 'offline'}`;
-      connectionPill.innerHTML = `<span class="dot"></span><span>${state.online ? 'Online' : 'Offline'}</span>`;
+      globalConnectionPill.className = `connection-pill global-connection-pill ${state.online ? 'online' : 'offline'}`;
+      globalConnectionPill.innerHTML = `<span class="dot"></span><span>${state.online ? 'Online' : 'Offline'}</span>`;
 
       kpiRoute.textContent = state.route;
       kpiQueue.textContent = String(state.queue.length);
       kpiNetwork.textContent = state.online ? 'online' : 'offline';
 
-      const notifications = buildNotifications();
-      renderNotifications(notifications);
+      renderAllEntries();
 
       if (nextActionTitle && nextActionCopy && nextActionButton) {
-        const actionableCount = notifications.filter((notification) => notification.route === 'sync').length;
-        if (actionableCount > 0) {
-          nextActionTitle.textContent = 'Sync your pending notifications';
-          nextActionCopy.textContent = `${actionableCount} notification${actionableCount === 1 ? '' : 's'} still need action. Clearing them will keep your dashboard tidy and move you closer to up to date.`;
-          nextActionButton.textContent = 'Go to notifications';
-        } else if (state.queue.length > 0) {
+        if (state.queue.length > 0) {
           nextActionTitle.textContent = 'Review your pending queue';
-          nextActionCopy.textContent = `${state.queue.length} entry${state.queue.length === 1 ? '' : 'ies'} are queued and will sync when you are back online.`;
-          nextActionButton.textContent = 'Review queue';
+          nextActionCopy.textContent = `${state.queue.length} entry${state.queue.length === 1 ? '' : 'ies'} are queued and can be synced from All entries when you are back online.`;
+          nextActionButton.textContent = 'All entries';
         } else {
           nextActionTitle.textContent = 'Add your next entry';
           nextActionCopy.textContent = 'Your portfolio is up to date. Capture a new reflective entry when you are ready.';
-          nextActionButton.textContent = '+ New entry';
+          nextActionButton.textContent = 'All entries';
         }
       }
 
-      const notificationsActionCount = notifications.filter((notification) => notification.route === 'sync').length;
-      if (notificationsTabBadge) {
-        notificationsTabBadge.textContent = notificationsActionCount > 99 ? '99+' : String(notificationsActionCount);
-        notificationsTabBadge.classList.toggle('hidden', notificationsActionCount === 0);
-      }
-
       renderEntryDetailFields();
+      renderViewEntryFields();
       renderProgress();
 
-      const draftState = document.getElementById('draftState');
-      draftState.textContent = state.lastEntryStatus;
-      draftState.className = `status ${state.lastEntryStatus === 'queued' ? 'queue' : 'ok'}`;
       entryDetailSubtitle.textContent = state.lastEntryStatus === 'queued' ? 'Saved offline and queued for sync.' : 'Saved and synced.';
 
-      offlineBanner.classList.toggle('hidden', state.online);
+      offlineBanner.className = 'dashboard-top-actions';
+      offlineBanner.querySelector('#nextActionButton').textContent = 'All entries';
     }
 
     function saveEntry() {
       const titleInput = document.getElementById('entryTitle');
       const title = titleInput.value || 'Learning event reflection';
+
+      state.pendingEntrySnapshot = {
+        queue: state.queue.map((item) => ({ ...item })),
+        allEntries: state.allEntries.map((entry) => ({ ...entry })),
+        totalEntries: state.totalEntries,
+        entriesLast30Days: [...state.entriesLast30Days],
+        lastEntryStatus: state.lastEntryStatus,
+      };
+
       state.currentEntryTitle = title;
       state.totalEntries += 1;
       state.entriesLast30Days.push(1);
@@ -1802,13 +2855,120 @@
       if (!state.online) {
         state.queue.push({ title, attempts: 1 });
         state.lastEntryStatus = 'queued';
-        state.notificationEntries = [{ title, status: 'queued', updatedAt: 'just now' }, ...state.notificationEntries].slice(0, 12);
       } else {
         state.lastEntryStatus = 'synced';
-        state.notificationEntries = [{ title, status: 'synced', updatedAt: 'just now' }, ...state.notificationEntries].slice(0, 12);
       }
 
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yy = String(now.getFullYear()).slice(-2);
+      state.allEntries.unshift({
+        title,
+        type: title === 'Appraisal overview' ? 'Appraisal' : 'Reflection',
+        date: `${dd}/${mm}/${yy}`,
+        status: state.online ? 'synced' : 'queued',
+      });
+      state.allEntries = state.allEntries.slice(0, 50);
+      state.currentEditingEntryIndex = 0;
+
       setRoute('entry-detail');
+    }
+
+    function submitCurrentEntry() {
+      const fallbackEntry = state.allEntries[0];
+      const targetIndex = Number.isInteger(state.currentEditingEntryIndex)
+        ? state.currentEditingEntryIndex
+        : 0;
+      const targetEntry = state.allEntries[targetIndex] || fallbackEntry;
+
+      if (!targetEntry) {
+        setRoute('all-entries');
+        return;
+      }
+
+      if (targetEntry.status === 'queued' && state.queue.length > 0) {
+        const queuedIndex = state.queue.findIndex((item) => item.title === targetEntry.title);
+        if (queuedIndex >= 0) {
+          state.queue.splice(queuedIndex, 1);
+        } else {
+          state.queue = state.queue.slice(0, Math.max(0, state.queue.length - 1));
+        }
+      }
+
+      targetEntry.status = 'synced';
+      state.lastEntryStatus = 'synced';
+      state.pendingEntrySnapshot = null;
+      state.currentEditingEntryIndex = null;
+      setRoute('all-entries');
+    }
+
+    function saveCurrentEntryAsDraft() {
+      const fallbackEntry = state.allEntries[0];
+      const targetIndex = Number.isInteger(state.currentEditingEntryIndex)
+        ? state.currentEditingEntryIndex
+        : 0;
+      const targetEntry = state.allEntries[targetIndex] || fallbackEntry;
+
+      if (!targetEntry) {
+        setRoute('all-entries');
+        return;
+      }
+
+      if (targetEntry.status === 'queued' && state.queue.length > 0) {
+        const queuedIndex = state.queue.findIndex((item) => item.title === targetEntry.title);
+        if (queuedIndex >= 0) {
+          state.queue.splice(queuedIndex, 1);
+        } else {
+          state.queue = state.queue.slice(0, Math.max(0, state.queue.length - 1));
+        }
+      }
+
+      targetEntry.status = 'draft';
+      state.lastEntryStatus = 'draft';
+      state.currentEditingEntryIndex = null;
+
+      setRoute('all-entries');
+    }
+
+    function editCurrentViewedEntry() {
+      const selectedEntry = getCurrentViewedEntry();
+      if (!selectedEntry) {
+        return;
+      }
+
+      state.currentEntryTitle = selectedEntry.title;
+      state.lastEntryStatus = selectedEntry.status;
+      state.currentEditingEntryIndex = state.allEntries.indexOf(selectedEntry);
+      setRoute('entry-detail');
+    }
+
+    function submitCurrentViewedEntry() {
+      const selectedEntry = getCurrentViewedEntry();
+      if (!selectedEntry) {
+        return;
+      }
+
+      selectedEntry.status = 'synced';
+      state.lastEntryStatus = 'synced';
+      render();
+    }
+
+    function cancelEntryCreation() {
+      const snapshot = state.pendingEntrySnapshot;
+      if (!snapshot) {
+        setRoute('dashboard');
+        return;
+      }
+
+      state.queue = snapshot.queue.map((item) => ({ ...item }));
+      state.allEntries = snapshot.allEntries.map((entry) => ({ ...entry }));
+      state.totalEntries = snapshot.totalEntries;
+      state.entriesLast30Days = [...snapshot.entriesLast30Days];
+      state.lastEntryStatus = snapshot.lastEntryStatus;
+      state.pendingEntrySnapshot = null;
+
+      setRoute('dashboard');
     }
 
     document.body.addEventListener('click', (event) => {
@@ -1825,12 +2985,18 @@
       if (route === 'login') {
         state.queue = [];
         state.lastEntryStatus = 'synced';
+        state.pendingEntrySnapshot = null;
       }
 
       setRoute(route);
     });
 
     document.getElementById('saveEntryButton').addEventListener('click', saveEntry);
+    document.getElementById('submitEntryButton')?.addEventListener('click', submitCurrentEntry);
+    submitViewedEntryButton?.addEventListener('click', submitCurrentViewedEntry);
+    editViewedEntryButton?.addEventListener('click', editCurrentViewedEntry);
+    document.getElementById('saveDetailDraftButton')?.addEventListener('click', saveCurrentEntryAsDraft);
+    document.getElementById('cancelEntryButton')?.addEventListener('click', cancelEntryCreation);
 
     document.getElementById('toggleNetwork').addEventListener('click', () => {
       state.online = !state.online;
@@ -1841,52 +3007,56 @@
       state.route = 'login';
       state.online = true;
       state.queue = [];
-      state.dismissedReadNotifications = [];
       state.lastEntryStatus = 'synced';
+      state.pendingEntrySnapshot = null;
+      state.currentEditingEntryIndex = null;
       state.totalEntries = 26;
-      state.notificationEntries = [
-        { title: 'Safeguarding reflection', status: 'synced', updatedAt: '2h ago' },
-        { title: 'New patient interaction', status: 'synced', updatedAt: '10m ago' },
-        { title: 'Clinical supervision note', status: 'synced', updatedAt: 'Yesterday' },
-        { title: 'Prescribing audit', status: 'synced', updatedAt: '2d ago' },
-        { title: 'Significant event review', status: 'queued', updatedAt: '3d ago' },
-        { title: 'CPD webinar reflection', status: 'synced', updatedAt: '4d ago' },
-        { title: 'Team feedback summary', status: 'synced', updatedAt: '5d ago' },
-        { title: 'Appraisal preparation note', status: 'queued', updatedAt: '6d ago' },
-      ];
       state.entriesLast30Days = Array.from({ length: 30 }, (_, index) => (index % 6 === 0 ? 2 : index % 5 === 0 ? 1 : 0));
+      state.allEntries = createRecentEntries(50);
+      state.queue = state.allEntries
+        .filter((entry) => entry.status === 'queued')
+        .map((entry) => ({ title: entry.title, attempts: 1 }));
       document.getElementById('entryTitle').value = 'Learning event reflection';
-      document.getElementById('otpInput').value = '123456';
+      const otpInput = document.getElementById('otpInput');
+      if (otpInput) {
+        otpInput.value = '123456';
+      }
       render();
     });
 
-    clearReadButton?.addEventListener('click', () => {
-      const readIds = buildNotifications()
-        .filter((notification) => notification.route !== 'sync')
-        .map((notification) => notification.id);
-      if (readIds.length === 0) {
+    syncAllEntriesButton?.addEventListener('click', () => {
+      if (!state.online) {
         return;
       }
 
-      const merged = new Set(state.dismissedReadNotifications);
-      readIds.forEach((id) => merged.add(id));
-      state.dismissedReadNotifications = Array.from(merged);
+      const hasQueuedEntries = state.allEntries.some((entry) => entry.status === 'queued');
+      if (!hasQueuedEntries) {
+        return;
+      }
+
+      state.queue = [];
+      state.lastEntryStatus = 'synced';
+      state.allEntries = state.allEntries.map((entry) => (entry.status === 'queued' ? { ...entry, status: 'synced' } : entry));
       render();
+    });
+
+    allEntriesList?.addEventListener('click', (event) => {
+      const viewButton = event.target.closest('[data-entry-index]');
+      if (!viewButton) {
+        return;
+      }
+
+      const index = Number(viewButton.dataset.entryIndex);
+      if (Number.isNaN(index)) {
+        return;
+      }
+
+      state.currentViewedEntryIndex = index;
+      setRoute('view-entry');
     });
 
     nextActionButton?.addEventListener('click', () => {
-      const actionableCount = buildNotifications().filter((notification) => notification.route === 'sync').length;
-      if (actionableCount > 0) {
-        setRoute('notifications');
-        return;
-      }
-
-      if (state.queue.length > 0) {
-        setRoute('notifications');
-        return;
-      }
-
-      setRoute('new-entry');
+      setRoute('all-entries');
     });
 
     document.getElementById('emailInput').addEventListener('input', (event) => {
@@ -1899,19 +3069,13 @@
       window.open(educationUrl, '_blank', 'noopener,noreferrer');
     });
 
-    continueAllEntriesButton.addEventListener('click', () => {
-      window.open(allEntriesUrl, '_blank', 'noopener,noreferrer');
-    });
-
     myAccountButton.addEventListener('click', () => {
       window.open(myAccountUrl, '_blank', 'noopener,noreferrer');
     });
 
-    connectionPill.addEventListener('click', () => {
-      if (state.route === 'dashboard') {
-        state.online = !state.online;
-        render();
-      }
+    globalConnectionPill?.addEventListener('click', () => {
+      state.online = !state.online;
+      render();
     });
 
     render();

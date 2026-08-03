@@ -3,22 +3,3082 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>App Prototype</title>
-  <meta http-equiv="refresh" content="0; url=./mockup.html" />
+  <title>FourteenFish Portfolio Interactive Mockup</title>
   <style>
+    :root {
+      --bg: #f5f6fa;
+      --surface: #ffffff;
+      --text: #16171a;
+      --muted: #676a74;
+      --border: #d6d8df;
+      --accent: #6f1b8b;
+      --accent-soft: #f2e7fb;
+      --success: #34c759;
+      --warning: #ff9500;
+      --danger: #ef4444;
+      --radius: 24px;
+      --shadow: 0 20px 44px rgba(12, 14, 20, 0.18);
+      --btn-height: 44px;
+      --btn-radius: 12px;
+      --btn-padding-x: 16px;
+      --btn-primary-start: #7b2cbf;
+      --btn-primary-end: #5d1678;
+    }
+
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 10%, rgba(207, 45, 129, 0.12), transparent 30%),
+        radial-gradient(circle at 90% 90%, rgba(52, 199, 89, 0.1), transparent 28%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+      padding: 24px;
+    }
+
+    .page {
+      max-width: 1260px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) minmax(300px, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .phone {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 38px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      min-height: 780px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 34%;
+      height: 22px;
+      border-radius: 999px;
+      background: #101116;
+      z-index: 8;
+    }
+
+    .screen {
+      padding: 38px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 780px;
+      position: relative;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header.hidden {
+      display: none;
+    }
+
+    .logo {
+      width: 156px;
+      height: 40px;
+      object-fit: contain;
+      object-position: left center;
+    }
+
+    .logo.micro {
+      width: 78px;
+      height: 22px;
+    }
+
+    .dashboard-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+      margin-top: 2px;
+      min-height: 40px;
+    }
+
+    .dashboard-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .dashboard-menu {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      border: 1px solid #e3e5ea;
+      background: #fff;
+      color: #24262c;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .dashboard-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: #1f2024;
+    }
+
+    .connection-pill.online {
+      background: #c6f0cd;
+      border-color: #c6f0cd;
+      color: #1f4325;
+      font-weight: 700;
+    }
+
+    .connection-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .global-connection-pill {
+      position: absolute;
+      top: 38px;
+      right: 16px;
+      z-index: 12;
+    }
+
+    .dot { width: 8px; height: 8px; border-radius: 99px; }
+    .online { background: #e9f8ef; border-color: #b8e3c7; }
+    .online .dot { background: var(--success); }
+    .offline { background: #fff4de; border-color: #f1cb86; }
+    .offline .dot { background: var(--warning); }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: #fff;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.08;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .copy { margin: 6px 0 0; color: var(--muted); line-height: 1.45; font-size: 13px; }
+
+    .chooser-hero {
+      text-align: center;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+    }
+
+    .chooser-hero .logo {
+      width: 166px;
+      height: 42px;
+      object-position: center;
+    }
+
+    .chooser-eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .chooser-hero,
+    .chooser-option,
+    .chooser-signout {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .chooser-enter .chooser-hero {
+      animation: chooserFadeUp 320ms ease-out forwards;
+    }
+
+    .chooser-enter .chooser-option.portfolio {
+      animation: chooserFadeUp 360ms ease-out 80ms forwards;
+    }
+
+    .chooser-enter .chooser-option.education {
+      animation: chooserFadeUp 360ms ease-out 150ms forwards;
+    }
+
+    .chooser-enter .chooser-signout {
+      animation: chooserFadeUp 320ms ease-out 220ms forwards;
+    }
+
+    .chooser-title {
+      text-align: center;
+    }
+
+    .chooser-copy {
+      text-align: center;
+      max-width: 340px;
+    }
+
+    .app-chooser-shell {
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 690px;
+    }
+
+    .app-chooser-card {
+      width: 100%;
+      max-width: 342px;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .app-chooser-options {
+      width: 100%;
+      max-width: 342px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .app-chooser-option {
+      min-height: 96px;
+      width: 100%;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 12px;
+      text-align: left;
+      align-items: center;
+      place-items: unset;
+      justify-items: stretch;
+    }
+
+    .app-chooser-option + .app-chooser-option {
+      margin-top: 2px;
+    }
+
+    .app-chooser-option-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
       display: grid;
       place-items: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f4f6fa;
-      color: #203040;
+      font-size: 18px;
+      font-weight: 900;
+      flex: 0 0 auto;
     }
-    a { color: #005eb8; }
+
+    .app-chooser-option-copy-wrap {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .app-chooser-option-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+    }
+
+    .app-chooser-option-copy {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .app-chooser-option.portfolio {
+      background: linear-gradient(180deg, #7b2cbf 0%, #5d1678 100%);
+      border-color: #7b2cbf;
+      color: #fff;
+    }
+
+    .app-chooser-option.portfolio .app-chooser-option-icon {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+
+    .app-chooser-option.education {
+      background: #f7f8fc;
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .app-chooser-option.education .app-chooser-option-copy {
+      color: var(--muted);
+    }
+
+    .app-chooser-option.education .app-chooser-option-icon {
+      background: #fff;
+      color: #5d1678;
+      border: 1px solid var(--border);
+    }
+
+    .app-chooser-signout {
+      width: 100%;
+      max-width: 342px;
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      background: #fff;
+      color: #5d1678;
+      border-color: var(--border);
+    }
+
+    .app-chooser-identity {
+      width: 100%;
+      max-width: 342px;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      background: #fff;
+      box-shadow: 0 14px 30px rgba(12, 14, 20, 0.08);
+      padding: 12px 14px 12px;
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .app-chooser-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      position: relative;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #f4d9ca 0%, #d6ad98 100%);
+      color: #5d1678;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.55);
+    }
+
+    .app-chooser-avatar-badge {
+      position: absolute;
+      right: 2px;
+      bottom: 2px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #1f2024;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      box-shadow: 0 4px 10px rgba(12, 14, 20, 0.2);
+    }
+
+    .app-chooser-name {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #1f2024;
+    }
+
+    .app-chooser-role {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .auth-shell {
+      position: relative;
+      padding: 18px 0 0;
+      display: grid;
+      gap: 14px;
+      min-height: 690px;
+    }
+
+    .auth-shell::before,
+    .auth-shell::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .auth-shell::before {
+      width: 210px;
+      height: 210px;
+      right: -84px;
+      top: -30px;
+      background: rgba(207, 45, 129, 0.12);
+      filter: blur(4px);
+    }
+
+    .auth-shell::after {
+      width: 260px;
+      height: 260px;
+      left: -120px;
+      bottom: -110px;
+      background: rgba(74, 144, 226, 0.08);
+      filter: blur(2px);
+    }
+
+    .auth-shell > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .auth-shell-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      align-self: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #f0f9ea;
+      color: #4f6a4b;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .auth-shell-brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .auth-shell-card {
+      max-width: 384px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 22px 18px 18px;
+      border-radius: 28px;
+      background: var(--surface);
+      border: 1px solid rgba(214, 216, 223, 0.9);
+      box-shadow: 0 26px 60px rgba(12, 14, 20, 0.12);
+    }
+
+    .auth-shell-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .auth-shell-copy {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .auth-shell-microcopy {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: center;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .auth-shell-note {
+      margin: 10px 0 0;
+      color: #51606d;
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .auth-shell-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(214, 216, 223, 0.95), transparent);
+      margin: 8px 0 2px;
+    }
+
+    .auth-shell-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .auth-shell-actions button,
+    .auth-shell-actions a {
+      width: 100%;
+    }
+
+    .auth-shell-actions button.secondary {
+      background: #f7f8fc;
+      color: var(--accent);
+      border-color: var(--border);
+    }
+
+    .auth-shell-inputs {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .auth-shell-list {
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+    }
+
+    .auth-shell-list li {
+      position: relative;
+      padding-left: 18px;
+      color: #51606d;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .auth-shell-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 7px;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+
+    .auth-shell-status {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .auth-shell-status span {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      background: #f7f8fc;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .auth-shell-auth {
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      min-height: 690px;
+    }
+
+    .auth-logo {
+      width: 156px;
+      height: 40px;
+      object-fit: contain;
+      object-position: center;
+    }
+
+    .auth-card-auth {
+      max-width: 300px;
+      width: 100%;
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      display: grid;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .auth-shell-auth .auth-card-auth {
+      max-width: 342px;
+      padding: 16px;
+      gap: 16px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .auth-card-auth--sent {
+      gap: 14px;
+      padding-top: 8px;
+    }
+
+    .auth-card-copy {
+      margin-top: -2px;
+      font-size: 12px;
+      color: #7a7d84;
+    }
+
+    .auth-auth-inputs {
+      margin-top: 4px;
+      gap: 8px;
+    }
+
+    .auth-input {
+      min-height: 34px;
+      border-radius: 10px;
+      background: #fff;
+      border-color: #dbdee5;
+      font-size: 12px;
+      color: #1f2024;
+    }
+
+    .auth-input::placeholder {
+      color: #b2b5bb;
+      opacity: 1;
+    }
+
+    .auth-auth-actions {
+      gap: 6px;
+      margin-top: 4px;
+      justify-content: center;
+    }
+
+    .auth-shell-auth .auth-auth-inputs {
+      margin-top: 0;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .auth-shell-auth .field {
+      margin: 0;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-shell-auth .field-label {
+      text-align: center;
+      width: 100%;
+    }
+
+    .auth-shell-auth .input {
+      text-align: center;
+    }
+
+    .auth-shell-auth .auth-shell-actions {
+      margin-top: auto;
+      padding-top: 8px;
+      gap: 12px;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-shell-auth .auth-auth-actions button,
+    .auth-shell-auth .button-inline {
+      width: 342px;
+    }
+
+    .auth-shell-auth .auth-code-grid {
+      width: 100%;
+      margin-top: 0;
+    }
+
+    .auth-shell-auth .auth-code-input {
+      min-height: 55px;
+      border-radius: 12px;
+    }
+
+    .auth-login-actions {
+      justify-items: center;
+    }
+
+    .auth-login-shell {
+      padding-top: 0;
+      gap: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 690px;
+    }
+
+    .auth-login-shell .auth-card-auth {
+      max-width: 342px;
+      padding: 16px;
+      gap: 16px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .auth-login-shell .auth-auth-inputs {
+      margin-top: 0;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .auth-login-shell .field {
+      margin: 0;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-login-shell .field-label {
+      text-align: center;
+      width: 100%;
+    }
+
+    .auth-login-shell .input {
+      text-align: center;
+    }
+
+    .auth-login-shell .auth-shell-actions {
+      margin-top: auto;
+      padding-top: 8px;
+      gap: 12px;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .auth-login-shell .auth-forgot-link {
+      width: 100%;
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      margin-top: 2px;
+      border: none;
+    }
+
+    .auth-login-shell .auth-shell-copy {
+      margin-top: 0;
+    }
+
+    .auth-auth-actions button {
+      width: 100%;
+    }
+
+    .auth-login-actions button {
+      width: 342px;
+    }
+
+    .auth-login-actions .ghost {
+      border: none;
+    }
+
+    .auth-code-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .auth-code-input {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid #dbdee5;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      background: #fff;
+      color: #1f2024;
+    }
+
+    .auth-code-input.active {
+      border-color: #8b3aa9;
+      box-shadow: 0 0 0 1px rgba(139, 58, 169, 0.18);
+    }
+
+    .chooser-card {
+      max-width: 392px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .chooser-options {
+      display: grid;
+      gap: 10px;
+    }
+
+    .chooser-option {
+      min-height: 116px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      text-align: center;
+      gap: 7px;
+    }
+
+    .chooser-option-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .chooser-option-copy {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .chooser-option.portfolio {
+      background: linear-gradient(180deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
+      border-color: var(--btn-primary-end);
+      color: #fff;
+    }
+
+    .chooser-option.education {
+      background: #f7f8fc;
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .chooser-option.education .chooser-option-copy {
+      color: var(--muted);
+    }
+
+    #view-all-entries .chooser-hero,
+    #view-all-entries .chooser-option {
+      opacity: 1;
+      transform: none;
+    }
+
+    @keyframes chooserFadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .field { margin: 10px 0; }
+    .field-label { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 700; }
+
+    .input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      min-height: 44px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #fafbfe;
+      color: var(--text);
+    }
+
+    select.input {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 34px;
+    }
+
+    .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: var(--btn-radius);
+      min-height: var(--btn-height);
+      padding: 0 var(--btn-padding-x);
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 13px;
+      transition: 0.2s ease;
+      background: linear-gradient(180deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
+      color: #fff;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button.secondary { background: #f3ecf8; color: #5d1678; border-color: #e0d1ea; }
+    button.ghost { background: transparent; color: #5d1678; border-color: #d9dde4; }
+    button.warn { background: var(--warning); color: #1f1400; }
+
+    .button-inline {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 var(--btn-padding-x);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .button-inline.gray {
+      background: #eeeeef;
+      color: #7d7f84;
+      border-color: #eeeeef;
+    }
+
+    .banner {
+      border-radius: 14px;
+      border: 1px solid #dde0e7;
+      background: #fff;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .banner.success { background: #edf9ef; border-color: #d1ead5; }
+    .banner.warning { background: #fff; border-color: #dde0e7; }
+    .banner.error { background: #feeceb; border-color: #f3b3ad; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    #view-dashboard {
+      gap: 14px;
+    }
+
+    #view-dashboard .stats {
+      gap: 12px;
+      margin-top: 2px;
+    }
+
+    .button-row.dashboard-actions {
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .button-row.dashboard-actions button {
+      min-width: 170px;
+      flex: 0 1 180px;
+    }
+
+    .button-row.settings-actions {
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .button-row.settings-actions button {
+      min-height: var(--btn-height);
+      min-width: 230px;
+      flex: 0 1 280px;
+      font-size: 13px;
+    }
+
+    .stat {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      padding: 10px;
+      min-height: 80px;
+    }
+
+    #view-dashboard {
+      display: grid;
+      gap: 15px;
+      align-content: start;
+      justify-items: stretch;
+    }
+
+    .sync-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid #dde0e7;
+      background: #fff;
+    }
+
+    .sync-card-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .sync-card-check {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: #eaf7ed;
+      color: #2d8a4a;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+
+    .sync-card-copy {
+      min-width: 0;
+    }
+
+    .sync-card-copy .row-title {
+      font-size: 13px;
+    }
+
+    .sync-card-copy .row-sub {
+      font-size: 11px;
+    }
+
+    .dashboard-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 2px;
+    }
+
+    #view-dashboard #nextActionButton {
+      min-width: 118px;
+    }
+
+    #view-dashboard #dashboardAddNewButton {
+      min-width: 118px;
+    }
+
+    .entries-card,
+    .progress-card {
+      border: 1px solid #dde0e7;
+      border-radius: 14px;
+      background: #fff;
+      padding: 16px;
+      width: 100%;
+    }
+
+    .entries-card .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 92px 56px;
+      column-gap: 14px;
+      padding: 11px 0;
+      min-height: 48px;
+      align-items: center;
+    }
+
+    .entry-chip {
+      border: 1px solid #7a7d84;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #44474d;
+      background: #fff;
+    }
+
+    .entry-date {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #1f2024;
+      text-align: right;
+      justify-self: end;
+    }
+
+    .entry-chip {
+      justify-self: end;
+    }
+
+    .entries-add-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+
+    .entries-add-row button {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 var(--btn-padding-x);
+      font-size: 13px;
+      background: linear-gradient(180deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
+      border-color: var(--btn-primary-end);
+      color: #fff;
+    }
+
+    .progress-card .title {
+      font-size: 14px;
+      line-height: 1.25;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .progress-card .progress-pie-card,
+    .progress-card .progress-trend-card {
+      background: transparent;
+      border: none;
+      padding: 0;
+    }
+
+    .progress-card .progress-layout {
+      justify-items: center;
+    }
+
+    .progress-card .progress-pie {
+      width: 128px;
+      height: 128px;
+    }
+
+    .progress-card .progress-pie-hole {
+      width: 80px;
+      height: 80px;
+    }
+
+    .progress-card .progress-pie-value {
+      font-size: 24px;
+      color: #6f1b8b;
+    }
+
+    .progress-card .progress-stats {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-top: 4px;
+    }
+
+    .progress-card .progress-stat {
+      border: none;
+      background: transparent;
+      padding: 0;
+      display: grid;
+      justify-items: center;
+      gap: 1px;
+      min-width: 96px;
+      text-align: center;
+    }
+
+    .progress-card .progress-stat-label {
+      font-size: 11px;
+      color: #6e727a;
+      font-weight: 500;
+    }
+
+    .progress-card .progress-stat-value {
+      font-size: 18px;
+      color: #1f2024;
+    }
+
+    .progress-card .progress-stat-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-bottom: 2px;
+      background: #d8dce3;
+    }
+
+    .progress-card .progress-stat-dot.primary {
+      background: #6f1b8b;
+    }
+
+    .stat-value { margin: 0 0 4px; font-size: 22px; font-weight: 900; letter-spacing: -0.04em; }
+    .stat-label { margin: 0; font-size: 11px; color: var(--muted); }
+    .stat-delta { margin-top: 6px; font-size: 11px; font-weight: 800; color: var(--accent); }
+
+    .list { display: flex; flex-direction: column; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+      align-items: center;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-title { margin: 0 0 2px; font-size: 13px; font-weight: 800; }
+    .row-sub { margin: 0; font-size: 12px; color: var(--muted); }
+
+    .all-entries-shell {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .all-entries-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .all-entries-toolbar .button-inline {
+      min-width: 94px;
+      min-height: var(--btn-height);
+    }
+
+    .all-entries-shell .copy {
+      margin: 2px 0 0;
+    }
+
+    .all-entries-summary {
+      border: 1px solid #dedee8;
+      border-radius: 14px;
+      background: #f2edf8;
+      color: #4e4560;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+
+    .all-entries-list {
+      border: 1px solid #e2e4eb;
+      border-radius: 14px;
+      background: #fff;
+      overflow: hidden;
+      max-height: 562px;
+      overflow-y: auto;
+    }
+
+    .all-entries-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 11px 12px 10px;
+      min-height: 58px;
+      border-bottom: 1px solid #edeff5;
+      align-items: center;
+      background: #fff;
+    }
+
+    .all-entries-side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .all-entries-view {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 var(--btn-padding-x);
+      border: 1px solid #ccb8df;
+      background: #f5edff;
+      color: #5f2578;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .all-entries-view:hover {
+      background: #ecdfff;
+    }
+
+    .all-entries-item:last-child {
+      border-bottom: none;
+    }
+
+    .all-entries-main {
+      min-width: 0;
+    }
+
+    .all-entries-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      color: #222429;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .all-entries-meta {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: #666b76;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .all-entries-type {
+      border: 1px solid #d8c8e8;
+      border-radius: 999px;
+      background: #f7f0ff;
+      color: #632080;
+      padding: 4px 9px;
+      min-width: 76px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .entry-sync-status {
+      border: 1px solid #d3d7de;
+      border-radius: 999px;
+      background: #f7f8fa;
+      color: #6a707a;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .entry-sync-status.synced {
+      border-color: #c8e8d1;
+      background: #edf9f1;
+      color: #277846;
+    }
+
+    .entry-sync-status.queued {
+      border-color: #f1cb86;
+      background: #fff4de;
+      color: #7d5200;
+    }
+
+    .entry-sync-status.draft {
+      border-color: #d8c8e8;
+      background: #f7f0ff;
+      color: #632080;
+    }
+
+    .status { font-size: 11px; text-transform: uppercase; font-weight: 900; letter-spacing: 0.07em; color: var(--accent); }
+    .status.ok { color: var(--success); }
+    .status.queue { color: var(--warning); }
+    .status.fail { color: var(--danger); }
+
+    .detail-sections {
+      display: grid;
+      gap: 12px;
+    }
+
+    #view-entry-detail {
+      gap: 14px;
+    }
+
+    #view-view-entry {
+      gap: 14px;
+    }
+
+    .view-entry-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .view-entry-lock {
+      border: 1px solid #d8c8e8;
+      border-radius: 999px;
+      background: #f7f0ff;
+      color: #632080;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      line-height: 1;
+    }
+
+    .view-entry-meta {
+      gap: 8px;
+    }
+
+    .view-entry-facts {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .view-entry-fact {
+      border: 1px solid #dddfea;
+      border-radius: 999px;
+      background: #f7f8fc;
+      color: #545b67;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .view-entry-fact.status-synced {
+      border-color: #c8e8d1;
+      background: #edf9f1;
+      color: #277846;
+      text-transform: uppercase;
+    }
+
+    .view-entry-fact.status-queued {
+      border-color: #f1cb86;
+      background: #fff4de;
+      color: #7d5200;
+      text-transform: uppercase;
+    }
+
+    .view-entry-fields .detail-field-value {
+      color: #4f5663;
+      font-weight: 600;
+    }
+
+    .view-entry-actions {
+      justify-content: center;
+    }
+
+    .detail-meta {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fafbfe;
+      padding: 12px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .detail-kicker {
+      margin: 0;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .detail-type {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .detail-subtitle {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 13px;
+    }
+
+    .detail-section {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .detail-section-title {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .detail-section-copy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .detail-field {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fafbfe;
+      padding: 10px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .detail-field-label {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .detail-field-value {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .progress-layout {
+      display: grid;
+      gap: 12px;
+    }
+
+    .progress-pie-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fafbfe;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .progress-pie {
+      width: 150px;
+      height: 150px;
+      border-radius: 999px;
+      background: conic-gradient(var(--accent) 0deg, var(--accent) 180deg, #ebd9f1 180deg, #ebd9f1 360deg);
+      display: grid;
+      place-items: center;
+    }
+
+    .progress-pie-hole {
+      width: 96px;
+      height: 96px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 2px;
+    }
+
+    .progress-pie-value {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .progress-pie-meta {
+      margin: 0;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .progress-stats {
+      display: grid;
+      gap: 8px;
+    }
+
+    .progress-stat {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      padding: 9px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .progress-stat-label {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .progress-stat-value {
+      margin: 0;
+      font-size: 18px;
+      color: var(--text);
+      font-weight: 900;
+    }
+
+    .progress-trend-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fafbfe;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .next-action-card {
+      border: 1px solid #dde0e7;
+      border-radius: 18px;
+      padding: 14px;
+      background: linear-gradient(180deg, #fff, #fbfbfd);
+      display: grid;
+      gap: 10px;
+    }
+
+    .next-action-eyebrow {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #6f1b8b;
+    }
+
+    .next-action-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #1f2024;
+    }
+
+    .next-action-copy {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #656a72;
+    }
+
+    .dashboard-greeting {
+      display: grid;
+      gap: 10px;
+    }
+
+    .dashboard-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .dashboard-actions-row button {
+      min-height: var(--btn-height);
+      border-radius: var(--btn-radius);
+      padding: 0 14px;
+      font-size: 13px;
+    }
+
+    .dashboard-actions-row .button-inline {
+      border-radius: 10px;
+    }
+
+    .user-type-selector {
+      display: grid;
+      gap: 8px;
+      margin: 10px 0 2px;
+    }
+
+    .user-type-label {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .user-type-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .user-type-pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .user-type-pill.active {
+      border-color: var(--accent);
+      background: #f2e7fb;
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .section-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .section-group-title {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    .section-group-count {
+      color: var(--accent);
+    }
+
+    .progress-trend-scroll {
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .progress-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      min-width: max-content;
+    }
+
+    .progress-bar-col {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+    }
+
+
+    .progress-bar-track {
+      width: 8px;
+      height: 122px;
+      border-radius: 999px;
+      background: #ebd9f1;
+      display: flex;
+      align-items: flex-end;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      width: 100%;
+      min-height: 6px;
+      border-radius: 999px;
+      background: #d092ba;
+    }
+
+    .progress-bar-fill.recent {
+      background: var(--accent-strong);
+    }
+
+    .progress-bar-day {
+      margin: 0;
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .progress-outstanding-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .progress-outstanding-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .progress-outstanding-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+      margin-top: 6px;
+      flex: 0 0 auto;
+    }
+
+    .progress-outstanding-text {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text);
+    }
+
+    .button-row.detail-actions {
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .button-row.detail-actions button {
+      min-width: 170px;
+      flex: 0 1 190px;
+    }
+
+    .tabbar {
+      margin-top: auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+
+    .tab {
+      background: #f7f8fc;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .tab.active {
+      background: #fff;
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(207, 45, 129, 0.08) inset;
+    }
+
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: var(--danger);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1;
+      padding: 0 4px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .tab-badge.hidden {
+      display: none;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      background: #ffffffd6;
+      backdrop-filter: blur(8px);
+      border-radius: 22px;
+      padding: 16px;
+    }
+
+    .panel h2 { margin: 0 0 8px; font-size: 18px; }
+    .panel p { margin: 0 0 12px; color: var(--muted); line-height: 1.45; }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .flow button {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      min-height: 34px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .flow button.active {
+      background: var(--accent-soft);
+      border-color: #dfcaec;
+      color: var(--accent);
+    }
+
+    .kpi {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .kpi > div {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      background: #fff;
+      font-size: 12px;
+    }
+
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+
+    @media (max-width: 980px) {
+      .page { grid-template-columns: 1fr; }
+      .phone { min-height: 740px; }
+      .screen { min-height: 740px; }
+    }
   </style>
 </head>
 <body>
-  <p>Redirecting to the App Prototype demo… If nothing happens, open <a href="./mockup.html">mockup.html</a>.</p>
+  <div class="page">
+    <section class="phone">
+      <div class="screen">
+        <div id="globalConnectionPill" class="connection-pill online global-connection-pill"><span class="dot"></span><span>Online</span></div>
+
+        <div class="header hidden">
+          <img class="logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+          <div class="connection-pill online"><span class="dot"></span><span>Online</span></div>
+        </div>
+
+        <div id="view-login" class="view">
+          <div class="auth-shell auth-shell-auth auth-login-shell chooser-enter">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Welcome!</h1>
+              <div class="auth-shell-inputs auth-auth-inputs">
+                <div class="field">
+                  <input id="emailInput" class="input auth-input" placeholder="Email Address" value="lee@example.com" />
+                </div>
+                <div class="field">
+                  <input class="input auth-input" type="password" placeholder="Password" value="password123" />
+                </div>
+                <button class="ghost button-inline auth-forgot-link" data-nav="recover-account">Forgot password?</button>
+              </div>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions auth-login-actions">
+              <button class="button-inline" data-nav="otp">Login</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-otp" class="view hidden">
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Enter confirmation code</h1>
+              <p class="auth-shell-copy auth-card-copy">A 4-digit code was sent to johnsmith@email.com</p>
+              <div class="auth-code-grid" aria-label="Confirmation code digits">
+                <input class="auth-code-input" value="1" maxlength="1" />
+                <input class="auth-code-input active" value="" maxlength="1" />
+                <input class="auth-code-input" value="" maxlength="1" />
+                <input class="auth-code-input" value="" maxlength="1" />
+              </div>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="app-chooser">Submit</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-recover-account" class="view hidden">
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Forgot your password?</h1>
+              <p class="auth-shell-copy auth-card-copy">Enter your email address below and we’ll send you password reset instructions.</p>
+              <div class="auth-shell-inputs auth-auth-inputs">
+                <div class="field">
+                  <input class="input auth-input" placeholder="Email Address" value="lee@example.com" />
+                </div>
+              </div>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="password-reset-sent">Submit</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-password-reset" class="view hidden">
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth">
+              <h1 class="auth-shell-title">Set a new password</h1>
+              <div class="auth-shell-inputs auth-auth-inputs">
+                <div class="field">
+                  <input class="input auth-input" type="password" placeholder="New password" value="new-password-1" />
+                </div>
+                <div class="field">
+                  <input class="input auth-input" type="password" placeholder="Confirm new password" value="new-password-1" />
+                </div>
+              </div>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="password-reset-sent">Submit</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-password-reset-sent" class="view hidden">
+          <div class="auth-shell auth-shell-auth">
+            <img class="logo auth-logo" src="./src/assets/fourteenfish-logo.png" alt="FourteenFish" />
+            <div class="auth-shell-card auth-card-auth auth-card-auth--sent">
+              <h1 class="auth-shell-title">Password reset complete</h1>
+              <p class="auth-shell-copy auth-card-copy">Your password has been reset successfully. You can now log in using your new password.</p>
+            </div>
+            <div class="auth-shell-actions auth-auth-actions">
+              <button class="button-inline" data-nav="login">Log on</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-app-chooser" class="view hidden">
+          <div class="auth-shell app-chooser-shell chooser-enter">
+            <div class="auth-shell-card app-chooser-card">
+              <h1 class="auth-shell-title">Where would you like to continue?</h1>
+              <p class="auth-shell-copy">Choose Portfolio to continue in app, or Education to open the FourteenFish web app.</p>
+
+              <div class="app-chooser-identity">
+                <div class="app-chooser-avatar">
+                  RJ
+                  <div class="app-chooser-avatar-badge">✎</div>
+                </div>
+                <div>
+                  <p class="app-chooser-name">Robert Jones</p>
+                  <p class="app-chooser-role">Practice Manager</p>
+                </div>
+              </div>
+
+              <div class="app-chooser-options">
+                <button class="app-chooser-option portfolio" data-nav="dashboard">
+                  <span class="app-chooser-option-icon">▣</span>
+                  <span class="app-chooser-option-copy-wrap">
+                    <p class="app-chooser-option-title">Portfolio</p>
+                    <p class="app-chooser-option-copy">Work on your Appraisal or Training Portfolio any time, anywhere.</p>
+                  </span>
+                </button>
+
+                <button id="openEducationButton" class="app-chooser-option education">
+                  <span class="app-chooser-option-icon">🎓</span>
+                  <span class="app-chooser-option-copy-wrap">
+                    <p class="app-chooser-option-title">Education</p>
+                    <p class="app-chooser-option-copy">Do your learning in your own time, whenever it suits you.</p>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-dashboard" class="view hidden">
+          <div class="dashboard-header">
+            <div class="dashboard-title-wrap">
+              <button class="dashboard-menu" aria-label="Open menu">≡</button>
+              <h1 class="dashboard-title">Portfolio</h1>
+            </div>
+          </div>
+
+          <div id="offlineBanner" class="dashboard-top-actions">
+            <button class="button-inline" id="nextActionButton">All entries</button>
+            <button class="button-inline" id="dashboardAddNewButton" data-nav="new-entry">✎ Add new</button>
+          </div>
+
+          <div class="entries-card">
+            <h2 class="title" style="font-size:18px; margin:0 0 8px 0;">Recent entries</h2>
+            <div class="row">
+              <p class="row-title">Training course</p>
+              <p class="entry-date">26/06/26</p>
+              <span class="entry-chip">CPD</span>
+            </div>
+            <div class="row">
+              <p class="row-title">Training video</p>
+              <p class="entry-date">03/05/26</p>
+              <span class="entry-chip">CPD</span>
+            </div>
+            <div class="row">
+              <p class="row-title">Event</p>
+              <p class="entry-date">01/05/26</p>
+              <span class="entry-chip">CPD</span>
+            </div>
+          </div>
+
+          <div class="progress-card">
+            <h2 class="title">Entries recorded since 21/03/2025</h2>
+            <div class="progress-layout">
+              <div class="progress-pie-card">
+                <div id="progressPie" class="progress-pie">
+                  <div class="progress-pie-hole">
+                    <p id="progressPieValue" class="progress-pie-value">71%</p>
+                  </div>
+                </div>
+              </div>
+              <div class="progress-stats">
+                <div class="progress-stat">
+                  <span class="progress-stat-dot"></span>
+                  <p class="progress-stat-value">38</p>
+                  <p class="progress-stat-label">Hours remaining</p>
+                </div>
+                <div class="progress-stat">
+                  <span class="progress-stat-dot primary"></span>
+                  <p class="progress-stat-value">150</p>
+                  <p class="progress-stat-label">Hours logged</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hidden">
+            <p id="progressIntroCopy">Track your progress across the portfolio with entry totals and outstanding appraisal actions.</p>
+            <p id="progressSummaryTitle">Appraisal progress summary</p>
+            <p id="progressDueDateText">60 days until due date</p>
+            <p id="progressPieMeta">of 40</p>
+            <p id="progressPieCaption">65% of current portfolio goal</p>
+            <div id="progressOutstandingList"></div>
+            <p id="nextActionTitle">Review your queued entries</p>
+            <p id="nextActionCopy">Entries created while offline will appear here and can be synced from All entries.</p>
+          </div>
+
+        </div>
+
+        <div id="view-new-entry" class="view hidden">
+          <h1 class="title">New entry</h1>
+          <p class="copy">Create an entry now. If offline, it is queued automatically.</p>
+          <div class="card">
+            <div class="field">
+              <p class="field-label">Title *</p>
+              <select id="entryTitle" class="input">
+                <option>Learning event reflection</option>
+                <option>Clinical case reflection</option>
+                <option>Quality improvement activity</option>
+                <option>CPD learning log</option>
+                <option>Appraisal overview</option>
+              </select>
+            </div>
+            <div class="button-row">
+              <button id="saveEntryButton">Create</button>
+              <button class="ghost" data-nav="dashboard">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-entry-detail" class="view hidden">
+          <h1 class="title">Entry detail</h1>
+          <div class="detail-meta">
+            <p class="detail-kicker">Form type</p>
+            <p class="detail-type" id="entryDetailType">Learning event reflection</p>
+            <p class="detail-subtitle" id="entryDetailSubtitle">Saved just now.</p>
+          </div>
+          <div id="entryDetailFields"></div>
+          <div class="button-row detail-actions">
+            <button id="submitEntryButton">Submit</button>
+            <button id="saveDetailDraftButton" class="secondary">Save as draft</button>
+            <button id="cancelEntryButton" class="warn">Cancel entry</button>
+            <button data-nav="dashboard">Back to dashboard</button>
+          </div>
+        </div>
+
+        <div id="view-view-entry" class="view hidden">
+          <div class="view-entry-head">
+            <h1 class="title">View entry</h1>
+          </div>
+          <div class="detail-meta view-entry-meta">
+            <p class="detail-kicker">Form type</p>
+            <p class="detail-type" id="viewEntryType">Learning event reflection</p>
+            <p class="detail-subtitle" id="viewEntrySubtitle">Completed entry.</p>
+            <div class="view-entry-facts">
+              <span class="view-entry-lock">Read only</span>
+              <span id="viewEntryDateChip" class="view-entry-fact">Date</span>
+              <span id="viewEntryStatusChip" class="view-entry-fact status-synced">Synced</span>
+              <span id="viewEntryCategoryChip" class="view-entry-fact">Type</span>
+            </div>
+          </div>
+          <div id="viewEntryFields" class="view-entry-fields"></div>
+          <div class="button-row detail-actions view-entry-actions">
+            <button id="submitViewedEntryButton">Submit</button>
+            <button id="editViewedEntryButton">Edit entry</button>
+            <button class="secondary" data-nav="all-entries">Back to all entries</button>
+          </div>
+        </div>
+
+        <div id="view-settings" class="view hidden">
+          <h1 class="title">Settings</h1>
+          <p class="copy">Manage account access and sign out.</p>
+          <div class="card">
+            <div class="button-row settings-actions">
+              <button id="myAccountButton" class="secondary">My account (opens in browser)</button>
+              <button class="warn" data-nav="login">Log out</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-all-entries" class="view hidden">
+          <div class="all-entries-shell">
+            <h1 class="title" style="font-size:30px;">All entries</h1>
+            <p class="copy">Your 50 most recent portfolio entries.</p>
+            <div class="all-entries-toolbar">
+              <div class="all-entries-summary" id="allEntriesSummary">Showing 50 of 50 entries</div>
+              <button id="syncAllEntriesButton" class="button-inline secondary">Sync all</button>
+            </div>
+            <div id="allEntriesList" class="all-entries-list"></div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab" data-nav="dashboard" data-tab="dashboard">Portfolio</button>
+          <button class="tab" data-nav="new-entry" data-tab="new-entry">+ New entry</button>
+          <button class="tab" data-nav="all-entries" data-tab="all-entries">All entries</button>
+          <button class="tab" data-nav="settings" data-tab="settings">Settings</button>
+          <button class="tab" data-nav="education" data-tab="education">Education</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>Interactive flow mockup</h2>
+      <p>Click any flow step or in-screen action to move through authentication, dashboard, entry creation, queue handling, and settings.</p>
+
+      <div id="flowNav" class="flow"></div>
+
+      <div class="kpi">
+        <div><strong id="kpiRoute">login</strong><br><span class="muted">Current screen</span></div>
+        <div><strong id="kpiQueue">0</strong><br><span class="muted">Queue items</span></div>
+        <div><strong id="kpiNetwork">online</strong><br><span class="muted">Network</span></div>
+      </div>
+
+      <div class="button-row" style="margin-bottom:10px;">
+        <button id="toggleNetwork" class="secondary">Toggle offline</button>
+        <button id="resetFlow" class="ghost">Reset flow</button>
+      </div>
+
+      <div class="banner">
+        Flow includes:
+        login -> OTP -> app chooser -> dashboard -> all entries -> view entry -> new entry -> entry detail -> settings.
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const LOGO_FALLBACK_DATA_URI = `data:image/svg+xml;utf8,${encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="64" viewBox="0 0 280 64" role="img" aria-label="FourteenFish"><rect width="280" height="64" rx="14" fill="#ffffff"/><rect x="2" y="2" width="276" height="60" rx="12" fill="#f2f6ff" stroke="#cbd5f5" stroke-width="2"/><circle cx="36" cy="32" r="12" fill="#2563eb"/><path d="M30 32h12M36 26v12" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/><text x="58" y="37" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" fill="#0f172a">FourteenFish</text></svg>'
+    )}`;
+
+    function applyLogoFallback(img) {
+      if (!img || img.dataset.fallbackApplied === 'true') return;
+      img.dataset.fallbackApplied = 'true';
+      img.src = LOGO_FALLBACK_DATA_URI;
+      img.alt = img.alt || 'FourteenFish';
+    }
+
+    function attachLogoFallbacks() {
+      document.querySelectorAll('img.logo').forEach((img) => {
+        img.addEventListener('error', () => applyLogoFallback(img), { once: true });
+
+        if (img.complete && img.naturalWidth === 0) {
+          applyLogoFallback(img);
+        }
+      });
+    }
+
+    attachLogoFallbacks();
+
+    const routes = [
+      'login',
+      'recover-account',
+      'password-reset',
+      'password-reset-sent',
+      'otp',
+      'app-chooser',
+      'dashboard',
+      'all-entries',
+      'view-entry',
+      'new-entry',
+      'entry-detail',
+      'settings',
+    ];
+
+    const state = {
+      route: 'login',
+      online: true,
+      queue: [],
+      lastEntryStatus: 'synced',
+      signedInEmail: 'lee@example.com',
+      userType: 'gp-appraisal',
+      currentEntryTitle: 'Learning event reflection',
+      currentViewedEntryIndex: 0,
+      currentEditingEntryIndex: null,
+      pendingEntrySnapshot: null,
+      totalEntries: 26,
+      entriesLast30Days: Array.from({ length: 30 }, (_, index) => (index % 6 === 0 ? 2 : index % 5 === 0 ? 1 : 0)),
+      allEntries: [],
+    };
+
+    function createRecentEntries(seedCount = 50) {
+      const types = ['CPD', 'Reflection', 'Event', 'Audit', 'Feedback'];
+      const titles = [
+        'Learning event reflection',
+        'Training course',
+        'Clinical case reflection',
+        'Quality improvement activity',
+        'Team feedback summary',
+        'Appraisal preparation note',
+        'Significant event review',
+        'CPD webinar reflection',
+      ];
+
+      const today = new Date();
+      return Array.from({ length: seedCount }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - index * 2);
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yy = String(date.getFullYear()).slice(-2);
+        const status = index < 2 ? 'queued' : 'synced';
+        return {
+          title: titles[index % titles.length],
+          type: types[index % types.length],
+          date: `${dd}/${mm}/${yy}`,
+          status,
+        };
+      });
+    }
+
+    function parseEntryDate(dateText) {
+      const [day, month, year] = String(dateText || '').split('/').map((part) => Number(part));
+      if (!day || !month || Number.isNaN(year)) {
+        return Number.NEGATIVE_INFINITY;
+      }
+
+      const fullYear = year >= 70 ? 1900 + year : 2000 + year;
+      return new Date(fullYear, month - 1, day).getTime();
+    }
+
+    function getEntriesSortedByDateDesc(entries) {
+      return [...entries].sort((left, right) => parseEntryDate(right.date) - parseEntryDate(left.date));
+    }
+
+    state.allEntries = createRecentEntries(50);
+    state.queue = state.allEntries
+      .filter((entry) => entry.status === 'queued')
+      .map((entry) => ({ title: entry.title, attempts: 1 }));
+
+    const entryFormTemplates = {
+      'Learning event reflection': [
+        {
+          title: 'Reflection details',
+          fields: ['What happened?', 'What did you learn?', 'What will you do differently next time?'],
+        },
+      ],
+      'Clinical case reflection': [
+        {
+          title: 'Case summary',
+          fields: ['Case overview', 'Clinical reasoning', 'Outcome and follow-up'],
+        },
+        {
+          title: 'Practice impact',
+          fields: ['What changed in your practice?', 'What evidence supports the change?'],
+        },
+      ],
+      'Quality improvement activity': [
+        {
+          title: 'Improvement cycle',
+          fields: ['Aim statement', 'Measures used', 'Interventions tested', 'Next cycle actions'],
+        },
+      ],
+      'CPD learning log': [
+        {
+          title: 'Learning record',
+          fields: ['Learning activity', 'Key takeaway', 'How this informs your work'],
+        },
+      ],
+      'Appraisal overview': [
+        {
+          title: 'Keeping up to date',
+          description: 'Maintaining and enhancing the quality of your professional work.',
+          fields: [
+            'What have you done to keep up to date across the whole of your scope of work?',
+            'What are the most significant things you have learned?',
+            'Have you identified any learning needs that you need, or want, to address, or key learning to be shared? If so, what action have you taken as a result?',
+          ],
+        },
+        {
+          title: 'Reviewing your practice',
+          description: 'Evaluating and improving the quality of your professional work.',
+          fields: [
+            'What have you learned from reviewing your practice across the whole of your scope of work?',
+            'What are the most significant things you have changed as a result and how effective have those changes been?',
+            'What else do you want to change (if anything)?',
+          ],
+        },
+        {
+          title: 'Feedback',
+          description: 'Seeking and acting on feedback about the quality of your professional work.',
+          fields: [
+            'From your patients and/or their carers (where applicable)',
+            'From any other group you provide medical services to, including teaching, training and appraising',
+            'From your colleagues',
+            'From any compliments you have been personally named in',
+            'What have you changed, or do you want to change (if anything) because of any feedback you have received?',
+          ],
+        },
+      ],
+    };
+
+    const defaultEntryTemplate = [
+      {
+        title: 'Entry details',
+        fields: ['Summary', 'Main notes', 'Next actions'],
+      },
+    ];
+
+    const viewMap = Object.fromEntries(routes.map((route) => [route, document.getElementById(`view-${route}`)]));
+
+    const flowNav = document.getElementById('flowNav');
+    const globalConnectionPill = document.getElementById('globalConnectionPill');
+    const kpiRoute = document.getElementById('kpiRoute');
+    const kpiQueue = document.getElementById('kpiQueue');
+    const kpiNetwork = document.getElementById('kpiNetwork');
+    const entryDetailType = document.getElementById('entryDetailType');
+    const entryDetailFields = document.getElementById('entryDetailFields');
+    const entryDetailSubtitle = document.getElementById('entryDetailSubtitle');
+    const viewEntryType = document.getElementById('viewEntryType');
+    const viewEntrySubtitle = document.getElementById('viewEntrySubtitle');
+    const viewEntryFields = document.getElementById('viewEntryFields');
+    const submitViewedEntryButton = document.getElementById('submitViewedEntryButton');
+    const editViewedEntryButton = document.getElementById('editViewedEntryButton');
+    const viewEntryDateChip = document.getElementById('viewEntryDateChip');
+    const viewEntryStatusChip = document.getElementById('viewEntryStatusChip');
+    const viewEntryCategoryChip = document.getElementById('viewEntryCategoryChip');
+    const offlineBanner = document.getElementById('offlineBanner');
+    const progressPie = document.getElementById('progressPie');
+    const progressPieValue = document.getElementById('progressPieValue');
+    const progressPieMeta = document.getElementById('progressPieMeta');
+    const progressPieCaption = document.getElementById('progressPieCaption');
+    const progressIntroCopy = document.getElementById('progressIntroCopy');
+    const progressSummaryTitle = document.getElementById('progressSummaryTitle');
+    const progressDueDateText = document.getElementById('progressDueDateText');
+    const progressOutstandingList = document.getElementById('progressOutstandingList');
+    const nextActionTitle = document.getElementById('nextActionTitle');
+    const nextActionCopy = document.getElementById('nextActionCopy');
+    const nextActionButton = document.getElementById('nextActionButton');
+    const allEntriesList = document.getElementById('allEntriesList');
+    const allEntriesSummary = document.getElementById('allEntriesSummary');
+    const syncAllEntriesButton = document.getElementById('syncAllEntriesButton');
+    const openEducationButton = document.getElementById('openEducationButton');
+    const myAccountButton = document.getElementById('myAccountButton');
+    const educationUrl = 'https://www.fourteenfish.com/educationpackages';
+    const myAccountUrl = 'https://www.fourteenfish.com/account/myaccount';
+    const appraisalDueDate = new Date('2026-09-26T00:00:00.000Z');
+
+    function resolveUserTypeFromEmail(email) {
+      const normalized = String(email || '').toLowerCase();
+
+      if (normalized.includes('rcpsych')) {
+        return 'rcpsych-trainee';
+      }
+
+      if (normalized.includes('rcgp') || normalized.includes('trainee')) {
+        return 'rcgp-trainee';
+      }
+
+      return 'gp-appraisal';
+    }
+
+    state.userType = resolveUserTypeFromEmail(state.signedInEmail);
+    const tabbar = document.querySelector('.tabbar');
+    const appChooserView = document.getElementById('view-app-chooser');
+
+    function getProgressProfile(userType) {
+      if (userType === 'rcgp-trainee') {
+        return {
+          label: 'RCGP Trainee',
+          summaryTitle: 'RCGP training progress summary',
+          dueLabel: 'ARCP review',
+          intro: 'Track your progress across the portfolio with entry totals and role-specific trainee actions.',
+          extras: [
+            'Record WPBA evidence linked to recent learning entries.',
+            'Review your ARCP capabilities and map gaps to new entries.',
+            'Update supervision reflections and agreed actions.',
+          ],
+        };
+      }
+
+      if (userType === 'rcpsych-trainee') {
+        return {
+          label: 'RCPsych Trainee',
+          summaryTitle: 'RCPsych training progress summary',
+          dueLabel: 'ARCP review',
+          intro: 'Track your progress across the portfolio with entry totals and role-specific trainee actions.',
+          extras: [
+            'Update psychotherapy and clinical experience logs.',
+            'Check required workplace-based assessments for ARCP.',
+            'Capture supervisor feedback and reflective follow-up actions.',
+          ],
+        };
+      }
+
+      return {
+        label: 'GP - Appraisal',
+        summaryTitle: 'Appraisal progress summary',
+        dueLabel: 'due date',
+        intro: 'Track your progress across the portfolio with entry totals and outstanding appraisal actions.',
+        extras: [
+          'Complete your final appraisal narrative summary.',
+          'Attach any remaining supporting evidence documents.',
+          'Review learning needs and record your planned follow-up actions.',
+        ],
+      };
+    }
+
+    routes.forEach((route) => {
+      const button = document.createElement('button');
+      button.textContent = route.replace('-', ' ');
+      button.dataset.nav = route;
+      flowNav.appendChild(button);
+    });
+
+    function setRoute(route) {
+      state.route = route;
+      render();
+    }
+
+    function getCurrentViewedEntry() {
+      const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
+      return sortedEntries[state.currentViewedEntryIndex] || sortedEntries[0] || null;
+    }
+
+    function renderEntryDetailFields() {
+      const sections = entryFormTemplates[state.currentEntryTitle] || defaultEntryTemplate;
+      entryDetailType.textContent = state.currentEntryTitle;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'detail-sections';
+
+      sections.forEach((section) => {
+        const sectionElement = document.createElement('section');
+        sectionElement.className = 'detail-section';
+
+        const heading = document.createElement('p');
+        heading.className = 'detail-section-title';
+        heading.textContent = section.title;
+        sectionElement.appendChild(heading);
+
+        if (section.description) {
+          const description = document.createElement('p');
+          description.className = 'detail-section-copy';
+          description.textContent = section.description;
+          sectionElement.appendChild(description);
+        }
+
+        section.fields.forEach((field) => {
+          const fieldElement = document.createElement('div');
+          fieldElement.className = 'detail-field';
+          fieldElement.innerHTML = `<p class="detail-field-label">${field}</p><p class="detail-field-value">Not answered yet</p>`;
+          sectionElement.appendChild(fieldElement);
+        });
+
+        wrapper.appendChild(sectionElement);
+      });
+
+      entryDetailFields.innerHTML = '';
+      entryDetailFields.appendChild(wrapper);
+    }
+
+    function renderProgress() {
+      const dailySeries = state.entriesLast30Days.slice(-30);
+      const thirtyDayTotal = dailySeries.reduce((total, value) => total + value, 0);
+      const totalEntries = Math.max(state.totalEntries, thirtyDayTotal);
+      const completionTarget = Math.max(40, Math.ceil(totalEntries / 10) * 10);
+      const completionPercent = Math.min(100, Math.round((totalEntries / completionTarget) * 100));
+      const remainingToGoal = Math.max(0, completionTarget - totalEntries);
+      const progressProfile = getProgressProfile(state.userType);
+
+      if (progressPie) {
+        progressPie.style.background = `conic-gradient(var(--accent) 0deg, var(--accent) ${completionPercent * 3.6}deg, #ebd9f1 ${completionPercent * 3.6}deg, #ebd9f1 360deg)`;
+      }
+      if (progressPieValue) {
+        progressPieValue.textContent = String(totalEntries);
+      }
+      if (progressPieMeta) {
+        progressPieMeta.textContent = `of ${completionTarget}`;
+      }
+      if (progressPieCaption) {
+        progressPieCaption.textContent = `${completionPercent}% of current portfolio goal`;
+      }
+      if (progressSummaryTitle) {
+        progressSummaryTitle.textContent = progressProfile.summaryTitle;
+      }
+      if (progressIntroCopy) {
+        progressIntroCopy.textContent = progressProfile.intro;
+      }
+
+      const outstandingItems = [];
+      if (state.queue.length > 0) {
+        outstandingItems.push(`Sync ${state.queue.length} pending entr${state.queue.length === 1 ? 'y' : 'ies'} from All entries.`);
+      }
+
+      if (remainingToGoal > 0) {
+        outstandingItems.push(`Add ${remainingToGoal} more entr${remainingToGoal === 1 ? 'y' : 'ies'} to reach your current portfolio goal.`);
+      }
+
+      progressProfile.extras.forEach((item) => outstandingItems.push(item));
+
+      const now = new Date();
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const nowUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      const dueUtc = Date.UTC(appraisalDueDate.getUTCFullYear(), appraisalDueDate.getUTCMonth(), appraisalDueDate.getUTCDate());
+      const daysUntilDue = Math.max(0, Math.ceil((dueUtc - nowUtc) / msPerDay));
+
+      if (progressDueDateText) {
+        progressDueDateText.textContent = `${daysUntilDue} days until ${progressProfile.dueLabel}`;
+      }
+      if (progressOutstandingList) {
+        progressOutstandingList.innerHTML = '';
+        outstandingItems.forEach((item) => {
+          const row = document.createElement('div');
+          row.className = 'progress-outstanding-item';
+          row.innerHTML = `<span class="progress-outstanding-dot"></span><p class="progress-outstanding-text">${item}</p>`;
+          progressOutstandingList.appendChild(row);
+        });
+      }
+
+    }
+
+    function renderViewEntryFields() {
+      if (!viewEntryType || !viewEntrySubtitle || !viewEntryFields) {
+        return;
+      }
+
+      const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
+      const selectedEntry = sortedEntries[state.currentViewedEntryIndex] || sortedEntries[0];
+      if (!selectedEntry) {
+        viewEntryType.textContent = 'No entry selected';
+        viewEntrySubtitle.textContent = 'Choose an entry from All entries.';
+        viewEntryFields.innerHTML = '';
+        return;
+      }
+
+      state.currentEntryTitle = selectedEntry.title;
+      const sections = entryFormTemplates[selectedEntry.title] || defaultEntryTemplate;
+      viewEntryType.textContent = selectedEntry.title;
+      viewEntrySubtitle.textContent = selectedEntry.status === 'draft' ? `Draft saved on ${selectedEntry.date}.` : `Completed on ${selectedEntry.date}.`;
+
+      if (viewEntryDateChip) {
+        viewEntryDateChip.textContent = selectedEntry.date;
+      }
+
+      if (viewEntryCategoryChip) {
+        viewEntryCategoryChip.textContent = selectedEntry.type;
+      }
+
+      if (viewEntryStatusChip) {
+        viewEntryStatusChip.textContent = selectedEntry.status === 'queued' ? 'unsynced' : selectedEntry.status;
+        viewEntryStatusChip.className = `view-entry-fact status-${selectedEntry.status}`;
+      }
+
+      if (editViewedEntryButton) {
+        editViewedEntryButton.classList.toggle('hidden', selectedEntry.status !== 'draft');
+      }
+
+      if (submitViewedEntryButton) {
+        submitViewedEntryButton.classList.toggle('hidden', selectedEntry.status !== 'draft');
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'detail-sections';
+
+      sections.forEach((section) => {
+        const sectionElement = document.createElement('section');
+        sectionElement.className = 'detail-section';
+
+        const heading = document.createElement('p');
+        heading.className = 'detail-section-title';
+        heading.textContent = section.title;
+        sectionElement.appendChild(heading);
+
+        if (section.description) {
+          const description = document.createElement('p');
+          description.className = 'detail-section-copy';
+          description.textContent = section.description;
+          sectionElement.appendChild(description);
+        }
+
+        section.fields.forEach((field) => {
+          const fieldElement = document.createElement('div');
+          fieldElement.className = 'detail-field';
+          fieldElement.innerHTML = `<p class="detail-field-label">${field}</p><p class="detail-field-value">Read-only response captured in this completed entry.</p>`;
+          sectionElement.appendChild(fieldElement);
+        });
+
+        wrapper.appendChild(sectionElement);
+      });
+
+      const statusCard = document.createElement('div');
+      statusCard.className = 'card list';
+      statusCard.innerHTML = `<div class="row"><div><p class="row-title">Sync state</p><p class="row-sub">Entry status in your local portfolio</p></div><span class="entry-sync-status ${selectedEntry.status}">${selectedEntry.status === 'queued' ? 'unsynced' : selectedEntry.status}</span></div>`;
+      wrapper.appendChild(statusCard);
+
+      viewEntryFields.innerHTML = '';
+      viewEntryFields.appendChild(wrapper);
+    }
+
+    function renderAllEntries() {
+      if (!allEntriesList || !allEntriesSummary) {
+        return;
+      }
+
+      const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
+      const recentEntries = sortedEntries.slice(0, 50);
+      const unsyncedEntriesCount = recentEntries.filter((entry) => entry.status === 'queued' || entry.status === 'draft').length;
+      const queuedEntriesCount = recentEntries.filter((entry) => entry.status === 'queued').length;
+      allEntriesSummary.textContent = `Showing ${recentEntries.length} of ${state.allEntries.length} entries${unsyncedEntriesCount > 0 ? ` (${unsyncedEntriesCount} unsynced)` : ''}`;
+
+      if (syncAllEntriesButton) {
+        const canSync = queuedEntriesCount > 0 && state.online;
+        syncAllEntriesButton.disabled = !canSync;
+        syncAllEntriesButton.className = `button-inline ${canSync ? '' : 'gray'}`;
+        if (!state.online && queuedEntriesCount > 0) {
+          syncAllEntriesButton.textContent = 'Offline';
+        } else {
+          syncAllEntriesButton.textContent = 'Sync all';
+        }
+      }
+
+      allEntriesList.innerHTML = '';
+      recentEntries.forEach((entry, index) => {
+        const row = document.createElement('div');
+        row.className = 'all-entries-item';
+        const statusText = entry.status === 'queued' ? 'unsynced' : entry.status;
+        row.innerHTML = `
+          <div class="all-entries-main">
+            <p class="all-entries-title">${index + 1}. ${entry.title}</p>
+            <p class="all-entries-meta">${entry.date}<span class="entry-sync-status ${entry.status}">${statusText}</span></p>
+          </div>
+          <div class="all-entries-side">
+            <span class="all-entries-type">${entry.type}</span>
+            <button class="all-entries-view" data-entry-index="${index}">View</button>
+          </div>
+        `;
+        allEntriesList.appendChild(row);
+      });
+    }
+
+    function render() {
+      Object.entries(viewMap).forEach(([route, el]) => {
+        if (!el) {
+          return;
+        }
+
+        el.classList.toggle('hidden', state.route !== route);
+      });
+
+      document.querySelectorAll('[data-nav]').forEach((button) => {
+        const isActive = button.dataset.nav === state.route && button.parentElement === flowNav;
+        button.classList.toggle('active', isActive);
+      });
+
+      document.querySelectorAll('[data-tab]').forEach((tab) => {
+        tab.classList.toggle('active', tab.dataset.tab === state.route || (state.route === 'dashboard' && tab.dataset.tab === 'dashboard'));
+      });
+
+      const authRoutes = ['login', 'recover-account', 'password-reset', 'password-reset-sent', 'otp', 'app-chooser'];
+      tabbar.classList.toggle('hidden', authRoutes.includes(state.route));
+      document.querySelector('.header')?.classList.add('hidden');
+
+      if (state.route === 'app-chooser') {
+        appChooserView.classList.remove('chooser-enter');
+        requestAnimationFrame(() => {
+          appChooserView.classList.add('chooser-enter');
+        });
+      } else {
+        appChooserView.classList.remove('chooser-enter');
+      }
+
+      globalConnectionPill.className = `connection-pill global-connection-pill ${state.online ? 'online' : 'offline'}`;
+      globalConnectionPill.innerHTML = `<span class="dot"></span><span>${state.online ? 'Online' : 'Offline'}</span>`;
+
+      kpiRoute.textContent = state.route;
+      kpiQueue.textContent = String(state.queue.length);
+      kpiNetwork.textContent = state.online ? 'online' : 'offline';
+
+      renderAllEntries();
+
+      if (nextActionTitle && nextActionCopy && nextActionButton) {
+        if (state.queue.length > 0) {
+          nextActionTitle.textContent = 'Review your pending queue';
+          nextActionCopy.textContent = `${state.queue.length} entry${state.queue.length === 1 ? '' : 'ies'} are queued and can be synced from All entries when you are back online.`;
+          nextActionButton.textContent = 'All entries';
+        } else {
+          nextActionTitle.textContent = 'Add your next entry';
+          nextActionCopy.textContent = 'Your portfolio is up to date. Capture a new reflective entry when you are ready.';
+          nextActionButton.textContent = 'All entries';
+        }
+      }
+
+      renderEntryDetailFields();
+      renderViewEntryFields();
+      renderProgress();
+
+      entryDetailSubtitle.textContent = state.lastEntryStatus === 'queued' ? 'Saved offline and queued for sync.' : 'Saved and synced.';
+
+      offlineBanner.className = 'dashboard-top-actions';
+      offlineBanner.querySelector('#nextActionButton').textContent = 'All entries';
+    }
+
+    function saveEntry() {
+      const titleInput = document.getElementById('entryTitle');
+      const title = titleInput.value || 'Learning event reflection';
+
+      state.pendingEntrySnapshot = {
+        queue: state.queue.map((item) => ({ ...item })),
+        allEntries: state.allEntries.map((entry) => ({ ...entry })),
+        totalEntries: state.totalEntries,
+        entriesLast30Days: [...state.entriesLast30Days],
+        lastEntryStatus: state.lastEntryStatus,
+      };
+
+      state.currentEntryTitle = title;
+      state.totalEntries += 1;
+      state.entriesLast30Days.push(1);
+      state.entriesLast30Days = state.entriesLast30Days.slice(-30);
+
+      if (!state.online) {
+        state.queue.push({ title, attempts: 1 });
+        state.lastEntryStatus = 'queued';
+      } else {
+        state.lastEntryStatus = 'synced';
+      }
+
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yy = String(now.getFullYear()).slice(-2);
+      state.allEntries.unshift({
+        title,
+        type: title === 'Appraisal overview' ? 'Appraisal' : 'Reflection',
+        date: `${dd}/${mm}/${yy}`,
+        status: state.online ? 'synced' : 'queued',
+      });
+      state.allEntries = state.allEntries.slice(0, 50);
+      state.currentEditingEntryIndex = 0;
+
+      setRoute('entry-detail');
+    }
+
+    function submitCurrentEntry() {
+      const fallbackEntry = state.allEntries[0];
+      const targetIndex = Number.isInteger(state.currentEditingEntryIndex)
+        ? state.currentEditingEntryIndex
+        : 0;
+      const targetEntry = state.allEntries[targetIndex] || fallbackEntry;
+
+      if (!targetEntry) {
+        setRoute('all-entries');
+        return;
+      }
+
+      if (targetEntry.status === 'queued' && state.queue.length > 0) {
+        const queuedIndex = state.queue.findIndex((item) => item.title === targetEntry.title);
+        if (queuedIndex >= 0) {
+          state.queue.splice(queuedIndex, 1);
+        } else {
+          state.queue = state.queue.slice(0, Math.max(0, state.queue.length - 1));
+        }
+      }
+
+      targetEntry.status = 'synced';
+      state.lastEntryStatus = 'synced';
+      state.pendingEntrySnapshot = null;
+      state.currentEditingEntryIndex = null;
+      setRoute('all-entries');
+    }
+
+    function saveCurrentEntryAsDraft() {
+      const fallbackEntry = state.allEntries[0];
+      const targetIndex = Number.isInteger(state.currentEditingEntryIndex)
+        ? state.currentEditingEntryIndex
+        : 0;
+      const targetEntry = state.allEntries[targetIndex] || fallbackEntry;
+
+      if (!targetEntry) {
+        setRoute('all-entries');
+        return;
+      }
+
+      if (targetEntry.status === 'queued' && state.queue.length > 0) {
+        const queuedIndex = state.queue.findIndex((item) => item.title === targetEntry.title);
+        if (queuedIndex >= 0) {
+          state.queue.splice(queuedIndex, 1);
+        } else {
+          state.queue = state.queue.slice(0, Math.max(0, state.queue.length - 1));
+        }
+      }
+
+      targetEntry.status = 'draft';
+      state.lastEntryStatus = 'draft';
+      state.currentEditingEntryIndex = null;
+
+      setRoute('all-entries');
+    }
+
+    function editCurrentViewedEntry() {
+      const selectedEntry = getCurrentViewedEntry();
+      if (!selectedEntry) {
+        return;
+      }
+
+      state.currentEntryTitle = selectedEntry.title;
+      state.lastEntryStatus = selectedEntry.status;
+      state.currentEditingEntryIndex = state.allEntries.indexOf(selectedEntry);
+      setRoute('entry-detail');
+    }
+
+    function submitCurrentViewedEntry() {
+      const selectedEntry = getCurrentViewedEntry();
+      if (!selectedEntry) {
+        return;
+      }
+
+      selectedEntry.status = 'synced';
+      state.lastEntryStatus = 'synced';
+      render();
+    }
+
+    function cancelEntryCreation() {
+      const snapshot = state.pendingEntrySnapshot;
+      if (!snapshot) {
+        setRoute('dashboard');
+        return;
+      }
+
+      state.queue = snapshot.queue.map((item) => ({ ...item }));
+      state.allEntries = snapshot.allEntries.map((entry) => ({ ...entry }));
+      state.totalEntries = snapshot.totalEntries;
+      state.entriesLast30Days = [...snapshot.entriesLast30Days];
+      state.lastEntryStatus = snapshot.lastEntryStatus;
+      state.pendingEntrySnapshot = null;
+
+      setRoute('dashboard');
+    }
+
+    document.body.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-nav]');
+      if (!target) return;
+      const route = target.dataset.nav;
+      if (!route) return;
+
+      if (route === 'education') {
+        window.open(educationUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      if (route === 'login') {
+        state.queue = [];
+        state.lastEntryStatus = 'synced';
+        state.pendingEntrySnapshot = null;
+      }
+
+      setRoute(route);
+    });
+
+    document.getElementById('saveEntryButton').addEventListener('click', saveEntry);
+    document.getElementById('submitEntryButton')?.addEventListener('click', submitCurrentEntry);
+    submitViewedEntryButton?.addEventListener('click', submitCurrentViewedEntry);
+    editViewedEntryButton?.addEventListener('click', editCurrentViewedEntry);
+    document.getElementById('saveDetailDraftButton')?.addEventListener('click', saveCurrentEntryAsDraft);
+    document.getElementById('cancelEntryButton')?.addEventListener('click', cancelEntryCreation);
+
+    document.getElementById('toggleNetwork').addEventListener('click', () => {
+      state.online = !state.online;
+      render();
+    });
+
+    document.getElementById('resetFlow').addEventListener('click', () => {
+      state.route = 'login';
+      state.online = true;
+      state.queue = [];
+      state.lastEntryStatus = 'synced';
+      state.pendingEntrySnapshot = null;
+      state.currentEditingEntryIndex = null;
+      state.totalEntries = 26;
+      state.entriesLast30Days = Array.from({ length: 30 }, (_, index) => (index % 6 === 0 ? 2 : index % 5 === 0 ? 1 : 0));
+      state.allEntries = createRecentEntries(50);
+      state.queue = state.allEntries
+        .filter((entry) => entry.status === 'queued')
+        .map((entry) => ({ title: entry.title, attempts: 1 }));
+      document.getElementById('entryTitle').value = 'Learning event reflection';
+      const otpInput = document.getElementById('otpInput');
+      if (otpInput) {
+        otpInput.value = '123456';
+      }
+      render();
+    });
+
+    syncAllEntriesButton?.addEventListener('click', () => {
+      if (!state.online) {
+        return;
+      }
+
+      const hasQueuedEntries = state.allEntries.some((entry) => entry.status === 'queued');
+      if (!hasQueuedEntries) {
+        return;
+      }
+
+      state.queue = [];
+      state.lastEntryStatus = 'synced';
+      state.allEntries = state.allEntries.map((entry) => (entry.status === 'queued' ? { ...entry, status: 'synced' } : entry));
+      render();
+    });
+
+    allEntriesList?.addEventListener('click', (event) => {
+      const viewButton = event.target.closest('[data-entry-index]');
+      if (!viewButton) {
+        return;
+      }
+
+      const index = Number(viewButton.dataset.entryIndex);
+      if (Number.isNaN(index)) {
+        return;
+      }
+
+      state.currentViewedEntryIndex = index;
+      setRoute('view-entry');
+    });
+
+    nextActionButton?.addEventListener('click', () => {
+      setRoute('all-entries');
+    });
+
+    document.getElementById('emailInput').addEventListener('input', (event) => {
+      state.signedInEmail = event.target.value || 'unknown user';
+      state.userType = resolveUserTypeFromEmail(state.signedInEmail);
+      render();
+    });
+
+    openEducationButton.addEventListener('click', () => {
+      window.open(educationUrl, '_blank', 'noopener,noreferrer');
+    });
+
+    myAccountButton.addEventListener('click', () => {
+      window.open(myAccountUrl, '_blank', 'noopener,noreferrer');
+    });
+
+    globalConnectionPill?.addEventListener('click', () => {
+      state.online = !state.online;
+      render();
+    });
+
+    render();
+  </script>
 </body>
 </html>
