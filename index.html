@@ -121,11 +121,34 @@
       min-width: 0;
     }
 
+    .app-shell-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      min-height: 44px;
+      margin-top: 2px;
+      margin-bottom: 4px;
+      padding-right: 60px;
+      position: relative;
+      z-index: 13;
+    }
+
+    .app-shell-topbar.hidden {
+      display: none;
+    }
+
+    .app-shell-menu-label {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
     .app-menu-toggle {
-      position: absolute;
-      top: 38px;
-      left: 16px;
-      z-index: 14;
       width: 40px;
       height: 40px;
       border-radius: 14px;
@@ -139,6 +162,7 @@
       font-weight: 800;
       box-shadow: 0 10px 24px rgba(12, 14, 20, 0.12);
       transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
+      flex: 0 0 auto;
     }
 
     .app-menu-toggle:active {
@@ -240,6 +264,31 @@
     .side-nav-items {
       display: grid;
       gap: 10px;
+    }
+
+    .side-nav-footer {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .side-nav-logout {
+      min-height: var(--btn-height);
+      width: 100%;
+      padding: 0 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
     }
 
     .side-nav-item {
@@ -2058,7 +2107,10 @@
     <section class="phone">
       <div class="screen">
         <div id="globalConnectionPill" class="connection-pill online global-connection-pill"><span class="dot"></span><span>Online</span></div>
-        <button id="appMenuButton" class="app-menu-toggle hidden" aria-label="Open navigation" aria-controls="sideNav" aria-expanded="false">≡</button>
+        <div id="appShellTopbar" class="app-shell-topbar hidden">
+          <button id="appMenuButton" class="app-menu-toggle" aria-label="Open navigation" aria-controls="sideNav" aria-expanded="false">≡</button>
+          <p class="app-shell-menu-label">Menu</p>
+        </div>
         <div id="sideNavScrim" class="side-nav-scrim hidden"></div>
         <nav id="sideNav" class="side-nav hidden" aria-label="Main navigation">
           <div class="side-nav-header">
@@ -2075,6 +2127,9 @@
             <button class="side-nav-item" data-nav="all-entries">All entries</button>
             <button class="side-nav-item" data-nav="settings">Settings</button>
             <button class="side-nav-item" data-nav="education">Education</button>
+          </div>
+          <div class="side-nav-footer">
+            <button class="side-nav-logout" data-nav="login">Log out</button>
           </div>
         </nav>
 
@@ -2568,6 +2623,7 @@
 
     const flowNav = document.getElementById('flowNav');
     const globalConnectionPill = document.getElementById('globalConnectionPill');
+    const appShellTopbar = document.getElementById('appShellTopbar');
     const kpiRoute = document.getElementById('kpiRoute');
     const kpiQueue = document.getElementById('kpiQueue');
     const kpiNetwork = document.getElementById('kpiNetwork');
@@ -2924,7 +2980,7 @@
 
       document.querySelector('.header')?.classList.add('hidden');
 
-      appMenuButton.classList.toggle('hidden', authRoutes.includes(state.route));
+      appShellTopbar.classList.toggle('hidden', authRoutes.includes(state.route));
       sideNav.classList.toggle('hidden', authRoutes.includes(state.route));
       sideNavScrim.classList.toggle('hidden', authRoutes.includes(state.route));
       sideNav.classList.toggle('open', state.menuOpen && !authRoutes.includes(state.route));
