@@ -1091,6 +1091,7 @@
     }
 
     button:hover { transform: translateY(-1px); }
+    button.button-primary-solid { background: #511268; border-color: #511268; background-image: none; color: #fff; }
     button.secondary { background: #f3ecf8; color: #5d1678; border-color: #e0d1ea; }
     button.ghost { background: transparent; color: #5d1678; border-color: #d9dde4; }
     button.warn { background: var(--warning); color: #1f1400; }
@@ -2474,7 +2475,7 @@
               </select>
             </div>
             <div class="button-row">
-              <button id="saveEntryButton">Create</button>
+              <button id="saveEntryButton" class="button-primary-solid">Create</button>
               <button class="ghost" data-nav="dashboard">Cancel</button>
             </div>
           </div>
@@ -2489,10 +2490,10 @@
           </div>
           <div id="entryDetailFields"></div>
           <div class="button-row detail-actions">
-            <button id="submitEntryButton">Submit</button>
+            <button id="submitEntryButton" class="button-primary-solid">Submit</button>
             <button id="saveDetailDraftButton" class="secondary">Save as draft</button>
             <button id="cancelEntryButton" class="warn">Cancel entry</button>
-            <button data-nav="dashboard">Back to dashboard</button>
+            <button class="button-primary-solid" data-nav="dashboard">Back to dashboard</button>
           </div>
         </div>
 
@@ -2536,7 +2537,7 @@
             <p class="copy">Your 50 most recent portfolio entries.</p>
             <div class="all-entries-toolbar">
               <div class="all-entries-summary" id="allEntriesSummary">Showing 50 of 50 entries</div>
-              <button id="syncAllEntriesButton" class="button-inline secondary">Sync all</button>
+              <button id="syncAllEntriesButton" class="button-inline button-primary-solid">Sync all</button>
             </div>
             <div id="allEntriesList" class="all-entries-list"></div>
           </div>
@@ -3253,7 +3254,7 @@
       if (syncAllEntriesButton) {
         const canSync = (queuedEntriesCount > 0 || errorEntriesCount > 0) && state.online && syncingEntriesCount === 0;
         syncAllEntriesButton.disabled = !canSync;
-        syncAllEntriesButton.className = `button-inline ${canSync ? '' : 'gray'}`;
+        syncAllEntriesButton.className = `button-inline ${canSync ? 'button-primary-solid' : 'gray'}`;
         if (syncingEntriesCount > 0) {
           syncAllEntriesButton.textContent = 'Syncing...';
         } else if (!state.online && (queuedEntriesCount > 0 || errorEntriesCount > 0)) {
