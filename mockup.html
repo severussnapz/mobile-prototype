@@ -2929,7 +2929,7 @@
       sideNavScrim.classList.toggle('hidden', authRoutes.includes(state.route));
       sideNav.classList.toggle('open', state.menuOpen && !authRoutes.includes(state.route));
       sideNavScrim.classList.toggle('open', state.menuOpen && !authRoutes.includes(state.route));
-      appMenuButton.textContent = state.menuOpen ? '×' : '≡';
+      appMenuButton.textContent = '≡';
       appMenuButton.setAttribute('aria-label', state.menuOpen ? 'Close navigation' : 'Open navigation');
       appMenuButton.setAttribute('aria-expanded', state.menuOpen ? 'true' : 'false');
 
