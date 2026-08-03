@@ -1126,6 +1126,84 @@
       cursor: pointer;
     }
 
+    .sync-status-widget {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #e3e5ea;
+      border-radius: 14px;
+      background: #ffffff;
+      margin-top: 10px;
+    }
+
+    .sync-status-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .sync-status-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #eef9f0;
+      color: #2f9e44;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+
+    .sync-status-icon.warning {
+      background: #fff6e8;
+      color: #b26a00;
+    }
+
+    .sync-status-copy {
+      min-width: 0;
+    }
+
+    .sync-status-title {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.1;
+      font-weight: 800;
+      color: #2f9e44;
+    }
+
+    .sync-status-title.warning {
+      color: #b26a00;
+    }
+
+    .sync-status-subtitle {
+      margin: 3px 0 0;
+      font-size: 12px;
+      line-height: 1.2;
+      color: #6b7280;
+    }
+
+    .sync-status-action {
+      min-height: 36px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 10px;
+      background: #ededed;
+      color: #717171;
+      font-family: "Roboto", sans-serif;
+      font-weight: 500;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
     .login-button {
       display: inline-flex;
       align-items: center;
@@ -2478,12 +2556,23 @@
       'settings',
     ];
 
+    const syncWidgetRoutes = [
+      'app-chooser',
+      'dashboard',
+      'all-entries',
+      'view-entry',
+      'new-entry',
+      'entry-detail',
+      'settings',
+    ];
+
     const state = {
       route: 'login',
       online: true,
       menuOpen: false,
       queue: [],
       lastEntryStatus: 'synced',
+      lastSyncTimestamp: new Date(),
       signedInEmail: 'lee@example.com',
       userType: 'gp-appraisal',
       currentEntryTitle: 'Learning event reflection',
@@ -2729,6 +2818,98 @@
       render();
     }
 
+    function formatSyncTimestamp(dateValue) {
+      const date = dateValue instanceof Date ? dateValue : new Date();
+      const hours24 = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const period = hours24 >= 12 ? 'PM' : 'AM';
+      const hours12 = hours24 % 12 || 12;
+      return `Today ${hours12}:${minutes} ${period}`;
+    }
+
+    function getUnsyncedEntryCount() {
+      return state.allEntries.filter((entry) => entry.status === 'queued' || entry.status === 'draft').length;
+    }
+
+    function createSyncStatusWidget() {
+      const widget = document.createElement('section');
+      widget.className = 'sync-status-widget';
+      widget.innerHTML = `
+        <div class="sync-status-main">
+          <span class="sync-status-icon" aria-hidden="true">✓</span>
+          <div class="sync-status-copy">
+            <p class="sync-status-title">All synced</p>
+            <p class="sync-status-subtitle">Last updated: ${formatSyncTimestamp(state.lastSyncTimestamp)}</p>
+          </div>
+        </div>
+        <button type="button" class="sync-status-action">View entries</button>
+      `;
+
+      widget.querySelector('.sync-status-action')?.addEventListener('click', () => {
+        setRoute('all-entries');
+      });
+
+      return widget;
+    }
+
+    function ensureSyncStatusWidgetForView(route) {
+      const view = viewMap[route];
+      if (!view) {
+        return;
+      }
+
+      if (view.querySelector('.sync-status-widget')) {
+        return;
+      }
+
+      const widget = createSyncStatusWidget();
+
+      if (route === 'dashboard') {
+        const dashboardHeader = view.querySelector('.dashboard-header');
+        if (dashboardHeader) {
+          dashboardHeader.insertAdjacentElement('afterend', widget);
+          return;
+        }
+      }
+
+      const title = view.querySelector('.view-entry-head, h1.title, .auth-shell-title, .dashboard-title');
+      if (title) {
+        title.insertAdjacentElement('afterend', widget);
+      } else {
+        view.prepend(widget);
+      }
+    }
+
+    function renderSyncStatusWidget() {
+      const unsyncedCount = getUnsyncedEntryCount();
+      const isAllSynced = unsyncedCount === 0;
+      const unsyncedLabel = `${unsyncedCount} unsynced entr${unsyncedCount === 1 ? 'y' : 'ies'}`;
+
+      document.querySelectorAll('.sync-status-widget').forEach((widget) => {
+        const icon = widget.querySelector('.sync-status-icon');
+        const title = widget.querySelector('.sync-status-title');
+        const subtitle = widget.querySelector('.sync-status-subtitle');
+
+        if (!icon || !title || !subtitle) {
+          return;
+        }
+
+        if (isAllSynced) {
+          icon.textContent = '✓';
+          icon.classList.remove('warning');
+          title.textContent = 'All synced';
+          title.classList.remove('warning');
+          subtitle.textContent = `Last updated: ${formatSyncTimestamp(state.lastSyncTimestamp)}`;
+        } else {
+          icon.textContent = '!';
+          icon.classList.add('warning');
+          title.textContent = unsyncedLabel;
+          title.classList.add('warning');
+          subtitle.textContent = `${unsyncedLabel} waiting to sync to your portfolio.`;
+        }
+      });
+    }
+
     function getCurrentViewedEntry() {
       const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
       return sortedEntries[state.currentViewedEntryIndex] || sortedEntries[0] || null;
@@ -2953,6 +3134,10 @@
     function render() {
       const authRoutes = ['login', 'recover-account', 'password-reset', 'password-reset-sent', 'otp'];
 
+      syncWidgetRoutes.forEach((route) => {
+        ensureSyncStatusWidgetForView(route);
+      });
+
       Object.entries(viewMap).forEach(([route, el]) => {
         if (!el) {
           return;
@@ -3004,6 +3189,7 @@
       kpiNetwork.textContent = state.online ? 'online' : 'offline';
 
       renderAllEntries();
+      renderSyncStatusWidget();
 
       if (nextActionTitle && nextActionCopy && nextActionButton) {
         if (state.queue.length > 0) {
@@ -3046,6 +3232,7 @@
         state.lastEntryStatus = 'queued';
       } else {
         state.lastEntryStatus = 'synced';
+        state.lastSyncTimestamp = new Date();
       }
 
       const now = new Date();
@@ -3087,6 +3274,7 @@
 
       targetEntry.status = 'synced';
       state.lastEntryStatus = 'synced';
+      state.lastSyncTimestamp = new Date();
       state.pendingEntrySnapshot = null;
       state.currentEditingEntryIndex = null;
       setRoute('all-entries');
@@ -3140,6 +3328,7 @@
 
       selectedEntry.status = 'synced';
       state.lastEntryStatus = 'synced';
+      state.lastSyncTimestamp = new Date();
       render();
     }
 
@@ -3176,6 +3365,7 @@
       if (route === 'login') {
         state.queue = [];
         state.lastEntryStatus = 'synced';
+        state.lastSyncTimestamp = new Date();
         state.pendingEntrySnapshot = null;
       }
 
@@ -3225,6 +3415,7 @@
       state.online = true;
       state.queue = [];
       state.lastEntryStatus = 'synced';
+      state.lastSyncTimestamp = new Date();
       state.pendingEntrySnapshot = null;
       state.currentEditingEntryIndex = null;
       state.totalEntries = 26;
@@ -3254,6 +3445,7 @@
       state.queue = [];
       state.lastEntryStatus = 'synced';
       state.allEntries = state.allEntries.map((entry) => (entry.status === 'queued' ? { ...entry, status: 'synced' } : entry));
+      state.lastSyncTimestamp = new Date();
       render();
     });
 
