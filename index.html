@@ -1166,6 +1166,16 @@
       color: #b26a00;
     }
 
+    .sync-status-icon.syncing {
+      background: #eaf2ff;
+      color: #1e58b5;
+    }
+
+    .sync-status-icon.error {
+      background: #feeceb;
+      color: #a63b35;
+    }
+
     .sync-status-copy {
       min-width: 0;
     }
@@ -1180,6 +1190,14 @@
 
     .sync-status-title.warning {
       color: #b26a00;
+    }
+
+    .sync-status-title.syncing {
+      color: #1e58b5;
+    }
+
+    .sync-status-title.error {
+      color: #a63b35;
     }
 
     .sync-status-subtitle {
@@ -1654,6 +1672,18 @@
       color: #632080;
     }
 
+    .entry-sync-status.syncing {
+      border-color: #bcd1f5;
+      background: #edf3ff;
+      color: #1e58b5;
+    }
+
+    .entry-sync-status.error {
+      border-color: #efb9b5;
+      background: #fdeeee;
+      color: #a63b35;
+    }
+
     .status { font-size: 11px; text-transform: uppercase; font-weight: 900; letter-spacing: 0.07em; color: var(--accent); }
     .status.ok { color: var(--success); }
     .status.queue { color: var(--warning); }
@@ -1728,6 +1758,27 @@
       border-color: #f1cb86;
       background: #fff4de;
       color: #7d5200;
+      text-transform: uppercase;
+    }
+
+    .view-entry-fact.status-draft {
+      border-color: #d8c8e8;
+      background: #f7f0ff;
+      color: #632080;
+      text-transform: uppercase;
+    }
+
+    .view-entry-fact.status-syncing {
+      border-color: #bcd1f5;
+      background: #edf3ff;
+      color: #1e58b5;
+      text-transform: uppercase;
+    }
+
+    .view-entry-fact.status-error {
+      border-color: #efb9b5;
+      background: #fdeeee;
+      color: #a63b35;
       text-transform: uppercase;
     }
 
@@ -2573,6 +2624,9 @@
       queue: [],
       lastEntryStatus: 'synced',
       lastSyncTimestamp: new Date(),
+      syncInProgress: false,
+      shouldSimulateSyncError: true,
+      syncTimers: [],
       signedInEmail: 'lee@example.com',
       userType: 'gp-appraisal',
       currentEntryTitle: 'Learning event reflection',
@@ -2828,7 +2882,68 @@
     }
 
     function getUnsyncedEntryCount() {
-      return state.allEntries.filter((entry) => entry.status === 'queued' || entry.status === 'draft').length;
+      return state.allEntries.filter((entry) => entry.status === 'queued' || entry.status === 'draft' || entry.status === 'syncing' || entry.status === 'error').length;
+    }
+
+    function rebuildQueueFromEntries() {
+      state.queue = state.allEntries
+        .filter((entry) => entry.status === 'queued' || entry.status === 'syncing' || entry.status === 'error')
+        .map((entry) => ({ title: entry.title, attempts: 1 }));
+    }
+
+    function clearSyncTimers() {
+      state.syncTimers.forEach((timerId) => clearTimeout(timerId));
+      state.syncTimers = [];
+    }
+
+    function runEntrySync({ includeErrorEntries = false, allowSimulatedError = false } = {}) {
+      if (!state.online || state.syncInProgress) {
+        return;
+      }
+
+      const shouldSyncEntry = (entry) => entry.status === 'queued' || (includeErrorEntries && entry.status === 'error');
+      const hasSyncCandidates = state.allEntries.some(shouldSyncEntry);
+      if (!hasSyncCandidates) {
+        return;
+      }
+
+      state.syncInProgress = true;
+      state.allEntries = state.allEntries.map((entry) => (shouldSyncEntry(entry) ? { ...entry, status: 'syncing' } : entry));
+      state.lastEntryStatus = 'syncing';
+      rebuildQueueFromEntries();
+      render();
+
+      const syncTimerId = setTimeout(() => {
+        let didInjectError = false;
+
+        state.allEntries = state.allEntries.map((entry) => {
+          if (entry.status !== 'syncing') {
+            return entry;
+          }
+
+          if (allowSimulatedError && state.shouldSimulateSyncError && !didInjectError) {
+            didInjectError = true;
+            return { ...entry, status: 'error' };
+          }
+
+          return { ...entry, status: 'synced' };
+        });
+
+        if (didInjectError) {
+          state.lastEntryStatus = 'error';
+          state.shouldSimulateSyncError = false;
+        } else {
+          state.lastEntryStatus = 'synced';
+          state.lastSyncTimestamp = new Date();
+        }
+
+        state.syncInProgress = false;
+        state.syncTimers = state.syncTimers.filter((timerId) => timerId !== syncTimerId);
+        rebuildQueueFromEntries();
+        render();
+      }, 1400);
+
+      state.syncTimers.push(syncTimerId);
     }
 
     function createSyncStatusWidget() {
@@ -2881,6 +2996,8 @@
     }
 
     function renderSyncStatusWidget() {
+      const syncingCount = state.allEntries.filter((entry) => entry.status === 'syncing').length;
+      const errorCount = state.allEntries.filter((entry) => entry.status === 'error').length;
       const unsyncedCount = getUnsyncedEntryCount();
       const isAllSynced = unsyncedCount === 0;
       const unsyncedLabel = `${unsyncedCount} unsynced entr${unsyncedCount === 1 ? 'y' : 'ies'}`;
@@ -2896,14 +3013,34 @@
 
         if (isAllSynced) {
           icon.textContent = '✓';
+          icon.classList.remove('syncing', 'error');
           icon.classList.remove('warning');
           title.textContent = 'All synced';
+          title.classList.remove('syncing', 'error');
           title.classList.remove('warning');
           subtitle.textContent = `Last updated: ${formatSyncTimestamp(state.lastSyncTimestamp)}`;
+        } else if (syncingCount > 0) {
+          icon.textContent = '↻';
+          icon.classList.add('syncing');
+          icon.classList.remove('warning', 'error');
+          title.textContent = `Syncing ${syncingCount} entr${syncingCount === 1 ? 'y' : 'ies'}`;
+          title.classList.add('syncing');
+          title.classList.remove('warning', 'error');
+          subtitle.textContent = 'Your queued entries are uploading now that you are back online.';
+        } else if (errorCount > 0) {
+          icon.textContent = '!';
+          icon.classList.add('error');
+          icon.classList.remove('warning', 'syncing');
+          title.textContent = `${errorCount} sync error${errorCount === 1 ? '' : 's'}`;
+          title.classList.add('error');
+          title.classList.remove('warning', 'syncing');
+          subtitle.textContent = 'Some entries failed to sync. Open All entries and try again.';
         } else {
           icon.textContent = '!';
+          icon.classList.remove('syncing', 'error');
           icon.classList.add('warning');
           title.textContent = unsyncedLabel;
+          title.classList.remove('syncing', 'error');
           title.classList.add('warning');
           subtitle.textContent = `${unsyncedLabel} waiting to sync to your portfolio.`;
         }
@@ -3029,7 +3166,17 @@
       state.currentEntryTitle = selectedEntry.title;
       const sections = entryFormTemplates[selectedEntry.title] || defaultEntryTemplate;
       viewEntryType.textContent = selectedEntry.title;
-      viewEntrySubtitle.textContent = selectedEntry.status === 'draft' ? `Draft saved on ${selectedEntry.date}.` : `Completed on ${selectedEntry.date}.`;
+      if (selectedEntry.status === 'draft') {
+        viewEntrySubtitle.textContent = `Draft saved on ${selectedEntry.date}.`;
+      } else if (selectedEntry.status === 'queued') {
+        viewEntrySubtitle.textContent = `Saved offline on ${selectedEntry.date}; waiting to sync.`;
+      } else if (selectedEntry.status === 'syncing') {
+        viewEntrySubtitle.textContent = `Sync in progress for this entry.`;
+      } else if (selectedEntry.status === 'error') {
+        viewEntrySubtitle.textContent = `Sync failed for this entry. Please try syncing again.`;
+      } else {
+        viewEntrySubtitle.textContent = `Completed on ${selectedEntry.date}.`;
+      }
 
       if (viewEntryDateChip) {
         viewEntryDateChip.textContent = selectedEntry.date;
@@ -3097,16 +3244,22 @@
 
       const sortedEntries = getEntriesSortedByDateDesc(state.allEntries);
       const recentEntries = sortedEntries.slice(0, 50);
-      const unsyncedEntriesCount = recentEntries.filter((entry) => entry.status === 'queued' || entry.status === 'draft').length;
+      const unsyncedEntriesCount = recentEntries.filter((entry) => entry.status === 'queued' || entry.status === 'draft' || entry.status === 'syncing' || entry.status === 'error').length;
       const queuedEntriesCount = recentEntries.filter((entry) => entry.status === 'queued').length;
+      const syncingEntriesCount = recentEntries.filter((entry) => entry.status === 'syncing').length;
+      const errorEntriesCount = recentEntries.filter((entry) => entry.status === 'error').length;
       allEntriesSummary.textContent = `Showing ${recentEntries.length} of ${state.allEntries.length} entries${unsyncedEntriesCount > 0 ? ` (${unsyncedEntriesCount} unsynced)` : ''}`;
 
       if (syncAllEntriesButton) {
-        const canSync = queuedEntriesCount > 0 && state.online;
+        const canSync = (queuedEntriesCount > 0 || errorEntriesCount > 0) && state.online && syncingEntriesCount === 0;
         syncAllEntriesButton.disabled = !canSync;
         syncAllEntriesButton.className = `button-inline ${canSync ? '' : 'gray'}`;
-        if (!state.online && queuedEntriesCount > 0) {
+        if (syncingEntriesCount > 0) {
+          syncAllEntriesButton.textContent = 'Syncing...';
+        } else if (!state.online && (queuedEntriesCount > 0 || errorEntriesCount > 0)) {
           syncAllEntriesButton.textContent = 'Offline';
+        } else if (errorEntriesCount > 0) {
+          syncAllEntriesButton.textContent = 'Retry sync';
         } else {
           syncAllEntriesButton.textContent = 'Sync all';
         }
@@ -3133,6 +3286,7 @@
 
     function render() {
       const authRoutes = ['login', 'recover-account', 'password-reset', 'password-reset-sent', 'otp'];
+      rebuildQueueFromEntries();
 
       syncWidgetRoutes.forEach((route) => {
         ensureSyncStatusWidgetForView(route);
@@ -3192,9 +3346,21 @@
       renderSyncStatusWidget();
 
       if (nextActionTitle && nextActionCopy && nextActionButton) {
-        if (state.queue.length > 0) {
+        const syncingCount = state.allEntries.filter((entry) => entry.status === 'syncing').length;
+        const errorCount = state.allEntries.filter((entry) => entry.status === 'error').length;
+        const queuedCount = state.allEntries.filter((entry) => entry.status === 'queued').length;
+
+        if (syncingCount > 0) {
+          nextActionTitle.textContent = 'Sync in progress';
+          nextActionCopy.textContent = `${syncingCount} entr${syncingCount === 1 ? 'y is' : 'ies are'} currently syncing.`;
+          nextActionButton.textContent = 'All entries';
+        } else if (errorCount > 0) {
+          nextActionTitle.textContent = 'Resolve sync errors';
+          nextActionCopy.textContent = `${errorCount} entr${errorCount === 1 ? 'y has' : 'ies have'} a sync error. Retry from All entries.`;
+          nextActionButton.textContent = 'All entries';
+        } else if (queuedCount > 0) {
           nextActionTitle.textContent = 'Review your pending queue';
-          nextActionCopy.textContent = `${state.queue.length} entry${state.queue.length === 1 ? '' : 'ies'} are queued and can be synced from All entries when you are back online.`;
+          nextActionCopy.textContent = `${queuedCount} entry${queuedCount === 1 ? '' : 'ies'} are queued and can be synced from All entries when you are back online.`;
           nextActionButton.textContent = 'All entries';
         } else {
           nextActionTitle.textContent = 'Add your next entry';
@@ -3207,7 +3373,17 @@
       renderViewEntryFields();
       renderProgress();
 
-      entryDetailSubtitle.textContent = state.lastEntryStatus === 'queued' ? 'Saved offline and queued for sync.' : 'Saved and synced.';
+      if (state.lastEntryStatus === 'queued') {
+        entryDetailSubtitle.textContent = 'Saved offline and queued for sync.';
+      } else if (state.lastEntryStatus === 'syncing') {
+        entryDetailSubtitle.textContent = 'Your entry is syncing now.';
+      } else if (state.lastEntryStatus === 'error') {
+        entryDetailSubtitle.textContent = 'Sync error. Try syncing again from All entries.';
+      } else if (state.lastEntryStatus === 'draft') {
+        entryDetailSubtitle.textContent = 'Saved as draft.';
+      } else {
+        entryDetailSubtitle.textContent = 'Saved and synced.';
+      }
     }
 
     function saveEntry() {
@@ -3363,6 +3539,8 @@
       }
 
       if (route === 'login') {
+        clearSyncTimers();
+        state.syncInProgress = false;
         state.queue = [];
         state.lastEntryStatus = 'synced';
         state.lastSyncTimestamp = new Date();
@@ -3406,16 +3584,32 @@
     document.getElementById('cancelEntryButton')?.addEventListener('click', cancelEntryCreation);
 
     document.getElementById('toggleNetwork').addEventListener('click', () => {
+      const wasOnline = state.online;
       state.online = !state.online;
+
+      if (wasOnline && !state.online) {
+        clearSyncTimers();
+        state.syncInProgress = false;
+        state.allEntries = state.allEntries.map((entry) => (entry.status === 'syncing' ? { ...entry, status: 'queued' } : entry));
+        state.lastEntryStatus = 'queued';
+      }
+
+      if (!wasOnline && state.online) {
+        runEntrySync({ includeErrorEntries: false, allowSimulatedError: true });
+      }
+
       render();
     });
 
     document.getElementById('resetFlow').addEventListener('click', () => {
+      clearSyncTimers();
       state.route = 'login';
       state.online = true;
       state.queue = [];
       state.lastEntryStatus = 'synced';
       state.lastSyncTimestamp = new Date();
+      state.syncInProgress = false;
+      state.shouldSimulateSyncError = true;
       state.pendingEntrySnapshot = null;
       state.currentEditingEntryIndex = null;
       state.totalEntries = 26;
@@ -3433,20 +3627,16 @@
     });
 
     syncAllEntriesButton?.addEventListener('click', () => {
-      if (!state.online) {
+      if (!state.online || state.syncInProgress) {
         return;
       }
 
-      const hasQueuedEntries = state.allEntries.some((entry) => entry.status === 'queued');
-      if (!hasQueuedEntries) {
+      const hasSyncableEntries = state.allEntries.some((entry) => entry.status === 'queued' || entry.status === 'error');
+      if (!hasSyncableEntries) {
         return;
       }
 
-      state.queue = [];
-      state.lastEntryStatus = 'synced';
-      state.allEntries = state.allEntries.map((entry) => (entry.status === 'queued' ? { ...entry, status: 'synced' } : entry));
-      state.lastSyncTimestamp = new Date();
-      render();
+      runEntrySync({ includeErrorEntries: true, allowSimulatedError: false });
     });
 
     allEntriesList?.addEventListener('click', (event) => {
