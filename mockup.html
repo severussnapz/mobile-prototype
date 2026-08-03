@@ -3439,7 +3439,7 @@
         return;
       }
 
-      if (targetEntry.status === 'queued' && state.queue.length > 0) {
+      if (state.online && targetEntry.status === 'queued' && state.queue.length > 0) {
         const queuedIndex = state.queue.findIndex((item) => item.title === targetEntry.title);
         if (queuedIndex >= 0) {
           state.queue.splice(queuedIndex, 1);
@@ -3448,9 +3448,12 @@
         }
       }
 
-      targetEntry.status = 'synced';
-      state.lastEntryStatus = 'synced';
-      state.lastSyncTimestamp = new Date();
+      const submittedStatus = state.online ? 'synced' : 'queued';
+      targetEntry.status = submittedStatus;
+      state.lastEntryStatus = submittedStatus;
+      if (state.online) {
+        state.lastSyncTimestamp = new Date();
+      }
       state.pendingEntrySnapshot = null;
       state.currentEditingEntryIndex = null;
       setRoute('all-entries');
@@ -3502,9 +3505,12 @@
         return;
       }
 
-      selectedEntry.status = 'synced';
-      state.lastEntryStatus = 'synced';
-      state.lastSyncTimestamp = new Date();
+      const submittedStatus = state.online ? 'synced' : 'queued';
+      selectedEntry.status = submittedStatus;
+      state.lastEntryStatus = submittedStatus;
+      if (state.online) {
+        state.lastSyncTimestamp = new Date();
+      }
       render();
     }
 
