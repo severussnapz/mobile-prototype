@@ -50,7 +50,7 @@
       border: 1px solid var(--border);
       border-radius: 38px;
       overflow: hidden;
-      box-shadow: var(--shadow);
+      box-shadow: none;
       min-height: 780px;
       position: relative;
       display: flex;
@@ -196,8 +196,8 @@
       padding: 76px 14px 16px;
       background: linear-gradient(180deg, #11131a 0%, #181a22 100%);
       color: #fff;
-      box-shadow: 24px 0 50px rgba(11, 13, 18, 0.28);
-      transform: translateX(-102%);
+      box-shadow: none;
+      transform: translateX(-120%);
       transition: transform 220ms ease;
       display: grid;
       align-content: start;
@@ -207,6 +207,7 @@
 
     .side-nav.open {
       transform: translateX(0);
+      box-shadow: 24px 0 50px rgba(11, 13, 18, 0.28);
     }
 
     .side-nav.hidden {
@@ -611,29 +612,7 @@
 
     .auth-shell::before,
     .auth-shell::after {
-      content: "";
-      position: absolute;
-      border-radius: 999px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .auth-shell::before {
-      width: 210px;
-      height: 210px;
-      right: -84px;
-      top: -30px;
-      background: rgba(207, 45, 129, 0.12);
-      filter: blur(4px);
-    }
-
-    .auth-shell::after {
-      width: 260px;
-      height: 260px;
-      left: -120px;
-      bottom: -110px;
-      background: rgba(74, 144, 226, 0.08);
-      filter: blur(2px);
+      content: none;
     }
 
     .auth-shell > * {
