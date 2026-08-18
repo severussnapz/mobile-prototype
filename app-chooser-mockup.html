@@ -514,9 +514,9 @@
       background: #f0f1f7;
     }
 
-    /* Dashboard Screen */
-    .screen.dashboard {
-      padding: 24px;
+    /* All Entries Screen */
+    .screen.all-entries {
+      padding: 20px 16px 28px;
     }
 
     .header {
@@ -541,41 +541,182 @@
       color: #191a21;
     }
 
-    .dashboard-section {
-      margin-bottom: 20px;
-    }
-
-    .dashboard-section h2 {
+    .online-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 12px;
+      background: #cfe7cf;
+      color: #284228;
       font-size: 13px;
-      font-weight: 800;
-      color: #676c78;
-      text-transform: uppercase;
-      margin-bottom: 12px;
+      font-weight: 700;
     }
 
-    .card {
+    .online-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #5dbb63;
+    }
+
+    .all-entries-title {
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 22px;
+    }
+
+    .sync-card {
       background: #fff;
       border: 1px solid #e5e5e8;
-      border-radius: 16px;
-      padding: 16px;
+      border-radius: 20px;
+      padding: 14px;
       margin-bottom: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
-    .card:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    .sync-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #f4ece0;
+      color: #a96d22;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
-    .card-title {
-      font-size: 16px;
-      font-weight: 800;
-      margin-bottom: 4px;
+    .sync-copy {
+      flex: 1;
     }
 
-    .card-desc {
-      font-size: 13px;
+    .sync-copy strong {
+      display: block;
+      color: #b17325;
+      font-size: 15px;
+      margin-bottom: 3px;
+    }
+
+    .sync-copy p, .all-entries-description {
+      font-size: 12px;
       color: #676c78;
+      line-height: 17px;
+    }
+
+    .sync-view-button {
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 10px;
+      background: #e7e7e8;
+      color: #565861;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .all-entries-description {
+      margin: 20px 0;
+      font-size: 13px;
+    }
+
+    .entries-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .entries-summary {
+      flex: 1;
+      min-width: 0;
+      border-radius: 20px;
+      padding: 8px 11px;
+      background: #f6f5f9;
+      color: #676c78;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .sync-all-button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 13px;
+      background: #511268;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .entries-list {
+      overflow: hidden;
+      border: 1px solid #d9d9e0;
+      border-radius: 20px;
+      background: #fff;
+    }
+
+    .entry-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px 12px;
+      padding: 15px;
+    }
+
+    .entry-row + .entry-row {
+      border-top: 1px solid #e8e8ee;
+    }
+
+    .entry-title {
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 19px;
+    }
+
+    .entry-meta {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 7px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .status-chip, .category-tag {
+      border-radius: 20px;
+      padding: 3px 7px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+
+    .status-chip.unsynced { background: #fff4e1; color: #b17325; }
+    .status-chip.synced { background: #e7f3e8; color: #2e7d32; }
+
+    .entry-actions {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .category-tag {
+      border: 1px solid #d2b9e6;
+      background: #ece8f4;
+      color: #511268;
+      white-space: nowrap;
+    }
+
+    .entry-view-button {
+      border: 1px solid #511268;
+      border-radius: 15px;
+      padding: 6px 9px;
+      background: #fff;
+      color: #511268;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
     }
 
     /* Settings Screen */
@@ -781,7 +922,7 @@
           </div>
 
           <div class="options">
-            <button class="option-button portfolio-option" onclick="navigate('dashboard')">
+            <button class="option-button portfolio-option" onclick="navigate('all-entries')">
               <div class="option-icon"><i class="fas fa-folder-open"></i></div>
               <div class="option-text">
                 <h4>Portfolio</h4>
@@ -805,29 +946,65 @@
           </button>
         </div>
 
-        <div class="screen dashboard">
+        <div class="screen all-entries">
           <div class="header">
-            <h1>Portfolio</h1>
             <button class="menu-trigger" onclick="toggleMenu()" aria-label="Open navigation menu" title="Open navigation menu"><i class="fas fa-bars"></i></button>
+            <button class="online-pill" type="button"><span class="online-dot"></span>Online</button>
           </div>
 
-          <div class="dashboard-section">
-            <h2>Your Progress</h2>
-            <div class="card" onclick="alert('Profile card')">
-              <div class="card-title">Robert Jones</div>
-              <div class="card-desc">Practice Manager • Active since 2023</div>
+          <h1 class="all-entries-title">All entries</h1>
+
+          <div class="sync-card" id="syncCard">
+            <div class="sync-icon"><i class="fas fa-exclamation"></i></div>
+            <div class="sync-copy">
+              <strong><span id="unsyncedCount">2</span> unsynced entries</strong>
+              <p>Waiting to sync to your portfolio.</p>
             </div>
+            <button class="sync-view-button" type="button">View entries</button>
           </div>
 
-          <div class="dashboard-section">
-            <h2>Main areas</h2>
-            <div class="card" onclick="navigate('dashboard')">
-              <div class="card-title">Portfolio</div>
-              <div class="card-desc">Your appraisal and training portfolio</div>
+          <p class="all-entries-description">Your 50 most recent portfolio entries.</p>
+
+          <div class="entries-toolbar">
+            <span class="entries-summary" id="entriesSummary">Showing 5 of 5 entries (2 unsynced)</span>
+            <button class="sync-all-button" type="button" onclick="syncAllEntries()">Sync all</button>
+          </div>
+
+          <div class="entries-list">
+            <div class="entry-row">
+              <div>
+                <p class="entry-title">Learning event reflection</p>
+                <div class="entry-meta"><span>13/08/26</span><span class="status-chip unsynced">UNSYNCED</span></div>
+              </div>
+              <div class="entry-actions"><span class="category-tag">Reflection</span><button class="entry-view-button" type="button" onclick="viewEntry('Learning event reflection')">View</button></div>
             </div>
-            <div class="card" onclick="window.open('https://www.fourteenfish.com/educationpackages')">
-              <div class="card-title">Education</div>
-              <div class="card-desc">Learning and development packages</div>
+            <div class="entry-row">
+              <div>
+                <p class="entry-title">Training course</p>
+                <div class="entry-meta"><span>11/08/26</span><span class="status-chip unsynced">UNSYNCED</span></div>
+              </div>
+              <div class="entry-actions"><span class="category-tag">CPD</span><button class="entry-view-button" type="button" onclick="viewEntry('Training course')">View</button></div>
+            </div>
+            <div class="entry-row">
+              <div>
+                <p class="entry-title">Clinical case reflection</p>
+                <div class="entry-meta"><span>09/08/26</span><span class="status-chip synced">SYNCED</span></div>
+              </div>
+              <div class="entry-actions"><span class="category-tag">Reflection</span><button class="entry-view-button" type="button" onclick="viewEntry('Clinical case reflection')">View</button></div>
+            </div>
+            <div class="entry-row">
+              <div>
+                <p class="entry-title">Quality improvement activity</p>
+                <div class="entry-meta"><span>07/08/26</span><span class="status-chip synced">SYNCED</span></div>
+              </div>
+              <div class="entry-actions"><span class="category-tag">Audit</span><button class="entry-view-button" type="button" onclick="viewEntry('Quality improvement activity')">View</button></div>
+            </div>
+            <div class="entry-row">
+              <div>
+                <p class="entry-title">Significant event analysis</p>
+                <div class="entry-meta"><span>05/08/26</span><span class="status-chip synced">SYNCED</span></div>
+              </div>
+              <div class="entry-actions"><span class="category-tag">Event</span><button class="entry-view-button" type="button" onclick="viewEntry('Significant event analysis')">View</button></div>
             </div>
           </div>
         </div>
@@ -859,17 +1036,17 @@
               <button class="menu-close" onclick="toggleMenu()"><i class="fas fa-times"></i></button>
             </div>
             <div class="menu-items">
-              <button class="menu-item" onclick="navigate('dashboard'); toggleMenu();">
+              <button class="menu-item" onclick="navigate('all-entries'); toggleMenu();">
                 <span class="menu-item-icon"><i class="fas fa-folder-open"></i></span>
                 <span class="menu-item-text">Portfolio</span>
                 <span class="menu-item-chevron"><i class="fas fa-chevron-right"></i></span>
               </button>
-              <button class="menu-item" onclick="navigate('dashboard'); toggleMenu();">
+              <button class="menu-item" onclick="navigate('all-entries'); toggleMenu();">
                 <span class="menu-item-icon"><i class="fas fa-plus-circle"></i></span>
                 <span class="menu-item-text">New entry</span>
                 <span class="menu-item-chevron"><i class="fas fa-chevron-right"></i></span>
               </button>
-              <button class="menu-item" onclick="navigate('dashboard'); toggleMenu();">
+              <button class="menu-item" onclick="navigate('all-entries'); toggleMenu();">
                 <span class="menu-item-icon"><i class="fas fa-list"></i></span>
                 <span class="menu-item-text">All entries</span>
                 <span class="menu-item-chevron"><i class="fas fa-chevron-right"></i></span>
@@ -902,7 +1079,7 @@
       <div class="flow-buttons">
         <button class="flow-button" onclick="navigate('login')">Login</button>
         <button class="flow-button" onclick="navigate('app-chooser')">App Chooser</button>
-        <button class="flow-button" onclick="navigate('dashboard')">Dashboard</button>
+        <button class="flow-button" onclick="navigate('all-entries')">All entries</button>
         <button class="flow-button" onclick="navigate('settings')">Settings</button>
       </div>
 
@@ -927,7 +1104,7 @@
       </div>
 
       <p class="description" style="margin-top: 16px; font-style: italic;">
-        <strong>Flow:</strong> login → app chooser → dashboard → settings. Education links to external FourteenFish website.
+        <strong>Flow:</strong> login → app chooser → all entries → settings. Education links to external FourteenFish website.
       </p>
     </div>
   </div>
@@ -946,6 +1123,21 @@
     function toggleMenu() {
       const menuModal = document.getElementById('menuModal');
       menuModal.classList.toggle('open');
+    }
+
+    function syncAllEntries() {
+      document.querySelectorAll('.status-chip.unsynced').forEach((chip) => {
+        chip.classList.remove('unsynced');
+        chip.classList.add('synced');
+        chip.textContent = 'SYNCED';
+      });
+      document.getElementById('syncCard').style.display = 'none';
+      document.getElementById('entriesSummary').textContent = 'Showing 5 of 5 entries (0 unsynced)';
+      document.getElementById('unsyncedCount').textContent = '0';
+    }
+
+    function viewEntry(title) {
+      alert(`${title} entry selected`);
     }
 
     function toggleOffline() {
