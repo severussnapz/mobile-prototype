@@ -249,6 +249,13 @@
       align-items: center;
       justify-content: center;
       text-align: center;
+      position: relative;
+    }
+
+    .app-chooser-menu {
+      position: absolute;
+      top: 16px;
+      right: 16px;
     }
 
     .hero {
@@ -579,7 +586,6 @@
     .screen.settings h1 {
       font-size: 24px;
       font-weight: 900;
-      margin-bottom: 24px;
     }
 
     .settings-section {
@@ -759,6 +765,7 @@
         </div>
 
         <div class="screen app-chooser">
+          <button class="menu-trigger app-chooser-menu" onclick="toggleMenu()" aria-label="Open navigation menu" title="Open navigation menu"><i class="fas fa-bars"></i></button>
           <div class="hero">
             <h1>Dashboard</h1>
             <p>Choose Portfolio to continue in app, or Education to open the FourteenFish web app.</p>
@@ -801,7 +808,7 @@
         <div class="screen dashboard">
           <div class="header">
             <h1>Portfolio</h1>
-            <button class="menu-trigger" onclick="toggleMenu()"><i class="fas fa-bars"></i></button>
+            <button class="menu-trigger" onclick="toggleMenu()" aria-label="Open navigation menu" title="Open navigation menu"><i class="fas fa-bars"></i></button>
           </div>
 
           <div class="dashboard-section">
@@ -826,7 +833,10 @@
         </div>
 
         <div class="screen settings">
-          <h1>Settings</h1>
+          <div class="header">
+            <h1>Settings</h1>
+            <button class="menu-trigger" onclick="toggleMenu()" aria-label="Open navigation menu" title="Open navigation menu"><i class="fas fa-bars"></i></button>
+          </div>
 
           <div class="settings-section">
             <h3>Account</h3>
