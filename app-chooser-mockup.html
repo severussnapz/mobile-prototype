@@ -458,18 +458,20 @@
     /* Login Screen */
     .screen.login {
       padding: 24px;
-      justify-content: center;
+      padding: 0;
+      justify-content: flex-start;
+      align-items: center;
       background: #fff;
     }
 
     .login-content {
       width: 100%;
-      max-width: 320px;
-      text-align: left;
+      text-align: center;
     }
 
-    .login-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 42px; color: #5d1678; font-size: 21px; font-weight: 900; }
-    .login-brand-mark { width: 30px; height: 30px; border-radius: 50%; background: #5d1678; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .login-brand { display: flex; align-items: center; justify-content: center; gap: 9px; height: 100px; margin-bottom: 34px; border-bottom: 2px solid #d02b84; color: #111; font-size: 21px; font-weight: 900; }
+    .login-brand-mark { width: 30px; height: 30px; border-radius: 50%; background: #d02b84; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .login-panel { max-width: 320px; margin: 0 auto; padding: 32px 34px 48px; border-radius: 4px; background: #f3f1f0; }
 
     .login-content h1 {
       font-size: 25px;
@@ -482,6 +484,8 @@
       color: #676c78;
       margin-bottom: 22px;
     }
+
+    .login-panel p { color: #222; text-align: center; }
 
     .form-group {
       margin-bottom: 16px;
@@ -506,7 +510,7 @@
     .login-button {
       width: 100%;
       padding: 12px;
-      background: #5d1678;
+      background: #d02b84;
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -516,7 +520,7 @@
     }
 
     .login-button:hover {
-      background: #3d0d52;
+      background: #b92370;
     }
 
     .demo-button {
@@ -535,9 +539,9 @@
       background: #f0f1f7;
     }
 
-    .login-link { display: block; margin-top: 18px; color: #5d1678; font-size: 12px; text-decoration: none; }
-    .login-register { margin-top: 34px; padding-top: 22px; border-top: 1px solid #e5e5e8; color: #676c78; font-size: 12px; line-height: 18px; }
-    .login-register a { color: #5d1678; font-weight: 700; text-decoration: none; }
+    .login-link { display: block; margin-top: 18px; color: #222; font-size: 12px; text-decoration: none; }
+    .login-link span, .login-register a { color: #d02b84; font-weight: 700; text-decoration: none; }
+    .login-register { margin-top: 20px; color: #222; font-size: 12px; line-height: 18px; }
 
     /* All Entries Screen */
     .screen.all-entries {
@@ -1047,13 +1051,15 @@
         <!-- Screens -->
         <div class="screen login active">
           <div class="login-content">
-            <div class="login-brand"><span class="login-brand-mark">f</span> FourteenFish</div>
-            <h1>Log in to your account</h1>
-            <p>Please enter your email address to log in</p>
-            <div class="form-group"><label>Email address</label><input type="email" placeholder="Enter your email address" /></div>
-            <button class="login-button" onclick="window.open('https://www.fourteenfish.com/account/logon', '_blank')">Next</button>
-            <a class="login-link" href="https://www.fourteenfish.com/account/forgotpassword?destinationUrl=%2Fdashboard" target="_blank">Having trouble logging in? Recover your account</a>
-            <p class="login-register">Don’t have a FourteenFish account? <a href="https://www.fourteenfish.com/account/register" target="_blank">Register now</a></p>
+            <div class="login-brand"><span>FourteenFish</span><span class="login-brand-mark">◆</span></div>
+            <div class="login-panel">
+              <h1>Log in to your account</h1>
+              <p>Please enter your email address to log in</p>
+              <div class="form-group"><input type="email" placeholder="Your email address" aria-label="Your email address" /></div>
+              <button class="login-button" onclick="window.open('https://www.fourteenfish.com/account/logon', '_blank')">Next</button>
+              <a class="login-link" href="https://www.fourteenfish.com/account/forgotpassword?destinationUrl=%2Fdashboard" target="_blank">Having trouble logging in? <span>Recover your account</span></a>
+              <p class="login-register">Don’t have a FourteenFish account? <a href="https://www.fourteenfish.com/account/register" target="_blank">Register now</a></p>
+            </div>
             <button class="demo-button" onclick="navigate('app-chooser')">Open demo</button>
           </div>
         </div>
