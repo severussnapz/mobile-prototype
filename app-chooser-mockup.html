@@ -534,6 +534,17 @@
       padding: 20px 16px 28px;
     }
 
+    .screen.view-entry { padding: 20px 16px 28px; }
+    .view-entry-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .view-entry-header h1 { font-size: 24px; font-weight: 900; }
+    .entry-completion { border-radius: 999px; padding: 7px 12px; background: #e7f3e8; color: #2e7d32; font-size: 12px; font-weight: 800; }
+    .entry-completion.draft { background: #ece8f4; color: #511268; }
+    .view-entry-card { padding: 20px; border: 1px solid #d9d9e0; border-radius: 20px; background: #fff; margin-bottom: 24px; }
+    .view-entry-card h2 { font-size: 21px; margin-bottom: 8px; }
+    .view-entry-meta { color: #676c78; font-size: 14px; margin-bottom: 22px; }
+    .view-entry-state { border-top: 1px solid #e8e8ee; padding-top: 18px; color: #191a21; font-size: 14px; font-weight: 700; }
+    .view-entry-actions { display: flex; flex-direction: column; gap: 10px; }
+
     /* New Entry Screen */
     .screen.new-entry {
       padding: 20px 16px 28px;
@@ -1139,6 +1150,12 @@
           </div>
         </div>
 
+        <div class="screen view-entry">
+          <div class="view-entry-header"><h1>View entry</h1><span id="viewEntryStatus" class="entry-completion">COMPLETED</span></div>
+          <div class="view-entry-card"><h2 id="viewEntryTitle">Portfolio entry</h2><p id="viewEntryMeta" class="view-entry-meta">Portfolio · No date</p><p id="viewEntryState" class="view-entry-state">✓ This entry is completed.</p></div>
+          <div id="viewEntryActions" class="view-entry-actions"><button class="login-button" type="button" onclick="navigate('all-entries')">Back to all entries</button></div>
+        </div>
+
         <div class="screen new-entry">
           <div class="header">
             <button class="menu-trigger" onclick="toggleMenu()" aria-label="Open navigation menu" title="Open navigation menu"><i class="fas fa-bars"></i></button>
@@ -1316,8 +1333,37 @@
       document.getElementById('unsyncedCount').textContent = '0';
     }
 
-    function viewEntry(title) {
-      alert(`${title} entry selected`);
+    function viewEntry(title, status = 'COMPLETED', category = 'Portfolio') {
+      document.getElementById('viewEntryTitle').textContent = title;
+      document.getElementById('viewEntryMeta').textContent = `${category} · Portfolio entry`;
+      const statusEl = document.getElementById('viewEntryStatus');
+      const stateEl = document.getElementById('viewEntryState');
+      const actionsEl = document.getElementById('viewEntryActions');
+      const isDraft = status === 'DRAFT';
+      statusEl.textContent = isDraft ? 'DRAFT' : 'COMPLETED';
+      statusEl.classList.toggle('draft', isDraft);
+      stateEl.textContent = isDraft ? 'This entry is still a draft.' : '✓ This entry is completed.';
+      actionsEl.innerHTML = isDraft
+        ? '<button class="login-button" type="button" onclick="submitViewedDraft()">Submit</button><button class="demo-button" type="button" onclick="editViewedDraft()">Edit entry</button><button class="draft-entry-button" type="button" onclick="navigate(\'all-entries\')">Back to all entries</button>'
+        : '<button class="login-button" type="button" onclick="navigate(\'all-entries\')">Back to all entries</button>';
+      window.viewedEntryTitle = title;
+      navigate('view-entry');
+    }
+
+    function submitViewedDraft() {
+      document.querySelectorAll('.entry-row').forEach((row) => {
+        if (row.querySelector('.entry-title')?.textContent === window.viewedEntryTitle) {
+          const chip = row.querySelector('.status-chip.draft');
+          if (chip) { chip.className = 'status-chip synced'; chip.textContent = 'SYNCED'; }
+        }
+      });
+      viewEntry(window.viewedEntryTitle, 'COMPLETED');
+    }
+
+    function editViewedDraft() {
+      navigate('new-entry');
+      createSelectedEntry();
+      document.getElementById('entryTitle').value = window.viewedEntryTitle;
     }
 
     function toggleEntryTypes() {
@@ -1385,7 +1431,7 @@
       entryRow.className = 'entry-row';
       entryRow.innerHTML = `
         <div><p class="entry-title"></p><div class="entry-meta"><span>${today}</span><span class="status-chip draft">DRAFT</span></div></div>
-        <div class="entry-actions"><span class="category-tag">${selectedEntryType}</span><button class="entry-view-button" type="button" onclick="viewEntry('${draftTitle.replace(/'/g, "\\'")}')">View</button></div>`;
+          <div class="entry-actions"><span class="category-tag">${selectedEntryType}</span><button class="entry-view-button" type="button" onclick="viewEntry('${draftTitle.replace(/'/g, "\\'")}', 'DRAFT', '${selectedEntryType.replace(/'/g, "\\'")}')">View</button></div>`;
       entryRow.querySelector('.entry-title').textContent = draftTitle;
       document.querySelector('.entries-list').prepend(entryRow);
       const entryCount = document.querySelectorAll('.entry-row').length;
