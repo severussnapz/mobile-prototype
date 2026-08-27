@@ -827,6 +827,7 @@
 
     .status-chip.unsynced { background: #fff4e1; color: #b17325; }
     .status-chip.synced { background: #e7f3e8; color: #2e7d32; }
+    .status-chip.draft { background: #ece8f4; color: #511268; }
 
     .entry-actions {
       display: flex;
@@ -1377,6 +1378,19 @@
     }
 
     function saveDraft() {
+      const title = document.getElementById('entryTitle');
+      const entryRow = document.createElement('div');
+      const draftTitle = title.value.trim() || `Untitled ${selectedEntryType} draft`;
+      const today = new Date().toLocaleDateString('en-GB');
+      entryRow.className = 'entry-row';
+      entryRow.innerHTML = `
+        <div><p class="entry-title"></p><div class="entry-meta"><span>${today}</span><span class="status-chip draft">DRAFT</span></div></div>
+        <div class="entry-actions"><span class="category-tag">${selectedEntryType}</span><button class="entry-view-button" type="button" onclick="viewEntry('${draftTitle.replace(/'/g, "\\'")}')">View</button></div>`;
+      entryRow.querySelector('.entry-title').textContent = draftTitle;
+      document.querySelector('.entries-list').prepend(entryRow);
+      const entryCount = document.querySelectorAll('.entry-row').length;
+      const unsyncedCount = document.querySelectorAll('.status-chip.unsynced').length;
+      document.getElementById('entriesSummary').textContent = `Showing ${entryCount} of ${entryCount} entries (${unsyncedCount} unsynced)`;
       alert('Draft saved locally.');
       navigate('all-entries');
     }
