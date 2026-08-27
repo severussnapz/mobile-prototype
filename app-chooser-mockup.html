@@ -556,6 +556,14 @@
       margin-bottom: 22px;
     }
 
+    .entry-type-selector { margin-top: 28px; }
+    .entry-type-selector label { display: block; font-size: 13px; font-weight: 800; margin-bottom: 7px; }
+    .entry-type-dropdown { width: 100%; display: flex; justify-content: space-between; align-items: center; border: 1px solid #d9d9e0; border-radius: 14px; padding: 14px; background: #fff; color: #191a21; cursor: pointer; font: inherit; font-size: 14px; text-align: left; }
+    .entry-type-options { display: none; margin-top: 6px; border: 1px solid #d9d9e0; border-radius: 14px; overflow: hidden; background: #fff; }
+    .entry-type-options.open { display: block; }
+    .entry-type-option { width: 100%; display: block; border: 0; border-bottom: 1px solid #e8e8ee; padding: 13px 14px; background: #fff; color: #191a21; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
+    .entry-type-option:last-child { border-bottom: 0; }
+
     .entry-form-group {
       margin-bottom: 20px;
     }
@@ -600,29 +608,6 @@
       display: block;
     }
 
-    .category-options {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-    }
-
-    .category-option {
-      border: 1px solid #d9d9e0;
-      border-radius: 999px;
-      padding: 8px 12px;
-      background: #fff;
-      color: #676c78;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .category-option.selected {
-      border-color: #511268;
-      background: #ece8f4;
-      color: #511268;
-    }
-
     .entry-form-actions {
       display: flex;
       gap: 10px;
@@ -648,6 +633,21 @@
       border: 1px solid #511268;
       background: #511268;
       color: #fff;
+    }
+
+    .save-message {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #e7f3e8;
+      color: #2e7d32;
+      font-size: 12px;
+      line-height: 17px;
+    }
+
+    .save-message.visible {
+      display: block;
     }
 
     .header {
@@ -1142,24 +1142,26 @@
             <h1>New entry</h1>
           </div>
 
-          <p class="new-entry-description">Capture a piece of work for your Portfolio.</p>
+          <p class="new-entry-description">Choose the type of Portfolio entry you want to create.</p>
 
-          <form id="newEntryForm" onsubmit="saveNewEntry(event)">
+          <div id="entryTypeSelector" class="entry-type-selector">
+            <label for="entryTypeDropdown">Entry type</label>
+            <button id="entryTypeDropdown" class="entry-type-dropdown" type="button" onclick="toggleEntryTypes()"><span id="selectedEntryType">Learning event reflections</span><i id="entryTypeChevron" class="fas fa-chevron-down"></i></button>
+            <div id="entryTypeOptions" class="entry-type-options">
+              <button class="entry-type-option" type="button" onclick="selectEntryType('Learning event reflections')">Learning event reflections</button>
+              <button class="entry-type-option" type="button" onclick="selectEntryType('Clinical case reflection')">Clinical case reflection</button>
+              <button class="entry-type-option" type="button" onclick="selectEntryType('Quality improvement Activity')">Quality improvement Activity</button>
+              <button class="entry-type-option" type="button" onclick="selectEntryType('CPD Learning log')">CPD Learning log</button>
+            </div>
+            <div class="entry-form-actions"><button class="cancel-entry-button" type="button" onclick="navigate('all-entries')">Cancel</button><button class="save-entry-button" type="button" onclick="createSelectedEntry()">Create</button></div>
+          </div>
+
+          <form id="newEntryForm" onsubmit="saveNewEntry(event)" style="display: none;">
+            <p id="selectedEntryTypeLabel" class="new-entry-description"></p>
             <div class="entry-form-group">
               <label for="entryTitle">Title</label>
               <input id="entryTitle" type="text" placeholder="Give your entry a title" maxlength="120" />
               <span id="entryTitleError" class="field-error">Enter a title.</span>
-            </div>
-
-            <div class="entry-form-group">
-              <label>Category</label>
-              <div class="category-options">
-                <button class="category-option selected" type="button" onclick="selectCategory(this)">Reflection</button>
-                <button class="category-option" type="button" onclick="selectCategory(this)">CPD</button>
-                <button class="category-option" type="button" onclick="selectCategory(this)">Audit</button>
-                <button class="category-option" type="button" onclick="selectCategory(this)">Event</button>
-                <button class="category-option" type="button" onclick="selectCategory(this)">Feedback</button>
-              </div>
             </div>
 
             <div class="entry-form-group">
@@ -1172,6 +1174,7 @@
               <button class="cancel-entry-button" type="button" onclick="navigate('all-entries')">Cancel</button>
               <button class="save-entry-button" type="submit"><i class="fas fa-check"></i> Save entry</button>
             </div>
+            <p id="saveMessage" class="save-message" role="status">Entry saved locally and queued to sync.</p>
           </form>
         </div>
 
@@ -1279,12 +1282,17 @@
   <script>
     let currentScreen = 'login';
     let isOffline = false;
+    let selectedEntryType = 'Learning event reflections';
 
     function navigate(screen) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.querySelector(`.screen.${screen}`).classList.add('active');
       document.getElementById('current-screen').textContent = screen.replace('-', ' ');
       currentScreen = screen;
+      if (screen === 'new-entry') {
+        document.getElementById('entryTypeSelector').style.display = 'block';
+        document.getElementById('newEntryForm').style.display = 'none';
+      }
     }
 
     function toggleMenu() {
@@ -1308,9 +1316,23 @@
       alert(`${title} entry selected`);
     }
 
-    function selectCategory(button) {
-      document.querySelectorAll('.category-option').forEach((option) => option.classList.remove('selected'));
-      button.classList.add('selected');
+    function toggleEntryTypes() {
+      const options = document.getElementById('entryTypeOptions');
+      options.classList.toggle('open');
+      document.getElementById('entryTypeChevron').className = options.classList.contains('open') ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    }
+
+    function selectEntryType(type) {
+      selectedEntryType = type;
+      document.getElementById('selectedEntryType').textContent = type;
+      document.getElementById('entryTypeOptions').classList.remove('open');
+      document.getElementById('entryTypeChevron').className = 'fas fa-chevron-down';
+    }
+
+    function createSelectedEntry() {
+      document.getElementById('entryTypeSelector').style.display = 'none';
+      document.getElementById('newEntryForm').style.display = 'block';
+      document.getElementById('selectedEntryTypeLabel').textContent = selectedEntryType;
     }
 
     function saveNewEntry(event) {
@@ -1328,9 +1350,25 @@
       reflectionError.classList.toggle('visible', !hasReflection);
 
       if (hasTitle && hasReflection) {
-        alert('Entry saved locally and queued to sync.');
+        const entryRow = document.createElement('div');
+        const today = new Date().toLocaleDateString('en-GB');
+        entryRow.className = 'entry-row';
+        entryRow.innerHTML = `
+          <div>
+            <p class="entry-title"></p>
+            <div class="entry-meta"><span>${today}</span><span class="status-chip unsynced">UNSYNCED</span></div>
+          </div>
+          <div class="entry-actions"><span class="category-tag">${selectedEntryType}</span><button class="entry-view-button" type="button" onclick="viewEntry('${title.value.replace(/'/g, "\\'")}')">View</button></div>`;
+        entryRow.querySelector('.entry-title').textContent = title.value.trim();
+        document.querySelector('.entries-list').prepend(entryRow);
+
+        const unsyncedCount = document.querySelectorAll('.status-chip.unsynced').length;
+        document.getElementById('unsyncedCount').textContent = unsyncedCount;
+        document.getElementById('entriesSummary').textContent = `Showing ${document.querySelectorAll('.entry-row').length} of ${document.querySelectorAll('.entry-row').length} entries (${unsyncedCount} unsynced)`;
+        document.getElementById('syncCard').style.display = 'flex';
+        document.getElementById('saveMessage').classList.add('visible');
         document.getElementById('newEntryForm').reset();
-        document.querySelectorAll('.category-option').forEach((option, index) => option.classList.toggle('selected', index === 0));
+        setTimeout(() => document.getElementById('saveMessage').classList.remove('visible'), 1200);
         navigate('all-entries');
       }
     }
