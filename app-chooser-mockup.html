@@ -28,7 +28,7 @@
       align-items: start;
     }
 
-    .phone-frame{ 
+    .phone-frame{
       background: #000;
       border-radius: 40px;
       padding: 12px;
@@ -458,24 +458,34 @@
     /* Login Screen */
     .screen.login {
       padding: 24px;
+      padding: 0;
       justify-content: flex-start;
+      align-items: center;
+      background: #fff;
     }
 
     .login-content {
       width: 100%;
+      text-align: center;
     }
 
+    .login-brand { display: flex; align-items: center; justify-content: center; gap: 9px; height: 100px; margin-bottom: 34px; border-bottom: 2px solid #d02b84; color: #111; font-size: 21px; font-weight: 900; }
+    .login-brand-mark { width: 30px; height: 30px; border-radius: 50%; background: #d02b84; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .login-panel { max-width: 320px; margin: 0 auto; padding: 32px 34px 48px; border-radius: 4px; background: #f3f1f0; }
+
     .login-content h1 {
-      font-size: 28px;
-      font-weight: 900;
-      margin-bottom: 12px;
+      font-size: 25px;
+      font-weight: 700;
+      margin-bottom: 10px;
     }
 
     .login-content p {
       font-size: 14px;
       color: #676c78;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
+
+    .login-panel p { color: #222; text-align: center; }
 
     .form-group {
       margin-bottom: 16px;
@@ -500,17 +510,17 @@
     .login-button {
       width: 100%;
       padding: 12px;
-      background: #511268;
+      background: #d02b84;
       color: #fff;
       border: none;
-      border-radius: 10px;
+      border-radius: 4px;
       font-weight: 800;
       cursor: pointer;
       margin-top: 12px;
     }
 
     .login-button:hover {
-      background: #3d0d52;
+      background: #b92370;
     }
 
     .demo-button {
@@ -529,9 +539,142 @@
       background: #f0f1f7;
     }
 
+    .login-link { display: block; margin-top: 18px; color: #222; font-size: 12px; text-decoration: none; }
+    .login-link span, .login-register a { color: #d02b84; font-weight: 700; text-decoration: none; }
+    .login-register { margin-top: 20px; color: #222; font-size: 12px; line-height: 18px; }
+
     /* All Entries Screen */
     .screen.all-entries {
       padding: 20px 16px 28px;
+    }
+
+    .screen.view-entry { padding: 20px 16px 28px; }
+    .view-entry-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .view-entry-header h1 { font-size: 24px; font-weight: 900; }
+    .entry-completion { border-radius: 999px; padding: 7px 12px; background: #e7f3e8; color: #2e7d32; font-size: 12px; font-weight: 800; }
+    .entry-completion.draft { background: #ece8f4; color: #511268; }
+    .view-entry-card { padding: 20px; border: 1px solid #d9d9e0; border-radius: 20px; background: #fff; margin-bottom: 24px; }
+    .view-entry-card h2 { font-size: 21px; margin-bottom: 8px; }
+    .view-entry-meta { color: #676c78; font-size: 14px; margin-bottom: 22px; }
+    .view-entry-state { border-top: 1px solid #e8e8ee; padding-top: 18px; color: #191a21; font-size: 14px; font-weight: 700; }
+    .view-entry-actions { display: flex; flex-direction: column; gap: 10px; }
+
+    /* New Entry Screen */
+    .screen.new-entry {
+      padding: 20px 16px 28px;
+    }
+
+    .new-entry .header {
+      margin-bottom: 20px;
+    }
+
+    .new-entry .header h1 {
+      flex: 1;
+      text-align: center;
+      margin-right: 44px;
+    }
+
+    .new-entry-description {
+      font-size: 14px;
+      line-height: 20px;
+      color: #676c78;
+      margin-bottom: 22px;
+    }
+
+    .entry-type-selector { margin-top: 28px; }
+    .entry-type-selector label { display: block; font-size: 13px; font-weight: 800; margin-bottom: 7px; }
+    .entry-type-dropdown { width: 100%; display: flex; justify-content: space-between; align-items: center; border: 1px solid #d9d9e0; border-radius: 14px; padding: 14px; background: #fff; color: #191a21; cursor: pointer; font: inherit; font-size: 14px; text-align: left; }
+    .entry-type-options { display: none; margin-top: 6px; border: 1px solid #d9d9e0; border-radius: 14px; overflow: hidden; background: #fff; }
+    .entry-type-options.open { display: block; }
+    .entry-type-option { width: 100%; display: block; border: 0; border-bottom: 1px solid #e8e8ee; padding: 13px 14px; background: #fff; color: #191a21; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
+    .entry-type-option:last-child { border-bottom: 0; }
+
+    .entry-form-group {
+      margin-bottom: 20px;
+    }
+
+    .entry-form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 7px;
+    }
+
+    .entry-form-group input,
+    .entry-form-group textarea {
+      width: 100%;
+      border: 1px solid #d9d9e0;
+      border-radius: 14px;
+      padding: 13px 14px;
+      background: #fff;
+      color: #191a21;
+      font: inherit;
+      font-size: 14px;
+    }
+
+    .entry-form-group textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+
+    .entry-form-group input.invalid,
+    .entry-form-group textarea.invalid {
+      border-color: #b54943;
+    }
+
+    .field-error {
+      display: none;
+      color: #b54943;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .field-error.visible {
+      display: block;
+    }
+
+    .entry-form-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .entry-form-actions button {
+      flex: 1;
+      padding: 13px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .cancel-entry-button {
+      border: 1px solid #d9d9e0;
+      background: #fff;
+      color: #676c78;
+    }
+
+    .save-entry-button {
+      border: 1px solid #511268;
+      background: #511268;
+      color: #fff;
+    }
+
+    .draft-entry-button { width: 100%; margin-top: 10px; padding: 12px; border: 1px solid #d9d9e0; border-radius: 12px; background: #fff; color: #511268; cursor: pointer; font-size: 13px; font-weight: 800; }
+
+    .save-message {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #e7f3e8;
+      color: #2e7d32;
+      font-size: 12px;
+      line-height: 17px;
+    }
+
+    .save-message.visible {
+      display: block;
     }
 
     .header {
@@ -709,6 +852,7 @@
 
     .status-chip.unsynced { background: #fff4e1; color: #b17325; }
     .status-chip.synced { background: #e7f3e8; color: #2e7d32; }
+    .status-chip.draft { background: #ece8f4; color: #511268; }
 
     .entry-actions {
       display: flex;
@@ -881,7 +1025,7 @@
       .container {
         grid-template-columns: 1fr;
       }
-      
+
       .phone-frame {
         position: static;
       }
@@ -907,17 +1051,15 @@
         <!-- Screens -->
         <div class="screen login active">
           <div class="login-content">
-            <h1>Sign in</h1>
-            <p>Enter your credentials to access your portfolio</p>
-            <div class="form-group">
-              <label>Email</label>
-              <input type="email" placeholder="user@example.com" />
+            <div class="login-brand"><span>FourteenFish</span><span class="login-brand-mark">◆</span></div>
+            <div class="login-panel">
+              <h1>Log in to your account</h1>
+              <p>Please enter your email address to log in</p>
+              <div class="form-group"><input type="email" placeholder="Your email address" aria-label="Your email address" /></div>
+              <button class="login-button" onclick="window.open('https://www.fourteenfish.com/account/logon', '_blank')">Next</button>
+              <a class="login-link" href="https://www.fourteenfish.com/account/forgotpassword?destinationUrl=%2Fdashboard" target="_blank">Having trouble logging in? <span>Recover your account</span></a>
+              <p class="login-register">Don’t have a FourteenFish account? <a href="https://www.fourteenfish.com/account/register" target="_blank">Register now</a></p>
             </div>
-            <div class="form-group">
-              <label>Password</label>
-              <input type="password" placeholder="••••••••" />
-            </div>
-            <button class="login-button" onclick="navigate('app-chooser')">Sign in</button>
             <button class="demo-button" onclick="navigate('app-chooser')">Open demo</button>
           </div>
         </div>
@@ -1020,6 +1162,55 @@
           </div>
         </div>
 
+        <div class="screen view-entry">
+          <div class="view-entry-header"><h1>View entry</h1><span id="viewEntryStatus" class="entry-completion">COMPLETED</span></div>
+          <div class="view-entry-card"><h2 id="viewEntryTitle">Portfolio entry</h2><p id="viewEntryMeta" class="view-entry-meta">Portfolio · No date</p><p id="viewEntryState" class="view-entry-state">✓ This entry is completed.</p></div>
+          <div id="viewEntryActions" class="view-entry-actions"><button class="login-button" type="button" onclick="navigate('all-entries')">Back to all entries</button></div>
+        </div>
+
+        <div class="screen new-entry">
+          <div class="header">
+            <button class="menu-trigger" onclick="toggleMenu()" aria-label="Open navigation menu" title="Open navigation menu"><i class="fas fa-bars"></i></button>
+            <h1>New entry</h1>
+          </div>
+
+          <p class="new-entry-description">Choose the type of Portfolio entry you want to create.</p>
+
+          <div id="entryTypeSelector" class="entry-type-selector">
+            <label for="entryTypeDropdown">Entry type</label>
+            <button id="entryTypeDropdown" class="entry-type-dropdown" type="button" onclick="toggleEntryTypes()"><span id="selectedEntryType">Learning event reflections</span><i id="entryTypeChevron" class="fas fa-chevron-down"></i></button>
+            <div id="entryTypeOptions" class="entry-type-options">
+              <button class="entry-type-option" type="button" onclick="selectEntryType('Learning event reflections')">Learning event reflections</button>
+              <button class="entry-type-option" type="button" onclick="selectEntryType('Clinical case reflection')">Clinical case reflection</button>
+              <button class="entry-type-option" type="button" onclick="selectEntryType('Quality improvement Activity')">Quality improvement Activity</button>
+              <button class="entry-type-option" type="button" onclick="selectEntryType('CPD Learning log')">CPD Learning log</button>
+            </div>
+            <div class="entry-form-actions"><button class="cancel-entry-button" type="button" onclick="navigate('all-entries')">Cancel</button><button class="save-entry-button" type="button" onclick="createSelectedEntry()">Create</button></div>
+          </div>
+
+          <form id="newEntryForm" onsubmit="saveNewEntry(event)" style="display: none;">
+            <p id="selectedEntryTypeLabel" class="new-entry-description"></p>
+            <div class="entry-form-group">
+              <label for="entryTitle">Title</label>
+              <input id="entryTitle" type="text" placeholder="Give your entry a title" maxlength="120" />
+              <span id="entryTitleError" class="field-error">Enter a title.</span>
+            </div>
+
+            <div class="entry-form-group">
+              <label for="entryReflection">Reflection</label>
+              <textarea id="entryReflection" placeholder="Add the detail you want to remember" maxlength="5000"></textarea>
+              <span id="entryReflectionError" class="field-error">Add some detail.</span>
+            </div>
+
+            <div class="entry-form-actions">
+              <button class="cancel-entry-button" type="button" onclick="navigate('all-entries')">Cancel</button>
+              <button class="save-entry-button" type="submit"><i class="fas fa-check"></i> Save entry</button>
+            </div>
+            <button class="draft-entry-button" type="button" onclick="saveDraft()"><i class="far fa-bookmark"></i> Save as draft</button>
+            <p id="saveMessage" class="save-message" role="status">Entry saved locally and queued to sync.</p>
+          </form>
+        </div>
+
         <div class="screen settings">
           <div class="header">
             <button class="menu-trigger" onclick="toggleMenu()" aria-label="Open navigation menu" title="Open navigation menu"><i class="fas fa-bars"></i></button>
@@ -1052,7 +1243,7 @@
                 <span class="menu-item-text">Dashboard</span>
                 <span class="menu-item-chevron"><i class="fas fa-chevron-right"></i></span>
               </button>
-              <button class="menu-item" onclick="navigate('all-entries'); toggleMenu();">
+              <button class="menu-item" onclick="navigate('new-entry'); toggleMenu();">
                 <span class="menu-item-icon"><i class="fas fa-plus-circle"></i></span>
                 <span class="menu-item-text">New entry</span>
                 <span class="menu-item-chevron"><i class="fas fa-chevron-right"></i></span>
@@ -1091,6 +1282,7 @@
         <button class="flow-button" onclick="navigate('login')">Login</button>
         <button class="flow-button" onclick="navigate('app-chooser')">App Chooser</button>
         <button class="flow-button" onclick="navigate('all-entries')">All entries</button>
+        <button class="flow-button" onclick="navigate('new-entry')">New entry</button>
         <button class="flow-button" onclick="navigate('settings')">Settings</button>
       </div>
 
@@ -1123,12 +1315,17 @@
   <script>
     let currentScreen = 'login';
     let isOffline = false;
+    let selectedEntryType = 'Learning event reflections';
 
     function navigate(screen) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.querySelector(`.screen.${screen}`).classList.add('active');
       document.getElementById('current-screen').textContent = screen.replace('-', ' ');
       currentScreen = screen;
+      if (screen === 'new-entry') {
+        document.getElementById('entryTypeSelector').style.display = 'block';
+        document.getElementById('newEntryForm').style.display = 'none';
+      }
     }
 
     function toggleMenu() {
@@ -1148,8 +1345,112 @@
       document.getElementById('unsyncedCount').textContent = '0';
     }
 
-    function viewEntry(title) {
-      alert(`${title} entry selected`);
+    function viewEntry(title, status = 'COMPLETED', category = 'Portfolio') {
+      document.getElementById('viewEntryTitle').textContent = title;
+      document.getElementById('viewEntryMeta').textContent = `${category} · Portfolio entry`;
+      const statusEl = document.getElementById('viewEntryStatus');
+      const stateEl = document.getElementById('viewEntryState');
+      const actionsEl = document.getElementById('viewEntryActions');
+      const isDraft = status === 'DRAFT';
+      statusEl.textContent = isDraft ? 'DRAFT' : 'COMPLETED';
+      statusEl.classList.toggle('draft', isDraft);
+      stateEl.textContent = isDraft ? 'This entry is still a draft.' : '✓ This entry is completed.';
+      actionsEl.innerHTML = isDraft
+        ? '<button class="login-button" type="button" onclick="submitViewedDraft()">Submit</button><button class="demo-button" type="button" onclick="editViewedDraft()">Edit entry</button><button class="draft-entry-button" type="button" onclick="navigate(\'all-entries\')">Back to all entries</button>'
+        : '<button class="login-button" type="button" onclick="navigate(\'all-entries\')">Back to all entries</button>';
+      window.viewedEntryTitle = title;
+      navigate('view-entry');
+    }
+
+    function submitViewedDraft() {
+      document.querySelectorAll('.entry-row').forEach((row) => {
+        if (row.querySelector('.entry-title')?.textContent === window.viewedEntryTitle) {
+          const chip = row.querySelector('.status-chip.draft');
+          if (chip) { chip.className = 'status-chip synced'; chip.textContent = 'SYNCED'; }
+        }
+      });
+      viewEntry(window.viewedEntryTitle, 'COMPLETED');
+    }
+
+    function editViewedDraft() {
+      navigate('new-entry');
+      createSelectedEntry();
+      document.getElementById('entryTitle').value = window.viewedEntryTitle;
+    }
+
+    function toggleEntryTypes() {
+      const options = document.getElementById('entryTypeOptions');
+      options.classList.toggle('open');
+      document.getElementById('entryTypeChevron').className = options.classList.contains('open') ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    }
+
+    function selectEntryType(type) {
+      selectedEntryType = type;
+      document.getElementById('selectedEntryType').textContent = type;
+      document.getElementById('entryTypeOptions').classList.remove('open');
+      document.getElementById('entryTypeChevron').className = 'fas fa-chevron-down';
+    }
+
+    function createSelectedEntry() {
+      document.getElementById('entryTypeSelector').style.display = 'none';
+      document.getElementById('newEntryForm').style.display = 'block';
+      document.getElementById('selectedEntryTypeLabel').textContent = selectedEntryType;
+    }
+
+    function saveNewEntry(event) {
+      event.preventDefault();
+      const title = document.getElementById('entryTitle');
+      const reflection = document.getElementById('entryReflection');
+      const titleError = document.getElementById('entryTitleError');
+      const reflectionError = document.getElementById('entryReflectionError');
+      const hasTitle = title.value.trim().length > 0;
+      const hasReflection = reflection.value.trim().length > 0;
+
+      title.classList.toggle('invalid', !hasTitle);
+      reflection.classList.toggle('invalid', !hasReflection);
+      titleError.classList.toggle('visible', !hasTitle);
+      reflectionError.classList.toggle('visible', !hasReflection);
+
+      if (hasTitle && hasReflection) {
+        const entryRow = document.createElement('div');
+        const today = new Date().toLocaleDateString('en-GB');
+        entryRow.className = 'entry-row';
+        entryRow.innerHTML = `
+          <div>
+            <p class="entry-title"></p>
+            <div class="entry-meta"><span>${today}</span><span class="status-chip unsynced">UNSYNCED</span></div>
+          </div>
+          <div class="entry-actions"><span class="category-tag">${selectedEntryType}</span><button class="entry-view-button" type="button" onclick="viewEntry('${title.value.replace(/'/g, "\\'")}')">View</button></div>`;
+        entryRow.querySelector('.entry-title').textContent = title.value.trim();
+        document.querySelector('.entries-list').prepend(entryRow);
+
+        const unsyncedCount = document.querySelectorAll('.status-chip.unsynced').length;
+        document.getElementById('unsyncedCount').textContent = unsyncedCount;
+        document.getElementById('entriesSummary').textContent = `Showing ${document.querySelectorAll('.entry-row').length} of ${document.querySelectorAll('.entry-row').length} entries (${unsyncedCount} unsynced)`;
+        document.getElementById('syncCard').style.display = 'flex';
+        document.getElementById('saveMessage').classList.add('visible');
+        document.getElementById('newEntryForm').reset();
+        setTimeout(() => document.getElementById('saveMessage').classList.remove('visible'), 1200);
+        navigate('all-entries');
+      }
+    }
+
+    function saveDraft() {
+      const title = document.getElementById('entryTitle');
+      const entryRow = document.createElement('div');
+      const draftTitle = title.value.trim() || `Untitled ${selectedEntryType} draft`;
+      const today = new Date().toLocaleDateString('en-GB');
+      entryRow.className = 'entry-row';
+      entryRow.innerHTML = `
+        <div><p class="entry-title"></p><div class="entry-meta"><span>${today}</span><span class="status-chip draft">DRAFT</span></div></div>
+          <div class="entry-actions"><span class="category-tag">${selectedEntryType}</span><button class="entry-view-button" type="button" onclick="viewEntry('${draftTitle.replace(/'/g, "\\'")}', 'DRAFT', '${selectedEntryType.replace(/'/g, "\\'")}')">View</button></div>`;
+      entryRow.querySelector('.entry-title').textContent = draftTitle;
+      document.querySelector('.entries-list').prepend(entryRow);
+      const entryCount = document.querySelectorAll('.entry-row').length;
+      const unsyncedCount = document.querySelectorAll('.status-chip.unsynced').length;
+      document.getElementById('entriesSummary').textContent = `Showing ${entryCount} of ${entryCount} entries (${unsyncedCount} unsynced)`;
+      alert('Draft saved locally.');
+      navigate('all-entries');
     }
 
     function toggleOffline() {
