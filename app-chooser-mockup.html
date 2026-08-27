@@ -635,6 +635,8 @@
       color: #fff;
     }
 
+    .draft-entry-button { width: 100%; margin-top: 10px; padding: 12px; border: 1px solid #d9d9e0; border-radius: 12px; background: #fff; color: #511268; cursor: pointer; font-size: 13px; font-weight: 800; }
+
     .save-message {
       display: none;
       margin-top: 14px;
@@ -1174,6 +1176,7 @@
               <button class="cancel-entry-button" type="button" onclick="navigate('all-entries')">Cancel</button>
               <button class="save-entry-button" type="submit"><i class="fas fa-check"></i> Save entry</button>
             </div>
+            <button class="draft-entry-button" type="button" onclick="saveDraft()"><i class="far fa-bookmark"></i> Save as draft</button>
             <p id="saveMessage" class="save-message" role="status">Entry saved locally and queued to sync.</p>
           </form>
         </div>
@@ -1371,6 +1374,11 @@
         setTimeout(() => document.getElementById('saveMessage').classList.remove('visible'), 1200);
         navigate('all-entries');
       }
+    }
+
+    function saveDraft() {
+      alert('Draft saved locally.');
+      navigate('all-entries');
     }
 
     function toggleOffline() {
