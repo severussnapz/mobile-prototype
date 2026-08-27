@@ -458,23 +458,29 @@
     /* Login Screen */
     .screen.login {
       padding: 24px;
-      justify-content: flex-start;
+      justify-content: center;
+      background: #fff;
     }
 
     .login-content {
       width: 100%;
+      max-width: 320px;
+      text-align: left;
     }
 
+    .login-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 42px; color: #5d1678; font-size: 21px; font-weight: 900; }
+    .login-brand-mark { width: 30px; height: 30px; border-radius: 50%; background: #5d1678; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+
     .login-content h1 {
-      font-size: 28px;
-      font-weight: 900;
-      margin-bottom: 12px;
+      font-size: 25px;
+      font-weight: 700;
+      margin-bottom: 10px;
     }
 
     .login-content p {
       font-size: 14px;
       color: #676c78;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
 
     .form-group {
@@ -500,10 +506,10 @@
     .login-button {
       width: 100%;
       padding: 12px;
-      background: #511268;
+      background: #5d1678;
       color: #fff;
       border: none;
-      border-radius: 10px;
+      border-radius: 4px;
       font-weight: 800;
       cursor: pointer;
       margin-top: 12px;
@@ -528,6 +534,10 @@
     .demo-button:hover {
       background: #f0f1f7;
     }
+
+    .login-link { display: block; margin-top: 18px; color: #5d1678; font-size: 12px; text-decoration: none; }
+    .login-register { margin-top: 34px; padding-top: 22px; border-top: 1px solid #e5e5e8; color: #676c78; font-size: 12px; line-height: 18px; }
+    .login-register a { color: #5d1678; font-weight: 700; text-decoration: none; }
 
     /* All Entries Screen */
     .screen.all-entries {
@@ -1037,9 +1047,13 @@
         <!-- Screens -->
         <div class="screen login active">
           <div class="login-content">
-            <h1>Sign in</h1>
-            <p>Sign in securely with your FourteenFish account to access your portfolio.</p>
-            <button class="login-button" onclick="window.open('https://www.fourteenfish.com/account/logon', '_blank')">Sign in</button>
+            <div class="login-brand"><span class="login-brand-mark">f</span> FourteenFish</div>
+            <h1>Log in to your account</h1>
+            <p>Please enter your email address to log in</p>
+            <div class="form-group"><label>Email address</label><input type="email" placeholder="Enter your email address" /></div>
+            <button class="login-button" onclick="window.open('https://www.fourteenfish.com/account/logon', '_blank')">Next</button>
+            <a class="login-link" href="https://www.fourteenfish.com/account/forgotpassword?destinationUrl=%2Fdashboard" target="_blank">Having trouble logging in? Recover your account</a>
+            <p class="login-register">Don’t have a FourteenFish account? <a href="https://www.fourteenfish.com/account/register" target="_blank">Register now</a></p>
             <button class="demo-button" onclick="navigate('app-chooser')">Open demo</button>
           </div>
         </div>
